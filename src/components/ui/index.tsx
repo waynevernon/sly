@@ -245,7 +245,7 @@ export function CommandItem({
             )}
           >
             {iconText ? (
-              <span className="text-xl text-text-muted font-serif">
+              <span className="text-xl text-text-muted font-sans">
                 {iconText}
               </span>
             ) : (

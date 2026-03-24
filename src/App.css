@@ -392,6 +392,7 @@ html.dark {
 
 /* Code blocks and inline code */
 .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-family: var(--font-mono);
   color: var(--color-code);
   background-color: var(--color-bg-muted);
   padding: 0.15em 0.3em;
@@ -419,6 +420,7 @@ html.dark {
 }
 
 .code-block-wrapper pre {
+  font-family: var(--font-mono);
   background-color: var(--color-bg-muted);
   color: var(--color-text);
   border-radius: 0.5rem;
@@ -427,6 +429,7 @@ html.dark {
 }
 
 .code-block-wrapper pre code {
+  font-family: var(--font-mono);
   background-color: transparent;
   color: var(--color-text);
   padding: 0;
@@ -545,6 +548,7 @@ html.dark {
       [class~="not-prose"] *
     )
   ) {
+  font-family: var(--font-mono);
   background-color: var(--color-bg-muted);
   color: var(--color-text);
   border-radius: 0.5rem;
@@ -558,8 +562,9 @@ html.dark {
       .code-block-wrapper pre code,
       [class~="not-prose"],
       [class~="not-prose"] *
-    )
+  )
   ) {
+  font-family: var(--font-mono);
   background-color: transparent;
   padding: 0;
   font-size: 0.933em;

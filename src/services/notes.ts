@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Note, NoteMetadata, Settings } from "../types/note";
+import type {
+  AppearanceSettings,
+  Note,
+  NoteMetadata,
+  Settings,
+} from "../types/note";
 
 export async function getNotesFolder(): Promise<string | null> {
   return invoke("get_notes_folder");
@@ -70,6 +75,16 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(settings: Settings): Promise<void> {
   return invoke("update_settings", { newSettings: settings });
+}
+
+export async function getAppearanceSettings(): Promise<AppearanceSettings> {
+  return invoke("get_appearance_settings");
+}
+
+export async function updateAppearanceSettings(
+  settings: AppearanceSettings,
+): Promise<void> {
+  return invoke("update_appearance_settings", { newSettings: settings });
 }
 
 export async function updateGitEnabled(

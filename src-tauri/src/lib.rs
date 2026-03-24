@@ -56,7 +56,19 @@ pub struct ThemeColors {
     pub text_muted: Option<String>,
     pub text_inverse: Option<String>,
     pub border: Option<String>,
+    pub border_solid: Option<String>,
     pub accent: Option<String>,
+    pub selection: Option<String>,
+    pub code: Option<String>,
+    pub syntax_keyword: Option<String>,
+    pub syntax_string: Option<String>,
+    pub syntax_number: Option<String>,
+    pub syntax_comment: Option<String>,
+    pub syntax_function: Option<String>,
+    pub syntax_variable: Option<String>,
+    pub syntax_type: Option<String>,
+    pub syntax_operator: Option<String>,
+    pub syntax_attr: Option<String>,
 }
 
 // Theme settings
@@ -88,6 +100,106 @@ pub struct EditorFontSettings {
     pub line_height: Option<f32>,         // default 1.6
 }
 
+fn default_font_choice_kind() -> String {
+    "preset".to_string()
+}
+
+fn default_theme_mode() -> String {
+    "system".to_string()
+}
+
+fn default_light_preset_id() -> String {
+    "github-light-default".to_string()
+}
+
+fn default_dark_preset_id() -> String {
+    "github-dark-default".to_string()
+}
+
+fn default_editor_width() -> String {
+    "normal".to_string()
+}
+
+fn default_interface_zoom() -> f32 {
+    1.0
+}
+
+fn default_note_base_font_size() -> f32 {
+    15.0
+}
+
+fn default_note_bold_weight() -> i32 {
+    600
+}
+
+fn default_note_line_height() -> f32 {
+    1.6
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontChoice {
+    #[serde(default = "default_font_choice_kind")]
+    pub kind: String,
+    #[serde(default)]
+    pub value: String,
+}
+
+impl FontChoice {
+    fn preset(value: &str) -> Self {
+        Self {
+            kind: "preset".to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    fn custom(value: String) -> Self {
+        Self {
+            kind: "custom".to_string(),
+            value,
+        }
+    }
+}
+
+impl Default for FontChoice {
+    fn default() -> Self {
+        Self::preset("system-sans")
+    }
+}
+
+fn default_ui_font() -> FontChoice {
+    FontChoice::preset("system-sans")
+}
+
+fn default_note_font() -> FontChoice {
+    FontChoice::preset("system-sans")
+}
+
+fn default_code_font() -> FontChoice {
+    FontChoice::preset("system-mono")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteTypographySettings {
+    #[serde(default = "default_note_base_font_size")]
+    pub base_font_size: f32,
+    #[serde(default = "default_note_bold_weight")]
+    pub bold_weight: i32,
+    #[serde(default = "default_note_line_height")]
+    pub line_height: f32,
+}
+
+impl Default for NoteTypographySettings {
+    fn default() -> Self {
+        Self {
+            base_font_size: default_note_base_font_size(),
+            bold_weight: default_note_bold_weight(),
+            line_height: default_note_line_height(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum TextDirection {
@@ -96,10 +208,68 @@ pub enum TextDirection {
     Rtl,
 }
 
-// App config (stored in app data directory - just the notes folder path)
+impl Default for TextDirection {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppearanceSettings {
+    #[serde(default = "default_theme_mode")]
+    pub mode: String,
+    #[serde(default = "default_light_preset_id")]
+    pub light_preset_id: String,
+    #[serde(default = "default_dark_preset_id")]
+    pub dark_preset_id: String,
+    #[serde(default = "default_ui_font")]
+    pub ui_font: FontChoice,
+    #[serde(default = "default_note_font")]
+    pub note_font: FontChoice,
+    #[serde(default = "default_code_font")]
+    pub code_font: FontChoice,
+    #[serde(default)]
+    pub note_typography: NoteTypographySettings,
+    #[serde(default)]
+    pub text_direction: TextDirection,
+    #[serde(default = "default_editor_width")]
+    pub editor_width: String,
+    #[serde(default)]
+    pub custom_editor_width_px: Option<u32>,
+    #[serde(default = "default_interface_zoom")]
+    pub interface_zoom: f32,
+    #[serde(default)]
+    pub custom_light_colors: Option<ThemeColors>,
+    #[serde(default)]
+    pub custom_dark_colors: Option<ThemeColors>,
+}
+
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self {
+            mode: default_theme_mode(),
+            light_preset_id: default_light_preset_id(),
+            dark_preset_id: default_dark_preset_id(),
+            ui_font: default_ui_font(),
+            note_font: default_note_font(),
+            code_font: default_code_font(),
+            note_typography: NoteTypographySettings::default(),
+            text_direction: TextDirection::Auto,
+            editor_width: default_editor_width(),
+            custom_editor_width_px: None,
+            interface_zoom: default_interface_zoom(),
+            custom_light_colors: None,
+            custom_dark_colors: None,
+        }
+    }
+}
+
+// App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     pub notes_folder: Option<String>,
+    pub appearance: Option<AppearanceSettings>,
 }
 
 // Per-folder settings (stored in .scratch/settings.json within notes folder)
@@ -720,6 +890,83 @@ fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
     Ok(())
 }
 
+fn normalize_theme_mode(mode: &str) -> String {
+    match mode {
+        "light" | "dark" | "system" => mode.to_string(),
+        _ => default_theme_mode(),
+    }
+}
+
+fn normalize_editor_width(width: Option<&str>) -> String {
+    match width {
+        Some("narrow" | "normal" | "wide" | "full" | "custom") => width.unwrap().to_string(),
+        _ => default_editor_width(),
+    }
+}
+
+fn clamp_interface_zoom(zoom: f32) -> f32 {
+    (zoom.clamp(0.7, 1.5) * 20.0).round() / 20.0
+}
+
+fn normalize_font_choice(value: Option<&str>, fallback_preset: &str) -> FontChoice {
+    match value.map(str::trim) {
+        Some("system-sans") => FontChoice::preset("system-sans"),
+        Some("serif") | Some("system-serif") => FontChoice::preset("system-serif"),
+        Some("monospace") | Some("system-mono") => FontChoice::preset("system-mono"),
+        Some(other) if !other.is_empty() => FontChoice::custom(other.to_string()),
+        _ => FontChoice::preset(fallback_preset),
+    }
+}
+
+fn migrate_appearance_from_settings(settings: &Settings) -> AppearanceSettings {
+    let legacy_editor_font = settings.editor_font.as_ref();
+
+    AppearanceSettings {
+        mode: normalize_theme_mode(&settings.theme.mode),
+        light_preset_id: default_light_preset_id(),
+        dark_preset_id: default_dark_preset_id(),
+        ui_font: default_ui_font(),
+        note_font: normalize_font_choice(
+            legacy_editor_font
+                .and_then(|font| font.base_font_family.as_deref()),
+            "system-sans",
+        ),
+        code_font: default_code_font(),
+        note_typography: NoteTypographySettings {
+            base_font_size: legacy_editor_font
+                .and_then(|font| font.base_font_size)
+                .unwrap_or_else(default_note_base_font_size),
+            bold_weight: legacy_editor_font
+                .and_then(|font| font.bold_weight)
+                .unwrap_or_else(default_note_bold_weight),
+            line_height: legacy_editor_font
+                .and_then(|font| font.line_height)
+                .unwrap_or_else(default_note_line_height),
+        },
+        text_direction: settings.text_direction.clone().unwrap_or_default(),
+        editor_width: normalize_editor_width(settings.editor_width.as_deref()),
+        custom_editor_width_px: settings.custom_editor_width_px.filter(|width| *width >= 480),
+        interface_zoom: clamp_interface_zoom(
+            settings.interface_zoom.unwrap_or_else(default_interface_zoom),
+        ),
+        custom_light_colors: settings.theme.custom_light_colors.clone(),
+        custom_dark_colors: settings.theme.custom_dark_colors.clone(),
+    }
+}
+
+fn ensure_app_appearance(app_config: &mut AppConfig, legacy_settings: Option<&Settings>) -> bool {
+    if app_config.appearance.is_some() {
+        return false;
+    }
+
+    app_config.appearance = Some(
+        legacy_settings
+            .map(migrate_appearance_from_settings)
+            .unwrap_or_default(),
+    );
+    true
+}
+
 // Clean up old entries from debounce map (entries older than 5 seconds)
 fn cleanup_debounce_map(map: &Mutex<HashMap<PathBuf, Instant>>) {
     let mut map = map.lock().expect("debounce map mutex");
@@ -773,22 +1020,18 @@ fn initialize_notes_folder(app: &AppHandle, path_buf: &PathBuf, state: &AppState
     // Load per-folder settings (starts fresh with defaults if none exist)
     let settings = load_settings(&normalized_path);
 
-    // Update app config
+    // Update app config, including one-time migration of legacy appearance fields.
     {
         let mut app_config = state.app_config.write().expect("app_config write lock");
         app_config.notes_folder = Some(normalized_path.clone());
+        ensure_app_appearance(&mut app_config, Some(&settings));
+        save_app_config(app, &app_config).map_err(|e| e.to_string())?;
     }
 
     // Update settings in memory
     {
         let mut current_settings = state.settings.write().expect("settings write lock");
         *current_settings = settings;
-    }
-
-    // Save app config to disk
-    {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        save_app_config(app, &app_config).map_err(|e| e.to_string())?;
     }
 
     // Add notes folder to asset protocol scope so images can be served
@@ -1659,6 +1902,33 @@ async fn move_folder(
 #[tauri::command]
 fn get_settings(state: State<AppState>) -> Settings {
     state.settings.read().expect("settings read lock").clone()
+}
+
+#[tauri::command]
+fn get_appearance_settings(state: State<AppState>) -> AppearanceSettings {
+    state
+        .app_config
+        .read()
+        .expect("app_config read lock")
+        .appearance
+        .clone()
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn update_appearance_settings(
+    new_settings: AppearanceSettings,
+    app: AppHandle,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let updated_config = {
+        let mut app_config = state.app_config.write().expect("app_config write lock");
+        app_config.appearance = Some(new_settings);
+        app_config.clone()
+    };
+
+    save_app_config(&app, &updated_config).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -3547,6 +3817,7 @@ pub fn run() {
         .setup(|app| {
             // Load app config on startup (contains notes folder path)
             let mut app_config = load_app_config(app.handle());
+            let mut app_config_dirty = false;
 
             // Normalize legacy/invalid saved paths (e.g. file:// URI from older builds)
             if let Some(saved_path) = app_config.notes_folder.clone() {
@@ -3555,7 +3826,7 @@ pub fn run() {
                         let normalized_str = normalized.to_string_lossy().into_owned();
                         if normalized_str != saved_path {
                             app_config.notes_folder = Some(normalized_str);
-                            let _ = save_app_config(app.handle(), &app_config);
+                            app_config_dirty = true;
                         }
                     }
                     Ok(normalized) => {
@@ -3565,7 +3836,7 @@ pub fn run() {
                     }
                     Err(_) => {
                         app_config.notes_folder = None;
-                        let _ = save_app_config(app.handle(), &app_config);
+                        app_config_dirty = true;
                     }
                 }
             }
@@ -3576,6 +3847,15 @@ pub fn run() {
             } else {
                 Settings::default()
             };
+
+            let has_notes_folder = app_config.notes_folder.is_some();
+            if has_notes_folder && ensure_app_appearance(&mut app_config, Some(&settings)) {
+                app_config_dirty = true;
+            }
+
+            if app_config_dirty {
+                let _ = save_app_config(app.handle(), &app_config);
+            }
 
             // Initialize search index if notes folder is set
             let search_index = if let Some(ref folder) = app_config.notes_folder {
@@ -3674,6 +3954,8 @@ pub fn run() {
             move_note,
             move_folder,
             get_settings,
+            get_appearance_settings,
+            update_appearance_settings,
             update_settings,
             update_git_enabled,
             preview_note_name,

@@ -206,7 +206,8 @@ export function GeneralSettingsSection() {
 
       if (selected) {
         await setNotesFolder(selected);
-        // Reload theme/font settings from the new folder's .scratch/settings.json
+        // Refresh global appearance state in case first-run migration seeded it
+        // from legacy folder-scoped appearance settings.
         await reloadSettings();
       }
     } catch (err) {

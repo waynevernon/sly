@@ -47,7 +47,7 @@ export const BlockMathEditor = ({
         onChange={(e) => setLatex(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Enter KaTeX expression..."
-        className="w-full h-30 resize-y rounded-md border border-border bg-bg px-2.5 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40"
+        className="w-full h-30 resize-y rounded-md border border-border bg-bg px-2.5 py-2 text-sm text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
       />
       <div className="flex items-center justify-end gap-1 mr-0.5 mb-0.5">
         <IconButton

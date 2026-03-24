@@ -17,7 +17,8 @@ export function FolderPicker() {
 
       if (selected && typeof selected === "string") {
         await setNotesFolder(selected);
-        // Reload theme/font settings from the new folder's .scratch/settings.json
+        // Refresh global appearance state in case first-run migration seeded it
+        // from legacy folder-scoped appearance settings.
         await reloadSettings();
       }
     } catch (err) {
@@ -40,7 +41,7 @@ export function FolderPicker() {
           />
 
           <h1
-            className="text-3xl text-text font-serif mb-2 tracking-[-0.01em] animate-fade-in-up"
+            className="text-3xl text-text font-sans mb-2 tracking-[-0.01em] animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
             Welcome to Scratch

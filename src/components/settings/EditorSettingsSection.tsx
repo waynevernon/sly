@@ -1,21 +1,34 @@
+import { useMemo, useState, type CSSProperties } from "react";
 import { useTheme } from "../../context/ThemeContext";
+import {
+  CODE_FONT_PRESET_IDS,
+  DEFAULT_APPEARANCE_SETTINGS,
+  DARK_THEME_PRESETS,
+  FONT_PRESETS,
+  LIGHT_THEME_PRESETS,
+  NOTE_FONT_PRESET_IDS,
+  resolveFontFamily,
+  resolveThemeTokens,
+  themeColorsToCSSVariables,
+  UI_FONT_PRESET_IDS,
+} from "../../lib/appearance";
 import { Button, IconButton, Input, Select } from "../ui";
 import type {
-  FontFamily,
-  TextDirection,
   EditorWidth,
+  FontChoice,
+  FontPresetId,
   PaneMode,
+  TextDirection,
+  ThemeMode,
 } from "../../types/note";
 import { ColumnsIcon, EyeIcon, MinusIcon, PlusIcon } from "../icons";
 
-// Text direction options
 const textDirectionOptions: { value: TextDirection; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "ltr", label: "LTR" },
   { value: "rtl", label: "RTL" },
 ];
 
-// Page width options
 const editorWidthOptions: { value: EditorWidth; label: string }[] = [
   { value: "narrow", label: "Narrow" },
   { value: "normal", label: "Normal" },
@@ -24,35 +37,107 @@ const editorWidthOptions: { value: EditorWidth; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-// Font family options
-const fontFamilyOptions: { value: FontFamily; label: string }[] = [
-  { value: "system-sans", label: "Sans" },
-  { value: "serif", label: "Serif" },
-  { value: "monospace", label: "Mono" },
-];
-
 const paneModeOptions: { value: PaneMode; label: string }[] = [
   { value: 1, label: "1 Pane" },
   { value: 2, label: "2 Panes" },
   { value: 3, label: "3 Panes" },
 ];
 
-// Bold weight options (medium excluded for monospace)
 const boldWeightOptions = [
-  { value: 500, label: "Medium", excludeForMonospace: true },
-  { value: 600, label: "Semibold", excludeForMonospace: false },
-  { value: 700, label: "Bold", excludeForMonospace: false },
-  { value: 800, label: "Extra Bold", excludeForMonospace: false },
+  { value: 500, label: "Medium" },
+  { value: 600, label: "Semibold" },
+  { value: 700, label: "Bold" },
+  { value: 800, label: "Extra Bold" },
 ];
+
+function fontChoiceEquals(a: FontChoice, b: FontChoice) {
+  return a.kind === b.kind && a.value === b.value;
+}
+
+interface FontChoiceControlProps {
+  label: string;
+  value: FontChoice;
+  presetIds: FontPresetId[];
+  customPlaceholder: string;
+  onChange: (value: FontChoice) => void;
+}
+
+function FontChoiceControl({
+  label,
+  value,
+  presetIds,
+  customPlaceholder,
+  onChange,
+}: FontChoiceControlProps) {
+  const selectValue =
+    value.kind === "preset" && presetIds.includes(value.value as FontPresetId)
+      ? value.value
+      : "custom";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <label className="text-sm text-text font-medium">{label}</label>
+        <Select
+          value={selectValue}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            if (nextValue === "custom") {
+              onChange(value.kind === "custom" ? value : { kind: "custom", value: "" });
+              return;
+            }
+            onChange({ kind: "preset", value: nextValue });
+          }}
+          className="w-56"
+        >
+          {presetIds.map((presetId) => (
+            <option key={presetId} value={presetId}>
+              {FONT_PRESETS[presetId].label}
+            </option>
+          ))}
+          <option value="custom">Custom</option>
+        </Select>
+      </div>
+
+      {selectValue === "custom" && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-xs text-text-muted">Font stack</span>
+          <Input
+            value={value.value}
+            placeholder={customPlaceholder}
+            onChange={(e) =>
+              onChange({
+                kind: "custom",
+                value: e.target.value,
+              })
+            }
+            className="w-56"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AppearanceSettingsSection() {
   const {
+    appearanceSettings,
     theme,
     resolvedTheme,
     setTheme,
-    editorFontSettings,
-    setEditorFontSetting,
-    resetEditorFontSettings,
+    lightPresetId,
+    darkPresetId,
+    setLightPresetId,
+    setDarkPresetId,
+    uiFont,
+    noteFont,
+    codeFont,
+    setUiFont,
+    setNoteFont,
+    setCodeFont,
+    noteTypography,
+    setNoteTypographySetting,
+    resetTypographySettings,
     textDirection,
     setTextDirection,
     editorWidth,
@@ -64,8 +149,10 @@ export function AppearanceSettingsSection() {
     customEditorWidthPx,
     setCustomEditorWidthPx,
   } = useTheme();
+  const [previewMode, setPreviewMode] = useState<"resolved" | "light" | "dark">(
+    "resolved",
+  );
 
-  // Validated numeric change handler
   const handleNumericChange = (
     field: "baseFontSize" | "lineHeight",
     value: string,
@@ -75,41 +162,74 @@ export function AppearanceSettingsSection() {
     const parsed = parseFloat(value);
     if (!Number.isFinite(parsed)) return;
     const clamped = Math.min(Math.max(parsed, min), max);
-    setEditorFontSetting(field, clamped);
+    setNoteTypographySetting(field, clamped);
   };
 
-  // Check if settings differ from defaults
-  const hasCustomFonts =
-    editorFontSettings.baseFontFamily !== "system-sans" ||
-    editorFontSettings.baseFontSize !== 15 ||
-    editorFontSettings.boldWeight !== 600 ||
-    editorFontSettings.lineHeight !== 1.6 ||
-    textDirection !== "auto" ||
-    editorWidth !== "normal" ||
+  const hasCustomTypography =
+    !fontChoiceEquals(uiFont, DEFAULT_APPEARANCE_SETTINGS.uiFont) ||
+    !fontChoiceEquals(noteFont, DEFAULT_APPEARANCE_SETTINGS.noteFont) ||
+    !fontChoiceEquals(codeFont, DEFAULT_APPEARANCE_SETTINGS.codeFont) ||
+    noteTypography.baseFontSize !==
+      DEFAULT_APPEARANCE_SETTINGS.noteTypography.baseFontSize ||
+    noteTypography.boldWeight !==
+      DEFAULT_APPEARANCE_SETTINGS.noteTypography.boldWeight ||
+    noteTypography.lineHeight !==
+      DEFAULT_APPEARANCE_SETTINGS.noteTypography.lineHeight ||
+    textDirection !== DEFAULT_APPEARANCE_SETTINGS.textDirection ||
+    editorWidth !== DEFAULT_APPEARANCE_SETTINGS.editorWidth ||
     Math.round(interfaceZoom * 100) !== 100;
 
-  // Filter weight options based on font family
-  const isMonospace = editorFontSettings.baseFontFamily === "monospace";
-  const availableWeightOptions = boldWeightOptions.filter(
-    (opt) => !isMonospace || !opt.excludeForMonospace,
-  );
+  const previewTheme = previewMode === "resolved" ? resolvedTheme : previewMode;
 
-  // Handle font family change - bump up weight if needed
-  const handleFontFamilyChange = (newFamily: FontFamily) => {
-    setEditorFontSetting("baseFontFamily", newFamily);
-    // If switching to monospace and current weight is medium, bump to semibold
-    if (newFamily === "monospace" && editorFontSettings.boldWeight === 500) {
-      setEditorFontSetting("boldWeight", 600);
-    }
-  };
+  const previewVariables = useMemo(() => {
+    const themeTokens = resolveThemeTokens(appearanceSettings, previewTheme);
+    const noteFontFamily = resolveFontFamily(noteFont, "system-sans");
+    const codeFontFamily = resolveFontFamily(codeFont, "system-mono");
+    const uiFontFamily = resolveFontFamily(uiFont, "system-sans");
+
+    return {
+      ...themeColorsToCSSVariables(themeTokens),
+      "--font-sans": uiFontFamily,
+      "--font-mono": codeFontFamily,
+      "--editor-font-family": noteFontFamily,
+      "--editor-base-font-size": `${noteTypography.baseFontSize}px`,
+      "--editor-bold-weight": `${noteTypography.boldWeight}`,
+      "--editor-line-height": `${noteTypography.lineHeight}`,
+      "--editor-h1-size": `${noteTypography.baseFontSize * 2.25}px`,
+      "--editor-h2-size": `${noteTypography.baseFontSize * 1.75}px`,
+      "--editor-h3-size": `${noteTypography.baseFontSize * 1.5}px`,
+      "--editor-h4-size": `${noteTypography.baseFontSize * 1.25}px`,
+      "--editor-h5-size": `${noteTypography.baseFontSize}px`,
+      "--editor-h6-size": `${noteTypography.baseFontSize}px`,
+    } as CSSProperties;
+  }, [
+    appearanceSettings,
+    codeFont,
+    noteFont,
+    noteTypography,
+    previewTheme,
+    uiFont,
+  ]);
+
+  const previewStyle = useMemo(() => {
+    return {
+      ...previewVariables,
+      colorScheme: previewTheme,
+      backgroundColor: "var(--color-bg)",
+      color: "var(--color-text)",
+      fontFamily: "var(--font-sans)",
+    } as CSSProperties;
+  }, [
+    previewVariables,
+    previewTheme,
+  ]);
 
   return (
     <div className="space-y-8 py-8">
-      {/* Theme Section */}
       <section className="pb-2">
         <h2 className="text-xl font-medium mb-3">Theme</h2>
-        <div className="flex gap-2 p-1 rounded-[10px] border border-border">
-          {(["light", "dark", "system"] as const).map((mode) => (
+        <div className="flex gap-2 p-1 rounded-[10px] border border-border mb-3">
+          {(["light", "dark", "system"] as ThemeMode[]).map((mode) => (
             <Button
               key={mode}
               onClick={() => setTheme(mode)}
@@ -121,6 +241,39 @@ export function AppearanceSettingsSection() {
             </Button>
           ))}
         </div>
+
+        <div className="rounded-[10px] border border-border px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <label className="text-sm text-text font-medium">Light Theme</label>
+            <Select
+              value={lightPresetId}
+              onChange={(e) => setLightPresetId(e.target.value as typeof lightPresetId)}
+              className="w-56"
+            >
+              {LIGHT_THEME_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <label className="text-sm text-text font-medium">Dark Theme</label>
+            <Select
+              value={darkPresetId}
+              onChange={(e) => setDarkPresetId(e.target.value as typeof darkPresetId)}
+              className="w-56"
+            >
+              {DARK_THEME_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
         {theme === "system" && (
           <p className="mt-3 text-sm text-text-muted">
             Currently using {resolvedTheme} mode based on system preference
@@ -128,48 +281,51 @@ export function AppearanceSettingsSection() {
         )}
       </section>
 
-      {/* Divider */}
       <div className="border-t border-border border-dashed" />
 
-      {/* Typography Section */}
       <section>
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="text-xl font-medium">Typography</h2>
-          {hasCustomFonts && (
-            <Button onClick={resetEditorFontSettings} variant="ghost" size="sm">
+          {hasCustomTypography && (
+            <Button onClick={resetTypographySettings} variant="ghost" size="sm">
               Reset to defaults
             </Button>
           )}
         </div>
 
-        <div className="rounded-[10px] border border-border pl-4 py-3 pr-3 space-y-2">
-          {/* Font Family */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-text font-medium">Font</label>
-            <Select
-              value={editorFontSettings.baseFontFamily}
-              onChange={(e) =>
-                handleFontFamilyChange(e.target.value as FontFamily)
-              }
-              className="w-40"
-            >
-              {fontFamilyOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Select>
-          </div>
+        <div className="rounded-[10px] border border-border pl-4 py-3 pr-3 space-y-4">
+          <FontChoiceControl
+            label="UI Font"
+            value={uiFont}
+            presetIds={UI_FONT_PRESET_IDS}
+            customPlaceholder={`"Inter", -apple-system, sans-serif`}
+            onChange={setUiFont}
+          />
 
-          {/* Base Font Size */}
+          <FontChoiceControl
+            label="Note Font"
+            value={noteFont}
+            presetIds={NOTE_FONT_PRESET_IDS}
+            customPlaceholder={`"Newsreader", Georgia, serif`}
+            onChange={setNoteFont}
+          />
+
+          <FontChoiceControl
+            label="Code Font"
+            value={codeFont}
+            presetIds={CODE_FONT_PRESET_IDS}
+            customPlaceholder={`"Berkeley Mono", monospace`}
+            onChange={setCodeFont}
+          />
+
           <div className="flex items-center justify-between">
-            <label className="text-sm text-text font-medium">Size</label>
+            <label className="text-sm text-text font-medium">Note Size</label>
             <div className="relative w-40">
               <Input
                 type="number"
                 min="12"
                 max="24"
-                value={editorFontSettings.baseFontSize}
+                value={noteTypography.baseFontSize}
                 onChange={(e) =>
                   handleNumericChange("baseFontSize", e.target.value, 12, 24)
                 }
@@ -178,17 +334,16 @@ export function AppearanceSettingsSection() {
             </div>
           </div>
 
-          {/* Bold Weight */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">Bold Weight</label>
             <Select
-              value={editorFontSettings.boldWeight}
+              value={noteTypography.boldWeight}
               onChange={(e) =>
-                setEditorFontSetting("boldWeight", Number(e.target.value))
+                setNoteTypographySetting("boldWeight", Number(e.target.value))
               }
               className="w-40"
             >
-              {availableWeightOptions.map((opt) => (
+              {boldWeightOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -196,7 +351,6 @@ export function AppearanceSettingsSection() {
             </Select>
           </div>
 
-          {/* Line Height */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">Line Height</label>
             <div className="relative w-40">
@@ -205,7 +359,7 @@ export function AppearanceSettingsSection() {
                 min="1.0"
                 max="2.5"
                 step="0.1"
-                value={editorFontSettings.lineHeight}
+                value={noteTypography.lineHeight}
                 onChange={(e) =>
                   handleNumericChange("lineHeight", e.target.value, 1.0, 2.5)
                 }
@@ -214,7 +368,6 @@ export function AppearanceSettingsSection() {
             </div>
           </div>
 
-          {/* Text Direction */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">
               Text Direction
@@ -234,7 +387,6 @@ export function AppearanceSettingsSection() {
             </Select>
           </div>
 
-          {/* Page Width */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">
               Workspace Layout
@@ -255,7 +407,6 @@ export function AppearanceSettingsSection() {
             </div>
           </div>
 
-          {/* Page Width */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">Page Width</label>
             <Select
@@ -270,6 +421,7 @@ export function AppearanceSettingsSection() {
               ))}
             </Select>
           </div>
+
           {editorWidth === "custom" && (
             <div className="flex items-center justify-between">
               <label className="text-sm text-text font-medium">
@@ -285,7 +437,7 @@ export function AppearanceSettingsSection() {
                   onChange={(e) => {
                     const parsed = parseInt(e.target.value, 10);
                     if (Number.isFinite(parsed)) {
-                      setCustomEditorWidthPx(Math.min(Math.max(parsed, 480), 3840));
+                      setCustomEditorWidthPx(parsed);
                     }
                   }}
                   className="w-full h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -295,7 +447,6 @@ export function AppearanceSettingsSection() {
             </div>
           )}
 
-          {/* Interface Zoom */}
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">
               Interface Zoom
@@ -326,25 +477,41 @@ export function AppearanceSettingsSection() {
           </div>
         </div>
 
-        {/* Preview */}
         <div className="mt-3 relative">
-          <div className="absolute top-3 left-4 flex items-center text-sm font-medium text-text-muted/70 gap-1">
+          <div className="absolute top-3 left-4 flex items-center text-sm font-medium text-text-muted/70 gap-1 z-10">
             <EyeIcon className="w-4.5 h-4.5 stroke-[1.5]" />
             <span>Preview</span>
           </div>
-          <div className="border border-border rounded-[10px] bg-bg p-6 pt-20 max-h-160 overflow-hidden rounded-t-lg">
+          <div className="absolute top-3 right-4 z-10">
+            <div className="flex gap-1 p-1 rounded-[10px] border border-border bg-bg/80 backdrop-blur">
+              {[
+                { value: "resolved", label: "Live" },
+                { value: "light", label: "Light" },
+                { value: "dark", label: "Dark" },
+              ].map((option) => (
+                <Button
+                  key={option.value}
+                  onClick={() =>
+                    setPreviewMode(option.value as "resolved" | "light" | "dark")
+                  }
+                  variant={previewMode === option.value ? "primary" : "ghost"}
+                  size="xs"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={`border border-border rounded-[10px] p-6 pt-20 max-h-160 overflow-hidden rounded-t-lg ${
+              previewTheme === "dark" ? "dark" : ""
+            }`}
+            style={previewStyle}
+          >
             <div
               className="prose prose-lg dark:prose-invert max-w-xl mx-auto"
               dir={textDirection}
-              style={{
-                fontFamily:
-                  editorFontSettings.baseFontFamily === "system-sans"
-                    ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-                    : editorFontSettings.baseFontFamily === "serif"
-                      ? "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif"
-                      : "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace",
-                fontSize: `${editorFontSettings.baseFontSize}px`,
-              }}
             >
               <h1>Kibble Maximization Protocol</h1>
               <p>
@@ -400,7 +567,7 @@ export function AppearanceSettingsSection() {
                 <li>
                   Maintain consistency in meal times (your schedule, not theirs)
                 </li>
-                <li>Don't forget to knock things off counters periodically</li>
+                <li>Don&apos;t forget to knock things off counters periodically</li>
               </ol>
 
               <p>
@@ -410,8 +577,10 @@ export function AppearanceSettingsSection() {
               </p>
             </div>
           </div>
-          {/* Fade overlay - content to muted background */}
-          <div className="absolute bottom-0 left-0 right-0 h-40 bg-linear-to-t from-bg to-transparent pointer-events-none" />
+          <div
+            className="absolute bottom-0 left-0 right-0 h-40 bg-linear-to-t from-bg to-transparent pointer-events-none"
+            style={previewVariables}
+          />
         </div>
       </section>
     </div>

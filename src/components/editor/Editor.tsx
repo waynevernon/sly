@@ -1897,7 +1897,7 @@ export function Editor({
               alt="Note"
               className="w-42 h-auto mx-auto mb-1 invert dark:invert-0"
             />
-            <h1 className="text-2xl text-text font-serif mb-1 tracking-[-0.01em] ">
+            <h1 className="text-2xl text-text font-sans mb-1 tracking-[-0.01em] ">
               What's on your mind?
             </h1>
             <p className="text-sm">
@@ -2158,9 +2158,8 @@ export function Editor({
                 className="w-full h-full bg-transparent text-text focus:outline-none resize-none px-6 pt-8 pb-24 mx-auto block"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",
-                  fontFamily:
-                    "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace",
-                  fontSize: "0.875em",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--editor-base-font-size)",
                   lineHeight: "var(--editor-line-height)",
                   tabSize: 2,
                 }}
