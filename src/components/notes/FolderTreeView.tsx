@@ -227,6 +227,7 @@ const FolderItem = memo(function FolderItem({
   onMoveFolderToParent,
   onOpenIconPicker,
 }: FolderItemProps) {
+  const suppressCloseAutoFocusRef = useRef(false);
   const isCollapsed = collapsedFolders.has(folder.path);
   const noteCount = countNotesInFolder(folder);
   const iconName = getFolderIconName(folderIcons, folder.path);
@@ -430,7 +431,14 @@ const FolderItem = memo(function FolderItem({
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-44 bg-bg border border-border rounded-md shadow-lg py-1 z-50">
+        <ContextMenu.Content
+          className="min-w-44 bg-bg border border-border rounded-md shadow-lg py-1 z-50"
+          onCloseAutoFocus={(event) => {
+            if (!suppressCloseAutoFocusRef.current) return;
+            suppressCloseAutoFocusRef.current = false;
+            event.preventDefault();
+          }}
+        >
           <ContextMenu.Item
             className={menuItemClass}
             onSelect={() => onCreateNoteHere(folder.path)}
@@ -440,7 +448,10 @@ const FolderItem = memo(function FolderItem({
           </ContextMenu.Item>
           <ContextMenu.Item
             className={menuItemClass}
-            onSelect={() => onStartCreateFolder(folder.path)}
+            onSelect={() => {
+              suppressCloseAutoFocusRef.current = true;
+              onStartCreateFolder(folder.path);
+            }}
           >
             <FolderPlusIcon className="w-4 h-4 stroke-[1.6]" />
             New Subfolder
@@ -448,9 +459,10 @@ const FolderItem = memo(function FolderItem({
           <ContextMenu.Separator className={menuSeparatorClass} />
           <ContextMenu.Item
             className={menuItemClass}
-            onSelect={() =>
-              onStartRenameFolder(folder.path, getFolderLeaf(folder.path))
-            }
+            onSelect={() => {
+              suppressCloseAutoFocusRef.current = true;
+              onStartRenameFolder(folder.path, getFolderLeaf(folder.path));
+            }}
           >
             <PencilIcon className="w-4 h-4 stroke-[1.6]" />
             Rename

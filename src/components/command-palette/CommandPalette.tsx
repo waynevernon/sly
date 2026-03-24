@@ -28,7 +28,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui";
-import { cleanTitle } from "../../lib/utils";
+import {
+  cleanPreviewText,
+  cleanTitle,
+  getDisplayInitial,
+} from "../../lib/utils";
 import { plainTextFromMarkdown } from "../../lib/plainText";
 import { duplicateNote } from "../../services/notes";
 import {
@@ -264,7 +268,19 @@ export function CommandPalette({
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
-              await invoke("copy_to_clipboard", { text: currentNote.content });
+              let markdown = currentNote.content;
+              const editorInstance = editorRef?.current;
+              if (editorInstance) {
+                const manager = editorInstance.storage.markdown?.manager;
+                if (manager) {
+                  markdown = manager.serialize(editorInstance.getJSON());
+                  markdown = markdown.replace(/&nbsp;|&#160;/g, " ");
+                } else {
+                  markdown = editorInstance.getText();
+                }
+              }
+
+              await invoke("copy_to_clipboard", { text: markdown });
               toast.success("Copied as Markdown");
               onClose();
             } catch (error) {
@@ -279,7 +295,19 @@ export function CommandPalette({
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
-              const plainText = plainTextFromMarkdown(currentNote.content);
+              let markdown = currentNote.content;
+              const editorInstance = editorRef?.current;
+              if (editorInstance) {
+                const manager = editorInstance.storage.markdown?.manager;
+                if (manager) {
+                  markdown = manager.serialize(editorInstance.getJSON());
+                  markdown = markdown.replace(/&nbsp;|&#160;/g, " ");
+                } else {
+                  markdown = editorInstance.getText();
+                }
+              }
+
+              const plainText = plainTextFromMarkdown(markdown);
               await invoke("copy_to_clipboard", { text: plainText });
               toast.success("Copied as plain text");
               onClose();
@@ -723,12 +751,8 @@ export function CommandPalette({
                   </div>
                   {filteredNotes.slice(0, 10).map((note, i) => {
                     const title = cleanTitle(note.title);
-                    const firstLetter = title.charAt(0).toUpperCase();
-                    // Clean subtitle: treat whitespace-only or &nbsp; as empty
-                    const cleanSubtitle = note.preview
-                      ?.replace(/&nbsp;/g, " ")
-                      .replace(/\u00A0/g, " ")
-                      .trim();
+                    const firstLetter = getDisplayInitial(note.title);
+                    const cleanSubtitle = cleanPreviewText(note.preview);
                     const index = commandsCount + i;
                     return (
                       <div key={note.id} data-index={index}>

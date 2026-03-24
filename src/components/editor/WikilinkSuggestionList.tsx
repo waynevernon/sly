@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { NoteMetadata } from "../../types/note";
+import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import {
   SuggestionList,
   type SuggestionListRef,
@@ -26,11 +27,11 @@ export const WikilinkSuggestionList = forwardRef<
     renderItem={(item) => (
       <div className="flex flex-col min-w-0">
         <span className="text-sm leading-snug font-medium truncate">
-          {item.title}
+          {cleanTitle(item.title)}
         </span>
         {item.preview && (
           <span className="text-xs text-text-muted truncate mt-0.5">
-            {item.preview}
+            {cleanPreviewText(item.preview)}
           </span>
         )}
       </div>

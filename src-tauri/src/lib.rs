@@ -179,18 +179,13 @@ impl Default for NoteTypographySettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TextDirection {
+    #[default]
     Auto,
     Ltr,
     Rtl,
-}
-
-impl Default for TextDirection {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,9 +242,10 @@ impl Default for AppearanceSettings {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteSortMode {
+    #[default]
     ModifiedDesc,
     ModifiedAsc,
     CreatedDesc,
@@ -258,24 +254,13 @@ pub enum NoteSortMode {
     TitleDesc,
 }
 
-impl Default for NoteSortMode {
-    fn default() -> Self {
-        Self::ModifiedDesc
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum FolderSortMode {
     Manual,
+    #[default]
     NameAsc,
     NameDesc,
-}
-
-impl Default for FolderSortMode {
-    fn default() -> Self {
-        Self::NameAsc
-    }
 }
 
 // App config (stored in app data directory)

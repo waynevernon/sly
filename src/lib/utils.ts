@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { emojifyShortcodes } from "./emoji";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -30,5 +31,27 @@ export function cleanTitle(title: string | undefined): string {
     .replace(/\u00A0/g, " ")
     .replace(/\u200B/g, "")
     .trim();
-  return cleaned || "Untitled";
+  return cleaned ? emojifyShortcodes(cleaned) : "Untitled";
+}
+
+export function cleanPreviewText(text: string | undefined): string {
+  if (!text) return "";
+  return emojifyShortcodes(
+    text
+      .replace(/&nbsp;/g, " ")
+      .replace(/\u00A0/g, " ")
+      .replace(/\u200B/g, "")
+      .trim(),
+  );
+}
+
+export function getDisplayInitial(text: string | undefined): string {
+  const title = cleanTitle(text);
+  const [firstCharacter = ""] = Array.from(title);
+
+  if (/^[a-z]$/i.test(firstCharacter)) {
+    return firstCharacter.toUpperCase();
+  }
+
+  return firstCharacter;
 }

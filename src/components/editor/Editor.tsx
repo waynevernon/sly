@@ -47,6 +47,8 @@ import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import { Frontmatter } from "./Frontmatter";
+import { Emoji } from "./Emoji";
+import { EmojiSuggestion } from "./EmojiSuggestion";
 import { BlockMathEditor } from "./BlockMathEditor";
 import { LinkEditor } from "./LinkEditor";
 import { SearchToolbar } from "./SearchToolbar";
@@ -1047,11 +1049,13 @@ export function Editor({
         },
       }),
       Frontmatter,
+      Emoji,
       Markdown.configure({}),
       SearchHighlight.configure({
         matches: [],
         currentIndex: 0,
       }),
+      EmojiSuggestion,
       SlashCommand,
       Wikilink,
       WikilinkSuggestion,

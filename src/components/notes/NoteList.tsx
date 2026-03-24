@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   ListItem,
 } from "../ui";
-import { cleanTitle } from "../../lib/utils";
+import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
 import { CopyIcon, PinIcon, TrashIcon } from "../icons";
 
@@ -105,11 +105,12 @@ const NoteItem = memo(function NoteItem({
     showFolderPrefix && id.includes("/")
       ? id.substring(0, id.lastIndexOf("/"))
       : null;
+  const previewText = cleanPreviewText(preview);
   const displayPreview = folder
-    ? preview
-      ? `${folder}/ · ${preview}`
+    ? previewText
+      ? `${folder}/ · ${previewText}`
       : `${folder}/`
-    : preview;
+    : previewText;
 
   return (
     <div ref={ref}>
