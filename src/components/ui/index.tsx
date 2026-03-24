@@ -14,6 +14,7 @@ export {
 } from "./Tooltip";
 export { Button } from "./Button";
 export { Input } from "./Input";
+export { InlineNameEditor } from "./InlineNameEditor";
 export { Select } from "./Select";
 export { Toaster } from "./Toaster";
 export {

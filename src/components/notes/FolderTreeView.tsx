@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -15,8 +15,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  InlineNameEditor,
 } from "../ui";
-import { FolderNameDialog } from "./FolderNameDialog";
 import {
   AddNoteIcon,
   ArrowUpIcon,
@@ -35,6 +35,10 @@ const menuItemClass =
 
 const menuSeparatorClass = "h-px bg-border my-1";
 
+type InlineFolderEditState =
+  | { mode: "create"; parentPath: string }
+  | { mode: "rename"; path: string; initialValue: string };
+
 function loadCollapsedFolders(): Set<string> {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -52,16 +56,95 @@ function saveCollapsedFolders(folders: Set<string>) {
   }
 }
 
+function sanitizeFolderName(name: string): string {
+  return name.replace(/[\/\\:*?"<>|]/g, "-").trim();
+}
+
+function getFolderLeaf(path: string): string {
+  return path.split("/").pop() || path;
+}
+
+function getRenamedFolderPath(path: string, newName: string): string {
+  const sanitizedName = sanitizeFolderName(newName);
+  const lastSlash = path.lastIndexOf("/");
+  return lastSlash >= 0
+    ? `${path.substring(0, lastSlash)}/${sanitizedName}`
+    : sanitizedName;
+}
+
+interface InlineFolderRowProps {
+  depth: number;
+  initialValue?: string;
+  placeholder: string;
+  noteCount?: number;
+  isSelected?: boolean;
+  collapseState?: "expanded" | "collapsed";
+  onSubmit: (name: string) => Promise<void> | void;
+  onCancel: () => void;
+}
+
+function InlineFolderRow({
+  depth,
+  initialValue = "",
+  placeholder,
+  noteCount,
+  isSelected = false,
+  collapseState,
+  onSubmit,
+  onCancel,
+}: InlineFolderRowProps) {
+  const CollapseIcon =
+    collapseState === "collapsed"
+      ? ChevronRightIcon
+      : collapseState === "expanded"
+        ? ChevronDownIcon
+        : null;
+
+  return (
+    <div
+      className={`rounded-md ${
+        isSelected ? "bg-bg-muted ring-1 ring-text-muted/20" : "bg-bg-muted/70"
+      }`}
+      style={{ marginLeft: `${depth * 12}px` }}
+    >
+      <div className="flex items-center gap-1.5 pr-2 py-1.5">
+        <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
+          {CollapseIcon ? <CollapseIcon className="w-4 h-4 stroke-[1.6]" /> : null}
+        </span>
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <FolderIcon className="w-4.25 h-4.25 stroke-[1.6] text-text-muted/80 shrink-0" />
+          <InlineNameEditor
+            initialValue={initialValue}
+            placeholder={placeholder}
+            onSubmit={onSubmit}
+            onCancel={onCancel}
+            className="h-7 flex-1 border-border/80 bg-bg px-2.5 py-1.5 text-sm font-medium"
+          />
+        </div>
+        {typeof noteCount === "number" && (
+          <span className="text-2xs font-medium text-text-muted/70 shrink-0 px-1.5 py-0.5 rounded-full bg-bg/70">
+            {noteCount}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface FolderItemProps {
   folder: FolderNode;
   depth: number;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
+  inlineEditState: InlineFolderEditState | null;
   onToggleCollapse: (path: string) => void;
   onSelectFolder: (path: string) => void;
   onCreateNoteHere: (path: string) => void;
-  onNewSubfolder: (parentPath: string) => void;
-  onRenameFolder: (path: string, currentName: string) => void;
+  onStartCreateFolder: (parentPath: string) => void;
+  onCreateFolder: (name: string) => Promise<void>;
+  onStartRenameFolder: (path: string, currentName: string) => void;
+  onRenameFolder: (name: string) => Promise<void>;
+  onCancelInlineEdit: () => void;
   onDeleteFolder: (path: string) => void;
   onMoveFolderToParent: (path: string, targetParent: string) => void;
 }
@@ -71,16 +154,25 @@ const FolderItem = memo(function FolderItem({
   depth,
   selectedFolderPath,
   collapsedFolders,
+  inlineEditState,
   onToggleCollapse,
   onSelectFolder,
   onCreateNoteHere,
-  onNewSubfolder,
+  onStartCreateFolder,
+  onCreateFolder,
+  onStartRenameFolder,
   onRenameFolder,
+  onCancelInlineEdit,
   onDeleteFolder,
   onMoveFolderToParent,
 }: FolderItemProps) {
   const isCollapsed = collapsedFolders.has(folder.path);
   const noteCount = countNotesInFolder(folder);
+  const isRenaming =
+    inlineEditState?.mode === "rename" && inlineEditState.path === folder.path;
+  const isCreatingChild =
+    inlineEditState?.mode === "create" &&
+    inlineEditState.parentPath === folder.path;
 
   const {
     attributes,
@@ -96,6 +188,48 @@ const FolderItem = memo(function FolderItem({
     id: `drop-folder:${folder.path}`,
     data: { type: "folder", path: folder.path },
   });
+
+  if (isRenaming) {
+    return (
+      <div>
+        <InlineFolderRow
+          depth={depth}
+          initialValue={inlineEditState.initialValue}
+          placeholder="Folder name"
+          noteCount={noteCount}
+          isSelected={selectedFolderPath === folder.path}
+          collapseState={isCollapsed ? "collapsed" : "expanded"}
+          onSubmit={onRenameFolder}
+          onCancel={onCancelInlineEdit}
+        />
+
+        {!isCollapsed && folder.children.length > 0 && (
+          <div className="flex flex-col gap-0.5 pt-0.5">
+            {folder.children.map((child) => (
+              <FolderItem
+                key={child.path}
+                folder={child}
+                depth={depth + 1}
+                selectedFolderPath={selectedFolderPath}
+                collapsedFolders={collapsedFolders}
+                inlineEditState={inlineEditState}
+                onToggleCollapse={onToggleCollapse}
+                onSelectFolder={onSelectFolder}
+                onCreateNoteHere={onCreateNoteHere}
+                onStartCreateFolder={onStartCreateFolder}
+                onCreateFolder={onCreateFolder}
+                onStartRenameFolder={onStartRenameFolder}
+                onRenameFolder={onRenameFolder}
+                onCancelInlineEdit={onCancelInlineEdit}
+                onDeleteFolder={onDeleteFolder}
+                onMoveFolderToParent={onMoveFolderToParent}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <ContextMenu.Root>
@@ -149,8 +283,17 @@ const FolderItem = memo(function FolderItem({
             </div>
           </div>
 
-          {!isCollapsed && folder.children.length > 0 && (
+          {!isCollapsed && (isCreatingChild || folder.children.length > 0) && (
             <div className="flex flex-col gap-0.5 pt-0.5">
+              {isCreatingChild && (
+                <InlineFolderRow
+                  depth={depth + 1}
+                  placeholder="Folder name"
+                  onSubmit={onCreateFolder}
+                  onCancel={onCancelInlineEdit}
+                />
+              )}
+
               {folder.children.map((child) => (
                 <FolderItem
                   key={child.path}
@@ -158,11 +301,15 @@ const FolderItem = memo(function FolderItem({
                   depth={depth + 1}
                   selectedFolderPath={selectedFolderPath}
                   collapsedFolders={collapsedFolders}
+                  inlineEditState={inlineEditState}
                   onToggleCollapse={onToggleCollapse}
                   onSelectFolder={onSelectFolder}
                   onCreateNoteHere={onCreateNoteHere}
-                  onNewSubfolder={onNewSubfolder}
+                  onStartCreateFolder={onStartCreateFolder}
+                  onCreateFolder={onCreateFolder}
+                  onStartRenameFolder={onStartRenameFolder}
                   onRenameFolder={onRenameFolder}
+                  onCancelInlineEdit={onCancelInlineEdit}
                   onDeleteFolder={onDeleteFolder}
                   onMoveFolderToParent={onMoveFolderToParent}
                 />
@@ -182,7 +329,7 @@ const FolderItem = memo(function FolderItem({
           </ContextMenu.Item>
           <ContextMenu.Item
             className={menuItemClass}
-            onSelect={() => onNewSubfolder(folder.path)}
+            onSelect={() => onStartCreateFolder(folder.path)}
           >
             <FolderPlusIcon className="w-4 h-4 stroke-[1.6]" />
             New Subfolder
@@ -190,9 +337,7 @@ const FolderItem = memo(function FolderItem({
           <ContextMenu.Separator className={menuSeparatorClass} />
           <ContextMenu.Item
             className={menuItemClass}
-            onSelect={() =>
-              onRenameFolder(folder.path, folder.path.split("/").pop() || folder.path)
-            }
+            onSelect={() => onStartRenameFolder(folder.path, getFolderLeaf(folder.path))}
           >
             <PencilIcon className="w-4 h-4 stroke-[1.6]" />
             Rename
@@ -243,13 +388,11 @@ export function FolderTreeView() {
   const [collapsedFolders, setCollapsedFolders] =
     useState<Set<string>>(loadCollapsedFolders);
   const [knownFolders, setKnownFolders] = useState<string[]>([]);
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
-  const [folderDialogParent, setFolderDialogParent] = useState("");
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [folderToRename, setFolderToRename] = useState<string | null>(null);
-  const [renameDefaultValue, setRenameDefaultValue] = useState("");
+  const [inlineEditState, setInlineEditState] =
+    useState<InlineFolderEditState | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const treeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     notesService
@@ -267,6 +410,12 @@ export function FolderTreeView() {
     [knownFolders, notes],
   );
 
+  const focusTree = useCallback(() => {
+    requestAnimationFrame(() => {
+      treeRef.current?.focus();
+    });
+  }, []);
+
   const expandFolder = useCallback((folderPath: string) => {
     if (!folderPath) return;
 
@@ -277,6 +426,21 @@ export function FolderTreeView() {
         next.delete(parts.slice(0, index).join("/"));
       }
       return next;
+    });
+  }, []);
+
+  const startCreateFolder = useCallback((parentPath: string) => {
+    if (parentPath) {
+      expandFolder(parentPath);
+    }
+    setInlineEditState({ mode: "create", parentPath });
+  }, [expandFolder]);
+
+  const startRenameFolder = useCallback((path: string, currentName: string) => {
+    setInlineEditState({
+      mode: "rename",
+      path,
+      initialValue: currentName,
     });
   }, []);
 
@@ -294,14 +458,13 @@ export function FolderTreeView() {
 
   useEffect(() => {
     const handleCreateFolder = () => {
-      setFolderDialogParent(selectedFolderPath ?? "");
-      setFolderDialogOpen(true);
+      startCreateFolder(selectedFolderPath ?? "");
     };
 
     window.addEventListener("create-new-folder", handleCreateFolder);
     return () =>
       window.removeEventListener("create-new-folder", handleCreateFolder);
-  }, [selectedFolderPath]);
+  }, [selectedFolderPath, startCreateFolder]);
 
   useEffect(() => {
     if (selectedFolderPath) {
@@ -321,37 +484,75 @@ export function FolderTreeView() {
     });
   }, []);
 
+  const handleCancelInlineEdit = useCallback(() => {
+    setInlineEditState(null);
+    focusTree();
+  }, [focusTree]);
+
   const handleCreateFolder = useCallback(async (name: string) => {
+    if (inlineEditState?.mode !== "create") return;
+
+    const parentPath = inlineEditState.parentPath;
+    const folderName = sanitizeFolderName(name);
+
+    if (!folderName) {
+      handleCancelInlineEdit();
+      return;
+    }
+
     try {
-      await createFolder(folderDialogParent, name);
-      if (folderDialogParent) {
-        expandFolder(folderDialogParent);
-      }
-      setFolderDialogOpen(false);
+      await createFolder(parentPath, folderName);
+      const newPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+      expandFolder(newPath);
+      selectFolder(newPath);
+      setInlineEditState(null);
+      focusTree();
     } catch (error) {
       console.error("Failed to create folder:", error);
       toast.error("Failed to create folder");
+      throw error;
     }
-  }, [createFolder, expandFolder, folderDialogParent]);
+  }, [
+    createFolder,
+    expandFolder,
+    focusTree,
+    handleCancelInlineEdit,
+    inlineEditState,
+    selectFolder,
+  ]);
 
-  const handleRenameFolder = useCallback((path: string, currentName: string) => {
-    setFolderToRename(path);
-    setRenameDefaultValue(currentName);
-    setRenameDialogOpen(true);
-  }, []);
+  const handleRenameFolder = useCallback(async (newName: string) => {
+    if (inlineEditState?.mode !== "rename") return;
 
-  const handleRenameConfirm = useCallback(async (newName: string) => {
-    if (!folderToRename) return;
+    const oldPath = inlineEditState.path;
+    const sanitizedName = sanitizeFolderName(newName);
+    const currentName = getFolderLeaf(oldPath);
+
+    if (!sanitizedName || sanitizedName === currentName) {
+      handleCancelInlineEdit();
+      return;
+    }
 
     try {
-      await renameFolder(folderToRename, newName);
-      setFolderToRename(null);
-      setRenameDialogOpen(false);
+      await renameFolder(oldPath, sanitizedName);
+      const newPath = getRenamedFolderPath(oldPath, sanitizedName);
+      expandFolder(newPath);
+      selectFolder(newPath);
+      setInlineEditState(null);
+      focusTree();
     } catch (error) {
       console.error("Failed to rename folder:", error);
       toast.error("Failed to rename folder");
+      throw error;
     }
-  }, [folderToRename, renameFolder]);
+  }, [
+    expandFolder,
+    focusTree,
+    handleCancelInlineEdit,
+    inlineEditState,
+    renameFolder,
+    selectFolder,
+  ]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!folderToDelete) return;
@@ -371,9 +572,17 @@ export function FolderTreeView() {
     data: { type: "folder", path: "" },
   });
 
+  const isCreatingRoot =
+    inlineEditState?.mode === "create" && inlineEditState.parentPath === "";
+
   return (
     <>
-      <div data-folder-tree className="flex flex-col gap-1 px-1.5 pb-1.5">
+      <div
+        ref={treeRef}
+        tabIndex={0}
+        data-folder-tree
+        className="flex flex-col gap-1 px-1.5 pb-1.5 outline-none"
+      >
         <div
           ref={setRootDropRef}
           className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
@@ -402,6 +611,15 @@ export function FolderTreeView() {
         </div>
 
         <div className="flex flex-col gap-0.5">
+          {isCreatingRoot && (
+            <InlineFolderRow
+              depth={0}
+              placeholder="Folder name"
+              onSubmit={handleCreateFolder}
+              onCancel={handleCancelInlineEdit}
+            />
+          )}
+
           {tree.folders.map((folder) => (
             <FolderItem
               key={folder.path}
@@ -409,14 +627,15 @@ export function FolderTreeView() {
               depth={0}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={collapsedFolders}
+              inlineEditState={inlineEditState}
               onToggleCollapse={handleToggleCollapse}
               onSelectFolder={selectFolder}
               onCreateNoteHere={createNoteInFolder}
-              onNewSubfolder={(parentPath) => {
-                setFolderDialogParent(parentPath);
-                setFolderDialogOpen(true);
-              }}
+              onStartCreateFolder={startCreateFolder}
+              onCreateFolder={handleCreateFolder}
+              onStartRenameFolder={startRenameFolder}
               onRenameFolder={handleRenameFolder}
+              onCancelInlineEdit={handleCancelInlineEdit}
               onDeleteFolder={(path) => {
                 setFolderToDelete(path);
                 setDeleteDialogOpen(true);
@@ -431,29 +650,6 @@ export function FolderTreeView() {
           ))}
         </div>
       </div>
-
-      <FolderNameDialog
-        open={folderDialogOpen}
-        onOpenChange={setFolderDialogOpen}
-        onConfirm={handleCreateFolder}
-        title={folderDialogParent ? "Create new subfolder" : "Create new folder"}
-        description={
-          folderDialogParent
-            ? "Enter a name for your new subfolder"
-            : "Enter a name for your new folder"
-        }
-        confirmLabel="Create"
-      />
-
-      <FolderNameDialog
-        open={renameDialogOpen}
-        onOpenChange={setRenameDialogOpen}
-        onConfirm={handleRenameConfirm}
-        title="Rename Folder"
-        description="Enter a new name for the folder"
-        confirmLabel="Rename"
-        defaultValue={renameDefaultValue}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
