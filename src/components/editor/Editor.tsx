@@ -2152,18 +2152,17 @@ export function Editor({
         >
           {sourceMode ? (
             /* Markdown source textarea */
-            <div
-              className="min-h-full mx-auto px-6 py-6"
-              style={{
-                maxWidth: "calc(var(--editor-max-width, 48rem) + 3rem)",
-              }}
-            >
+            <div className="h-full">
               <textarea
                 value={sourceContent}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 dir={textDirection}
-                className="ui-focus-ring-subtle w-full min-h-full resize-none rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary px-6 py-6 text-text outline-none"
+                className="w-full h-full resize-none bg-transparent px-6 pt-8 pb-24 text-text outline-none"
                 style={{
+                  maxWidth: "var(--editor-max-width, 48rem)",
+                  marginLeft: "auto",
+                  marginRight: "auto",
+                  display: "block",
                   fontFamily: "var(--font-mono)",
                   fontSize: "var(--editor-base-font-size)",
                   lineHeight: "var(--editor-line-height)",

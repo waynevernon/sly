@@ -46,6 +46,9 @@
   --ui-pane-padding-start: 16px;
   --ui-pane-padding-end: 12px;
   --ui-action-gap: 2px;
+  --ui-count-badge-height: 20px;
+  --ui-count-badge-width: 28px;
+  --ui-count-badge-column-width: 2.5rem;
   --ui-surface-pad-menu: 4px;
   --ui-surface-pad-popover: 8px;
   --ui-surface-pad-dialog: 16px;
@@ -223,6 +226,13 @@ body {
   box-shadow: var(--ui-shadow-dialog);
 }
 
+.ui-surface-toast {
+  border: 1px solid var(--color-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--color-bg);
+  box-shadow: var(--ui-shadow-menu);
+}
+
 .ui-dialog-overlay {
   background: rgb(0 0 0 / 0.45);
   backdrop-filter: blur(12px);
@@ -308,18 +318,27 @@ body {
   flex-shrink: 0;
 }
 
-.ui-pane-count {
+.ui-count-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.25rem;
+  width: var(--ui-count-badge-width);
+  height: var(--ui-count-badge-height);
+  padding: 0;
   border-radius: var(--ui-radius-sm);
   background: var(--color-bg-muted);
   font-size: 0.75rem;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   color: var(--color-text-muted);
+}
+
+.ui-count-badge-column {
+  display: flex;
+  justify-content: flex-end;
+  min-width: var(--ui-count-badge-column-width);
+  flex-shrink: 0;
 }
 
 .ui-settings-separator {

@@ -23,6 +23,16 @@ The interface should read as:
 4. Density is good if scanning remains immediate.
 5. Motion should explain structure, not decorate it.
 
+## Core Principles
+
+- Beauty through restraint: use spacing, typography, rhythm, and alignment before adding more chrome.
+- Calm hierarchy: each screen should have one dominant working plane and clearly subordinate secondary surfaces.
+- Dense, not cluttered: fit useful information in view, but remove decorative noise and duplicate controls.
+- Native-feeling interaction: respect platform conventions, especially title bar behavior, keyboard shortcuts, and pane affordances.
+- Consistency over cleverness: repeated UI patterns should behave the same way everywhere.
+- Progressive disclosure: keep the default surface simple and reveal advanced controls only when they are relevant.
+- Navigation should recede: folders and note lists are supporting panes; the editor is the primary canvas.
+
 ## Tokens
 
 ### Geometry
@@ -86,6 +96,13 @@ Settings should belong to the same product language as the workspace shell, not 
 - Standard inputs and routine buttons are `32px`.
 - Primary CTAs are `40px`.
 - Use a shared destructive tone instead of ad hoc red text styling.
+
+### Badges and Counts
+
+- Count badges use the shared compact badge treatment, not ad hoc pills.
+- Use `radius-sm` geometry for note counts and similar metadata chips.
+- Keep note-count badges quiet: muted fill, muted text, compact height, and no accent color unless the count itself represents alert-level state.
+- In list and tree rows, right-justify count badges in a consistent trailing column so nested items still share one visual edge.
 
 ### Menus
 

@@ -172,7 +172,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
             <div className="font-medium text-base text-text truncate">
               {heading}
             </div>
-            <div className="ui-pane-count mt-0.5 pt-px shrink-0">
+            <div className="ui-count-badge mt-0.5 pt-px shrink-0">
               {noteCount}
             </div>
           </div>
