@@ -17,7 +17,9 @@ import type { SearchResult } from "../services/notes";
 // Data context: changes frequently, only subscribed by components that need the data
 interface NotesDataContextValue {
   notes: NoteMetadata[];
+  scopedNotes: NoteMetadata[];
   selectedNoteId: string | null;
+  selectedFolderPath: string | null;
   currentNote: Note | null;
   notesFolder: string | null;
   isLoading: boolean;
@@ -32,6 +34,7 @@ interface NotesDataContextValue {
 // Actions context: stable references, rarely causes re-renders
 interface NotesActionsContextValue {
   selectNote: (id: string) => Promise<void>;
+  selectFolder: (path: string | null) => void;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
@@ -56,8 +59,21 @@ interface NotesActionsContextValue {
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
 const NotesActionsContext = createContext<NotesActionsContextValue | null>(null);
 
+function getParentFolderPath(noteId: string): string | null {
+  const lastSlash = noteId.lastIndexOf("/");
+  return lastSlash > 0 ? noteId.substring(0, lastSlash) : null;
+}
+
+function getParentPath(path: string): string | null {
+  const lastSlash = path.lastIndexOf("/");
+  return lastSlash > 0 ? path.substring(0, lastSlash) : null;
+}
+
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
+  const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
+    null,
+  );
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
   const [notesFolder, setNotesFolderState] = useState<string | null>(null);
@@ -80,6 +96,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // Ref to access notes in search callback without re-creating it on every notes change
   const notesRef = useRef<NoteMetadata[]>([]);
   notesRef.current = notes;
+  const searchQueryRef = useRef("");
+  searchQueryRef.current = searchQuery;
+  const selectedFolderPathRef = useRef<string | null>(null);
+  selectedFolderPathRef.current = selectedFolderPath;
   // Monotonic counter to ignore stale async note selection responses.
   const selectRequestIdRef = useRef(0);
   // Monotonic counter to ignore stale async search responses
@@ -108,6 +128,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }, 300);
   }, [refreshNotes]);
 
+  const selectFolder = useCallback((path: string | null) => {
+    setSelectedFolderPath(path);
+    if (
+      path &&
+      selectedNoteIdRef.current &&
+      getParentFolderPath(selectedNoteIdRef.current) !== path
+    ) {
+      setSelectedNoteId(null);
+      setCurrentNote(null);
+    }
+    if (path) {
+      window.dispatchEvent(new CustomEvent("expand-folder", { detail: path }));
+    }
+  }, []);
+
   const selectNote = useCallback(async (id: string) => {
     const requestId = ++selectRequestIdRef.current;
     try {
@@ -117,12 +152,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       // Set selected ID immediately for responsive UI
       setSelectedNoteId(id);
       setHasExternalChanges(false);
+      const parentFolder = getParentFolderPath(id);
+      if (
+        selectedFolderPathRef.current !== null &&
+        !searchQueryRef.current.trim() &&
+        parentFolder !== selectedFolderPathRef.current
+      ) {
+        setSelectedFolderPath(parentFolder);
+      }
       // Expand parent folders so the note is visible in the tree
-      const lastSlash = id.lastIndexOf("/");
-      if (lastSlash > 0) {
+      if (parentFolder) {
         window.dispatchEvent(
           new CustomEvent("expand-folder", {
-            detail: id.substring(0, lastSlash),
+            detail: parentFolder,
           }),
         );
       }
@@ -149,14 +191,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const createNote = useCallback(async () => {
     try {
-      // Derive target folder from the selected note's parent path
-      let targetFolder: string | undefined;
-      if (selectedNoteIdRef.current) {
-        const lastSlash = selectedNoteIdRef.current.lastIndexOf("/");
-        if (lastSlash > 0) {
-          targetFolder = selectedNoteIdRef.current.substring(0, lastSlash);
-        }
-      }
+      const targetFolder = selectedFolderPathRef.current ?? undefined;
       const note = await notesService.createNote(targetFolder);
       selectRequestIdRef.current += 1;
       pendingNewNoteIdRef.current = note.id;
@@ -165,6 +200,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await refreshNotes();
       setCurrentNote(note);
       setSelectedNoteId(note.id);
+      const parentFolder = getParentFolderPath(note.id);
+      if (selectedFolderPathRef.current !== null) {
+        setSelectedFolderPath(parentFolder);
+      }
       // Clear search when creating a new note
       setSearchQuery("");
       setSearchResults([]);
@@ -293,6 +332,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await refreshNotes();
         setCurrentNote(newNote);
         setSelectedNoteId(newNote.id);
+        const parentFolder = getParentFolderPath(newNote.id);
+        if (selectedFolderPathRef.current !== null) {
+          setSelectedFolderPath(parentFolder);
+        }
         setTimeout(() => {
           recentlySavedRef.current.delete(newNote.id);
         }, 1000);
@@ -353,6 +396,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await refreshNotes();
         setCurrentNote(note);
         setSelectedNoteId(note.id);
+        setSelectedFolderPath(folderPath);
         setSearchQuery("");
         setSearchResults([]);
         setTimeout(() => {
@@ -394,6 +438,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevId;
         });
+        setSelectedFolderPath((prevPath) => {
+          if (!prevPath) return prevPath;
+          if (prevPath === path || prevPath.startsWith(path + "/")) {
+            return getParentPath(path);
+          }
+          return prevPath;
+        });
         await refreshNotes();
       } catch (err) {
         setError(
@@ -431,6 +482,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevId;
         });
+        setSelectedFolderPath((prevPath) => {
+          if (!prevPath) return prevPath;
+          if (prevPath === oldPath) return newPath;
+          if (prevPath.startsWith(oldPrefix)) {
+            return newPrefix + prevPath.substring(oldPrefix.length);
+          }
+          return prevPath;
+        });
 
         await refreshNotes();
       } catch (err) {
@@ -457,6 +516,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             return newId;
           }
           return prevId;
+        });
+        setSelectedFolderPath((prevPath) => {
+          if (prevPath && getParentFolderPath(id) === prevPath) {
+            return targetFolder || null;
+          }
+          return prevPath;
         });
         await refreshNotes();
       } catch (err) {
@@ -494,6 +559,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevId;
         });
+        setSelectedFolderPath((prevPath) => {
+          if (!prevPath) return prevPath;
+          if (prevPath === path) return newPath;
+          if (prevPath.startsWith(oldPrefix)) {
+            return newPrefix + prevPath.substring(oldPrefix.length);
+          }
+          return prevPath;
+        });
 
         await refreshNotes();
       } catch (err) {
@@ -507,6 +580,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     try {
       await notesService.setNotesFolder(path);
       setNotesFolderState(path);
+      setSelectedFolderPath(null);
+      setSelectedNoteId(null);
+      setCurrentNote(null);
       // Start file watcher after setting folder
       await notesService.startFileWatcher();
     } catch (err) {
@@ -521,6 +597,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const syncNotesFolder = useCallback(async (path: string) => {
     try {
       setNotesFolderState(path);
+      setSelectedFolderPath(null);
       setSelectedNoteId(null);
       setCurrentNote(null);
       const notesList = await notesService.listNotes();
@@ -680,11 +757,23 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder, refreshNotes]);
 
+  const scopedNotes = useMemo(() => {
+    if (selectedFolderPath === null) {
+      return notes;
+    }
+
+    return notes.filter(
+      (note) => getParentFolderPath(note.id) === selectedFolderPath,
+    );
+  }, [notes, selectedFolderPath]);
+
   // Memoize data context value to prevent unnecessary re-renders
   const dataValue = useMemo<NotesDataContextValue>(
     () => ({
       notes,
+      scopedNotes,
       selectedNoteId,
+      selectedFolderPath,
       currentNote,
       notesFolder,
       isLoading,
@@ -697,7 +786,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }),
     [
       notes,
+      scopedNotes,
       selectedNoteId,
+      selectedFolderPath,
       currentNote,
       notesFolder,
       isLoading,
@@ -714,6 +805,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const actionsValue = useMemo<NotesActionsContextValue>(
     () => ({
       selectNote,
+      selectFolder,
       createNote,
       consumePendingNewNote,
       saveNote,
@@ -736,6 +828,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }),
     [
       selectNote,
+      selectFolder,
       createNote,
       consumePendingNewNote,
       saveNote,

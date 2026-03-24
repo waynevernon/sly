@@ -1,9 +1,10 @@
-import { useCallback, useMemo, memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useNotes } from "../../context/NotesContext";
+import type { Settings } from "../../types/note";
 import {
-  ListItem,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -12,21 +13,29 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  ListItem,
 } from "../ui";
 import { cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
-import { FolderTreeView } from "./FolderTreeView";
-import {
-  PinIcon,
-  CopyIcon,
-  TrashIcon,
-} from "../icons";
-import type { Settings } from "../../types/note";
+import { CopyIcon, PinIcon, TrashIcon } from "../icons";
 
 const menuItemClass =
   "px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2 rounded-sm";
 
 const menuSeparatorClass = "h-px bg-border my-1";
+
+export interface NoteListItem {
+  id: string;
+  title: string;
+  preview: string;
+  modified: number;
+}
+
+interface NoteListProps {
+  items: NoteListItem[];
+  emptyMessage: string;
+  showFolderPrefix?: boolean;
+}
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp * 1000);
@@ -35,7 +44,7 @@ function formatDate(timestamp: number): string {
   const startOfToday = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate()
+    now.getDate(),
   );
   const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
 
@@ -63,7 +72,6 @@ function formatDate(timestamp: number): string {
   });
 }
 
-// Memoized note item component (used in flat list)
 interface NoteItemProps {
   id: string;
   title: string;
@@ -72,11 +80,10 @@ interface NoteItemProps {
   isSelected: boolean;
   isPinned: boolean;
   onSelect: (id: string) => void;
-  depth?: number;
   showFolderPrefix?: boolean;
 }
 
-export const NoteItem = memo(function NoteItem({
+const NoteItem = memo(function NoteItem({
   id,
   title,
   preview,
@@ -84,11 +91,10 @@ export const NoteItem = memo(function NoteItem({
   isSelected,
   isPinned,
   onSelect,
-  depth,
   showFolderPrefix = true,
 }: NoteItemProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const handleClick = useCallback(() => onSelect(id), [onSelect, id]);
+  const handleClick = useCallback(() => onSelect(id), [id, onSelect]);
 
   useEffect(() => {
     if (isSelected) {
@@ -107,10 +113,7 @@ export const NoteItem = memo(function NoteItem({
     : preview;
 
   return (
-    <div
-      ref={ref}
-      style={depth != null ? { paddingLeft: `${depth * 12}px` } : undefined}
-    >
+    <div ref={ref}>
       <ListItem
         title={cleanTitle(title)}
         subtitle={displayPreview}
@@ -123,15 +126,7 @@ export const NoteItem = memo(function NoteItem({
   );
 });
 
-// Note item wrapped with Radix context menu
-interface NoteItemWithMenuProps {
-  id: string;
-  title: string;
-  preview?: string;
-  modified: number;
-  isSelected: boolean;
-  isPinned: boolean;
-  onSelect: (id: string) => void;
+interface NoteItemWithMenuProps extends NoteItemProps {
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
@@ -152,6 +147,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onDuplicate,
   onDelete,
   onRefreshSettings,
+  showFolderPrefix = true,
 }: NoteItemWithMenuProps) {
   const handlePin = useCallback(async () => {
     try {
@@ -160,24 +156,38 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
     } catch (error) {
       console.error("Failed to pin/unpin note:", error);
     }
-  }, [id, isPinned, onPin, onUnpin, onRefreshSettings]);
+  }, [id, isPinned, onPin, onRefreshSettings, onUnpin]);
 
   const handleCopyFilepath = useCallback(async () => {
     try {
       const folder = await notesService.getNotesFolder();
       if (folder) {
-        const filepath = `${folder}/${id}.md`;
-        await invoke("copy_to_clipboard", { text: filepath });
+        await invoke("copy_to_clipboard", { text: `${folder}/${id}.md` });
       }
     } catch (error) {
       console.error("Failed to copy filepath:", error);
     }
   }, [id]);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    isDragging,
+  } = useDraggable({
+    id: `note:${id}`,
+    data: { type: "note", id },
+  });
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div>
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className={isDragging ? "opacity-40" : ""}
+        >
           <NoteItem
             id={id}
             title={title}
@@ -186,6 +196,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             isSelected={isSelected}
             isPinned={isPinned}
             onSelect={onSelect}
+            showFolderPrefix={showFolderPrefix}
           />
         </div>
       </ContextMenu.Trigger>
@@ -226,9 +237,12 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   );
 });
 
-export function NoteList() {
+export function NoteList({
+  items,
+  emptyMessage,
+  showFolderPrefix = true,
+}: NoteListProps) {
   const {
-    notes,
     selectedNoteId,
     selectNote,
     deleteNote,
@@ -236,8 +250,6 @@ export function NoteList() {
     pinNote,
     unpinNote,
     isLoading,
-    searchQuery,
-    searchResults,
   } = useNotes();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -245,7 +257,6 @@ export function NoteList() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load settings when notes change
   useEffect(() => {
     notesService
       .getSettings()
@@ -253,49 +264,34 @@ export function NoteList() {
       .catch((error) => {
         console.error("Failed to load settings:", error);
       });
-  }, [notes]);
+  }, [items]);
 
-  // Calculate pinned IDs set for efficient lookup
   const pinnedIds = useMemo(
     () => new Set(settings?.pinnedNoteIds || []),
-    [settings]
+    [settings],
   );
 
+  const refreshSettings = useCallback(() => {
+    notesService.getSettings().then(setSettings);
+  }, []);
+
   const handleDeleteConfirm = useCallback(async () => {
-    if (noteToDelete) {
-      try {
-        await deleteNote(noteToDelete);
-        setNoteToDelete(null);
-        setDeleteDialogOpen(false);
-      } catch (error) {
-        console.error("Failed to delete note:", error);
-      }
+    if (!noteToDelete) return;
+
+    try {
+      await deleteNote(noteToDelete);
+      setNoteToDelete(null);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to delete note:", error);
     }
-  }, [noteToDelete, deleteNote]);
+  }, [deleteNote, noteToDelete]);
 
   const openDeleteDialogForNote = useCallback((noteId: string) => {
     setNoteToDelete(noteId);
     setDeleteDialogOpen(true);
   }, []);
 
-  const refreshSettings = useCallback(() => {
-    notesService.getSettings().then(setSettings);
-  }, []);
-
-  // Memoize display items to prevent recalculation on every render
-  const displayItems = useMemo(() => {
-    if (searchQuery.trim()) {
-      return searchResults.map((r) => ({
-        id: r.id,
-        title: r.title,
-        preview: r.preview,
-        modified: r.modified,
-      }));
-    }
-    return notes;
-  }, [searchQuery, searchResults, notes]);
-
-  // Listen for focus request from editor (when Escape is pressed)
   useEffect(() => {
     const handleFocusNoteList = () => {
       containerRef.current?.focus();
@@ -318,10 +314,7 @@ export function NoteList() {
       window.removeEventListener("request-delete-note", handleRequestDelete);
   }, [openDeleteDialogForNote]);
 
-  const foldersEnabled = settings?.foldersEnabled === true;
-  const isSearching = searchQuery.trim().length > 0;
-
-  if (isLoading && notes.length === 0) {
+  if (isLoading && items.length === 0) {
     return (
       <div className="p-4 text-center text-text-muted select-none">
         Loading...
@@ -329,50 +322,11 @@ export function NoteList() {
     );
   }
 
-  if (isSearching && displayItems.length === 0) {
+  if (items.length === 0) {
     return (
-      <div className="p-4 text-center text-sm text-text-muted select-none">
-        No results found
+      <div className="px-4 py-6 text-center text-sm text-text-muted select-none">
+        {emptyMessage}
       </div>
-    );
-  }
-
-  if (displayItems.length === 0) {
-    return (
-      <div className="p-4 text-center text-sm text-text-muted select-none">
-        No notes yet
-      </div>
-    );
-  }
-
-  // Show folder tree view when folders enabled and not searching
-  if (foldersEnabled && !isSearching) {
-    return (
-      <>
-        <FolderTreeView pinnedIds={pinnedIds} settings={settings} />
-
-        {/* Delete confirmation dialog */}
-        <AlertDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete note?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete the note and all its content. This
-                action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm}>
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
     );
   }
 
@@ -384,7 +338,7 @@ export function NoteList() {
         data-note-list
         className="group/notelist flex flex-col gap-1 p-1.5 outline-none"
       >
-        {displayItems.map((item) => (
+        {items.map((item) => (
           <NoteItemWithMenu
             key={item.id}
             id={item.id}
@@ -399,11 +353,11 @@ export function NoteList() {
             onDuplicate={duplicateNote}
             onDelete={openDeleteDialogForNote}
             onRefreshSettings={refreshSettings}
+            showFolderPrefix={showFolderPrefix}
           />
         ))}
       </div>
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

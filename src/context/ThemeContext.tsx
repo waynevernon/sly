@@ -13,6 +13,7 @@ import type {
   FontFamily,
   TextDirection,
   EditorWidth,
+  PaneMode,
 } from "../types/note";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -36,6 +37,8 @@ const editorWidthMap: Record<Exclude<EditorWidth, "custom">, string> = {
 
 // Default custom width in px
 const DEFAULT_CUSTOM_WIDTH_PX = 768;
+const DEFAULT_PANE_MODE: PaneMode = 2;
+const PANE_MODE_STORAGE_KEY = "scratch:paneMode";
 
 // Default editor font settings (simplified)
 const defaultEditorFontSettings: Required<EditorFontSettings> = {
@@ -61,6 +64,9 @@ interface ThemeContextType {
   setTextDirection: (dir: TextDirection) => void;
   editorWidth: EditorWidth;
   setEditorWidth: (width: EditorWidth) => void;
+  paneMode: PaneMode;
+  setPaneMode: (mode: PaneMode) => void;
+  cyclePaneMode: () => void;
   interfaceZoom: number;
   setInterfaceZoom: (zoomOrUpdater: number | ((prev: number) => number)) => void;
   customEditorWidthPx: number;
@@ -125,6 +131,27 @@ function isTextDirection(value: unknown): value is TextDirection {
   return value === "auto" || value === "ltr" || value === "rtl";
 }
 
+function isPaneMode(value: unknown): value is PaneMode {
+  return value === 1 || value === 2 || value === 3;
+}
+
+function loadStoredPaneMode(): PaneMode | null {
+  try {
+    const value = Number(window.localStorage.getItem(PANE_MODE_STORAGE_KEY));
+    return isPaneMode(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredPaneMode(mode: PaneMode) {
+  try {
+    window.localStorage.setItem(PANE_MODE_STORAGE_KEY, String(mode));
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
+
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [editorFontSettings, setEditorFontSettings] = useState<
@@ -132,6 +159,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   >(defaultEditorFontSettings);
   const [textDirection, setTextDirectionState] = useState<TextDirection>("auto");
   const [editorWidth, setEditorWidthState] = useState<EditorWidth>("normal");
+  const [paneMode, setPaneModeState] = useState<PaneMode>(DEFAULT_PANE_MODE);
   const [interfaceZoom, setInterfaceZoomState] = useState(1.0);
   const [customEditorWidthPx, setCustomEditorWidthPxState] = useState<number>(
     DEFAULT_CUSTOM_WIDTH_PX
@@ -146,8 +174,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   // Function to load settings from backend
   const loadSettingsFromBackend = useCallback(async () => {
+    const storedPaneMode = loadStoredPaneMode();
+    if (storedPaneMode) {
+      setPaneModeState(storedPaneMode);
+    }
+
     try {
       const settings = await getSettings();
+      if (!storedPaneMode) {
+        const migratedPaneMode: PaneMode =
+          settings.foldersEnabled === true ? 3 : DEFAULT_PANE_MODE;
+        setPaneModeState(migratedPaneMode);
+        saveStoredPaneMode(migratedPaneMode);
+      }
       if (settings.theme) {
         const mode = settings.theme.mode as ThemeMode;
         if (mode === "light" || mode === "dark" || mode === "system") {
@@ -190,7 +229,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setCustomEditorWidthPxState(settings.customEditorWidthPx);
       }
     } catch {
-      // If settings can't be loaded, use defaults
+      if (!storedPaneMode) {
+        setPaneModeState(DEFAULT_PANE_MODE);
+        saveStoredPaneMode(DEFAULT_PANE_MODE);
+      }
     }
   }, []);
 
@@ -356,6 +398,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, []);
 
+  const setPaneMode = useCallback((mode: PaneMode) => {
+    setPaneModeState(mode);
+    saveStoredPaneMode(mode);
+  }, []);
+
+  const cyclePaneMode = useCallback(() => {
+    const order: PaneMode[] = [1, 2, 3];
+    const currentIndex = order.indexOf(paneMode);
+    const nextMode = order[(currentIndex + 1) % order.length];
+    setPaneMode(nextMode);
+  }, [paneMode, setPaneMode]);
+
   // Save and set interface zoom (accepts absolute value or updater function)
   const setInterfaceZoom = useCallback(
     (zoomOrUpdater: number | ((prev: number) => number)) => {
@@ -423,6 +477,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setTextDirection,
         editorWidth,
         setEditorWidth,
+        paneMode,
+        setPaneMode,
+        cyclePaneMode,
         interfaceZoom,
         setInterfaceZoom,
         customEditorWidthPx,

@@ -5,7 +5,7 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
 import { GitProvider } from "./context/GitContext";
 import { TooltipProvider, Toaster } from "./components/ui";
-import { Sidebar } from "./components/layout/Sidebar";
+import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
@@ -51,7 +51,7 @@ function AppContent() {
     isLoading,
     createNote,
     duplicateNote,
-    notes,
+    scopedNotes,
     selectedNoteId,
     selectNote,
     searchQuery,
@@ -60,14 +60,22 @@ function AppContent() {
     currentNote,
     syncNotesFolder,
   } = useNotes();
-  const { interfaceZoom, setInterfaceZoom, reloadSettings } = useTheme();
+  const {
+    interfaceZoom,
+    setInterfaceZoom,
+    reloadSettings,
+    paneMode,
+    setPaneMode,
+    cyclePaneMode,
+  } = useTheme();
   const interfaceZoomRef = useRef(interfaceZoom);
   interfaceZoomRef.current = interfaceZoom;
+  const paneModeRef = useRef(paneMode);
+  paneModeRef.current = paneMode;
   const currentNoteRef = useRef(currentNote);
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [view, setView] = useState<ViewState>("notes");
-  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiEditing, setAiEditing] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -92,18 +100,10 @@ function AppContent() {
     };
   }, [syncNotesFolder, reloadSettings]);
 
-  const toggleSidebar = useCallback(() => {
-    setSidebarVisible((prev) => !prev);
-  }, []);
-
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
       // Don't enter focus mode without a selected note
       if (!prev && !selectedNoteId) return prev;
-      if (prev) {
-        // Exiting focus mode — always restore sidebar
-        setSidebarVisible(true);
-      }
       return !prev;
     });
   }, [selectedNoteId]);
@@ -188,8 +188,8 @@ function AppContent() {
 
   // Memoize display items to prevent unnecessary recalculations
   const displayItems = useMemo(() => {
-    return searchQuery.trim() ? searchResults : notes;
-  }, [searchQuery, searchResults, notes]);
+    return searchQuery.trim() ? searchResults : scopedNotes;
+  }, [scopedNotes, searchQuery, searchResults]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -290,15 +290,22 @@ function AppContent() {
         e.key.toLowerCase() === "f"
       ) {
         e.preventDefault();
-        setSidebarVisible(true);
-        window.dispatchEvent(new CustomEvent("open-sidebar-search"));
+        if (focusMode) {
+          setFocusMode(false);
+        }
+        if (paneModeRef.current < 2) {
+          setPaneMode(2);
+        }
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent("open-notes-search"));
+        });
         return;
       }
 
-      // Cmd+\ - Toggle sidebar
+      // Cmd+\ - Cycle pane layout
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
-        toggleSidebar();
+        cyclePaneMode();
         return;
       }
 
@@ -351,6 +358,8 @@ function AppContent() {
         displayItems.length > 0 &&
         (e.key === "ArrowDown" || e.key === "ArrowUp") &&
         ((!isInEditor && !isInInput) || isEditorEmpty) &&
+        paneModeRef.current >= 2 &&
+        !focusMode &&
         !isInFolderTree
       ) {
         e.preventDefault();
@@ -386,8 +395,9 @@ function AppContent() {
       if (e.key === "Escape" && isInEditor) {
         e.preventDefault();
         (target as HTMLElement).blur();
-        // Focus the note list for keyboard navigation
-        window.dispatchEvent(new CustomEvent("focus-note-list"));
+        if (!focusMode && paneModeRef.current >= 2) {
+          window.dispatchEvent(new CustomEvent("focus-note-list"));
+        }
         return;
       }
     };
@@ -414,13 +424,15 @@ function AppContent() {
     };
   }, [
     createNote,
+    cyclePaneMode,
     duplicateNote,
     displayItems,
+    paneMode,
     reloadCurrentNote,
     selectedNoteId,
     selectNote,
+    setPaneMode,
     toggleSettings,
-    toggleSidebar,
     toggleFocusMode,
     focusMode,
     view,
@@ -453,14 +465,14 @@ function AppContent() {
           <SettingsPage onBack={closeSettings} />
         ) : (
           <>
-            <div
-              className={`transition-all duration-500 ease-out overflow-hidden ${!sidebarVisible || focusMode ? "opacity-0 -translate-x-4 w-0 pointer-events-none" : "opacity-100 translate-x-0 w-64"}`}
-            >
-              <Sidebar onOpenSettings={toggleSettings} />
-            </div>
+            <WorkspaceNavigation
+              paneMode={focusMode ? 1 : paneMode}
+              onOpenSettings={toggleSettings}
+            />
             <Editor
-              onToggleSidebar={toggleSidebar}
-              sidebarVisible={sidebarVisible}
+              paneMode={paneMode}
+              onCyclePaneMode={cyclePaneMode}
+              onOpenSettings={toggleSettings}
               focusMode={focusMode}
               onEditorReady={(editor) => {
                 editorRef.current = editor;

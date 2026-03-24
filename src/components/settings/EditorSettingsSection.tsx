@@ -1,7 +1,12 @@
 import { useTheme } from "../../context/ThemeContext";
 import { Button, IconButton, Input, Select } from "../ui";
-import type { FontFamily, TextDirection, EditorWidth } from "../../types/note";
-import { EyeIcon, MinusIcon, PlusIcon } from "../icons";
+import type {
+  FontFamily,
+  TextDirection,
+  EditorWidth,
+  PaneMode,
+} from "../../types/note";
+import { ColumnsIcon, EyeIcon, MinusIcon, PlusIcon } from "../icons";
 
 // Text direction options
 const textDirectionOptions: { value: TextDirection; label: string }[] = [
@@ -26,6 +31,12 @@ const fontFamilyOptions: { value: FontFamily; label: string }[] = [
   { value: "monospace", label: "Mono" },
 ];
 
+const paneModeOptions: { value: PaneMode; label: string }[] = [
+  { value: 1, label: "1 Pane" },
+  { value: 2, label: "2 Panes" },
+  { value: 3, label: "3 Panes" },
+];
+
 // Bold weight options (medium excluded for monospace)
 const boldWeightOptions = [
   { value: 500, label: "Medium", excludeForMonospace: true },
@@ -46,6 +57,8 @@ export function AppearanceSettingsSection() {
     setTextDirection,
     editorWidth,
     setEditorWidth,
+    paneMode,
+    setPaneMode,
     interfaceZoom,
     setInterfaceZoom,
     customEditorWidthPx,
@@ -219,6 +232,27 @@ export function AppearanceSettingsSection() {
                 </option>
               ))}
             </Select>
+          </div>
+
+          {/* Page Width */}
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-text font-medium">
+              Workspace Layout
+            </label>
+            <div className="flex gap-1 p-1 rounded-[10px] border border-border">
+              {paneModeOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  onClick={() => setPaneMode(option.value)}
+                  variant={paneMode === option.value ? "primary" : "ghost"}
+                  size="xs"
+                  className="gap-1.5 min-w-19"
+                >
+                  <ColumnsIcon className="w-4 h-4 stroke-[1.6]" />
+                  {option.label}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Page Width */}

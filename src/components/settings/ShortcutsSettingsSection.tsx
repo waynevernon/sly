@@ -49,7 +49,7 @@ const shortcuts: Shortcut[] = [
   },
   {
     keys: [mod, "\\"],
-    description: "Toggle sidebar",
+    description: "Cycle workspace layout",
     category: "Navigation",
   },
   {

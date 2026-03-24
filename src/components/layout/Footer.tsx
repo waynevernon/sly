@@ -1,4 +1,4 @@
-import { useCallback, memo } from "react";
+import { memo, useCallback } from "react";
 import { toast } from "sonner";
 import { useGit } from "../../context/GitContext";
 import { Button, IconButton, Tooltip } from "../ui";
@@ -7,11 +7,11 @@ import {
   GitBranchDeletedIcon,
   GitCommitIcon,
   RefreshCwIcon,
-  SpinnerIcon,
   SettingsIcon,
+  SpinnerIcon,
 } from "../icons";
 import { cn } from "../../lib/utils";
-import { mod, isMac } from "../../lib/platform";
+import { isMac, mod } from "../../lib/platform";
 
 interface FooterProps {
   onOpenSettings?: () => void;
@@ -153,29 +153,13 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
           ? `${aheadCount} commit${aheadCount === 1 ? "" : "s"} to push`
           : "Synced with remote";
 
-  const hasGitFooterContent =
-    showCommitButton || showSyncButton || renderGitStatus() !== null;
-
-  // When there's no git content, show a floating settings button
-  if (!hasGitFooterContent) {
-    return (
-      <div className="absolute bottom-3 right-3">
-        <IconButton
-          onClick={onOpenSettings}
-          title={`Settings (${mod}${isMac ? "" : "+"}, to toggle)`}
-          className="rounded-lg bg-bg-secondary border border-border hover:bg-bg-muted backdrop-blur-sm w-8 h-8"
-        >
-          <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-        </IconButton>
-      </div>
-    );
-  }
+  const gitStatus = renderGitStatus();
 
   return (
     <div className="shrink-0 border-t border-border">
       {/* Footer bar with git status and action buttons */}
       <div className="pl-4 pr-3 pt-2 pb-2.5 flex items-center justify-between">
-        {renderGitStatus()}
+        <div className="min-w-0">{gitStatus}</div>
         <div className="flex items-center gap-px">
           {/* Sync button — pulls then pushes, always visible when upstream is configured */}
           {showSyncButton && (
@@ -218,12 +202,14 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
               )}
             </IconButton>
           )}
-          <IconButton
-            onClick={onOpenSettings}
-            title={`Settings (${mod}${isMac ? "" : "+"}, to toggle)`}
-          >
-            <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-          </IconButton>
+          {onOpenSettings && (
+            <IconButton
+              onClick={onOpenSettings}
+              title={`Settings (${mod}${isMac ? "" : "+"},)`}
+            >
+              <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+            </IconButton>
+          )}
         </div>
       </div>
     </div>

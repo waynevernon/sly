@@ -60,7 +60,7 @@ import { plainTextFromMarkdown } from "../../lib/plainText";
 import { Button, IconButton, ToolbarButton, Tooltip } from "../ui";
 import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
-import type { Settings } from "../../types/note";
+import type { PaneMode, Settings } from "../../types/note";
 import {
   BoldIcon,
   ItalicIcon,
@@ -93,6 +93,7 @@ import {
   MarkdownIcon,
   MarkdownOffIcon,
   FolderPlusIcon,
+  SettingsIcon,
 } from "../icons";
 
 function formatDateTime(timestamp: number): string {
@@ -105,6 +106,16 @@ function formatDateTime(timestamp: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatPaneModeLabel(mode: PaneMode): string {
+  if (mode === 1) return "1 Pane";
+  if (mode === 2) return "2 Panes";
+  return "3 Panes";
+}
+
+function getNextPaneMode(mode: PaneMode): PaneMode {
+  return mode === 3 ? 1 : ((mode + 1) as PaneMode);
 }
 
 function focusAndSelectTitle(editor: TiptapEditor): boolean {
@@ -424,8 +435,9 @@ export interface PreviewModeData {
 }
 
 interface EditorProps {
-  onToggleSidebar?: () => void;
-  sidebarVisible?: boolean;
+  paneMode?: PaneMode;
+  onCyclePaneMode?: () => void;
+  onOpenSettings?: () => void;
   focusMode?: boolean;
   previewMode?: PreviewModeData;
   onEditorReady?: (editor: TiptapEditor | null) => void;
@@ -434,8 +446,9 @@ interface EditorProps {
 }
 
 export function Editor({
-  onToggleSidebar,
-  sidebarVisible,
+  paneMode = 2,
+  onCyclePaneMode,
+  onOpenSettings,
   focusMode,
   onEditorReady,
   previewMode,
@@ -485,6 +498,8 @@ export function Editor({
   const [settings, setSettings] = useState<Settings | null>(null);
   // Delay transition classes until after initial mount to avoid format bar height animation on note load
   const [hasTransitioned, setHasTransitioned] = useState(false);
+  const [isCollapsingToSinglePane, setIsCollapsingToSinglePane] =
+    useState(false);
   useEffect(() => {
     if (!hasTransitioned && currentNote) {
       const id = requestAnimationFrame(() => setHasTransitioned(true));
@@ -492,9 +507,30 @@ export function Editor({
     }
   }, [hasTransitioned, currentNote]);
 
-  // Delay format bar / header transitions only when the sidebar needs to animate closed
-  const needsSidebarDelay = focusMode && sidebarVisible;
-  const isSidebarActive = sidebarVisible && !focusMode;
+  const previousPaneModeRef = useRef(paneMode);
+  useEffect(() => {
+    if (focusMode) {
+      previousPaneModeRef.current = paneMode;
+      setIsCollapsingToSinglePane(false);
+      return;
+    }
+
+    if (previousPaneModeRef.current > 1 && paneMode === 1) {
+      setIsCollapsingToSinglePane(true);
+      const timeout = window.setTimeout(() => {
+        setIsCollapsingToSinglePane(false);
+      }, 240);
+      previousPaneModeRef.current = paneMode;
+      return () => window.clearTimeout(timeout);
+    }
+
+    previousPaneModeRef.current = paneMode;
+    setIsCollapsingToSinglePane(false);
+  }, [focusMode, paneMode]);
+
+  const effectivePaneMode = focusMode ? 1 : paneMode;
+  const needsPaneDelay = focusMode && paneMode > 1;
+  const navigationVisible = effectivePaneMode > 1;
   // Source mode state
   const [sourceMode, setSourceMode] = useState(false);
   const [sourceContent, setSourceContent] = useState("");
@@ -1893,21 +1929,17 @@ export function Editor({
       <div
         className={cn(
           "h-11 shrink-0 flex items-center justify-between px-3",
-          !isSidebarActive && "pl-22",
+          !navigationVisible && (isMac ? "pl-22" : "pl-4"),
         )}
         data-tauri-drag-region
       >
         <div
-          className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-400 ${needsSidebarDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-400 ${needsPaneDelay ? "delay-200" : ""} ${focusMode || isCollapsingToSinglePane ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
-          {onToggleSidebar && (
+          {onCyclePaneMode && (
             <IconButton
-              onClick={onToggleSidebar}
-              title={
-                isSidebarActive
-                  ? `Hide sidebar (${mod}${isMac ? "" : "+"}\\)`
-                  : `Show sidebar (${mod}${isMac ? "" : "+"}\\)`
-              }
+              onClick={onCyclePaneMode}
+              title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
               className="shrink-0"
             >
               <PanelLeftIcon className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -1918,7 +1950,7 @@ export function Editor({
           </span>
         </div>
         <div
-          className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-400 ${needsSidebarDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-400 ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
           {hasExternalChanges ? (
             <Tooltip
@@ -2069,6 +2101,13 @@ export function Editor({
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
+          {onOpenSettings && (
+            <Tooltip content={`Settings (${mod}${isMac ? "" : "+"},)`}>
+              <IconButton onClick={onOpenSettings}>
+                <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+              </IconButton>
+            </Tooltip>
+          )}
           {onSaveToFolder && (
             <Tooltip content="Save in Folder">
               <IconButton
@@ -2089,7 +2128,7 @@ export function Editor({
 
       {/* Format Bar – transition only after initial mount to avoid height animation on note load */}
       <div
-        className={`${focusMode || sourceMode ? "opacity-0 max-h-0 overflow-hidden pointer-events-none" : "opacity-100 max-h-20"} ${hasTransitioned ? `transition-all duration-400 ${needsSidebarDelay ? "delay-200" : ""}` : ""}`}
+        className={`${focusMode || sourceMode ? "opacity-0 max-h-0 overflow-hidden pointer-events-none" : "opacity-100 max-h-20"} ${hasTransitioned ? `transition-all duration-400 ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
       >
         <FormatBar
           editor={editor}

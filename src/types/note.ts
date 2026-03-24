@@ -20,6 +20,7 @@ export interface ThemeSettings {
 export type FontFamily = "system-sans" | "serif" | "monospace";
 export type TextDirection = "auto" | "ltr" | "rtl";
 export type EditorWidth = "narrow" | "normal" | "wide" | "full" | "custom";
+export type PaneMode = 1 | 2 | 3;
 
 export interface EditorFontSettings {
   baseFontFamily?: FontFamily;
