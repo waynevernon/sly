@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon, XIcon } from "../icons";
-import { IconButton } from "../ui";
+import { IconButton, PopoverSurface } from "../ui";
 
 export interface BlockMathEditorProps {
   initialLatex: string;
@@ -40,14 +40,14 @@ export const BlockMathEditor = ({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 bg-bg border border-border rounded-lg shadow-md p-1.5 w-84">
+    <PopoverSurface className="flex w-84 flex-col gap-1.5">
       <textarea
         ref={textareaRef}
         value={latex}
         onChange={(e) => setLatex(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Enter KaTeX expression..."
-        className="w-full h-30 resize-y rounded-md border border-border bg-bg px-2.5 py-2 text-sm text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
+        className="ui-focus-ring w-full h-30 resize-y rounded-[var(--ui-radius-md)] border border-border bg-bg px-2.5 py-2 text-sm text-text font-mono"
       />
       <div className="flex items-center justify-end gap-1 mr-0.5 mb-0.5">
         <IconButton
@@ -69,6 +69,6 @@ export const BlockMathEditor = ({
           <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
         </IconButton>
       </div>
-    </div>
+    </PopoverSurface>
   );
 };

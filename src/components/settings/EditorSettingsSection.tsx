@@ -226,10 +226,10 @@ export function AppearanceSettingsSection() {
   ]);
 
   return (
-    <div className="space-y-8 py-8">
-      <section className="pb-2">
+    <div className="space-y-10 pt-8 pb-10">
+      <section className="space-y-4">
         <h2 className="text-xl font-medium mb-3">Theme</h2>
-        <div className="flex gap-2 p-1 rounded-[10px] border border-border mb-3">
+        <div className="ui-settings-toggle-group mb-3">
           {(["light", "dark", "system"] as ThemeMode[]).map((mode) => (
             <Button
               key={mode}
@@ -243,7 +243,7 @@ export function AppearanceSettingsSection() {
           ))}
         </div>
 
-        <div className="rounded-[10px] border border-border px-4 py-3 space-y-3">
+        <div className="ui-settings-panel px-4 py-4 space-y-3">
           <div className="flex items-center justify-between gap-4">
             <label className="text-sm text-text font-medium">Light Theme</label>
             <Select
@@ -282,7 +282,7 @@ export function AppearanceSettingsSection() {
         )}
       </section>
 
-      <div className="border-t border-border border-dashed" />
+      <div className="ui-settings-separator" />
 
       <section>
         <div className="flex items-baseline justify-between mb-3">
@@ -298,7 +298,7 @@ export function AppearanceSettingsSection() {
           )}
         </div>
 
-        <div className="rounded-[10px] border border-border pl-4 py-3 pr-3 space-y-4">
+        <div className="ui-settings-panel pl-4 py-4 pr-4 space-y-4">
           <FontChoiceControl
             label="UI Font"
             value={uiFont}
@@ -334,7 +334,7 @@ export function AppearanceSettingsSection() {
                 onChange={(e) =>
                   handleNumericChange("baseFontSize", e.target.value, 12, 24)
                 }
-                className="w-full h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
@@ -368,7 +368,7 @@ export function AppearanceSettingsSection() {
                 onChange={(e) =>
                   handleNumericChange("lineHeight", e.target.value, 1.0, 2.5)
                 }
-                className="w-full h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
@@ -396,7 +396,7 @@ export function AppearanceSettingsSection() {
             <label className="text-sm text-text font-medium">
               Workspace Layout
             </label>
-            <div className="flex gap-1 p-1 rounded-[10px] border border-border">
+            <div className="ui-settings-toggle-group">
               {paneModeOptions.map((option) => (
                 <Button
                   key={option.value}
@@ -445,7 +445,7 @@ export function AppearanceSettingsSection() {
                       setCustomEditorWidthPx(parsed);
                     }
                   }}
-                  className="w-full h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="text-sm text-text-muted">px</span>
               </div>
@@ -488,7 +488,7 @@ export function AppearanceSettingsSection() {
             <span>Preview</span>
           </div>
           <div className="absolute top-3 right-4 z-10">
-            <div className="flex gap-1 p-1 rounded-[10px] border border-border bg-bg/80 backdrop-blur">
+            <div className="ui-settings-toggle-group bg-bg/80 backdrop-blur">
               {[
                 { value: "resolved", label: "Live" },
                 { value: "light", label: "Light" },
@@ -509,7 +509,7 @@ export function AppearanceSettingsSection() {
           </div>
 
           <div
-            className={`border border-border rounded-[10px] p-6 pt-20 max-h-160 overflow-hidden rounded-t-lg ${
+            className={`ui-settings-panel p-6 pt-20 max-h-160 overflow-hidden ${
               previewTheme === "dark" ? "dark" : ""
             }`}
             style={previewStyle}

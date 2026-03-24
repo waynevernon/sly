@@ -107,7 +107,7 @@ export function InlineNameEditor({
         }
       }}
       className={cn(
-        "h-8 rounded-md border-border bg-bg px-2.5 py-1.5 text-sm font-medium text-text shadow-none",
+        "h-[var(--ui-control-height-standard)] rounded-[var(--ui-radius-md)] border-border bg-bg px-2.5 py-1.5 text-sm font-medium text-text shadow-none",
         className
       )}
     />

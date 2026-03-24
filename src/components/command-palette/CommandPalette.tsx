@@ -27,6 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  DialogShell,
 } from "../ui";
 import {
   cleanPreviewText,
@@ -640,7 +641,7 @@ export function CommandPalette({
       const selectedItem = listRef.current.querySelector(
         `[data-index="${selectedIndex}"]`,
       );
-      selectedItem?.scrollIntoView({ block: "center", behavior: "smooth" });
+      selectedItem?.scrollIntoView({ block: "nearest" });
     }
   }, [selectedIndex]);
 
@@ -693,9 +694,11 @@ export function CommandPalette({
   const commandsCount = filteredCommands.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center py-11 px-4 pointer-events-none">
-      {/* Palette */}
-      <div className="relative w-full h-full max-h-108 max-w-2xl bg-bg rounded-xl shadow-2xl overflow-hidden border border-border animate-slide-down flex flex-col pointer-events-auto">
+    <>
+      <DialogShell
+        onBackdropClick={onClose}
+        panelClassName="max-w-2xl h-full max-h-108 flex flex-col"
+      >
         {/* Search input */}
         <div className="border-b border-border flex-none">
           <input
@@ -709,7 +712,7 @@ export function CommandPalette({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="w-full px-4.5 py-3.5 text-[17px] bg-transparent outline-none text-text placeholder-text-muted/50"
+            className="ui-focus-ring-subtle h-[var(--ui-control-height-prominent)] w-full border-0 bg-transparent px-4 py-3 text-[17px] text-text placeholder:text-text-muted/50"
           />
         </div>
 
@@ -772,7 +775,7 @@ export function CommandPalette({
             </>
           )}
         </div>
-      </div>
+      </DialogShell>
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -792,6 +795,6 @@ export function CommandPalette({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

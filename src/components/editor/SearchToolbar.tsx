@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { Input, IconButton } from "../ui";
+import { Input, IconButton, PopoverSurface } from "../ui";
 import { ArrowUpIcon, ArrowDownIcon, XIcon } from "../icons";
 import { shift } from "../../lib/platform";
 
@@ -50,7 +50,7 @@ export function SearchToolbar({
   };
 
   return (
-    <div className="flex items-center gap-1.5 bg-bg border border-border rounded-lg shadow-lg p-1">
+    <PopoverSurface className="flex items-center gap-1.5">
       <Input
         ref={inputRef}
         type="text"
@@ -86,6 +86,6 @@ export function SearchToolbar({
           <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
         </IconButton>
       </div>
-    </div>
+    </PopoverSurface>
   );
 }

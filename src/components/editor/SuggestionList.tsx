@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../../lib/utils";
+import { PopoverSurface } from "../ui";
 
 export interface SuggestionListRef {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
@@ -68,22 +69,17 @@ function SuggestionListInner<T>(
 
   if (items.length === 0) {
     return (
-      <div
-        className={cn(
-          "bg-bg border border-border rounded-lg shadow-lg p-2",
-          width,
-        )}
-      >
+      <PopoverSurface className={cn("p-2", width)}>
         <div className="text-sm text-text-muted px-3 py-2">{emptyText}</div>
-      </div>
+      </PopoverSurface>
     );
   }
 
   return (
-    <div
+    <PopoverSurface
       ref={listRef}
       className={cn(
-        "bg-bg border border-border rounded-lg shadow-lg p-1.5 max-h-80 overflow-y-auto animate-slide-down flex flex-col gap-0.5",
+        "max-h-80 overflow-y-auto flex flex-col gap-0.5",
         width,
       )}
     >
@@ -104,7 +100,7 @@ function SuggestionListInner<T>(
           {renderItem(item, selectedIndex === index)}
         </div>
       ))}
-    </div>
+    </PopoverSurface>
   );
 }
 

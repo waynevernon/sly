@@ -225,8 +225,12 @@ export function AiResponseToast({ output, provider }: AiResponseToastProps) {
         <div className="text-text-muted max-h-60 overflow-y-auto pr-2">
           {parseMarkdown(output)}
         </div>
-        <div className="text-xs text-text-muted mt-2 pt-2.5 border-t border-border border-dashed">
-          Use {mod}+Z to undo changes
+        <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2.5 text-xs text-text-muted">
+          <span>Use</span>
+          <kbd className="ui-kbd">{mod}</kbd>
+          <span>+</span>
+          <kbd className="ui-kbd">Z</kbd>
+          <span>to undo changes</span>
         </div>
       </div>
     </div>

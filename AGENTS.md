@@ -339,13 +339,6 @@ The app watches the notes folder for external changes (e.g., from AI agents or o
 - Non-blocking operations (async everything)
 - Error handling with user-friendly messages
 
-### Design Principles
-- Beauty through restraint: use spacing, typography, rhythm, and alignment before adding more chrome
-- Writing comes first: navigation and controls should support the note, not compete with it
-- Calm hierarchy: each screen should have one primary focal plane and clearly subordinate secondary surfaces
-- Dense, not cluttered: fit useful information in view, but remove decorative noise and duplicate controls
-- Motion with purpose: transitions should explain layout changes and preserve orientation, never feel ornamental
-- Native-feeling interaction: respect platform conventions, especially title bar behavior, keyboard shortcuts, and pane affordances
-- Consistency over cleverness: repeated UI patterns should behave the same way everywhere
-- Progressive disclosure: keep the default surface simple and reveal advanced controls only when they are relevant
-- Navigation should recede: folders and note lists are supporting panes; the editor is the primary canvas
+### UI Design Reference
+
+Before changing user-facing UI, consult `docs/ui-design-language.md`. Treat it as the canonical design-language reference and `docs/ui-audit-2026-03-24.md` as the supporting rationale/backlog snapshot. Do not duplicate UI rules here unless they are truly repo-wide engineering constraints rather than design-language guidance.

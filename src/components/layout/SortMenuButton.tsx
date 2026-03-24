@@ -1,6 +1,12 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { CheckIcon, ListOrderedIcon } from "../icons";
-import { IconButton } from "../ui";
+import {
+  IconButton,
+  menuItemClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
+} from "../ui";
 
 interface SortOption<T extends string> {
   value: T;
@@ -13,13 +19,6 @@ interface SortMenuButtonProps<T extends string> {
   options: SortOption<T>[];
   onChange: (value: T) => void;
 }
-
-const contentClassName =
-  "min-w-52 rounded-md border border-border bg-bg p-1 shadow-lg z-50";
-const labelClassName = "px-2.5 py-1 text-xs font-medium text-text-muted";
-const separatorClassName = "my-1 h-px bg-border";
-const itemClassName =
-  "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2.5 text-sm text-text outline-none hover:bg-bg-muted focus:bg-bg-muted";
 
 export function SortMenuButton<T extends string>({
   title,
@@ -38,12 +37,12 @@ export function SortMenuButton<T extends string>({
         <DropdownMenu.Content
           sideOffset={8}
           align="end"
-          className={contentClassName}
+          className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
-          <DropdownMenu.Label className={labelClassName}>
+          <DropdownMenu.Label className={menuLabelClassName}>
             {title}
           </DropdownMenu.Label>
-          <DropdownMenu.Separator className={separatorClassName} />
+          <DropdownMenu.Separator className={menuSeparatorClassName} />
           <DropdownMenu.RadioGroup
             value={value}
             onValueChange={(nextValue) => onChange(nextValue as T)}
@@ -52,7 +51,7 @@ export function SortMenuButton<T extends string>({
               <DropdownMenu.RadioItem
                 key={option.value}
                 value={option.value}
-                className={itemClassName}
+                className={`${menuItemClassName} relative pl-8 pr-2.5`}
               >
                 <span className="absolute left-2.5 inline-flex h-4 w-4 items-center justify-center text-text-muted">
                   <DropdownMenu.ItemIndicator>

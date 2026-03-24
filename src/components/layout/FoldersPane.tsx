@@ -3,6 +3,7 @@ import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
 import { IconButton } from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
+import { Footer } from "./Footer";
 import { SortMenuButton } from "./SortMenuButton";
 
 const folderSortOptions: { value: FolderSortMode; label: string }[] = [
@@ -11,15 +12,19 @@ const folderSortOptions: { value: FolderSortMode; label: string }[] = [
   { value: "nameDesc", label: "Name (Z-A)" },
 ];
 
-export function FoldersPane() {
+interface FoldersPaneProps {
+  onOpenSettings?: () => void;
+}
+
+export function FoldersPane({ onOpenSettings }: FoldersPaneProps) {
   const { folderSortMode, setFolderSortMode } = useNotes();
 
   return (
     <div className="h-full bg-bg-secondary border-r border-border/80 flex flex-col select-none">
-      <div className="h-11 shrink-0" data-tauri-drag-region></div>
-      <div className="flex items-center justify-between pl-4 pr-3 pb-2 border-b border-border/80 shrink-0">
+      <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+      <div className="ui-pane-header border-border/80">
         <div className="font-medium text-base text-text">Folders</div>
-        <div className="flex items-center gap-px">
+        <div className="ui-pane-header-actions">
           <SortMenuButton
             title="Sort Folders"
             value={folderSortMode}
@@ -40,9 +45,11 @@ export function FoldersPane() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto py-2.5">
         <FolderTreeView />
       </div>
+
+      <Footer onOpenSettings={onOpenSettings} />
     </div>
   );
 }

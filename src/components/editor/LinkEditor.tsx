@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { CheckIcon, XIcon, LinkOffIcon } from "../icons";
-import { Input, IconButton } from "../ui";
+import { Input, IconButton, PopoverSurface } from "../ui";
 
 export interface LinkEditorProps {
   initialUrl: string;
@@ -61,8 +61,8 @@ export const LinkEditor = ({
   };
 
   return (
-    <div
-      className={`flex gap-0.5 bg-bg border border-border rounded-lg shadow-md p-1.5 ${
+    <PopoverSurface
+      className={`flex gap-0.5 p-1.5 ${
         needsText ? "flex-col items-stretch" : "items-center"
       }`}
     >
@@ -74,7 +74,7 @@ export const LinkEditor = ({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Link text..."
-            className="w-70 h-9"
+            className="w-70"
             onKeyDown={handleKeyDown}
             tabIndex={0}
           />
@@ -85,7 +85,7 @@ export const LinkEditor = ({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Enter URL..."
-          className={needsText ? "w-70 h-9" : "w-55 h-9"}
+          className={needsText ? "w-70" : "w-55"}
           onKeyDown={handleKeyDown}
           tabIndex={0}
         />
@@ -125,6 +125,6 @@ export const LinkEditor = ({
           <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
         </IconButton>
       </div>
-    </div>
+    </PopoverSurface>
   );
 };

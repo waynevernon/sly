@@ -311,15 +311,15 @@ export function GeneralSettingsSection() {
   };
 
   return (
-    <div className="space-y-8 py-8">
+    <div className="space-y-10 pt-8 pb-10">
       {/* Folder Location */}
-      <section className="pb-2">
+      <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">Folder Location</h2>
         <p className="text-sm text-text-muted mb-4">
           Your notes are stored as markdown files in this folder
         </p>
-        <div className="flex items-center gap-2.5 p-2.5 rounded-[10px] border border-border mb-2.5">
-          <div className="p-2 rounded-md bg-bg-muted">
+        <div className="ui-settings-panel flex items-center gap-2.5 p-3 mb-2.5">
+          <div className="p-2 rounded-[var(--ui-radius-md)] bg-bg-muted">
             <FolderIcon className="w-4.5 h-4.5 stroke-[1.5] text-text-muted" />
           </div>
           <p
@@ -353,10 +353,10 @@ export function GeneralSettingsSection() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-border border-dashed" />
+      <div className="ui-settings-separator" />
 
       {/* Git Section */}
-      <section className="pb-2 flex flex-col gap-4">
+      <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-6">
           <div className="flex flex-col gap-0.75">
             <h2 className="text-xl font-medium">Version Control</h2>
@@ -364,7 +364,7 @@ export function GeneralSettingsSection() {
               Track changes and store backups of your notes using Git
             </p>
           </div>
-          <div className="flex gap-1 p-1 rounded-[10px] border border-border">
+          <div className="ui-settings-toggle-group">
             <Button
               onClick={() => handleToggleGitEnabled(false)}
               variant={!gitEnabled ? "primary" : "ghost"}
@@ -384,14 +384,14 @@ export function GeneralSettingsSection() {
           </div>
         </div>
         {!gitEnabled ? null : !gitAvailable ? (
-          <div className="bg-bg-secondary rounded-[10px] border border-border p-4">
+          <div className="ui-status-panel-warning p-4">
             <p className="text-sm text-text-muted">
               Git is not available on this system.{" "}
               <a
                 href="https://git-scm.com/downloads"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-text-muted border-b border-text-muted/50 hover:text-text hover:border-text cursor-pointer transition-colors"
+                className="ui-inline-link"
               >
                 Install Git
               </a>{" "}
@@ -399,12 +399,12 @@ export function GeneralSettingsSection() {
             </p>
           </div>
         ) : isLoading ? (
-          <div className="rounded-[10px] border border-border p-4 flex items-center justify-center">
+          <div className="ui-settings-panel p-4 flex items-center justify-center">
             <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
           </div>
         ) : !status?.isRepo ? (
-          <div className="bg-bg-secondary rounded-[10px] border border-border p-4">
-            <p className="text-sm text-text-muted mb-2">
+          <div className="ui-settings-panel p-4">
+            <p className="text-sm text-text-muted mb-3">
               Enable Git to track changes to your notes with version control.
               Your changes will be tracked automatically and you can commit and
               push from the sidebar.
@@ -420,7 +420,7 @@ export function GeneralSettingsSection() {
           </div>
         ) : (
           <>
-            <div className="rounded-[10px] border border-border p-4 space-y-2.5">
+            <div className="ui-settings-panel p-4 space-y-2.5">
               {/* Branch status */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text font-medium">Status</span>
@@ -473,12 +473,12 @@ export function GeneralSettingsSection() {
                     </div>
                   ) : (
                     status.currentBranch && (
-                      <div className="pt-3 border-t border-border border-dashed space-y-0.5">
+                      <div className="pt-3 border-t border-border space-y-0.5">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-text font-medium">
                             Tracking
                           </span>
-                          <span className="text-sm font-medium text-amber-500">
+                          <span className="text-sm font-medium text-[var(--color-warning)]">
                             Not set up
                           </span>
                         </div>
@@ -506,12 +506,12 @@ export function GeneralSettingsSection() {
                   )}
                 </>
               ) : (
-                <div className="pt-3 border-t border-border border-dashed space-y-2.5">
+                <div className="pt-3 border-t border-border space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-text font-medium">
                       Remote
                     </span>
-                    <span className="text-sm font-medium text-orange-500">
+                    <span className="text-sm font-medium text-[var(--color-warning)]">
                       Not connected
                     </span>
                   </div>
@@ -572,7 +572,7 @@ export function GeneralSettingsSection() {
 
               {/* Changes count */}
               {status.changedCount > 0 && (
-                <div className="flex items-center justify-between pt-3 border-t border-border border-dashed">
+                <div className="flex items-center justify-between pt-3 border-t border-border">
                   <span className="text-sm text-text font-medium">
                     Changes to commit
                   </span>
@@ -612,15 +612,17 @@ export function GeneralSettingsSection() {
               {/* Error display */}
               {lastError && (
                 <div className="pt-3 border-t border-border">
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3">
-                    <p className="text-sm text-red-500">{lastError}</p>
+                  <div className="ui-status-panel-danger p-3">
+                    <p className="text-sm text-[var(--color-danger)]">
+                      {lastError}
+                    </p>
                     {(lastError.includes("Authentication") ||
                       lastError.includes("SSH")) && (
                       <a
                         href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-red-400 hover:text-red-300 underline mt-1 inline-block"
+                        className="mt-1 inline-block text-xs text-[var(--color-danger)] underline"
                       >
                         Learn more about SSH authentication
                       </a>
@@ -628,7 +630,7 @@ export function GeneralSettingsSection() {
                     <Button
                       onClick={clearError}
                       variant="link"
-                      className="block text-xs h-auto p-0 mt-2 text-red-400 hover:text-red-300"
+                      className="block text-xs h-auto p-0 mt-2 text-[var(--color-danger)] hover:opacity-80"
                     >
                       Dismiss
                     </Button>
@@ -641,10 +643,10 @@ export function GeneralSettingsSection() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-border border-dashed" />
+      <div className="ui-settings-separator" />
 
       {/* New Note Template */}
-      <section className="pb-2">
+      <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">Default Note Name</h2>
         <p className="text-sm text-text-muted mb-4">
           Customize the default name when creating a new note
@@ -660,7 +662,7 @@ export function GeneralSettingsSection() {
               placeholder="Untitled"
             />
           </div>
-          <div className="text-2xs text-text-muted font-mono p-2 rounded-md bg-bg-muted mb-4">
+          <div className="ui-settings-panel text-2xs text-text-muted font-mono px-3 py-2 mb-4">
             Preview: {previewNoteName}
           </div>
 
@@ -696,10 +698,10 @@ export function GeneralSettingsSection() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-border border-dashed" />
+      <div className="ui-settings-separator" />
 
       {/* AI Providers */}
-      <section className="pb-2">
+      <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">AI Providers</h2>
         <p className="text-sm text-text-muted mb-4">
           Edit notes with AI from the command palette ({mod}P while editing a
@@ -721,7 +723,7 @@ export function GeneralSettingsSection() {
               return (
                 <div
                   key={provider}
-                  className="flex items-center justify-between p-3 rounded-[10px] border border-border"
+                  className="ui-settings-panel flex items-center justify-between p-3"
                 >
                   <div className="flex items-center gap-2.5">
                     <info.icon className="w-4.5 h-4.5 text-text-muted" />
@@ -754,31 +756,31 @@ export function GeneralSettingsSection() {
       {/* CLI Tool (macOS only) */}
       {(cli.loaded && cli.status?.supported) || cli.error ? (
         <>
-          <div className="border-t border-border border-dashed" />
+          <div className="ui-settings-separator" />
 
-          <section className="pb-2">
+          <section className="space-y-4">
             <h2 className="text-xl font-medium mb-0.5">CLI Tool</h2>
             <p className="text-sm text-text-muted mb-4">
               Open notes from the terminal with the{" "}
-              <code className="font-mono text-xs bg-bg-muted px-1.5 py-0.5 rounded">
+              <code className="ui-kbd font-mono">
                 scratch
               </code>{" "}
               command
             </p>
 
             {cli.error ? (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3">
-                <p className="text-sm text-red-500">
+              <div className="ui-status-panel-danger p-3">
+                <p className="text-sm text-[var(--color-danger)]">
                   Failed to check CLI status. Please restart the app.
                 </p>
               </div>
             ) : cli.status === null ? (
-              <div className="rounded-[10px] border border-border p-4 flex items-center justify-center">
+              <div className="ui-settings-panel p-4 flex items-center justify-center">
                 <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
               </div>
             ) : cli.status.installed ? (
               <>
-                <div className="rounded-[10px] border border-border p-4 space-y-3 mb-2.5">
+                <div className="ui-settings-panel p-4 space-y-3 mb-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-text font-medium">
                       Status
@@ -792,7 +794,7 @@ export function GeneralSettingsSection() {
                       </span>
                       <button
                         type="button"
-                        className="text-xs font-mono text-text-muted bg-bg-muted px-2 py-0.5 rounded max-w-48 truncate cursor-pointer hover:bg-bg-hover transition-colors"
+                        className="ui-copy-chip max-w-48 truncate cursor-pointer"
                         title="Click to copy path"
                         onClick={async () => {
                           try {
@@ -807,7 +809,7 @@ export function GeneralSettingsSection() {
                       </button>
                     </div>
                   )}
-                  <div className="pt-3 border-t border-border border-dashed">
+                  <div className="pt-3 border-t border-border">
                     <CliUsageHint />
                   </div>
                 </div>
@@ -829,7 +831,7 @@ export function GeneralSettingsSection() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2.5 p-2.5 rounded-[10px] border border-border bg-bg-secondary mb-2.5">
+                <div className="ui-settings-panel flex items-center gap-2.5 p-3 mb-2.5">
                   <CliUsageHint />
                 </div>
                 <Button

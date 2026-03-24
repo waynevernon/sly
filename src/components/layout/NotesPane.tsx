@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNotes } from "../../context/NotesContext";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
-import { Footer } from "./Footer";
 import { IconButton, Input } from "../ui";
 import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
@@ -25,11 +24,7 @@ function getFolderLabel(path: string | null): string {
   return parts[parts.length - 1];
 }
 
-interface NotesPaneProps {
-  onOpenSettings?: () => void;
-}
-
-export function NotesPane({ onOpenSettings }: NotesPaneProps) {
+export function NotesPane() {
   const {
     notes,
     scopedNotes,
@@ -158,8 +153,8 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
 
   return (
     <div className="h-full bg-bg border-r border-border/80 flex flex-col select-none">
-      <div className="h-11 shrink-0" data-tauri-drag-region></div>
-      <div className="flex items-start justify-between gap-3 pl-4 pr-3 pb-2 border-b border-border/80 shrink-0">
+      <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+      <div className="ui-pane-header items-start border-border/80">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {!searchQuery.trim() && (
@@ -172,7 +167,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
             <div className="font-medium text-base text-text truncate">
               {heading}
             </div>
-            <div className="text-text-muted font-medium text-2xs min-w-4.75 h-4.75 flex items-center justify-center px-1 bg-bg-muted rounded-sm mt-0.5 pt-px shrink-0">
+            <div className="ui-count-badge mt-0.5 pt-px shrink-0">
               {noteCount}
             </div>
           </div>
@@ -180,7 +175,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
             {subtitle}
           </div>
         </div>
-        <div className="flex items-center gap-px shrink-0">
+        <div className="ui-pane-header-actions">
           {!searchQuery.trim() && (
             <SortMenuButton
               title="Sort Notes"
@@ -215,7 +210,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
 
       <div className="flex-1 overflow-y-auto">
         {searchOpen && (
-          <div className="sticky top-0 z-10 px-2 pt-2 bg-bg">
+          <div className="sticky top-0 z-10 px-3 pt-2 bg-bg">
             <div className="relative">
               <Input
                 ref={searchInputRef}
@@ -224,16 +219,16 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search notes..."
-                className="h-9 pr-8 text-sm"
+                className="pr-8 text-sm"
               />
               {inputValue && (
                 <button
+                  type="button"
                   onClick={() => {
                     setInputValue("");
                     clearSearch();
                   }}
-                  tabIndex={-1}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                  className="ui-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded-[var(--ui-radius-sm)] text-text-muted hover:text-text"
                 >
                   <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                 </button>
@@ -254,8 +249,6 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
           showFolderPrefix={searchQuery.trim().length > 0 || selectedFolderPath === null}
         />
       </div>
-
-      <Footer onOpenSettings={onOpenSettings} />
     </div>
   );
 }

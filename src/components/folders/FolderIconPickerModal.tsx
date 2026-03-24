@@ -13,6 +13,10 @@ import {
   type LucideIconCatalogEntry,
 } from "../../lib/lucideIcons";
 import { Button, Input, IconButton } from "../ui";
+import {
+  dialogOverlayClassName,
+  dialogPanelClassName,
+} from "../ui/DialogShell";
 import { CheckIcon, FolderIcon, SearchIcon, XIcon } from "../icons";
 const ICON_CATALOG: LucideIconCatalogEntry[] = LUCIDE_ICON_CATALOG;
 
@@ -180,11 +184,13 @@ export function FolderIconPickerModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Overlay
+          className={`fixed inset-0 z-50 ${dialogOverlayClassName} data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0`}
+        />
         <Dialog.Content
           onOpenAutoFocus={(event) => event.preventDefault()}
           onKeyDown={handleKeyDown}
-          className="fixed left-[50%] top-[50%] z-50 flex w-[min(calc(100vw-1.5rem),46rem)] max-h-[min(80vh,42rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden rounded-[18px] border border-border bg-bg shadow-2xl duration-200 data-[state=open]:animate-slide-down focus:outline-none"
+          className={`fixed left-[50%] top-[50%] z-50 flex w-[min(calc(100vw-1.5rem),46rem)] max-h-[min(80vh,42rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden duration-200 data-[state=open]:animate-slide-down focus:outline-none ${dialogPanelClassName}`}
         >
           <div className="border-b border-border/80 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
@@ -217,13 +223,13 @@ export function FolderIconPickerModal({
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  className="h-10 rounded-xl border-border/90 bg-bg pl-10 pr-10"
+                  className="h-[var(--ui-control-height-prominent)] rounded-[var(--ui-radius-md)] border-border/90 bg-bg pl-10 pr-10"
                 />
                 {query && (
                   <button
                     type="button"
                     onClick={() => setQuery("")}
-                    className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                    className="ui-focus-ring absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
                     aria-label="Clear search"
                   >
                     <XIcon className="h-4 w-4 stroke-[1.8]" />
@@ -232,8 +238,8 @@ export function FolderIconPickerModal({
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-bg-secondary/80 px-3 py-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg ring-1 ring-border/70">
+                <div className="flex min-w-0 items-center gap-2 rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary/80 px-3 py-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] bg-bg ring-1 ring-border/70">
                     {previewIcon ? (
                       <previewIcon.Component
                         className="h-5 w-5 text-text"
@@ -257,7 +263,7 @@ export function FolderIconPickerModal({
                   variant="outline"
                   size="md"
                   onClick={() => onSelect(null)}
-                  className="h-8 rounded-xl px-3 text-xs"
+                  className="h-[var(--ui-control-height-standard)] rounded-[var(--ui-radius-md)] px-3 text-xs"
                 >
                   Use Default
                 </Button>
@@ -276,11 +282,11 @@ export function FolderIconPickerModal({
           <div className="px-4 pb-4">
             <div
               ref={scrollRef}
-              className="h-[22rem] overflow-auto rounded-[18px] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
+              className="h-[22rem] overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
             >
               <div ref={gridMeasureRef} className="w-full">
                 {filteredIcons.length === 0 ? (
-                  <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-bg/60 text-center">
+                  <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--ui-radius-lg)] border border-border bg-bg/60 text-center">
                     <div className="text-sm font-medium text-text">
                       No icons found
                     </div>
@@ -329,7 +335,7 @@ export function FolderIconPickerModal({
                                   onMouseEnter={() => setActiveIndex(index)}
                                   onFocus={() => setActiveIndex(index)}
                                   onClick={() => onSelect(icon.name)}
-                                  className={`group relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
+                                  className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
                                     isSelected
                                       ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
                                       : isActive

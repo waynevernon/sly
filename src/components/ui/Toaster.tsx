@@ -12,7 +12,7 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            "group toast bg-bg border-border text-text shadow-lg rounded-lg w-full max-w-72",
+            "group toast ui-surface-toast w-full max-w-80 px-3 py-2 text-text",
           description: "text-text-muted",
           actionButton: "bg-accent text-white",
           cancelButton: "bg-bg-muted text-text",

@@ -17,6 +17,16 @@ export { Input } from "./Input";
 export { InlineNameEditor } from "./InlineNameEditor";
 export { Select } from "./Select";
 export { Toaster } from "./Toaster";
+export { DialogShell } from "./DialogShell";
+export { PopoverSurface } from "./PopoverSurface";
+export {
+  MenuSurface,
+  menuSurfaceClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+  menuItemClassName,
+  destructiveMenuItemClassName,
+} from "./MenuSurface";
 export {
   AlertDialog,
   AlertDialogPortal,
@@ -47,14 +57,12 @@ export function ToolbarButton({
   const button = (
     <button
       className={cn(
-        "h-7 w-7 flex items-center justify-center text-sm rounded transition-colors shrink-0",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+        "ui-focus-ring h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors shrink-0",
         isActive
           ? "bg-bg-muted text-text"
           : "hover:bg-bg-muted text-text-muted",
         className
       )}
-      tabIndex={-1}
       aria-label={title}
       {...props}
     >
@@ -74,16 +82,22 @@ export interface IconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
-  variant?: "primary" | "default" | "secondary" | "ghost" | "outline";
+  variant?:
+    | "primary"
+    | "default"
+    | "secondary"
+    | "ghost"
+    | "outline"
+    | "destructive";
   title?: string;
 }
 
 const iconButtonSizes = {
-  xs: "w-6 h-6", // 24px
-  sm: "w-7 h-7", // 28px
-  md: "w-8 h-8", // 32px
+  xs: "w-[var(--ui-control-height-compact)] h-[var(--ui-control-height-compact)]",
+  sm: "w-[var(--ui-control-height-compact)] h-[var(--ui-control-height-compact)]",
+  md: "w-[var(--ui-control-height-standard)] h-[var(--ui-control-height-standard)]",
   lg: "w-9 h-9", // 36px
-  xl: "w-10 h-10", // 40px
+  xl: "w-[var(--ui-control-height-prominent)] h-[var(--ui-control-height-prominent)]",
 };
 
 const iconButtonVariants = {
@@ -93,6 +107,8 @@ const iconButtonVariants = {
   ghost: "hover:bg-bg-muted text-text-muted hover:text-text",
   outline:
     "border border-border text-text-muted hover:bg-bg-muted hover:text-text",
+  destructive:
+    "bg-[var(--color-danger-muted)] text-[var(--color-danger)] hover:bg-[var(--color-danger-muted)]/90",
 };
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -104,14 +120,12 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "flex items-center justify-center rounded-md transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+          "ui-focus-ring flex items-center justify-center rounded-[var(--ui-radius-md)] transition-colors",
           "disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
           iconButtonSizes[size],
           iconButtonVariants[variant],
           className
         )}
-        tabIndex={-1}
         aria-label={title}
         {...props}
       >

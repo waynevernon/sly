@@ -2,6 +2,7 @@ import {
   Suspense,
   lazy,
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -32,6 +33,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   InlineNameEditor,
+  destructiveMenuItemClassName,
+  menuItemClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
 } from "../ui";
 import {
   AddNoteIcon,
@@ -52,11 +57,6 @@ const FolderIconPickerModal = lazy(() =>
     default: module.FolderIconPickerModal,
   })),
 );
-
-const menuItemClass =
-  "px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2 rounded-sm";
-
-const menuSeparatorClass = "h-px bg-border my-1";
 
 type InlineFolderEditState =
   | { mode: "create"; parentPath: string; iconName: string | null }
@@ -110,6 +110,27 @@ function getRenamedFolderPath(path: string, newName: string): string {
     : sanitizedName;
 }
 
+function FolderCountBadge({ count }: { count: number }) {
+  return <span className="ui-count-badge">{count}</span>;
+}
+
+function FolderRowTrailing({
+  count,
+  children,
+}: {
+  count: number;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="ml-auto flex items-center gap-1.5 pl-2 shrink-0">
+      {children}
+      <div className="ui-count-badge-column">
+        <FolderCountBadge count={count} />
+      </div>
+    </div>
+  );
+}
+
 interface InlineFolderRowProps {
   depth: number;
   initialValue?: string;
@@ -150,10 +171,12 @@ function InlineFolderRow({
       style={{ marginLeft: `${depth * 12}px` }}
     >
       <div className="flex items-center gap-1.5 pr-2 py-1.5">
-        <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
-          {CollapseIcon ? <CollapseIcon className="w-4 h-4 stroke-[1.6]" /> : null}
-        </span>
-        <div className="min-w-0 flex-1 flex items-center gap-2">
+        <div className="min-w-0 flex flex-1 items-center gap-2">
+          <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
+            {CollapseIcon ? (
+              <CollapseIcon className="w-4 h-4 stroke-[1.6]" />
+            ) : null}
+          </span>
           <button
             type="button"
             onClick={onOpenIconPicker}
@@ -175,9 +198,7 @@ function InlineFolderRow({
           />
         </div>
         {typeof noteCount === "number" && (
-          <span className="text-2xs font-medium text-text-muted/70 shrink-0 px-1.5 py-0.5 rounded-full bg-bg/70">
-            {noteCount}
-          </span>
+          <FolderRowTrailing count={noteCount} />
         )}
       </div>
     </div>
@@ -360,57 +381,62 @@ const FolderItem = memo(function FolderItem({
         style={{ marginLeft: `${depth * 12}px` }}
       >
         <div className="flex items-center gap-1.5 pr-2 py-1.5">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleCollapse(folder.path);
-            }}
-            className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
-            aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
-          >
-            {isCollapsed ? (
-              <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-            ) : (
-              <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
-            )}
-          </button>
-          <button
-            type="button"
-            ref={setMoveDragRef}
-            {...moveAttributes}
-            {...moveListeners}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
-            aria-label={`Move ${folder.name}`}
-          >
-            <FolderGlyph
-              iconName={iconName}
-              className="w-4.25 h-4.25 text-current shrink-0"
-              strokeWidth={1.7}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectFolder(folder.path)}
-            className="min-w-0 flex-1 text-left"
-          >
-            <span className="text-sm text-text truncate block">{folder.name}</span>
-          </button>
-          {isManualSorting && (
+          <div className="min-w-0 flex flex-1 items-center gap-1.5">
             <button
               type="button"
-              ref={setActivatorNodeRef}
-              {...sortAttributes}
-              {...sortListeners}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/70 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
-              aria-label={`Reorder ${folder.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleCollapse(folder.path);
+              }}
+              className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+              aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
             >
-              <GripVerticalIcon className="w-4 h-4 stroke-[1.7]" />
+              {isCollapsed ? (
+                <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
+              )}
             </button>
-          )}
-          <span className="text-2xs font-medium text-text-muted/70 shrink-0 px-1.5 py-0.5 rounded-full bg-bg/70">
-            {noteCount}
-          </span>
+            <button
+              type="button"
+              ref={setMoveDragRef}
+              {...moveAttributes}
+              {...moveListeners}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+              aria-label={`Move ${folder.name}`}
+            >
+              <FolderGlyph
+                iconName={iconName}
+                className="w-4.25 h-4.25 text-current shrink-0"
+                strokeWidth={1.7}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectFolder(folder.path)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <span className="text-sm text-text truncate block">
+                {folder.name}
+              </span>
+            </button>
+          </div>
+          <FolderRowTrailing
+            count={noteCount}
+          >
+            {isManualSorting && (
+              <button
+                type="button"
+                ref={setActivatorNodeRef}
+                {...sortAttributes}
+                {...sortListeners}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/70 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+                aria-label={`Reorder ${folder.name}`}
+              >
+                <GripVerticalIcon className="w-4 h-4 stroke-[1.7]" />
+              </button>
+            )}
+          </FolderRowTrailing>
         </div>
       </div>
       {children}
@@ -432,7 +458,7 @@ const FolderItem = memo(function FolderItem({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content
-          className="min-w-44 bg-bg border border-border rounded-md shadow-lg py-1 z-50"
+          className={`${menuSurfaceClassName} min-w-44 z-50`}
           onCloseAutoFocus={(event) => {
             if (!suppressCloseAutoFocusRef.current) return;
             suppressCloseAutoFocusRef.current = false;
@@ -440,14 +466,14 @@ const FolderItem = memo(function FolderItem({
           }}
         >
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => onCreateNoteHere(folder.path)}
           >
             <AddNoteIcon className="w-4 h-4 stroke-[1.6]" />
             New Note
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => {
               suppressCloseAutoFocusRef.current = true;
               onStartCreateFolder(folder.path);
@@ -456,9 +482,9 @@ const FolderItem = memo(function FolderItem({
             <FolderPlusIcon className="w-4 h-4 stroke-[1.6]" />
             New Subfolder
           </ContextMenu.Item>
-          <ContextMenu.Separator className={menuSeparatorClass} />
+          <ContextMenu.Separator className={menuSeparatorClassName} />
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => {
               suppressCloseAutoFocusRef.current = true;
               onStartRenameFolder(folder.path, getFolderLeaf(folder.path));
@@ -468,7 +494,7 @@ const FolderItem = memo(function FolderItem({
             Rename
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => onOpenIconPicker({ kind: "existing", path: folder.path })}
           >
             <SwatchIcon className="w-4 h-4 stroke-[1.6]" />
@@ -476,9 +502,9 @@ const FolderItem = memo(function FolderItem({
           </ContextMenu.Item>
           {folder.path.includes("/") && (
             <>
-              <ContextMenu.Separator className={menuSeparatorClass} />
+              <ContextMenu.Separator className={menuSeparatorClassName} />
               <ContextMenu.Item
-                className={menuItemClass}
+                className={menuItemClassName}
                 onSelect={() =>
                   onMoveFolderToParent(
                     folder.path,
@@ -491,12 +517,9 @@ const FolderItem = memo(function FolderItem({
               </ContextMenu.Item>
             </>
           )}
-          <ContextMenu.Separator className={menuSeparatorClass} />
+          <ContextMenu.Separator className={menuSeparatorClassName} />
           <ContextMenu.Item
-            className={
-              menuItemClass +
-              " text-red-500 hover:text-red-500 focus:text-red-500"
-            }
+            className={destructiveMenuItemClassName}
             onSelect={() => onDeleteFolder(folder.path)}
           >
             <TrashIcon className="w-4 h-4 stroke-[1.6]" />
@@ -870,9 +893,9 @@ export function FolderTreeView() {
           <button
             type="button"
             onClick={() => selectFolder(null)}
-            className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
+            className="w-full flex items-center gap-3 pl-3 pr-2 py-2 text-left"
           >
-            <span className="flex items-center gap-2 min-w-0">
+            <span className="flex items-center gap-2 min-w-0 flex-1">
               <FolderGlyph
                 className="w-4.25 h-4.25 text-text-muted/80 shrink-0"
                 strokeWidth={1.7}
@@ -881,9 +904,7 @@ export function FolderTreeView() {
                 All Notes
               </span>
             </span>
-            <span className="text-2xs font-medium text-text-muted/70 shrink-0 px-1.5 py-0.5 rounded-full bg-bg/70">
-              {notes.length}
-            </span>
+            <FolderRowTrailing count={notes.length} />
           </button>
         </div>
 
