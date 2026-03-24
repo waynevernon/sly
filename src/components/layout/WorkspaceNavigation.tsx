@@ -6,11 +6,12 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
 import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
+import type { FolderDropOrderPlan } from "../../lib/folderTree";
 import { cn } from "../../lib/utils";
 import { NoteIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
@@ -31,12 +32,26 @@ export function WorkspaceNavigation({
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [dragType, setDragType] = useState<"folder" | "note" | null>(null);
   const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
+  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null);
+  const [manualFolderDropPlan, setManualFolderDropPlan] =
+    useState<FolderDropOrderPlan | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  const clearDragState = useCallback(() => {
+    setDragLabel(null);
+    setDragType(null);
+    setDragFolderPath(null);
+    setDragDelta(null);
+    setManualFolderDropPlan(null);
+  }, []);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    setDragDelta({ x: 0, y: 0 });
+    setManualFolderDropPlan(null);
+
     const data = event.active.data.current;
     if (data?.type === "note") {
       const noteId = data.id as string;
@@ -49,7 +64,7 @@ export function WorkspaceNavigation({
       return;
     }
 
-    if (data?.type === "folder-move" || data?.type === "folder-sort") {
+    if (data?.type === "folder") {
       const path = data.path as string;
       const name = path.includes("/")
         ? path.substring(path.lastIndexOf("/") + 1)
@@ -60,53 +75,77 @@ export function WorkspaceNavigation({
     }
   }, []);
 
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    setDragDelta({ x: event.delta.x, y: event.delta.y });
+  }, []);
+
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    setDragLabel(null);
-    setDragType(null);
-    setDragFolderPath(null);
-
     const { active, over } = event;
-    if (!over) return;
-
     const activeData = active.data.current;
-    const overData = over.data.current;
-    if (!activeData || !overData) return;
-
-    const targetFolder = (overData.path as string) || "";
+    const overData = over?.data.current;
+    const nextManualFolderDropPlan = manualFolderDropPlan;
+    clearDragState();
+    if (!activeData) return;
 
     try {
-      if (activeData.type === "folder-sort") {
-        if (overData.type !== "folder-sort") return;
-
-        const activePath = activeData.path as string;
-        const overPath = overData.path as string;
-        const parentPath = (activeData.parentPath as string) || "";
-        const siblingPaths = Array.isArray(activeData.siblingPaths)
-          ? (activeData.siblingPaths as string[])
-          : [];
-
-        if (activePath === overPath) return;
-        if (parentPath !== ((overData.parentPath as string) || "")) return;
-
-        const activeIndex = siblingPaths.indexOf(activePath);
-        const overIndex = siblingPaths.indexOf(overPath);
-        if (activeIndex === -1 || overIndex === -1) return;
-
-        await setFolderManualOrder(
-          parentPath,
-          arrayMove(siblingPaths, activeIndex, overIndex),
-        );
-        return;
-      }
-
       if (activeData.type === "note") {
+        if (!overData) return;
+
+        const targetFolder = (overData.path as string) || "";
         const noteId = activeData.id as string;
         const noteParent = noteId.includes("/")
           ? noteId.substring(0, noteId.lastIndexOf("/"))
           : "";
         if (noteParent === targetFolder) return;
         await moveNote(noteId, targetFolder);
-      } else if (activeData.type === "folder-move") {
+        if (targetFolder) {
+          window.dispatchEvent(
+            new CustomEvent("expand-folder", { detail: targetFolder }),
+          );
+        }
+        return;
+      }
+
+      if (activeData.type === "folder" && activeData.manualSort === true) {
+        const folderPath = activeData.path as string;
+        if (
+          !nextManualFolderDropPlan ||
+          nextManualFolderDropPlan.activePath !== folderPath ||
+          nextManualFolderDropPlan.isNoOp
+        ) {
+          return;
+        }
+
+        if (nextManualFolderDropPlan.movedAcrossParents) {
+          await moveFolder(folderPath, nextManualFolderDropPlan.targetParentPath);
+          await setFolderManualOrder(
+            nextManualFolderDropPlan.sourceParentPath,
+            nextManualFolderDropPlan.sourceOrder ?? [],
+          );
+        }
+
+        await setFolderManualOrder(
+          nextManualFolderDropPlan.targetParentPath,
+          nextManualFolderDropPlan.targetOrder,
+        );
+
+        if (
+          nextManualFolderDropPlan.movedAcrossParents &&
+          nextManualFolderDropPlan.targetParentPath
+        ) {
+          window.dispatchEvent(
+            new CustomEvent("expand-folder", {
+              detail: nextManualFolderDropPlan.targetParentPath,
+            }),
+          );
+        }
+        return;
+      }
+
+      if (activeData.type === "folder") {
+        if (!overData) return;
+
+        const targetFolder = (overData.path as string) || "";
         const folderPath = activeData.path as string;
         const folderParent = folderPath.includes("/")
           ? folderPath.substring(0, folderPath.lastIndexOf("/"))
@@ -121,17 +160,22 @@ export function WorkspaceNavigation({
         }
 
         await moveFolder(folderPath, targetFolder);
-      }
-
-      if (targetFolder) {
-        window.dispatchEvent(
-          new CustomEvent("expand-folder", { detail: targetFolder }),
-        );
+        if (targetFolder) {
+          window.dispatchEvent(
+            new CustomEvent("expand-folder", { detail: targetFolder }),
+          );
+        }
       }
     } catch (error) {
       console.error("Failed to move item:", error);
     }
-  }, [moveFolder, moveNote, setFolderManualOrder]);
+  }, [
+    clearDragState,
+    manualFolderDropPlan,
+    moveFolder,
+    moveNote,
+    setFolderManualOrder,
+  ]);
 
   const foldersVisible = paneMode === 3;
   const notesVisible = paneMode >= 2;
@@ -140,12 +184,9 @@ export function WorkspaceNavigation({
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => {
-        setDragLabel(null);
-        setDragType(null);
-        setDragFolderPath(null);
-      }}
+      onDragCancel={clearDragState}
     >
       <div className="h-full flex shrink-0">
         <div
@@ -156,7 +197,11 @@ export function WorkspaceNavigation({
               : "w-0 opacity-0 -translate-x-3 pointer-events-none",
           )}
         >
-          <FoldersPane onOpenSettings={onOpenSettings} />
+          <FoldersPane
+            onOpenSettings={onOpenSettings}
+            dragDelta={dragDelta}
+            onManualFolderDropPlanChange={setManualFolderDropPlan}
+          />
         </div>
 
         <div

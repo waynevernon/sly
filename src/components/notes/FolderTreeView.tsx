@@ -2,6 +2,7 @@ import {
   Suspense,
   lazy,
   memo,
+  type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
@@ -11,15 +12,16 @@ import {
 } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
-import { buildFolderTree, countNotesInFolder } from "../../lib/folderTree";
+import {
+  buildFolderDropOrderPlan,
+  buildFolderTree,
+  countNotesInFolder,
+  projectFolderDrop,
+  type FolderDropOrderPlan,
+  type ProjectedFolderDrop,
+} from "../../lib/folderTree";
 import type { FolderNode } from "../../types/note";
 import * as notesService from "../../services/notes";
 import { getFolderIconName } from "../../lib/folderIcons";
@@ -44,7 +46,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   FolderPlusIcon,
-  GripVerticalIcon,
   PencilIcon,
   SwatchIcon,
   TrashIcon,
@@ -71,6 +72,14 @@ type FolderIconPickerTarget =
   | { kind: "existing"; path: string }
   | { kind: "inline-create" }
   | { kind: "inline-rename"; path: string };
+
+interface FolderTreeViewProps {
+  dragDelta: { x: number; y: number } | null;
+  onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
+}
+
+const TREE_INDENT_WIDTH = 12;
+const DROP_LINE_BASE_OFFSET = 28;
 
 function loadCollapsedFolders(): Set<string> {
   try {
@@ -108,6 +117,12 @@ function getRenamedFolderPath(path: string, newName: string): string {
   return lastSlash >= 0
     ? `${path.substring(0, lastSlash)}/${sanitizedName}`
     : sanitizedName;
+}
+
+function getDropLineStyle(depth: number): CSSProperties {
+  return {
+    left: `${depth * TREE_INDENT_WIDTH + DROP_LINE_BASE_OFFSET}px`,
+  };
 }
 
 function FolderCountBadge({ count }: { count: number }) {
@@ -208,12 +223,12 @@ function InlineFolderRow({
 interface FolderItemProps {
   folder: FolderNode;
   depth: number;
-  siblingPaths: string[];
   isManualSorting: boolean;
   folderIcons: Record<string, string>;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
+  projectedDrop: ProjectedFolderDrop | null;
   onToggleCollapse: (path: string) => void;
   onSelectFolder: (path: string) => void;
   onCreateNoteHere: (path: string) => void;
@@ -230,12 +245,12 @@ interface FolderItemProps {
 const FolderItem = memo(function FolderItem({
   folder,
   depth,
-  siblingPaths,
   isManualSorting,
   folderIcons,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
+  projectedDrop,
   onToggleCollapse,
   onSelectFolder,
   onCreateNoteHere,
@@ -253,106 +268,92 @@ const FolderItem = memo(function FolderItem({
   const noteCount = countNotesInFolder(folder);
   const iconName = getFolderIconName(folderIcons, folder.path);
   const parentPath = getFolderParentPath(folder.path);
-  const childSortableIds = folder.children.map(
-    (child) => `folder-sort:${child.path}`,
-  );
   const isRenaming =
     inlineEditState?.mode === "rename" && inlineEditState.path === folder.path;
   const isCreatingChild =
     inlineEditState?.mode === "create" &&
     inlineEditState.parentPath === folder.path;
   const { active } = useDndContext();
-  const isMoveDragActive =
-    active?.data.current?.type === "folder-move" ||
-    active?.data.current?.type === "note";
+  const activeDragType = active?.data.current?.type;
+  const isContainerDropActive =
+    activeDragType === "note" ||
+    (activeDragType === "folder" && active?.data.current?.manualSort !== true);
 
   const {
-    attributes: moveAttributes,
-    listeners: moveListeners,
-    setNodeRef: setMoveDragRef,
-    isDragging: isMovingFolder,
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    setNodeRef: setDragRef,
+    isDragging,
   } = useDraggable({
     id: `folder:${folder.path}`,
-    data: { type: "folder-move", path: folder.path, parentPath },
+    data: {
+      type: "folder",
+      path: folder.path,
+      parentPath,
+      manualSort: isManualSorting,
+    },
   });
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-folder:${folder.path}`,
-    data: { type: "folder-move", path: folder.path },
-  });
-
-  const {
-    attributes: sortAttributes,
-    listeners: sortListeners,
-    setNodeRef: setSortableNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging: isSortingFolder,
-  } = useSortable({
-    id: `folder-sort:${folder.path}`,
     data: {
-      type: "folder-sort",
+      type: "folder-drop-target",
       path: folder.path,
-      parentPath,
-      siblingPaths,
     },
-    disabled: !isManualSorting,
   });
 
-  const rowClassName = `rounded-md transition-[background-color,opacity,transform] duration-200 ${
-    isSortingFolder || isMovingFolder ? "opacity-40" : ""
-  } ${
-    isOver && isMoveDragActive
+  const rowClassName = `rounded-md transition-[background-color,box-shadow,opacity] duration-200 ${
+    isOver && isContainerDropActive
       ? "bg-accent/12 ring-1 ring-accent/60"
       : selectedFolderPath === folder.path
         ? "bg-bg-muted"
         : "hover:bg-bg-muted/80"
   }`;
+  const showTopDropLine = projectedDrop?.afterPath === folder.path;
+  const showBottomDropLine =
+    !projectedDrop?.afterPath && projectedDrop?.beforePath === folder.path;
+  const dropLineStyle = projectedDrop
+    ? getDropLineStyle(projectedDrop.depth)
+    : undefined;
 
   const children = !isCollapsed && (isCreatingChild || folder.children.length > 0) && (
-    <SortableContext
-      items={childSortableIds}
-      strategy={verticalListSortingStrategy}
-    >
-      <div className="flex flex-col gap-0.5 pt-0.5">
-        {isCreatingChild && (
-          <InlineFolderRow
-            depth={depth + 1}
-            iconName={inlineEditState?.mode === "create" ? inlineEditState.iconName : null}
-            placeholder="Folder name"
-            onSubmit={onCreateFolder}
-            onCancel={onCancelInlineEdit}
-            onOpenIconPicker={() => onOpenIconPicker({ kind: "inline-create" })}
-          />
-        )}
+    <div className="flex flex-col gap-0.5 pt-0.5">
+      {isCreatingChild && (
+        <InlineFolderRow
+          depth={depth + 1}
+          iconName={inlineEditState?.mode === "create" ? inlineEditState.iconName : null}
+          placeholder="Folder name"
+          onSubmit={onCreateFolder}
+          onCancel={onCancelInlineEdit}
+          onOpenIconPicker={() => onOpenIconPicker({ kind: "inline-create" })}
+        />
+      )}
 
-        {folder.children.map((child) => (
-          <FolderItem
-            key={child.path}
-            folder={child}
-            depth={depth + 1}
-            siblingPaths={folder.children.map((sibling) => sibling.path)}
-            isManualSorting={isManualSorting}
-            folderIcons={folderIcons}
-            selectedFolderPath={selectedFolderPath}
-            collapsedFolders={collapsedFolders}
-            inlineEditState={inlineEditState}
-            onToggleCollapse={onToggleCollapse}
-            onSelectFolder={onSelectFolder}
-            onCreateNoteHere={onCreateNoteHere}
-            onStartCreateFolder={onStartCreateFolder}
-            onCreateFolder={onCreateFolder}
-            onStartRenameFolder={onStartRenameFolder}
-            onRenameFolder={onRenameFolder}
-            onCancelInlineEdit={onCancelInlineEdit}
-            onDeleteFolder={onDeleteFolder}
-            onMoveFolderToParent={onMoveFolderToParent}
-            onOpenIconPicker={onOpenIconPicker}
-          />
-        ))}
-      </div>
-    </SortableContext>
+      {folder.children.map((child) => (
+        <FolderItem
+          key={child.path}
+          folder={child}
+          depth={depth + 1}
+          isManualSorting={isManualSorting}
+          folderIcons={folderIcons}
+          selectedFolderPath={selectedFolderPath}
+          collapsedFolders={collapsedFolders}
+          inlineEditState={inlineEditState}
+          projectedDrop={projectedDrop}
+          onToggleCollapse={onToggleCollapse}
+          onSelectFolder={onSelectFolder}
+          onCreateNoteHere={onCreateNoteHere}
+          onStartCreateFolder={onStartCreateFolder}
+          onCreateFolder={onCreateFolder}
+          onStartRenameFolder={onStartRenameFolder}
+          onRenameFolder={onRenameFolder}
+          onCancelInlineEdit={onCancelInlineEdit}
+          onDeleteFolder={onDeleteFolder}
+          onMoveFolderToParent={onMoveFolderToParent}
+          onOpenIconPicker={onOpenIconPicker}
+        />
+      ))}
+    </div>
   );
 
   const content = isRenaming ? (
@@ -375,69 +376,68 @@ const FolderItem = memo(function FolderItem({
     </>
   ) : (
     <>
-      <div
-        ref={setDropRef}
-        className={rowClassName}
-        style={{ marginLeft: `${depth * 12}px` }}
-      >
-        <div className="flex items-center gap-1.5 pr-2 py-1.5">
-          <div className="min-w-0 flex flex-1 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleCollapse(folder.path);
-              }}
-              className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
-              aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
-            >
-              {isCollapsed ? (
-                <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-              ) : (
-                <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
-              )}
-            </button>
-            <button
-              type="button"
-              ref={setMoveDragRef}
-              {...moveAttributes}
-              {...moveListeners}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
-              aria-label={`Move ${folder.name}`}
-            >
-              <FolderGlyph
-                iconName={iconName}
-                className="w-4.25 h-4.25 text-current shrink-0"
-                strokeWidth={1.7}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectFolder(folder.path)}
-              className="min-w-0 flex-1 text-left"
-            >
-              <span className="text-sm text-text truncate block">
-                {folder.name}
-              </span>
-            </button>
-          </div>
-          <FolderRowTrailing
-            count={noteCount}
-          >
-            {isManualSorting && (
+      <div className={`relative ${isDragging ? "opacity-40" : ""}`}>
+        {showTopDropLine && dropLineStyle && (
+          <div
+            className="folder-tree-drop-line folder-tree-drop-line-top"
+            style={dropLineStyle}
+          />
+        )}
+        <div
+          ref={setDropRef}
+          className={rowClassName}
+          style={{ marginLeft: `${depth * TREE_INDENT_WIDTH}px` }}
+        >
+          <div className="flex items-center gap-1.5 pr-2 py-1.5">
+            <div className="min-w-0 flex flex-1 items-center gap-1.5">
               <button
                 type="button"
-                ref={setActivatorNodeRef}
-                {...sortAttributes}
-                {...sortListeners}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/70 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
-                aria-label={`Reorder ${folder.name}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleCollapse(folder.path);
+                }}
+                className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+                aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
               >
-                <GripVerticalIcon className="w-4 h-4 stroke-[1.7]" />
+                {isCollapsed ? (
+                  <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
+                )}
               </button>
-            )}
-          </FolderRowTrailing>
+              <button
+                type="button"
+                ref={setDragRef}
+                {...dragAttributes}
+                {...dragListeners}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+                aria-label={`Move ${folder.name}`}
+              >
+                <FolderGlyph
+                  iconName={iconName}
+                  className="w-4.25 h-4.25 text-current shrink-0"
+                  strokeWidth={1.7}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectFolder(folder.path)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="text-sm text-text truncate block">
+                  {folder.name}
+                </span>
+              </button>
+            </div>
+            <FolderRowTrailing count={noteCount} />
+          </div>
         </div>
+        {showBottomDropLine && dropLineStyle && (
+          <div
+            className="folder-tree-drop-line folder-tree-drop-line-bottom"
+            style={dropLineStyle}
+          />
+        )}
       </div>
       {children}
     </>
@@ -446,13 +446,7 @@ const FolderItem = memo(function FolderItem({
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div
-          ref={setSortableNodeRef}
-          style={{
-            transform: CSS.Transform.toString(transform),
-            transition,
-          }}
-        >
+        <div data-folder-path={folder.path}>
           {content}
         </div>
       </ContextMenu.Trigger>
@@ -531,7 +525,10 @@ const FolderItem = memo(function FolderItem({
   );
 });
 
-export function FolderTreeView() {
+export function FolderTreeView({
+  dragDelta,
+  onManualFolderDropPlanChange,
+}: FolderTreeViewProps) {
   const {
     notes,
     folderIcons,
@@ -594,6 +591,53 @@ export function FolderTreeView() {
       ),
     [folderManualOrder, folderSortMode, knownFolders, notes],
   );
+  const { active, over } = useDndContext();
+  const activeDragType = active?.data.current?.type;
+  const isContainerDropActive =
+    activeDragType === "note" ||
+    (activeDragType === "folder" && active?.data.current?.manualSort !== true);
+  const activeManualFolderPath =
+    folderSortMode === "manual" &&
+    activeDragType === "folder" &&
+    active?.data.current?.manualSort === true
+      ? (active.data.current?.path as string)
+      : null;
+  const projectedDrop = useMemo(() => {
+    if (!activeManualFolderPath || !dragDelta) {
+      return null;
+    }
+
+    if (over?.data.current?.type !== "folder-drop-target") {
+      return null;
+    }
+
+    const overPath = over.data.current?.path;
+    const initialRect = active?.rect.current.initial;
+    if (!overPath || !initialRect) {
+      return null;
+    }
+
+    const currentCenterY = initialRect.top + dragDelta.y + initialRect.height / 2;
+    const placement =
+      currentCenterY < over.rect.top + over.rect.height / 2 ? "before" : "after";
+
+    return projectFolderDrop({
+      tree,
+      collapsedFolders,
+      activePath: activeManualFolderPath,
+      overPath,
+      placement,
+      horizontalOffset: dragDelta.x,
+      indentationWidth: TREE_INDENT_WIDTH,
+    });
+  }, [active, activeManualFolderPath, collapsedFolders, dragDelta, over, tree]);
+  const manualFolderDropPlan = useMemo(() => {
+    if (!activeManualFolderPath || !projectedDrop) {
+      return null;
+    }
+
+    return buildFolderDropOrderPlan(tree, activeManualFolderPath, projectedDrop);
+  }, [activeManualFolderPath, projectedDrop, tree]);
 
   const focusTree = useCallback(() => {
     requestAnimationFrame(() => {
@@ -859,14 +903,13 @@ export function FolderTreeView() {
     }
   }, [deleteFolder, folderToDelete]);
 
-  const { active } = useDndContext();
-  const isMoveDragActive =
-    active?.data.current?.type === "folder-move" ||
-    active?.data.current?.type === "note";
+  useEffect(() => {
+    onManualFolderDropPlanChange?.(manualFolderDropPlan);
+  }, [manualFolderDropPlan, onManualFolderDropPlanChange]);
 
   const { setNodeRef: setRootDropRef, isOver: isOverRoot } = useDroppable({
     id: "drop-folder:root",
-    data: { type: "folder-move", path: "" },
+    data: { type: "folder-drop-target", path: "" },
   });
 
   const isCreatingRoot =
@@ -883,7 +926,7 @@ export function FolderTreeView() {
         <div
           ref={setRootDropRef}
           className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
-            isOverRoot && isMoveDragActive
+            isOverRoot && isContainerDropActive
               ? "bg-accent/12 ring-1 ring-accent/60"
               : selectedFolderPath === null
                 ? "bg-bg-muted"
@@ -908,11 +951,7 @@ export function FolderTreeView() {
           </button>
         </div>
 
-        <SortableContext
-          items={tree.folders.map((folder) => `folder-sort:${folder.path}`)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5">
           {isCreatingRoot && (
             <InlineFolderRow
               depth={0}
@@ -929,12 +968,12 @@ export function FolderTreeView() {
               key={folder.path}
               folder={folder}
               depth={0}
-              siblingPaths={tree.folders.map((sibling) => sibling.path)}
               isManualSorting={folderSortMode === "manual"}
               folderIcons={folderIcons}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={collapsedFolders}
               inlineEditState={inlineEditState}
+              projectedDrop={projectedDrop}
               onToggleCollapse={handleToggleCollapse}
               onSelectFolder={selectFolder}
               onCreateNoteHere={createNoteInFolder}
@@ -956,8 +995,7 @@ export function FolderTreeView() {
               }}
             />
           ))}
-          </div>
-        </SortableContext>
+        </div>
       </div>
 
       <Suspense fallback={null}>

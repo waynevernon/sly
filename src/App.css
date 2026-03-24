@@ -341,6 +341,27 @@ body {
   flex-shrink: 0;
 }
 
+.folder-tree-drop-line {
+  position: absolute;
+  right: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 78%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bg) 88%, transparent);
+  pointer-events: none;
+  transition:
+    left var(--ui-motion-duration-fade) var(--ui-motion-ease-standard),
+    background-color var(--ui-motion-duration-fade) var(--ui-motion-ease-standard);
+}
+
+.folder-tree-drop-line-top {
+  top: -1px;
+}
+
+.folder-tree-drop-line-bottom {
+  bottom: -1px;
+}
+
 .ui-settings-separator {
   border-top: 1px solid var(--color-border);
 }

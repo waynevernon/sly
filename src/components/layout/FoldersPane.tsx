@@ -5,6 +5,7 @@ import { IconButton } from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton } from "./SortMenuButton";
+import type { FolderDropOrderPlan } from "../../lib/folderTree";
 
 const folderSortOptions: { value: FolderSortMode; label: string }[] = [
   { value: "manual", label: "Manual" },
@@ -14,9 +15,15 @@ const folderSortOptions: { value: FolderSortMode; label: string }[] = [
 
 interface FoldersPaneProps {
   onOpenSettings?: () => void;
+  dragDelta: { x: number; y: number } | null;
+  onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
 }
 
-export function FoldersPane({ onOpenSettings }: FoldersPaneProps) {
+export function FoldersPane({
+  onOpenSettings,
+  dragDelta,
+  onManualFolderDropPlanChange,
+}: FoldersPaneProps) {
   const { folderSortMode, setFolderSortMode } = useNotes();
 
   return (
@@ -46,7 +53,10 @@ export function FoldersPane({ onOpenSettings }: FoldersPaneProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-2.5">
-        <FolderTreeView />
+        <FolderTreeView
+          dragDelta={dragDelta}
+          onManualFolderDropPlanChange={onManualFolderDropPlanChange}
+        />
       </div>
 
       <Footer onOpenSettings={onOpenSettings} />
