@@ -349,3 +349,7 @@ The app watches the notes folder for external changes (e.g., from AI agents or o
 - Consistency over cleverness: repeated UI patterns should behave the same way everywhere
 - Progressive disclosure: keep the default surface simple and reveal advanced controls only when they are relevant
 - Navigation should recede: folders and note lists are supporting panes; the editor is the primary canvas
+
+### UI Design Reference
+
+Before changing user-facing UI, consult `docs/ui-design-language.md`. Treat it as the canonical design-language reference and `docs/ui-audit-2026-03-24.md` as the supporting rationale/backlog snapshot.

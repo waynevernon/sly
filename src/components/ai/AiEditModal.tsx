@@ -10,6 +10,7 @@ import {
 import * as aiService from "../../services/ai";
 import type { AiProvider } from "../../services/ai";
 import type { Settings } from "../../types/note";
+import { DialogShell } from "../ui";
 
 interface AiEditModalProps {
   open: boolean;
@@ -163,9 +164,10 @@ export function AiEditModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center py-11 px-4 pointer-events-none">
-      {/* Modal */}
-      <div className="relative w-full max-w-2xl bg-bg rounded-xl shadow-2xl overflow-hidden border border-border animate-slide-down pointer-events-auto">
+    <DialogShell
+      onBackdropClick={onBack}
+      panelClassName="max-w-2xl"
+    >
         {/* Input */}
         <div className="border-b border-border">
           <div className="flex items-center gap-3 px-4.5 py-3.5">
@@ -186,7 +188,7 @@ export function AiEditModal({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="flex-1 text-[17px] bg-transparent outline-none text-text placeholder-text-muted/50 disabled:opacity-50"
+              className="ui-focus-ring-subtle h-[var(--ui-control-height-prominent)] flex-1 bg-transparent text-[17px] text-text placeholder:text-text-muted/50 disabled:opacity-50"
             />
             {isExecuting && (
               <SpinnerIcon className="w-5 h-5 animate-spin text-text-muted shrink-0" />
@@ -203,7 +205,7 @@ export function AiEditModal({
             </div>
           ) : cliInstalled === false ? (
             <>
-              <div className="text-sm space-y-0.5 p-3 bg-orange-500/10 rounded-md ">
+              <div className="text-sm space-y-0.5 rounded-[var(--ui-radius-md)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] p-3">
                 <div className="font-medium text-orange-700 dark:text-orange-400">
                   {cliName} Not Found
                 </div>
@@ -222,9 +224,7 @@ export function AiEditModal({
               </div>
               <div className="w-full flex justify-between">
                 <div className="flex items-center gap-1.5 text-sm text-text-muted">
-                  <kbd className="text-xs px-1.5 py-0.5 rounded-md bg-bg-muted text-text-muted">
-                    Esc
-                  </kbd>
+                  <kbd className="ui-kbd">Esc</kbd>
                   <span>to go back</span>
                 </div>
               </div>
@@ -253,12 +253,12 @@ export function AiEditModal({
                       autoCorrect="off"
                       autoCapitalize="off"
                       spellCheck={false}
-                      className="flex-1 text-sm bg-bg-muted rounded-md px-2.5 py-1.5 outline-none text-text placeholder-text-muted/50 border border-border focus:border-text-muted transition-colors"
+                      className="ui-focus-ring h-[var(--ui-control-height-standard)] flex-1 rounded-[var(--ui-radius-md)] border border-border bg-bg-muted px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted/50 transition-colors"
                     />
                   </div>
                 </div>
               )}
-              <div className="text-sm space-y-1 p-3 bg-bg-muted rounded-md">
+              <div className="text-sm space-y-1 rounded-[var(--ui-radius-md)] bg-bg-muted p-3">
                 <span className="font-medium text-text">How does it work?</span>{" "}
                 <span className="text-text-muted">
                   {providerName} will edit the current note directly using your
@@ -268,22 +268,17 @@ export function AiEditModal({
 
               <div className="w-full flex justify-between">
                 <div className="flex items-center gap-1.5 text-sm text-text-muted">
-                  <kbd className="text-xs px-1.5 py-0.5 rounded-md bg-bg-muted text-text-muted">
-                    Esc
-                  </kbd>
+                  <kbd className="ui-kbd">Esc</kbd>
                   <span>to go back</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-text-muted">
-                  <kbd className="text-xs px-1.5 py-0.5 rounded-md bg-bg-muted text-text-muted">
-                    Enter
-                  </kbd>
+                  <kbd className="ui-kbd">Enter</kbd>
                   <span>to submit</span>
                 </div>
               </div>
             </>
           )}
         </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

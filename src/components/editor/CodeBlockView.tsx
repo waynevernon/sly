@@ -5,8 +5,7 @@ import { SUPPORTED_LANGUAGES } from "./lowlight";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { ChevronDownIcon, PencilIcon, EyeIcon } from "../icons";
 
-const btnClass =
-  "code-block-mermaid-btn inline-flex items-center gap-1 text-xs h-6 px-1.5 text-text-muted rounded cursor-pointer transition-colors hover:text-text hover:bg-bg-emphasis";
+const btnClass = "code-block-toolbar-btn ui-focus-ring text-xs";
 
 export function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
   const language: string = node.attrs.language || "";
@@ -47,7 +46,7 @@ export function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
         <select
           value={language}
           onChange={handleLanguageChange}
-          className="appearance-none bg-transparent text-text-muted text-xs h-6 cursor-pointer outline-none pr-4 pl-1.5 rounded hover:bg-bg-emphasis transition-colors"
+          className="code-block-language-select ui-focus-ring text-xs"
         >
           {SUPPORTED_LANGUAGES.map((lang) => (
             <option key={lang.value} value={lang.value}>
@@ -66,7 +65,7 @@ export function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
         {toolbar}
         <div
           contentEditable={false}
-          className="mermaid-preview rounded-lg bg-bg-muted p-4 my-1"
+          className="mermaid-preview my-1 rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary p-4"
         >
           <MermaidRenderer code={codeContent} />
         </div>

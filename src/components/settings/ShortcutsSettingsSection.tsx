@@ -154,11 +154,7 @@ const groupedShortcuts = shortcuts.reduce(
 
 // Render individual key as keyboard button
 function KeyboardKey({ keyLabel }: { keyLabel: string }) {
-  return (
-    <kbd className="text-xs px-1.5 py-0.5 rounded-md bg-bg-muted text-text min-w-6.5 inline-flex items-center justify-center">
-      {keyLabel}
-    </kbd>
-  );
+  return <kbd className="ui-kbd">{keyLabel}</kbd>;
 }
 
 // Render shortcut keys
@@ -176,18 +172,16 @@ export function ShortcutsSettingsSection() {
   const categoryOrder = ["Navigation", "Notes", "Editor", "Settings"];
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-10 pt-8 pb-10">
       {categoryOrder.map((category, idx) => {
         const categoryShortcuts = groupedShortcuts[category];
         if (!categoryShortcuts) return null;
 
         return (
           <div key={category}>
-            {idx > 0 && (
-              <div className="border-t border-border border-dashed" />
-            )}
+            {idx > 0 && <div className="ui-settings-separator" />}
             <section>
-              <h2 className="text-xl font-medium pt-8 mb-4">{category}</h2>
+              <h2 className="text-xl font-medium pt-10 mb-4">{category}</h2>
               <div className="space-y-3">
                 {categoryShortcuts.map((shortcut, index) => (
                   <div

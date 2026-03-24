@@ -93,10 +93,10 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {/* Sidebar - matches main Notes sidebar */}
       <div className="w-64 h-full bg-bg-secondary border-r border-border flex flex-col select-none">
         {/* Drag region */}
-        <div className="h-11 shrink-0" data-tauri-drag-region></div>
+        <div className="ui-pane-drag-region" data-tauri-drag-region></div>
 
         {/* Header with back button and Settings title */}
-        <div className="flex items-center justify-between px-3 pb-2 border-b border-border shrink-0">
+        <div className="ui-pane-header">
           <div className="flex items-center gap-1">
             <IconButton
               onClick={onBack}
@@ -109,7 +109,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         </div>
 
         {/* Navigation tabs */}
-        <nav className="flex-1 p-2 flex flex-col gap-1">
+        <nav className="flex-1 p-2.5 flex flex-col gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -135,14 +135,14 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {/* Main content area */}
       <div className="flex-1 flex flex-col bg-bg overflow-hidden">
         {/* Drag region */}
-        <div className="h-11 shrink-0" data-tauri-drag-region></div>
+        <div className="ui-pane-drag-region" data-tauri-drag-region></div>
 
         {/* Content - centered with max width */}
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-auto scrollbar-gutter-stable"
         >
-          <div className="w-full max-w-3xl mx-auto px-6 pb-6">
+          <div className="w-full max-w-[56rem] mx-auto px-8 pb-8">
             {activeTab === "general" && <GeneralSettingsSection />}
             {activeTab === "editor" && <AppearanceSettingsSection />}
             {activeTab === "shortcuts" && <ShortcutsSettingsSection />}

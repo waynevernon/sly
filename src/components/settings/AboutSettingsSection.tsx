@@ -37,13 +37,15 @@ export function AboutSettingsSection() {
   };
 
   return (
-    <div className="space-y-8 py-8">
+    <div className="space-y-10 pt-8 pb-10">
       {/* Version */}
-      <section className="pb-2">
-        <h2 className="text-xl font-medium mb-0.5">Version</h2>
-        <p className="text-sm text-text-muted mb-4">
-          You are currently using Scratch v{appVersion || "..."}
-        </p>
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-medium mb-0.5">Version</h2>
+          <p className="text-sm text-text-muted">
+            You are currently using Scratch v{appVersion || "..."}
+          </p>
+        </div>
         <Button
           onClick={handleCheckForUpdates}
           disabled={checkingUpdate}
@@ -66,36 +68,38 @@ export function AboutSettingsSection() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-border border-dashed" />
+      <div className="ui-settings-separator" />
 
       {/* About Section */}
-      <section className="pb-2">
-        <h2 className="text-xl font-medium mb-1">About Scratch</h2>
-        <p className="text-sm text-text-muted mb-4">
-          Scratch is a minimalist markdown scratchpad for capturing quick
-          thoughts, todos, and ideas. We're offline-first, keyboard-optimized,
-          AI-compatible, and open source with no cloud, no accounts, and no
-          subscriptions. Learn more on{" "}
-          <button
-            onClick={() => handleOpenUrl("https://www.ericli.io/scratch")}
-            className="text-text-muted border-b border-text-muted/50 hover:text-text hover:border-text cursor-pointer transition-colors"
-          >
-            our website
-          </button>
-          .
-        </p>
-        <p className="text-sm text-text-muted mb-4">
-          Created and maintained by{" "}
-          <button
-            onClick={() => handleOpenUrl("https://ericli.io")}
-            className="text-text-muted border-b border-text-muted/50 hover:text-text hover:border-text cursor-pointer transition-colors"
-          >
-            Eric Li
-          </button>{" "}
-          with moral support from his cat, Mochi, and actual support from many
-          contributors on GitHub.
-        </p>
-        <div className="flex items-center gap-1">
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-medium mb-1">About Scratch</h2>
+          <p className="text-sm text-text-muted mb-4">
+            Scratch is a minimalist markdown scratchpad for capturing quick
+            thoughts, todos, and ideas. We're offline-first,
+            keyboard-optimized, AI-compatible, and open source with no cloud,
+            no accounts, and no subscriptions. Learn more on{" "}
+            <button
+              onClick={() => handleOpenUrl("https://www.ericli.io/scratch")}
+              className="ui-inline-link cursor-pointer"
+            >
+              our website
+            </button>
+            .
+          </p>
+          <p className="text-sm text-text-muted">
+            Created and maintained by{" "}
+            <button
+              onClick={() => handleOpenUrl("https://ericli.io")}
+              className="ui-inline-link cursor-pointer"
+            >
+              Eric Li
+            </button>{" "}
+            with moral support from his cat, Mochi, and actual support from
+            many contributors on GitHub.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <Button
             onClick={() => handleOpenUrl("https://github.com/erictli/scratch")}
             variant="outline"

@@ -59,7 +59,15 @@ import { EditorWidthHandles } from "./EditorWidthHandle";
 import { ScratchBlockMath, normalizeBlockMath } from "./MathExtensions";
 import { cn } from "../../lib/utils";
 import { plainTextFromMarkdown } from "../../lib/plainText";
-import { Button, IconButton, ToolbarButton, Tooltip } from "../ui";
+import {
+  Button,
+  IconButton,
+  ToolbarButton,
+  Tooltip,
+  menuItemClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
+} from "../ui";
 import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
 import type { PaneMode, Settings } from "../../types/note";
@@ -399,7 +407,7 @@ function FormatBar({
         </Tooltip>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="p-2.5 bg-bg border border-border rounded-md shadow-lg z-50"
+            className="ui-surface-popover z-50 p-2.5"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
             <GridPicker
@@ -1857,8 +1865,8 @@ export function Editor({
     if (previewMode) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
-          <div
-            className="h-10 shrink-0 flex items-end px-4 pb-1"
+        <div
+            className="ui-pane-drag-region flex items-end px-4 pb-1"
             data-tauri-drag-region
           ></div>
           <div className="flex-1 flex items-center justify-center">
@@ -1872,8 +1880,8 @@ export function Editor({
     if (notesCtx?.selectedNoteId) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
-          <div
-            className="h-10 shrink-0 flex items-end px-4 pb-1"
+        <div
+            className="ui-pane-drag-region flex items-end px-4 pb-1"
             data-tauri-drag-region
           ></div>
           <div className="flex-1 flex items-center justify-center">
@@ -1888,7 +1896,7 @@ export function Editor({
       <div className="flex-1 flex flex-col bg-bg">
         {/* Drag region */}
         <div
-          className="h-10 shrink-0 flex items-end px-4 pb-1"
+          className="ui-pane-drag-region flex items-end px-4 pb-1"
           data-tauri-drag-region
         ></div>
         <div className="flex-1 flex items-center justify-center pb-8">
@@ -1929,13 +1937,13 @@ export function Editor({
       {/* Drag region with sidebar toggle, date and save status */}
       <div
         className={cn(
-          "h-11 shrink-0 flex items-center justify-between px-3",
+          "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-between px-[var(--ui-pane-padding-end)]",
           !navigationVisible && (isMac ? "pl-22" : "pl-4"),
         )}
         data-tauri-drag-region
       >
         <div
-          className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-400 ${needsPaneDelay ? "delay-200" : ""} ${focusMode || isCollapsingToSinglePane ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode || isCollapsingToSinglePane ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
           {onCyclePaneMode && (
             <IconButton
@@ -1951,7 +1959,7 @@ export function Editor({
           </span>
         </div>
         <div
-          className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-400 ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
           {hasExternalChanges ? (
             <Tooltip
@@ -1959,7 +1967,7 @@ export function Editor({
             >
               <button
                 onClick={reloadCurrentNote}
-                className="h-7 px-2 flex items-center gap-1 text-xs text-text-muted hover:bg-bg-emphasis rounded transition-colors font-medium"
+                className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-text-muted hover:bg-bg-muted hover:text-text transition-colors font-medium"
               >
                 <RefreshCwIcon className="w-4 h-4 stroke-[1.6]" />
                 <span>Refresh</span>
@@ -1967,13 +1975,13 @@ export function Editor({
             </Tooltip>
           ) : isSaving ? (
             <Tooltip content="Saving...">
-              <div className="h-7 w-7 flex items-center justify-center">
+              <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center">
                 <SpinnerIcon className="w-4.5 h-4.5 text-text-muted/40 stroke-[1.5] animate-spin" />
               </div>
             </Tooltip>
           ) : (
             <Tooltip content="All changes saved">
-              <div className="h-7 w-7 flex items-center justify-center rounded-full">
+              <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)]">
                 <CircleCheckIcon className="w-4.5 h-4.5 mt-px stroke-[1.5] text-text-muted/40" />
               </div>
             </Tooltip>
@@ -2049,7 +2057,7 @@ export function Editor({
             </Tooltip>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                className="min-w-35 bg-bg border border-border rounded-md shadow-lg py-1 z-50"
+                className={`${menuSurfaceClassName} min-w-35 z-50`}
                 sideOffset={5}
                 align="end"
                 onCloseAutoFocus={(e) => {
@@ -2064,36 +2072,36 @@ export function Editor({
                 }}
               >
                 <DropdownMenu.Item
-                  className="px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2"
+                  className={menuItemClassName}
                   onSelect={handleCopyMarkdown}
                 >
                   <CopyIcon className="w-4 h-4 stroke-[1.6]" />
                   Copy Markdown
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  className="px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2"
+                  className={menuItemClassName}
                   onSelect={handleCopyPlainText}
                 >
                   <CopyIcon className="w-4 h-4 stroke-[1.6]" />
                   Copy Plain Text
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  className="px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2"
+                  className={menuItemClassName}
                   onSelect={handleCopyHtml}
                 >
                   <CopyIcon className="w-4 h-4 stroke-[1.6]" />
                   Copy HTML
                 </DropdownMenu.Item>
-                <DropdownMenu.Separator className="h-px bg-border my-1" />
+                <DropdownMenu.Separator className={menuSeparatorClassName} />
                 <DropdownMenu.Item
-                  className="px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2"
+                  className={menuItemClassName}
                   onSelect={handleDownloadPdf}
                 >
                   <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
                   Print as PDF
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
-                  className="px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2"
+                  className={menuItemClassName}
                   onSelect={handleDownloadMarkdown}
                 >
                   <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
@@ -2122,7 +2130,7 @@ export function Editor({
 
       {/* Format Bar – transition only after initial mount to avoid height animation on note load */}
       <div
-        className={`${focusMode || sourceMode ? "opacity-0 max-h-0 overflow-hidden pointer-events-none" : "opacity-100 max-h-20"} ${hasTransitioned ? `transition-all duration-400 ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
+        className={`${focusMode || sourceMode ? "opacity-0 max-h-0 overflow-hidden pointer-events-none" : "opacity-100 max-h-20"} ${hasTransitioned ? `transition-all duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
       >
         <FormatBar
           editor={editor}
@@ -2144,14 +2152,18 @@ export function Editor({
         >
           {sourceMode ? (
             /* Markdown source textarea */
-            <div className="h-full">
+            <div
+              className="min-h-full mx-auto px-6 py-6"
+              style={{
+                maxWidth: "calc(var(--editor-max-width, 48rem) + 3rem)",
+              }}
+            >
               <textarea
                 value={sourceContent}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 dir={textDirection}
-                className="w-full h-full bg-transparent text-text focus:outline-none resize-none px-6 pt-8 pb-24 mx-auto block"
+                className="ui-focus-ring-subtle w-full min-h-full resize-none rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary px-6 py-6 text-text outline-none"
                 style={{
-                  maxWidth: "var(--editor-max-width, 48rem)",
                   fontFamily: "var(--font-mono)",
                   fontSize: "var(--editor-base-font-size)",
                   lineHeight: "var(--editor-line-height)",
@@ -2163,7 +2175,7 @@ export function Editor({
           ) : (
             <>
               {searchOpen && (
-                <div className="sticky top-2 z-10 animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-none pr-2 flex justify-end">
+                <div className="sticky top-2 z-10 animate-in fade-in slide-in-from-top-4 duration-[180ms] pointer-events-none pr-2 flex justify-end">
                   <div className="pointer-events-auto">
                     <SearchToolbar
                       inputRef={searchInputRef}

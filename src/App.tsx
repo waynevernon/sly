@@ -307,13 +307,6 @@ function AppContent() {
         return;
       }
 
-      // Trap Tab/Shift+Tab in notes view only - prevent focus navigation
-      // TipTap handles indentation internally before event bubbles up
-      if (e.key === "Tab") {
-        e.preventDefault();
-        return;
-      }
-
       // Cmd+P - Open command palette
       if ((e.metaKey || e.ctrlKey) && e.key === "p") {
         e.preventDefault();
@@ -518,17 +511,6 @@ function AppContent() {
           </>
         )}
       </div>
-
-      {/* Shared backdrop for command palette and AI modal */}
-      {(paletteOpen || aiModalOpen) && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in"
-          onClick={() => {
-            if (paletteOpen) handleClosePalette();
-            if (aiModalOpen) setAiModalOpen(false);
-          }}
-        />
-      )}
 
       <CommandPalette
         open={paletteOpen}

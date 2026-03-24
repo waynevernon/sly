@@ -123,7 +123,7 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
             <Button
               onClick={clearError}
               variant="link"
-              className="text-xs h-auto p-0 text-orange-500 hover:text-orange-600 hover:no-underline"
+              className="text-xs h-auto p-0 text-[var(--color-warning)] hover:opacity-80 hover:no-underline"
             >
               An error occurred
             </Button>
@@ -158,9 +158,9 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
   return (
     <div className="shrink-0 border-t border-border">
       {/* Footer bar with git status and action buttons */}
-      <div className="pl-4 pr-3 pt-2 pb-2.5 flex items-center justify-between">
+      <div className="pl-[var(--ui-pane-padding-start)] pr-[var(--ui-pane-padding-end)] pt-2 pb-2.5 flex items-center justify-between">
         <div className="min-w-0">{gitStatus}</div>
-        <div className="flex items-center gap-px">
+        <div className="ui-pane-header-actions">
           {/* Sync button — pulls then pushes, always visible when upstream is configured */}
           {showSyncButton && (
             <Tooltip content={syncTooltip}>

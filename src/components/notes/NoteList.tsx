@@ -13,15 +13,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   ListItem,
+  destructiveMenuItemClassName,
+  menuItemClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
 import { CopyIcon, PinIcon, TrashIcon } from "../icons";
-
-const menuItemClass =
-  "px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2 rounded-sm";
-
-const menuSeparatorClass = "h-px bg-border my-1";
 
 export interface NoteListItem {
   id: string;
@@ -97,7 +96,7 @@ const NoteItem = memo(function NoteItem({
 
   useEffect(() => {
     if (isSelected) {
-      ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      ref.current?.scrollIntoView({ block: "nearest" });
     }
   }, [isSelected]);
 
@@ -198,31 +197,30 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-44 bg-bg border border-border rounded-md shadow-lg py-1 z-50">
-          <ContextMenu.Item className={menuItemClass} onSelect={handlePin}>
+        <ContextMenu.Content
+          className={`${menuSurfaceClassName} min-w-44 z-50`}
+        >
+          <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
             <PinIcon className="w-4 h-4 stroke-[1.6]" />
             {isPinned ? "Unpin" : "Pin"}
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => onDuplicate(id)}
           >
             <CopyIcon className="w-4 h-4 stroke-[1.6]" />
             Duplicate
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={handleCopyFilepath}
           >
             <CopyIcon className="w-4 h-4 stroke-[1.6]" />
             Copy Filepath
           </ContextMenu.Item>
-          <ContextMenu.Separator className={menuSeparatorClass} />
+          <ContextMenu.Separator className={menuSeparatorClassName} />
           <ContextMenu.Item
-            className={
-              menuItemClass +
-              " text-red-500 hover:text-red-500 focus:text-red-500"
-            }
+            className={destructiveMenuItemClassName}
             onSelect={() => onDelete(id)}
           >
             <TrashIcon className="w-4 h-4 stroke-[1.6]" />

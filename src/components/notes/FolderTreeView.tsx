@@ -32,6 +32,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   InlineNameEditor,
+  destructiveMenuItemClassName,
+  menuItemClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
 } from "../ui";
 import {
   AddNoteIcon,
@@ -52,11 +56,6 @@ const FolderIconPickerModal = lazy(() =>
     default: module.FolderIconPickerModal,
   })),
 );
-
-const menuItemClass =
-  "px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2 rounded-sm";
-
-const menuSeparatorClass = "h-px bg-border my-1";
 
 type InlineFolderEditState =
   | { mode: "create"; parentPath: string; iconName: string | null }
@@ -432,7 +431,7 @@ const FolderItem = memo(function FolderItem({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content
-          className="min-w-44 bg-bg border border-border rounded-md shadow-lg py-1 z-50"
+          className={`${menuSurfaceClassName} min-w-44 z-50`}
           onCloseAutoFocus={(event) => {
             if (!suppressCloseAutoFocusRef.current) return;
             suppressCloseAutoFocusRef.current = false;
@@ -440,14 +439,14 @@ const FolderItem = memo(function FolderItem({
           }}
         >
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => onCreateNoteHere(folder.path)}
           >
             <AddNoteIcon className="w-4 h-4 stroke-[1.6]" />
             New Note
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => {
               suppressCloseAutoFocusRef.current = true;
               onStartCreateFolder(folder.path);
@@ -456,9 +455,9 @@ const FolderItem = memo(function FolderItem({
             <FolderPlusIcon className="w-4 h-4 stroke-[1.6]" />
             New Subfolder
           </ContextMenu.Item>
-          <ContextMenu.Separator className={menuSeparatorClass} />
+          <ContextMenu.Separator className={menuSeparatorClassName} />
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => {
               suppressCloseAutoFocusRef.current = true;
               onStartRenameFolder(folder.path, getFolderLeaf(folder.path));
@@ -468,7 +467,7 @@ const FolderItem = memo(function FolderItem({
             Rename
           </ContextMenu.Item>
           <ContextMenu.Item
-            className={menuItemClass}
+            className={menuItemClassName}
             onSelect={() => onOpenIconPicker({ kind: "existing", path: folder.path })}
           >
             <SwatchIcon className="w-4 h-4 stroke-[1.6]" />
@@ -476,9 +475,9 @@ const FolderItem = memo(function FolderItem({
           </ContextMenu.Item>
           {folder.path.includes("/") && (
             <>
-              <ContextMenu.Separator className={menuSeparatorClass} />
+              <ContextMenu.Separator className={menuSeparatorClassName} />
               <ContextMenu.Item
-                className={menuItemClass}
+                className={menuItemClassName}
                 onSelect={() =>
                   onMoveFolderToParent(
                     folder.path,
@@ -491,12 +490,9 @@ const FolderItem = memo(function FolderItem({
               </ContextMenu.Item>
             </>
           )}
-          <ContextMenu.Separator className={menuSeparatorClass} />
+          <ContextMenu.Separator className={menuSeparatorClassName} />
           <ContextMenu.Item
-            className={
-              menuItemClass +
-              " text-red-500 hover:text-red-500 focus:text-red-500"
-            }
+            className={destructiveMenuItemClassName}
             onSelect={() => onDeleteFolder(folder.path)}
           >
             <TrashIcon className="w-4 h-4 stroke-[1.6]" />
