@@ -93,7 +93,6 @@ import {
   MarkdownIcon,
   MarkdownOffIcon,
   FolderPlusIcon,
-  SettingsIcon,
 } from "../icons";
 
 function formatDateTime(timestamp: number): string {
@@ -437,7 +436,6 @@ export interface PreviewModeData {
 interface EditorProps {
   paneMode?: PaneMode;
   onCyclePaneMode?: () => void;
-  onOpenSettings?: () => void;
   focusMode?: boolean;
   previewMode?: PreviewModeData;
   onEditorReady?: (editor: TiptapEditor | null) => void;
@@ -448,7 +446,6 @@ interface EditorProps {
 export function Editor({
   paneMode = 2,
   onCyclePaneMode,
-  onOpenSettings,
   focusMode,
   onEditorReady,
   previewMode,
@@ -2101,13 +2098,6 @@ export function Editor({
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          {onOpenSettings && (
-            <Tooltip content={`Settings (${mod}${isMac ? "" : "+"},)`}>
-              <IconButton onClick={onOpenSettings}>
-                <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-              </IconButton>
-            </Tooltip>
-          )}
           {onSaveToFolder && (
             <Tooltip content="Save in Folder">
               <IconButton

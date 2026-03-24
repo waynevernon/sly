@@ -38,6 +38,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   textDirection: "auto",
   editorWidth: "normal",
   interfaceZoom: 1,
+  paneMode: 2,
 };
 
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {

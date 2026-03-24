@@ -11,6 +11,7 @@ import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { SettingsPage } from "./components/settings";
+import type { PaneMode } from "./types/note";
 import {
   SpinnerIcon,
   ClaudeIcon,
@@ -63,7 +64,6 @@ function AppContent() {
   const {
     interfaceZoom,
     setInterfaceZoom,
-    reloadSettings,
     paneMode,
     setPaneMode,
     cyclePaneMode,
@@ -89,7 +89,6 @@ function AppContent() {
     let unlisten: (() => void) | undefined;
     listen<string>("set-notes-folder", async (event) => {
       await syncNotesFolder(event.payload);
-      await reloadSettings();
     }).then((fn) => {
       if (cancelled) fn();
       else unlisten = fn;
@@ -98,7 +97,7 @@ function AppContent() {
       cancelled = true;
       unlisten?.();
     };
-  }, [syncNotesFolder, reloadSettings]);
+  }, [syncNotesFolder]);
 
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
@@ -108,13 +107,52 @@ function AppContent() {
     });
   }, [selectedNoteId]);
 
-  const toggleSettings = useCallback(() => {
-    setView((prev) => (prev === "settings" ? "notes" : "settings"));
+  const openSettings = useCallback(() => {
+    setPaletteOpen(false);
+    setAiModalOpen(false);
+    setView("settings");
   }, []);
 
   const closeSettings = useCallback(() => {
     setView("notes");
   }, []);
+
+  const applyPaneModeSelection = useCallback(
+    (mode: PaneMode) => {
+      setFocusMode(false);
+      setPaneMode(mode);
+    },
+    [setPaneMode],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenOpenSettings: (() => void) | undefined;
+    let unlistenSetPaneMode: (() => void) | undefined;
+
+    listen("open-settings", () => {
+      openSettings();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenOpenSettings = fn;
+    });
+
+    listen<number>("set-pane-mode", (event) => {
+      const nextPaneMode = event.payload;
+      if (nextPaneMode === 1 || nextPaneMode === 2 || nextPaneMode === 3) {
+        applyPaneModeSelection(nextPaneMode);
+      }
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenSetPaneMode = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      unlistenOpenSettings?.();
+      unlistenSetPaneMode?.();
+    };
+  }, [applyPaneModeSelection, openSettings]);
 
   // Go back to command palette from AI modal
   const handleBackToPalette = useCallback(() => {
@@ -201,10 +239,10 @@ function AppContent() {
       const isEditorEmpty =
         isInEditor && currentNoteRef.current?.content.trim() === "";
 
-      // Cmd+, - Toggle settings (always works, even in settings)
+      // Cmd+, - Open settings (always works, even in settings)
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        toggleSettings();
+        openSettings();
         return;
       }
 
@@ -432,7 +470,7 @@ function AppContent() {
     selectedNoteId,
     selectNote,
     setPaneMode,
-    toggleSettings,
+    openSettings,
     toggleFocusMode,
     focusMode,
     view,
@@ -467,12 +505,11 @@ function AppContent() {
           <>
             <WorkspaceNavigation
               paneMode={focusMode ? 1 : paneMode}
-              onOpenSettings={toggleSettings}
+              onOpenSettings={openSettings}
             />
             <Editor
               paneMode={paneMode}
               onCyclePaneMode={cyclePaneMode}
-              onOpenSettings={toggleSettings}
               focusMode={focusMode}
               onEditorReady={(editor) => {
                 editorRef.current = editor;
@@ -496,7 +533,7 @@ function AppContent() {
       <CommandPalette
         open={paletteOpen}
         onClose={handleClosePalette}
-        onOpenSettings={toggleSettings}
+        onOpenSettings={openSettings}
         onOpenAiModal={(provider) => {
           setAiProvider(provider);
           setAiModalOpen(true);

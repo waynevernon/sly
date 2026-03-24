@@ -1,4 +1,4 @@
-import { mod } from "../../lib/platform";
+import { alt, mod } from "../../lib/platform";
 
 interface Shortcut {
   keys: string[];
@@ -48,6 +48,21 @@ const shortcuts: Shortcut[] = [
     category: "Navigation",
   },
   {
+    keys: [mod, "1"],
+    description: "Switch to 1-pane view",
+    category: "Navigation",
+  },
+  {
+    keys: [mod, "2"],
+    description: "Switch to 2-pane view",
+    category: "Navigation",
+  },
+  {
+    keys: [mod, "3"],
+    description: "Switch to 3-pane view",
+    category: "Navigation",
+  },
+  {
     keys: [mod, "\\"],
     description: "Cycle workspace layout",
     category: "Navigation",
@@ -88,23 +103,23 @@ const shortcuts: Shortcut[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, "1"],
-    description: "Go to General settings",
+    keys: [mod, alt, "1"],
+    description: "Go to General settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, "2"],
-    description: "Go to Appearance settings",
+    keys: [mod, alt, "2"],
+    description: "Go to Appearance settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, "3"],
-    description: "Go to Shortcuts settings",
+    keys: [mod, alt, "3"],
+    description: "Go to Shortcuts settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, "4"],
-    description: "Go to About settings",
+    keys: [mod, alt, "4"],
+    description: "Go to About settings tab",
     category: "Settings",
   },
   {

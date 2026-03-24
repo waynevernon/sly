@@ -94,6 +94,7 @@ export interface AppearanceSettings {
   editorWidth: EditorWidth;
   customEditorWidthPx?: number;
   interfaceZoom: number;
+  paneMode: PaneMode;
   customLightColors?: ThemeColors;
   customDarkColors?: ThemeColors;
 }
@@ -101,7 +102,6 @@ export interface AppearanceSettings {
 // Per-folder settings (stored in .scratch/settings.json)
 export interface Settings {
   gitEnabled?: boolean;
-  foldersEnabled?: boolean;
   pinnedNoteIds?: string[];
   defaultNoteName?: string;
   ollamaModel?: string;

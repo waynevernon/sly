@@ -137,7 +137,7 @@ export function AppearanceSettingsSection() {
     setCodeFont,
     noteTypography,
     setNoteTypographySetting,
-    resetTypographySettings,
+    resetTypographyAndLayoutSettings,
     textDirection,
     setTextDirection,
     editorWidth,
@@ -165,7 +165,7 @@ export function AppearanceSettingsSection() {
     setNoteTypographySetting(field, clamped);
   };
 
-  const hasCustomTypography =
+  const hasCustomizedTypographyOrLayout =
     !fontChoiceEquals(uiFont, DEFAULT_APPEARANCE_SETTINGS.uiFont) ||
     !fontChoiceEquals(noteFont, DEFAULT_APPEARANCE_SETTINGS.noteFont) ||
     !fontChoiceEquals(codeFont, DEFAULT_APPEARANCE_SETTINGS.codeFont) ||
@@ -177,6 +177,7 @@ export function AppearanceSettingsSection() {
       DEFAULT_APPEARANCE_SETTINGS.noteTypography.lineHeight ||
     textDirection !== DEFAULT_APPEARANCE_SETTINGS.textDirection ||
     editorWidth !== DEFAULT_APPEARANCE_SETTINGS.editorWidth ||
+    paneMode !== DEFAULT_APPEARANCE_SETTINGS.paneMode ||
     Math.round(interfaceZoom * 100) !== 100;
 
   const previewTheme = previewMode === "resolved" ? resolvedTheme : previewMode;
@@ -285,10 +286,14 @@ export function AppearanceSettingsSection() {
 
       <section>
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-xl font-medium">Typography</h2>
-          {hasCustomTypography && (
-            <Button onClick={resetTypographySettings} variant="ghost" size="sm">
-              Reset to defaults
+          <h2 className="text-xl font-medium">Typography & Layout</h2>
+          {hasCustomizedTypographyOrLayout && (
+            <Button
+              onClick={resetTypographyAndLayoutSettings}
+              variant="ghost"
+              size="sm"
+            >
+              Reset typography & layout
             </Button>
           )}
         </div>

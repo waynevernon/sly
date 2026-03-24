@@ -16,7 +16,6 @@ import {
 } from "../lib/appearance";
 import {
   getAppearanceSettings,
-  getSettings,
   updateAppearanceSettings,
 } from "../services/notes";
 import type {
@@ -38,8 +37,6 @@ const editorWidthMap: Record<Exclude<EditorWidth, "custom">, string> = {
 };
 
 const DEFAULT_CUSTOM_WIDTH_PX = 768;
-const DEFAULT_PANE_MODE: PaneMode = 2;
-const PANE_MODE_STORAGE_KEY = "scratch:paneMode";
 
 interface ThemeContextType {
   appearanceSettings: AppearanceSettings;
@@ -62,8 +59,7 @@ interface ThemeContextType {
     key: K,
     value: NoteTypographySettings[K],
   ) => void;
-  resetTypographySettings: () => void;
-  reloadSettings: () => Promise<void>;
+  resetTypographyAndLayoutSettings: () => void;
   textDirection: TextDirection;
   setTextDirection: (dir: TextDirection) => void;
   editorWidth: EditorWidth;
@@ -114,23 +110,6 @@ function isPaneMode(value: unknown): value is PaneMode {
 
 function clampZoom(zoom: number) {
   return Math.round(Math.min(Math.max(zoom, 0.7), 1.5) * 20) / 20;
-}
-
-function loadStoredPaneMode(): PaneMode | null {
-  try {
-    const value = Number(window.localStorage.getItem(PANE_MODE_STORAGE_KEY));
-    return isPaneMode(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredPaneMode(mode: PaneMode) {
-  try {
-    window.localStorage.setItem(PANE_MODE_STORAGE_KEY, String(mode));
-  } catch {
-    // Ignore localStorage failures.
-  }
 }
 
 function normalizeAppearanceSettings(
@@ -184,6 +163,9 @@ function normalizeAppearanceSettings(
       typeof next.interfaceZoom === "number"
         ? clampZoom(next.interfaceZoom)
         : defaultAppearance.interfaceZoom,
+    paneMode: isPaneMode(next.paneMode)
+      ? next.paneMode
+      : defaultAppearance.paneMode,
     customLightColors: next.customLightColors,
     customDarkColors: next.customDarkColors,
   };
@@ -234,7 +216,6 @@ function applyAppearanceCSSVariables(
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [appearanceSettings, setAppearanceSettingsState] =
     useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
-  const [paneMode, setPaneModeState] = useState<PaneMode>(DEFAULT_PANE_MODE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">(() => {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -262,38 +243,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
 
   const loadSettingsFromBackend = useCallback(async () => {
-    const storedPaneMode = loadStoredPaneMode();
-    if (storedPaneMode) {
-      setPaneModeState(storedPaneMode);
-    }
-
     try {
-      const [appearance, folderSettings] = await Promise.all([
-        getAppearanceSettings(),
-        getSettings(),
-      ]);
+      const appearance = await getAppearanceSettings();
       setAppearanceSettingsState(normalizeAppearanceSettings(appearance));
-
-      if (!storedPaneMode) {
-        const migratedPaneMode: PaneMode =
-          folderSettings.foldersEnabled === true ? 3 : DEFAULT_PANE_MODE;
-        setPaneModeState(migratedPaneMode);
-        saveStoredPaneMode(migratedPaneMode);
-      }
     } catch (error) {
       console.error("Failed to load appearance settings:", error);
       setAppearanceSettingsState(DEFAULT_APPEARANCE_SETTINGS);
-
-      if (!storedPaneMode) {
-        setPaneModeState(DEFAULT_PANE_MODE);
-        saveStoredPaneMode(DEFAULT_PANE_MODE);
-      }
     }
   }, []);
-
-  const reloadSettings = useCallback(async () => {
-    await loadSettingsFromBackend();
-  }, [loadSettingsFromBackend]);
 
   useEffect(() => {
     loadSettingsFromBackend().finally(() => {
@@ -397,7 +354,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
-  const resetTypographySettings = useCallback(() => {
+  const resetTypographyAndLayoutSettings = useCallback(() => {
     updateAppearance((prev) => ({
       ...prev,
       uiFont: DEFAULT_APPEARANCE_SETTINGS.uiFont,
@@ -408,6 +365,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       editorWidth: DEFAULT_APPEARANCE_SETTINGS.editorWidth,
       customEditorWidthPx: undefined,
       interfaceZoom: DEFAULT_APPEARANCE_SETTINGS.interfaceZoom,
+      paneMode: DEFAULT_APPEARANCE_SETTINGS.paneMode,
     }));
   }, [updateAppearance]);
 
@@ -425,17 +383,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
-  const setPaneMode = useCallback((mode: PaneMode) => {
-    setPaneModeState(mode);
-    saveStoredPaneMode(mode);
-  }, []);
+  const setPaneMode = useCallback(
+    (mode: PaneMode) => {
+      updateAppearance((prev) => ({ ...prev, paneMode: mode }));
+    },
+    [updateAppearance],
+  );
 
   const cyclePaneMode = useCallback(() => {
     const order: PaneMode[] = [1, 2, 3];
-    const currentIndex = order.indexOf(paneMode);
+    const currentIndex = order.indexOf(appearanceSettings.paneMode);
     const nextMode = order[(currentIndex + 1) % order.length];
     setPaneMode(nextMode);
-  }, [paneMode, setPaneMode]);
+  }, [appearanceSettings.paneMode, setPaneMode]);
 
   const setInterfaceZoom = useCallback(
     (zoomOrUpdater: number | ((prev: number) => number)) => {
@@ -492,13 +452,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setCodeFont,
         noteTypography: appearanceSettings.noteTypography,
         setNoteTypographySetting,
-        resetTypographySettings,
-        reloadSettings,
+        resetTypographyAndLayoutSettings,
         textDirection: appearanceSettings.textDirection,
         setTextDirection,
         editorWidth: appearanceSettings.editorWidth,
         setEditorWidth,
-        paneMode,
+        paneMode: appearanceSettings.paneMode,
         setPaneMode,
         cyclePaneMode,
         interfaceZoom: appearanceSettings.interfaceZoom,

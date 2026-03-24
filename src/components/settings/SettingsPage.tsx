@@ -11,7 +11,7 @@ import { GeneralSettingsSection } from "./GeneralSettingsSection";
 import { AppearanceSettingsSection } from "./EditorSettingsSection";
 import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
 import { AboutSettingsSection } from "./AboutSettingsSection";
-import { mod, isMac } from "../../lib/platform";
+import { alt, isMac, mod, shortcut } from "../../lib/platform";
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -23,12 +23,32 @@ const tabs: {
   id: SettingsTab;
   label: string;
   icon: typeof FolderIcon;
-  shortcut: string;
+  shortcutLabel: string;
 }[] = [
-  { id: "general", label: "General", icon: FolderIcon, shortcut: "1" },
-  { id: "editor", label: "Appearance", icon: SwatchIcon, shortcut: "2" },
-  { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, shortcut: "3" },
-  { id: "about", label: "About", icon: InfoIcon, shortcut: "4" },
+  {
+    id: "general",
+    label: "General",
+    icon: FolderIcon,
+    shortcutLabel: shortcut(mod, alt, "1"),
+  },
+  {
+    id: "editor",
+    label: "Appearance",
+    icon: SwatchIcon,
+    shortcutLabel: shortcut(mod, alt, "2"),
+  },
+  {
+    id: "shortcuts",
+    label: "Shortcuts",
+    icon: KeyboardIcon,
+    shortcutLabel: shortcut(mod, alt, "3"),
+  },
+  {
+    id: "about",
+    label: "About",
+    icon: InfoIcon,
+    shortcutLabel: shortcut(mod, alt, "4"),
+  },
 ];
 
 export function SettingsPage({ onBack }: SettingsPageProps) {
@@ -45,20 +65,22 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === "1") {
-          e.preventDefault();
-          setActiveTab("general");
-        } else if (e.key === "2") {
-          e.preventDefault();
-          setActiveTab("editor");
-        } else if (e.key === "3") {
-          e.preventDefault();
-          setActiveTab("shortcuts");
-        } else if (e.key === "4") {
-          e.preventDefault();
-          setActiveTab("about");
-        }
+      if (!(e.metaKey || e.ctrlKey) || !e.altKey) {
+        return;
+      }
+
+      if (e.code === "Digit1") {
+        e.preventDefault();
+        setActiveTab("general");
+      } else if (e.code === "Digit2") {
+        e.preventDefault();
+        setActiveTab("editor");
+      } else if (e.code === "Digit3") {
+        e.preventDefault();
+        setActiveTab("shortcuts");
+      } else if (e.code === "Digit4") {
+        e.preventDefault();
+        setActiveTab("about");
       }
     };
 
@@ -103,10 +125,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                   <Icon className="w-4.5 h-4.5 stroke-[1.5]" />
                   {tab.label}
                 </div>
-                <div className="text-xs text-text-muted">
-                  <span className="mr-0.5">{mod}</span>
-                  {tab.shortcut}
-                </div>
+                <div className="text-xs text-text-muted">{tab.shortcutLabel}</div>
               </Button>
             );
           })}

@@ -10,13 +10,22 @@ use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl};
+use tauri::menu::{
+    AboutMetadata, Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu,
+    HELP_SUBMENU_ID, WINDOW_SUBMENU_ID,
+};
 use tauri::webview::WebviewWindowBuilder;
+use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
 mod git;
+
+const MENU_SETTINGS_ID: &str = "app-settings";
+const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
+const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
+const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
 
 // Note metadata for list display
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,35 +80,6 @@ pub struct ThemeColors {
     pub syntax_attr: Option<String>,
 }
 
-// Theme settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ThemeSettings {
-    pub mode: String, // "light" | "dark" | "system"
-    pub custom_light_colors: Option<ThemeColors>,
-    pub custom_dark_colors: Option<ThemeColors>,
-}
-
-impl Default for ThemeSettings {
-    fn default() -> Self {
-        Self {
-            mode: "system".to_string(),
-            custom_light_colors: None,
-            custom_dark_colors: None,
-        }
-    }
-}
-
-// Editor font settings (simplified)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct EditorFontSettings {
-    pub base_font_family: Option<String>, // "system-sans" | "serif" | "monospace"
-    pub base_font_size: Option<f32>,      // in px, default 16
-    pub bold_weight: Option<i32>,         // 600, 700, 800 for headings and bold
-    pub line_height: Option<f32>,         // default 1.6
-}
-
 fn default_font_choice_kind() -> String {
     "preset".to_string()
 }
@@ -122,6 +102,10 @@ fn default_editor_width() -> String {
 
 fn default_interface_zoom() -> f32 {
     1.0
+}
+
+fn default_pane_mode() -> i32 {
+    2
 }
 
 fn default_note_base_font_size() -> f32 {
@@ -150,13 +134,6 @@ impl FontChoice {
         Self {
             kind: "preset".to_string(),
             value: value.to_string(),
-        }
-    }
-
-    fn custom(value: String) -> Self {
-        Self {
-            kind: "custom".to_string(),
-            value,
         }
     }
 }
@@ -239,6 +216,8 @@ pub struct AppearanceSettings {
     pub custom_editor_width_px: Option<u32>,
     #[serde(default = "default_interface_zoom")]
     pub interface_zoom: f32,
+    #[serde(default = "default_pane_mode")]
+    pub pane_mode: i32,
     #[serde(default)]
     pub custom_light_colors: Option<ThemeColors>,
     #[serde(default)]
@@ -259,6 +238,7 @@ impl Default for AppearanceSettings {
             editor_width: default_editor_width(),
             custom_editor_width_px: None,
             interface_zoom: default_interface_zoom(),
+            pane_mode: default_pane_mode(),
             custom_light_colors: None,
             custom_dark_colors: None,
         }
@@ -269,33 +249,21 @@ impl Default for AppearanceSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     pub notes_folder: Option<String>,
-    pub appearance: Option<AppearanceSettings>,
+    #[serde(default)]
+    pub appearance: AppearanceSettings,
 }
 
 // Per-folder settings (stored in .scratch/settings.json within notes folder)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings {
-    pub theme: ThemeSettings,
-    #[serde(rename = "editorFont")]
-    pub editor_font: Option<EditorFontSettings>,
     #[serde(rename = "gitEnabled")]
     pub git_enabled: Option<bool>,
     #[serde(rename = "pinnedNoteIds")]
     pub pinned_note_ids: Option<Vec<String>>,
-    #[serde(rename = "textDirection")]
-    pub text_direction: Option<TextDirection>,
-    #[serde(rename = "editorWidth")]
-    pub editor_width: Option<String>,
     #[serde(rename = "defaultNoteName")]
     pub default_note_name: Option<String>,
-    #[serde(rename = "interfaceZoom")]
-    pub interface_zoom: Option<f32>,
-    #[serde(rename = "customEditorWidthPx")]
-    pub custom_editor_width_px: Option<u32>,
     #[serde(rename = "ollamaModel")]
     pub ollama_model: Option<String>,
-    #[serde(rename = "foldersEnabled")]
-    pub folders_enabled: Option<bool>,
 }
 
 // Search result
@@ -495,8 +463,8 @@ impl SearchIndex {
 
 // App state with improved structure
 pub struct AppState {
-    pub app_config: RwLock<AppConfig>,  // notes_folder path (stored in app data)
-    pub settings: RwLock<Settings>,      // per-folder settings (stored in .scratch/)
+    pub app_config: RwLock<AppConfig>, // notes_folder path (stored in app data)
+    pub settings: RwLock<Settings>,    // per-folder settings (stored in .scratch/)
     pub notes_cache: RwLock<HashMap<String, NoteMetadata>>,
     pub file_watcher: Mutex<Option<FileWatcherState>>,
     pub search_index: Mutex<Option<SearchIndex>>,
@@ -656,7 +624,12 @@ fn strip_markdown(text: &str) -> String {
     while let Some(start) = result.find("~~") {
         if let Some(end) = result[start + 2..].find("~~") {
             let inner = &result[start + 2..start + 2 + end];
-            result = format!("{}{}{}", &result[..start], inner, &result[start + 4 + end..]);
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                inner,
+                &result[start + 4 + end..]
+            );
         } else {
             break;
         }
@@ -666,7 +639,12 @@ fn strip_markdown(text: &str) -> String {
     while let Some(start) = result.find("**") {
         if let Some(end) = result[start + 2..].find("**") {
             let inner = &result[start + 2..start + 2 + end];
-            result = format!("{}{}{}", &result[..start], inner, &result[start + 4 + end..]);
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                inner,
+                &result[start + 4 + end..]
+            );
         } else {
             break;
         }
@@ -674,7 +652,12 @@ fn strip_markdown(text: &str) -> String {
     while let Some(start) = result.find("__") {
         if let Some(end) = result[start + 2..].find("__") {
             let inner = &result[start + 2..start + 2 + end];
-            result = format!("{}{}{}", &result[..start], inner, &result[start + 4 + end..]);
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                inner,
+                &result[start + 4 + end..]
+            );
         } else {
             break;
         }
@@ -684,7 +667,12 @@ fn strip_markdown(text: &str) -> String {
     while let Some(start) = result.find('`') {
         if let Some(end) = result[start + 1..].find('`') {
             let inner = &result[start + 1..start + 1 + end];
-            result = format!("{}{}{}", &result[..start], inner, &result[start + 2 + end..]);
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                inner,
+                &result[start + 2 + end..]
+            );
         } else {
             break;
         }
@@ -704,7 +692,12 @@ fn strip_markdown(text: &str) -> String {
         if let Some(end) = result[start + 1..].find('*') {
             if end > 0 {
                 let inner = &result[start + 1..start + 1 + end];
-                result = format!("{}{}{}", &result[..start], inner, &result[start + 2 + end..]);
+                result = format!(
+                    "{}{}{}",
+                    &result[..start],
+                    inner,
+                    &result[start + 2 + end..]
+                );
             } else {
                 break;
             }
@@ -717,7 +710,12 @@ fn strip_markdown(text: &str) -> String {
         if let Some(end) = result[start + 1..].find('_') {
             if end > 0 {
                 let inner = &result[start + 1..start + 1 + end];
-                result = format!("{}{}{}", &result[..start], inner, &result[start + 2 + end..]);
+                result = format!(
+                    "{}{}{}",
+                    &result[..start],
+                    inner,
+                    &result[start + 2 + end..]
+                );
             } else {
                 break;
             }
@@ -776,7 +774,9 @@ fn id_from_abs_path(notes_root: &Path, file_path: &Path) -> Option<String> {
     // Strip .md by converting to string and trimming (avoids with_extension
     // which breaks on stems containing dots like "meeting.2024-01-15.md").
     let rel_str = rel.to_str()?;
-    let id = rel_str.strip_suffix(".md")?.replace(std::path::MAIN_SEPARATOR, "/");
+    let id = rel_str
+        .strip_suffix(".md")?
+        .replace(std::path::MAIN_SEPARATOR, "/");
 
     if id.is_empty() {
         None
@@ -890,83 +890,6 @@ fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
     Ok(())
 }
 
-fn normalize_theme_mode(mode: &str) -> String {
-    match mode {
-        "light" | "dark" | "system" => mode.to_string(),
-        _ => default_theme_mode(),
-    }
-}
-
-fn normalize_editor_width(width: Option<&str>) -> String {
-    match width {
-        Some("narrow" | "normal" | "wide" | "full" | "custom") => width.unwrap().to_string(),
-        _ => default_editor_width(),
-    }
-}
-
-fn clamp_interface_zoom(zoom: f32) -> f32 {
-    (zoom.clamp(0.7, 1.5) * 20.0).round() / 20.0
-}
-
-fn normalize_font_choice(value: Option<&str>, fallback_preset: &str) -> FontChoice {
-    match value.map(str::trim) {
-        Some("system-sans") => FontChoice::preset("system-sans"),
-        Some("serif") | Some("system-serif") => FontChoice::preset("system-serif"),
-        Some("monospace") | Some("system-mono") => FontChoice::preset("system-mono"),
-        Some(other) if !other.is_empty() => FontChoice::custom(other.to_string()),
-        _ => FontChoice::preset(fallback_preset),
-    }
-}
-
-fn migrate_appearance_from_settings(settings: &Settings) -> AppearanceSettings {
-    let legacy_editor_font = settings.editor_font.as_ref();
-
-    AppearanceSettings {
-        mode: normalize_theme_mode(&settings.theme.mode),
-        light_preset_id: default_light_preset_id(),
-        dark_preset_id: default_dark_preset_id(),
-        ui_font: default_ui_font(),
-        note_font: normalize_font_choice(
-            legacy_editor_font
-                .and_then(|font| font.base_font_family.as_deref()),
-            "system-sans",
-        ),
-        code_font: default_code_font(),
-        note_typography: NoteTypographySettings {
-            base_font_size: legacy_editor_font
-                .and_then(|font| font.base_font_size)
-                .unwrap_or_else(default_note_base_font_size),
-            bold_weight: legacy_editor_font
-                .and_then(|font| font.bold_weight)
-                .unwrap_or_else(default_note_bold_weight),
-            line_height: legacy_editor_font
-                .and_then(|font| font.line_height)
-                .unwrap_or_else(default_note_line_height),
-        },
-        text_direction: settings.text_direction.clone().unwrap_or_default(),
-        editor_width: normalize_editor_width(settings.editor_width.as_deref()),
-        custom_editor_width_px: settings.custom_editor_width_px.filter(|width| *width >= 480),
-        interface_zoom: clamp_interface_zoom(
-            settings.interface_zoom.unwrap_or_else(default_interface_zoom),
-        ),
-        custom_light_colors: settings.theme.custom_light_colors.clone(),
-        custom_dark_colors: settings.theme.custom_dark_colors.clone(),
-    }
-}
-
-fn ensure_app_appearance(app_config: &mut AppConfig, legacy_settings: Option<&Settings>) -> bool {
-    if app_config.appearance.is_some() {
-        return false;
-    }
-
-    app_config.appearance = Some(
-        legacy_settings
-            .map(migrate_appearance_from_settings)
-            .unwrap_or_default(),
-    );
-    true
-}
-
 // Clean up old entries from debounce map (entries older than 5 seconds)
 fn cleanup_debounce_map(map: &Mutex<HashMap<PathBuf, Instant>>) {
     let mut map = map.lock().expect("debounce map mutex");
@@ -995,7 +918,11 @@ fn normalize_notes_folder_path(path: &str) -> Result<PathBuf, String> {
 /// Shared initialization logic for setting a notes folder.
 /// Creates required directories, verifies write access, updates config/settings,
 /// adds asset protocol scope, and rebuilds the search index.
-fn initialize_notes_folder(app: &AppHandle, path_buf: &PathBuf, state: &AppState) -> Result<String, String> {
+fn initialize_notes_folder(
+    app: &AppHandle,
+    path_buf: &PathBuf,
+    state: &AppState,
+) -> Result<String, String> {
     let normalized_path = path_buf.to_string_lossy().into_owned();
 
     // Verify it's a valid directory
@@ -1020,11 +947,10 @@ fn initialize_notes_folder(app: &AppHandle, path_buf: &PathBuf, state: &AppState
     // Load per-folder settings (starts fresh with defaults if none exist)
     let settings = load_settings(&normalized_path);
 
-    // Update app config, including one-time migration of legacy appearance fields.
+    // Update app config with the active notes folder.
     {
         let mut app_config = state.app_config.write().expect("app_config write lock");
         app_config.notes_folder = Some(normalized_path.clone());
-        ensure_app_appearance(&mut app_config, Some(&settings));
         save_app_config(app, &app_config).map_err(|e| e.to_string())?;
     }
 
@@ -1143,9 +1069,9 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
         let b_pinned = pinned_ids.contains(&b.id);
 
         match (a_pinned, b_pinned) {
-            (true, false) => std::cmp::Ordering::Less,    // a pinned, b not -> a first
+            (true, false) => std::cmp::Ordering::Less, // a pinned, b not -> a first
             (false, true) => std::cmp::Ordering::Greater, // b pinned, a not -> b first
-            _ => b.modified.cmp(&a.modified),             // both same status -> sort by date (newest first)
+            _ => b.modified.cmp(&a.modified), // both same status -> sort by date (newest first)
         }
     });
 
@@ -1180,9 +1106,7 @@ async fn read_note(id: String, state: State<'_, AppState>) -> Result<Note, Strin
     let content = fs::read_to_string(&file_path)
         .await
         .map_err(|e| e.to_string())?;
-    let metadata = fs::metadata(&file_path)
-        .await
-        .map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
 
     let modified = metadata
         .modified()
@@ -1223,7 +1147,10 @@ async fn save_note(
         // Preserve directory prefix for notes in subfolders
         let (dir_prefix, desired_id) = if let Some(pos) = existing_id.rfind('/') {
             let prefix = &existing_id[..pos];
-            (Some(prefix.to_string()), format!("{}/{}", prefix, sanitized_leaf))
+            (
+                Some(prefix.to_string()),
+                format!("{}/{}", prefix, sanitized_leaf),
+            )
         } else {
             (None, sanitized_leaf.clone())
         };
@@ -1281,9 +1208,7 @@ async fn save_note(
         }
     }
 
-    let metadata = fs::metadata(&file_path)
-        .await
-        .map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
     let modified = metadata
         .modified()
         .ok()
@@ -1353,7 +1278,10 @@ async fn delete_note(id: String, state: State<'_, AppState>) -> Result<(), Strin
 }
 
 #[tauri::command]
-async fn create_note(target_folder: Option<String>, state: State<'_, AppState>) -> Result<Note, String> {
+async fn create_note(
+    target_folder: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Note, String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
         app_config
@@ -1743,7 +1671,9 @@ async fn move_note(
 
     // Ensure target directory exists
     if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     // Handle collision
@@ -1840,7 +1770,9 @@ async fn move_folder(
 
     // Ensure target parent exists
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     // Compute old and new path prefixes for updating IDs
@@ -1912,7 +1844,6 @@ fn get_appearance_settings(state: State<AppState>) -> AppearanceSettings {
         .expect("app_config read lock")
         .appearance
         .clone()
-        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1923,7 +1854,7 @@ fn update_appearance_settings(
 ) -> Result<(), String> {
     let updated_config = {
         let mut app_config = state.app_config.write().expect("app_config write lock");
-        app_config.appearance = Some(new_settings);
+        app_config.appearance = new_settings;
         app_config.clone()
     };
 
@@ -1932,13 +1863,13 @@ fn update_appearance_settings(
 }
 
 #[tauri::command]
-fn update_settings(
-    new_settings: Settings,
-    state: State<AppState>,
-) -> Result<(), String> {
+fn update_settings(new_settings: Settings, state: State<AppState>) -> Result<(), String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        app_config.notes_folder.clone().ok_or("Notes folder not set")?
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
     };
 
     {
@@ -1960,7 +1891,10 @@ fn update_git_enabled(
 ) -> Result<(), String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        let folder = app_config.notes_folder.clone().ok_or("Notes folder not set")?;
+        let folder = app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?;
 
         if folder != expected_folder {
             return Err("Notes folder changed".to_string());
@@ -2158,7 +2092,7 @@ async fn import_file_to_folder(
             }
             Err(_) => return Err("Failed to create file".to_string()),
         }
-    };
+    }
 
     let modified = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2204,7 +2138,10 @@ async fn import_file_to_folder(
 }
 
 #[tauri::command]
-async fn search_notes(query: String, state: State<'_, AppState>) -> Result<Vec<SearchResult>, String> {
+async fn search_notes(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<SearchResult>, String> {
     let trimmed_query = query.trim().to_string();
     if trimmed_query.is_empty() {
         return Ok(vec![]);
@@ -2214,7 +2151,9 @@ async fn search_notes(query: String, state: State<'_, AppState>) -> Result<Vec<S
     let indexed_result = {
         let index = state.search_index.lock().expect("search index mutex");
         (*index).as_ref().map(|search_index| {
-            search_index.search(&trimmed_query, 20).map_err(|e| e.to_string())
+            search_index
+                .search(&trimmed_query, 20)
+                .map_err(|e| e.to_string())
         })
     };
 
@@ -2225,7 +2164,10 @@ async fn search_notes(query: String, state: State<'_, AppState>) -> Result<Vec<S
             fallback_search(&trimmed_query, &state).await
         }
         Some(Err(e)) => {
-            eprintln!("Tantivy search error, falling back to substring search: {}", e);
+            eprintln!(
+                "Tantivy search error, falling back to substring search: {}",
+                e
+            );
             fallback_search(&trimmed_query, &state).await
         }
         None => {
@@ -2236,7 +2178,10 @@ async fn search_notes(query: String, state: State<'_, AppState>) -> Result<Vec<S
 }
 
 // Fallback search when Tantivy index isn't available - searches title and full content
-async fn fallback_search(query: &str, state: &State<'_, AppState>) -> Result<Vec<SearchResult>, String> {
+async fn fallback_search(
+    query: &str,
+    state: &State<'_, AppState>,
+) -> Result<Vec<SearchResult>, String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
         app_config.notes_folder.clone()
@@ -2303,7 +2248,11 @@ async fn fallback_search(query: &str, state: &State<'_, AppState>) -> Result<Vec
         }
     }
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(20);
 
     Ok(results)
@@ -2341,7 +2290,9 @@ fn setup_file_watcher(
                         let now = Instant::now();
 
                         if map.len() > 100 {
-                            map.retain(|_, last| now.duration_since(*last) < Duration::from_secs(5));
+                            map.retain(|_, last| {
+                                now.duration_since(*last) < Duration::from_secs(5)
+                            });
                         }
 
                         if let Some(last) = map.get(path) {
@@ -2373,10 +2324,13 @@ fn setup_file_watcher(
                                             let modified = std::fs::metadata(path)
                                                 .ok()
                                                 .and_then(|m| m.modified().ok())
-                                                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                                                .and_then(|t| {
+                                                    t.duration_since(std::time::UNIX_EPOCH).ok()
+                                                })
                                                 .map(|d| d.as_secs() as i64)
                                                 .unwrap_or(0);
-                                            let _ = search_index.index_note(&note_id, &title, &content, modified);
+                                            let _ = search_index
+                                                .index_note(&note_id, &title, &content, modified);
                                         }
                                         Err(_) => {
                                             // File gone between event and read — treat as deletion
@@ -2440,11 +2394,7 @@ fn start_file_watcher(app: AppHandle, state: State<AppState>) -> Result<(), Stri
     // Clean up debounce map before starting
     cleanup_debounce_map(&state.debounce_map);
 
-    let watcher_state = setup_file_watcher(
-        app,
-        &folder,
-        Arc::clone(&state.debounce_map),
-    )?;
+    let watcher_state = setup_file_watcher(app, &folder, Arc::clone(&state.debounce_map))?;
 
     let mut file_watcher = state.file_watcher.lock().expect("file watcher mutex");
     *file_watcher = Some(watcher_state);
@@ -2709,11 +2659,9 @@ async fn git_get_status(state: State<'_, AppState>) -> Result<git::GitStatus, St
 
     match folder {
         Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::get_status(&PathBuf::from(path))
-            })
-            .await
-            .map_err(|e| e.to_string())
+            tauri::async_runtime::spawn_blocking(move || git::get_status(&PathBuf::from(path)))
+                .await
+                .map_err(|e| e.to_string())
         }
         None => Ok(git::GitStatus::default()),
     }
@@ -2723,14 +2671,15 @@ async fn git_get_status(state: State<'_, AppState>) -> Result<git::GitStatus, St
 async fn git_init_repo(state: State<'_, AppState>) -> Result<(), String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        app_config.notes_folder.clone().ok_or("Notes folder not set")?
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
     };
 
-    tauri::async_runtime::spawn_blocking(move || {
-        git::git_init(&PathBuf::from(folder))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || git::git_init(&PathBuf::from(folder)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -2741,13 +2690,11 @@ async fn git_commit(message: String, state: State<'_, AppState>) -> Result<git::
     };
 
     match folder {
-        Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::commit_all(&PathBuf::from(path), &message)
-            })
-            .await
-            .map_err(|e| e.to_string())
-        }
+        Some(path) => tauri::async_runtime::spawn_blocking(move || {
+            git::commit_all(&PathBuf::from(path), &message)
+        })
+        .await
+        .map_err(|e| e.to_string()),
         None => Ok(git::GitResult {
             success: false,
             message: None,
@@ -2764,13 +2711,9 @@ async fn git_push(state: State<'_, AppState>) -> Result<git::GitResult, String> 
     };
 
     match folder {
-        Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::push(&PathBuf::from(path))
-            })
+        Some(path) => tauri::async_runtime::spawn_blocking(move || git::push(&PathBuf::from(path)))
             .await
-            .map_err(|e| e.to_string())
-        }
+            .map_err(|e| e.to_string()),
         None => Ok(git::GitResult {
             success: false,
             message: None,
@@ -2788,11 +2731,9 @@ async fn git_fetch(state: State<'_, AppState>) -> Result<git::GitResult, String>
 
     match folder {
         Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::fetch(&PathBuf::from(path))
-            })
-            .await
-            .map_err(|e| e.to_string())
+            tauri::async_runtime::spawn_blocking(move || git::fetch(&PathBuf::from(path)))
+                .await
+                .map_err(|e| e.to_string())
         }
         None => Ok(git::GitResult {
             success: false,
@@ -2810,13 +2751,9 @@ async fn git_pull(state: State<'_, AppState>) -> Result<git::GitResult, String> 
     };
 
     match folder {
-        Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::pull(&PathBuf::from(path))
-            })
+        Some(path) => tauri::async_runtime::spawn_blocking(move || git::pull(&PathBuf::from(path)))
             .await
-            .map_err(|e| e.to_string())
-        }
+            .map_err(|e| e.to_string()),
         None => Ok(git::GitResult {
             success: false,
             message: None,
@@ -2833,13 +2770,11 @@ async fn git_add_remote(url: String, state: State<'_, AppState>) -> Result<git::
     };
 
     match folder {
-        Some(path) => {
-            tauri::async_runtime::spawn_blocking(move || {
-                git::add_remote(&PathBuf::from(path), &url)
-            })
-            .await
-            .map_err(|e| e.to_string())
-        }
+        Some(path) => tauri::async_runtime::spawn_blocking(move || {
+            git::add_remote(&PathBuf::from(path), &url)
+        })
+        .await
+        .map_err(|e| e.to_string()),
         None => Ok(git::GitResult {
             success: false,
             message: None,
@@ -2862,10 +2797,9 @@ async fn git_push_with_upstream(state: State<'_, AppState>) -> Result<git::GitRe
                 let status = git::get_status(&PathBuf::from(&path));
                 match status.current_branch {
                     Some(branch) => {
-                        if !branch
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.'))
-                        {
+                        if !branch.chars().all(|c| {
+                            c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.')
+                        }) {
                             return git::GitResult {
                                 success: false,
                                 message: None,
@@ -2997,26 +2931,42 @@ fn cli_target_path() -> PathBuf {
 #[tauri::command]
 fn get_cli_status() -> Result<CliStatus, String> {
     #[cfg(not(target_os = "macos"))]
-    return Ok(CliStatus { supported: false, installed: false, path: None });
+    return Ok(CliStatus {
+        supported: false,
+        installed: false,
+        path: None,
+    });
 
     #[cfg(target_os = "macos")]
     {
         let target = cli_target_path();
         if !target.exists() && target.symlink_metadata().is_err() {
-            return Ok(CliStatus { supported: true, installed: false, path: None });
+            return Ok(CliStatus {
+                supported: true,
+                installed: false,
+                path: None,
+            });
         }
         // Verify this is our wrapper (has marker) and points to the current binary
         let content = std::fs::read_to_string(&target).unwrap_or_default();
         if !content.contains(SCRATCH_CLI_MARKER) {
             // Foreign binary at this path — don't claim it as ours
-            return Ok(CliStatus { supported: true, installed: false, path: None });
+            return Ok(CliStatus {
+                supported: true,
+                installed: false,
+                path: None,
+            });
         }
         let current_exe = std::env::current_exe()
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default();
         if !current_exe.is_empty() && !content.contains(&current_exe) {
             // Our wrapper but points to a moved/deleted binary — needs reinstall
-            return Ok(CliStatus { supported: true, installed: false, path: None });
+            return Ok(CliStatus {
+                supported: true,
+                installed: false,
+                path: None,
+            });
         }
         Ok(CliStatus {
             supported: true,
@@ -3055,8 +3005,8 @@ fn install_cli() -> Result<String, String> {
                 .map_err(|e| format!("Failed to remove existing file: {}", e))?;
         }
 
-        let exe_path = std::env::current_exe()
-            .map_err(|e| format!("Cannot find exe path: {}", e))?;
+        let exe_path =
+            std::env::current_exe().map_err(|e| format!("Cannot find exe path: {}", e))?;
 
         // Shell-escape the exe path using single quotes to prevent
         // interpretation of $, `, ", and other metacharacters.
@@ -3067,8 +3017,7 @@ fn install_cli() -> Result<String, String> {
         // the terminal is not blocked waiting for the GUI app to exit.
         let script = format!(
             "#!/bin/sh\n{}\nnohup {} \"$@\" >/dev/null 2>&1 &\n",
-            SCRATCH_CLI_MARKER,
-            escaped_exe
+            SCRATCH_CLI_MARKER, escaped_exe
         );
         std::fs::write(&target, script.as_bytes())
             .map_err(|e| format!("Failed to write CLI script: {}", e))?;
@@ -3356,7 +3305,10 @@ async fn ai_execute_claude(
 ) -> Result<AiExecutionResult, String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        app_config.notes_folder.clone().ok_or("Notes folder not set")?
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
     };
     let path = PathBuf::from(&file_path);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -3424,7 +3376,10 @@ async fn ai_execute_opencode(
 ) -> Result<AiExecutionResult, String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        app_config.notes_folder.clone().ok_or("Notes folder not set")?
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
     };
     let path = PathBuf::from(&file_path);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -3491,7 +3446,10 @@ async fn ai_execute_ollama(
 ) -> Result<AiExecutionResult, String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
-        app_config.notes_folder.clone().ok_or("Notes folder not set")?
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
     };
     let path = PathBuf::from(&file_path);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -3593,7 +3551,10 @@ async fn ai_execute_ollama(
                 return Ok(AiExecutionResult {
                     success: false,
                     output: String::new(),
-                    error: Some("Authentication required. Run `ollama login` in your terminal to sign in.".to_string()),
+                    error: Some(
+                        "Authentication required. Run `ollama login` in your terminal to sign in."
+                            .to_string(),
+                    ),
                 });
             }
         }
@@ -3802,9 +3763,173 @@ fn handle_cli_args(app: &AppHandle, args: &[String], cwd: &str) -> bool {
     opened_preview
 }
 
+fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let pkg_info = app.package_info();
+    let config = app.config();
+    let about_metadata = AboutMetadata {
+        name: Some(pkg_info.name.clone()),
+        version: Some(pkg_info.version.to_string()),
+        copyright: config.bundle.copyright.clone(),
+        authors: config
+            .bundle
+            .publisher
+            .clone()
+            .map(|publisher| vec![publisher]),
+        ..Default::default()
+    };
+
+    let settings_item = MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings...")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+    let one_pane_item = MenuItemBuilder::with_id(MENU_VIEW_1_PANE_ID, "1 Pane")
+        .accelerator("CmdOrCtrl+1")
+        .build(app)?;
+    let two_pane_item = MenuItemBuilder::with_id(MENU_VIEW_2_PANE_ID, "2 Panes")
+        .accelerator("CmdOrCtrl+2")
+        .build(app)?;
+    let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
+        .accelerator("CmdOrCtrl+3")
+        .build(app)?;
+
+    #[cfg(target_os = "macos")]
+    let app_menu = Submenu::with_items(
+        app,
+        pkg_info.name.clone(),
+        true,
+        &[
+            &PredefinedMenuItem::about(app, None, Some(about_metadata.clone()))?,
+            &PredefinedMenuItem::separator(app)?,
+            &settings_item,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::services(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::show_all(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::quit(app, None)?,
+        ],
+    )?;
+
+    #[cfg(not(target_os = "macos"))]
+    let file_menu = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &settings_item,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+            &PredefinedMenuItem::quit(app, None)?,
+        ],
+    )?;
+
+    let edit_menu = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+
+    let view_menu = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[
+            &one_pane_item,
+            &two_pane_item,
+            &three_pane_item,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::fullscreen(app, None)?,
+        ],
+    )?;
+
+    let window_menu = Submenu::with_id_and_items(
+        app,
+        WINDOW_SUBMENU_ID,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+
+    let help_menu = Submenu::with_id_and_items(
+        app,
+        HELP_SUBMENU_ID,
+        "Help",
+        true,
+        &[
+            #[cfg(not(target_os = "macos"))]
+            &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
+        ],
+    )?;
+
+    let mut menu = MenuBuilder::new(app);
+
+    #[cfg(target_os = "macos")]
+    {
+        menu = menu.item(&app_menu);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        menu = menu.item(&file_menu);
+    }
+
+    menu.item(&edit_menu)
+        .item(&view_menu)
+        .item(&window_menu)
+        .item(&help_menu)
+        .build()
+}
+
+fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.show();
+        let _ = main_window.unminimize();
+        let _ = main_window.set_focus();
+    }
+}
+
+fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
+    match event.id().as_ref() {
+        MENU_SETTINGS_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "open-settings", ());
+        }
+        MENU_VIEW_1_PANE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "set-pane-mode", 1_i32);
+        }
+        MENU_VIEW_2_PANE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "set-pane-mode", 2_i32);
+        }
+        MENU_VIEW_3_PANE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "set-pane-mode", 3_i32);
+        }
+        _ => {}
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .menu(build_app_menu)
+        .on_menu_event(handle_app_menu_event)
         // Single-instance: forward CLI args from subsequent launches to the running instance
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             handle_cli_args(app, &args, &cwd);
@@ -3832,7 +3957,10 @@ pub fn run() {
                     Ok(normalized) => {
                         // Path is structurally valid but not currently a directory
                         // (e.g., unmounted drive). Preserve the user's preference.
-                        eprintln!("Notes folder not found (may be temporarily unavailable): {:?}", normalized);
+                        eprintln!(
+                            "Notes folder not found (may be temporarily unavailable): {:?}",
+                            normalized
+                        );
                     }
                     Err(_) => {
                         app_config.notes_folder = None;
@@ -3847,11 +3975,6 @@ pub fn run() {
             } else {
                 Settings::default()
             };
-
-            let has_notes_folder = app_config.notes_folder.is_some();
-            if has_notes_folder && ensure_app_appearance(&mut app_config, Some(&settings)) {
-                app_config_dirty = true;
-            }
 
             if app_config_dirty {
                 let _ = save_app_config(app.handle(), &app_config);
@@ -3881,7 +4004,14 @@ pub fn run() {
             app.manage(state);
 
             // Add notes folder to asset protocol scope so images can be served
-            if let Some(ref folder) = app.state::<AppState>().app_config.read().expect("app_config read lock").notes_folder.clone() {
+            if let Some(ref folder) = app
+                .state::<AppState>()
+                .app_config
+                .read()
+                .expect("app_config read lock")
+                .notes_folder
+                .clone()
+            {
                 let _ = app.asset_protocol_scope().allow_directory(folder, true);
             }
 

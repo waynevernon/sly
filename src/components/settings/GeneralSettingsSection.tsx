@@ -2,7 +2,6 @@ import { useState, useEffect, useReducer } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
-import { useTheme } from "../../context/ThemeContext";
 import { useGit } from "../../context/GitContext";
 import { Button } from "../ui";
 import { Input } from "../ui";
@@ -103,7 +102,6 @@ function CliUsageHint() {
 
 export function GeneralSettingsSection() {
   const { notesFolder, setNotesFolder } = useNotes();
-  const { reloadSettings } = useTheme();
   const {
     status,
     gitAvailable,
@@ -206,9 +204,6 @@ export function GeneralSettingsSection() {
 
       if (selected) {
         await setNotesFolder(selected);
-        // Refresh global appearance state in case first-run migration seeded it
-        // from legacy folder-scoped appearance settings.
-        await reloadSettings();
       }
     } catch (err) {
       console.error("Failed to select folder:", err);
