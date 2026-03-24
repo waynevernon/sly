@@ -11,7 +11,9 @@ import {
 import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
 import { cn } from "../../lib/utils";
-import { FolderIcon, NoteIcon } from "../icons";
+import { NoteIcon } from "../icons";
+import { FolderGlyph } from "../folders/FolderGlyph";
+import { getFolderIconName } from "../../lib/folderIcons";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
 
@@ -24,9 +26,10 @@ export function WorkspaceNavigation({
   paneMode,
   onOpenSettings,
 }: WorkspaceNavigationProps) {
-  const { moveFolder, moveNote } = useNotes();
+  const { moveFolder, moveNote, folderIcons } = useNotes();
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [dragType, setDragType] = useState<"folder" | "note" | null>(null);
+  const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -41,6 +44,7 @@ export function WorkspaceNavigation({
         : noteId;
       setDragLabel(leaf);
       setDragType("note");
+      setDragFolderPath(null);
       return;
     }
 
@@ -51,12 +55,14 @@ export function WorkspaceNavigation({
         : path;
       setDragLabel(name);
       setDragType("folder");
+      setDragFolderPath(path);
     }
   }, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setDragLabel(null);
     setDragType(null);
+    setDragFolderPath(null);
 
     const { active, over } = event;
     if (!over) return;
@@ -113,6 +119,7 @@ export function WorkspaceNavigation({
       onDragCancel={() => {
         setDragLabel(null);
         setDragType(null);
+        setDragFolderPath(null);
       }}
     >
       <div className="h-full flex shrink-0">
@@ -143,7 +150,11 @@ export function WorkspaceNavigation({
         {dragLabel && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-bg border border-border rounded-md shadow-lg text-sm text-text">
             {dragType === "folder" ? (
-              <FolderIcon className="w-3.5 h-3.5 stroke-[1.6] opacity-70 shrink-0" />
+              <FolderGlyph
+                iconName={getFolderIconName(folderIcons, dragFolderPath)}
+                className="w-3.5 h-3.5 text-text/70 shrink-0"
+                strokeWidth={1.75}
+              />
             ) : (
               <NoteIcon className="w-3.5 h-3.5 stroke-[1.6] opacity-50 shrink-0" />
             )}

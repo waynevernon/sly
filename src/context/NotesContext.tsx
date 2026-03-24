@@ -12,12 +12,19 @@ import { listen } from "@tauri-apps/api/event";
 import type { Note, NoteMetadata } from "../types/note";
 import * as notesService from "../services/notes";
 import type { SearchResult } from "../services/notes";
+import {
+  removeFolderIconPaths,
+  rewriteFolderIconPaths,
+  sanitizeFolderIcons,
+  type FolderIconsMap,
+} from "../lib/folderIcons";
 
 // Separate contexts to prevent unnecessary re-renders
 // Data context: changes frequently, only subscribed by components that need the data
 interface NotesDataContextValue {
   notes: NoteMetadata[];
   scopedNotes: NoteMetadata[];
+  folderIcons: FolderIconsMap;
   selectedNoteId: string | null;
   selectedFolderPath: string | null;
   currentNote: Note | null;
@@ -54,6 +61,7 @@ interface NotesActionsContextValue {
   renameFolder: (oldPath: string, newName: string) => Promise<void>;
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
+  setFolderIcon: (path: string, iconName: string | null) => Promise<void>;
 }
 
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
@@ -71,6 +79,7 @@ function getParentPath(path: string): string | null {
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
+  const [folderIcons, setFolderIcons] = useState<FolderIconsMap>({});
   const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
     null,
   );
@@ -116,6 +125,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setError(err instanceof Error ? err.message : "Failed to load notes");
     }
   }, [notesFolder]);
+
+  const syncFolderIcons = useCallback(async () => {
+    const settings = await notesService.getSettings();
+    const nextFolderIcons = sanitizeFolderIcons(settings.folderIcons);
+    setFolderIcons(nextFolderIcons);
+    return nextFolderIcons;
+  }, []);
 
   // Debounced refresh - coalesces rapid saves into a single refresh
   const scheduleRefresh = useCallback(() => {
@@ -430,6 +446,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async (path: string) => {
       try {
         await notesService.deleteFolder(path);
+        setFolderIcons((prev) => removeFolderIconPaths(prev, path));
         // If the selected note was inside the deleted folder, clear selection
         setSelectedNoteId((prevId) => {
           if (prevId && prevId.startsWith(path + "/")) {
@@ -490,6 +507,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
+        setFolderIcons((prev) => rewriteFolderIconPaths(prev, oldPath, newPath));
 
         await refreshNotes();
       } catch (err) {
@@ -567,6 +585,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
+        setFolderIcons((prev) => rewriteFolderIconPaths(prev, path, newPath));
 
         await refreshNotes();
       } catch (err) {
@@ -576,39 +595,70 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [refreshNotes]
   );
 
+  const setFolderIcon = useCallback(async (path: string, iconName: string | null) => {
+    if (!path) return;
+
+    try {
+      const settings = await notesService.getSettings();
+      const nextFolderIcons = sanitizeFolderIcons(settings.folderIcons);
+
+      if (iconName) {
+        nextFolderIcons[path] = iconName;
+      } else {
+        delete nextFolderIcons[path];
+      }
+
+      await notesService.updateSettings({
+        ...settings,
+        folderIcons:
+          Object.keys(nextFolderIcons).length > 0 ? nextFolderIcons : undefined,
+      });
+      setFolderIcons(nextFolderIcons);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update folder icon"
+      );
+      throw err;
+    }
+  }, []);
+
   const setNotesFolder = useCallback(async (path: string) => {
     try {
       await notesService.setNotesFolder(path);
       setNotesFolderState(path);
+      setFolderIcons({});
       setSelectedFolderPath(null);
       setSelectedNoteId(null);
       setCurrentNote(null);
       // Start file watcher after setting folder
       await notesService.startFileWatcher();
+      await syncFolderIcons();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to set notes folder"
       );
     }
-  }, []);
+  }, [syncFolderIcons]);
 
   // Update local state only (backend already initialized the folder).
   // Used when the CLI sets the notes folder and emits an event.
   const syncNotesFolder = useCallback(async (path: string) => {
     try {
       setNotesFolderState(path);
+      setFolderIcons({});
       setSelectedFolderPath(null);
       setSelectedNoteId(null);
       setCurrentNote(null);
       const notesList = await notesService.listNotes();
       setNotes(notesList);
       await notesService.startFileWatcher();
+      await syncFolderIcons();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to sync notes folder"
       );
     }
-  }, []);
+  }, [syncFolderIcons]);
 
   const search = useCallback(async (query: string) => {
     const requestId = ++searchRequestIdRef.current;
@@ -683,8 +733,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (folder) {
           const notesList = await notesService.listNotes();
           setNotes(notesList);
+          await syncFolderIcons();
           // Start file watcher
           await notesService.startFileWatcher();
+        } else {
+          setFolderIcons({});
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize");
@@ -772,6 +825,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     () => ({
       notes,
       scopedNotes,
+      folderIcons,
       selectedNoteId,
       selectedFolderPath,
       currentNote,
@@ -787,6 +841,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [
       notes,
       scopedNotes,
+      folderIcons,
       selectedNoteId,
       selectedFolderPath,
       currentNote,
@@ -825,6 +880,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       renameFolder: renameFolderAction,
       moveNote: moveNoteAction,
       moveFolder: moveFolderAction,
+      setFolderIcon,
     }),
     [
       selectNote,
@@ -848,6 +904,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       renameFolderAction,
       moveNoteAction,
       moveFolderAction,
+      setFolderIcon,
     ]
   );
 

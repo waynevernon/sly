@@ -5,6 +5,8 @@ import { NoteList } from "../notes/NoteList";
 import { Footer } from "./Footer";
 import { IconButton, Input } from "../ui";
 import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
+import { FolderGlyph } from "../folders/FolderGlyph";
+import { getFolderIconName } from "../../lib/folderIcons";
 
 function getFolderLabel(path: string | null): string {
   if (!path) return "All Notes";
@@ -20,6 +22,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
   const {
     notes,
     scopedNotes,
+    folderIcons,
     selectedFolderPath,
     createNote,
     search,
@@ -71,6 +74,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
       : "Browse every note";
 
   const noteCount = searchQuery.trim() ? displayItems.length : selectedFolderPath ? scopedNotes.length : notes.length;
+  const selectedFolderIcon = getFolderIconName(folderIcons, selectedFolderPath);
 
   const handleSearchChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,6 +149,13 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
       <div className="flex items-start justify-between gap-3 pl-4 pr-3 pb-2 border-b border-border/80 shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
+            {!searchQuery.trim() && (
+              <FolderGlyph
+                iconName={selectedFolderIcon}
+                className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
+                strokeWidth={1.7}
+              />
+            )}
             <div className="font-medium text-base text-text truncate">
               {heading}
             </div>

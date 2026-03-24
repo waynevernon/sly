@@ -105,6 +105,7 @@ export interface Settings {
   pinnedNoteIds?: string[];
   defaultNoteName?: string;
   ollamaModel?: string;
+  folderIcons?: Record<string, string>;
 }
 
 export interface FolderNode {

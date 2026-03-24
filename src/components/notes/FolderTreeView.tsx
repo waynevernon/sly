@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -6,6 +15,7 @@ import { useNotes } from "../../context/NotesContext";
 import { buildFolderTree, countNotesInFolder } from "../../lib/folderTree";
 import type { FolderNode } from "../../types/note";
 import * as notesService from "../../services/notes";
+import { getFolderIconName } from "../../lib/folderIcons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,13 +32,19 @@ import {
   ArrowUpIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  FolderIcon,
   FolderPlusIcon,
   PencilIcon,
+  SwatchIcon,
   TrashIcon,
 } from "../icons";
+import { FolderGlyph } from "../folders/FolderGlyph";
 
 const STORAGE_KEY = "scratch:collapsedFolders";
+const FolderIconPickerModal = lazy(() =>
+  import("../folders/FolderIconPickerModal").then((module) => ({
+    default: module.FolderIconPickerModal,
+  })),
+);
 
 const menuItemClass =
   "px-3 py-1.5 text-sm text-text cursor-pointer outline-none hover:bg-bg-muted focus:bg-bg-muted flex items-center gap-2 rounded-sm";
@@ -36,8 +52,18 @@ const menuItemClass =
 const menuSeparatorClass = "h-px bg-border my-1";
 
 type InlineFolderEditState =
-  | { mode: "create"; parentPath: string }
-  | { mode: "rename"; path: string; initialValue: string };
+  | { mode: "create"; parentPath: string; iconName: string | null }
+  | {
+      mode: "rename";
+      path: string;
+      initialValue: string;
+      iconName: string | null;
+    };
+
+type FolderIconPickerTarget =
+  | { kind: "existing"; path: string }
+  | { kind: "inline-create" }
+  | { kind: "inline-rename"; path: string };
 
 function loadCollapsedFolders(): Set<string> {
   try {
@@ -75,23 +101,27 @@ function getRenamedFolderPath(path: string, newName: string): string {
 interface InlineFolderRowProps {
   depth: number;
   initialValue?: string;
+  iconName?: string | null;
   placeholder: string;
   noteCount?: number;
   isSelected?: boolean;
   collapseState?: "expanded" | "collapsed";
   onSubmit: (name: string) => Promise<void> | void;
   onCancel: () => void;
+  onOpenIconPicker: () => void;
 }
 
 function InlineFolderRow({
   depth,
   initialValue = "",
+  iconName = null,
   placeholder,
   noteCount,
   isSelected = false,
   collapseState,
   onSubmit,
   onCancel,
+  onOpenIconPicker,
 }: InlineFolderRowProps) {
   const CollapseIcon =
     collapseState === "collapsed"
@@ -112,7 +142,18 @@ function InlineFolderRow({
           {CollapseIcon ? <CollapseIcon className="w-4 h-4 stroke-[1.6]" /> : null}
         </span>
         <div className="min-w-0 flex-1 flex items-center gap-2">
-          <FolderIcon className="w-4.25 h-4.25 stroke-[1.6] text-text-muted/80 shrink-0" />
+          <button
+            type="button"
+            onClick={onOpenIconPicker}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
+            aria-label="Choose folder icon"
+          >
+            <FolderGlyph
+              iconName={iconName}
+              className="w-4.25 h-4.25 text-current shrink-0"
+              strokeWidth={1.7}
+            />
+          </button>
           <InlineNameEditor
             initialValue={initialValue}
             placeholder={placeholder}
@@ -134,6 +175,7 @@ function InlineFolderRow({
 interface FolderItemProps {
   folder: FolderNode;
   depth: number;
+  folderIcons: Record<string, string>;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
@@ -147,11 +189,13 @@ interface FolderItemProps {
   onCancelInlineEdit: () => void;
   onDeleteFolder: (path: string) => void;
   onMoveFolderToParent: (path: string, targetParent: string) => void;
+  onOpenIconPicker: (target: FolderIconPickerTarget) => void;
 }
 
 const FolderItem = memo(function FolderItem({
   folder,
   depth,
+  folderIcons,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
@@ -165,9 +209,11 @@ const FolderItem = memo(function FolderItem({
   onCancelInlineEdit,
   onDeleteFolder,
   onMoveFolderToParent,
+  onOpenIconPicker,
 }: FolderItemProps) {
   const isCollapsed = collapsedFolders.has(folder.path);
   const noteCount = countNotesInFolder(folder);
+  const iconName = getFolderIconName(folderIcons, folder.path);
   const isRenaming =
     inlineEditState?.mode === "rename" && inlineEditState.path === folder.path;
   const isCreatingChild =
@@ -195,12 +241,16 @@ const FolderItem = memo(function FolderItem({
         <InlineFolderRow
           depth={depth}
           initialValue={inlineEditState.initialValue}
+          iconName={inlineEditState.iconName}
           placeholder="Folder name"
           noteCount={noteCount}
           isSelected={selectedFolderPath === folder.path}
           collapseState={isCollapsed ? "collapsed" : "expanded"}
           onSubmit={onRenameFolder}
           onCancel={onCancelInlineEdit}
+          onOpenIconPicker={() =>
+            onOpenIconPicker({ kind: "inline-rename", path: folder.path })
+          }
         />
 
         {!isCollapsed && folder.children.length > 0 && (
@@ -210,6 +260,7 @@ const FolderItem = memo(function FolderItem({
                 key={child.path}
                 folder={child}
                 depth={depth + 1}
+                folderIcons={folderIcons}
                 selectedFolderPath={selectedFolderPath}
                 collapsedFolders={collapsedFolders}
                 inlineEditState={inlineEditState}
@@ -223,6 +274,7 @@ const FolderItem = memo(function FolderItem({
                 onCancelInlineEdit={onCancelInlineEdit}
                 onDeleteFolder={onDeleteFolder}
                 onMoveFolderToParent={onMoveFolderToParent}
+                onOpenIconPicker={onOpenIconPicker}
               />
             ))}
           </div>
@@ -274,7 +326,11 @@ const FolderItem = memo(function FolderItem({
                 onClick={() => onSelectFolder(folder.path)}
                 className="min-w-0 flex-1 flex items-center gap-2 text-left"
               >
-                <FolderIcon className="w-4.25 h-4.25 stroke-[1.6] text-text-muted/80 shrink-0" />
+                <FolderGlyph
+                  iconName={iconName}
+                  className="w-4.25 h-4.25 text-text-muted/80 shrink-0"
+                  strokeWidth={1.7}
+                />
                 <span className="text-sm text-text truncate">{folder.name}</span>
               </button>
               <span className="text-2xs font-medium text-text-muted/70 shrink-0 px-1.5 py-0.5 rounded-full bg-bg/70">
@@ -288,9 +344,13 @@ const FolderItem = memo(function FolderItem({
               {isCreatingChild && (
                 <InlineFolderRow
                   depth={depth + 1}
+                  iconName={inlineEditState.iconName}
                   placeholder="Folder name"
                   onSubmit={onCreateFolder}
                   onCancel={onCancelInlineEdit}
+                  onOpenIconPicker={() =>
+                    onOpenIconPicker({ kind: "inline-create" })
+                  }
                 />
               )}
 
@@ -299,6 +359,7 @@ const FolderItem = memo(function FolderItem({
                   key={child.path}
                   folder={child}
                   depth={depth + 1}
+                  folderIcons={folderIcons}
                   selectedFolderPath={selectedFolderPath}
                   collapsedFolders={collapsedFolders}
                   inlineEditState={inlineEditState}
@@ -312,6 +373,7 @@ const FolderItem = memo(function FolderItem({
                   onCancelInlineEdit={onCancelInlineEdit}
                   onDeleteFolder={onDeleteFolder}
                   onMoveFolderToParent={onMoveFolderToParent}
+                  onOpenIconPicker={onOpenIconPicker}
                 />
               ))}
             </div>
@@ -341,6 +403,13 @@ const FolderItem = memo(function FolderItem({
           >
             <PencilIcon className="w-4 h-4 stroke-[1.6]" />
             Rename
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            className={menuItemClass}
+            onSelect={() => onOpenIconPicker({ kind: "existing", path: folder.path })}
+          >
+            <SwatchIcon className="w-4 h-4 stroke-[1.6]" />
+            Change Icon
           </ContextMenu.Item>
           {folder.path.includes("/") && (
             <>
@@ -376,6 +445,7 @@ const FolderItem = memo(function FolderItem({
 export function FolderTreeView() {
   const {
     notes,
+    folderIcons,
     selectedFolderPath,
     selectFolder,
     createNoteInFolder,
@@ -383,6 +453,7 @@ export function FolderTreeView() {
     deleteFolder,
     renameFolder,
     moveFolder,
+    setFolderIcon,
   } = useNotes();
 
   const [collapsedFolders, setCollapsedFolders] =
@@ -390,9 +461,25 @@ export function FolderTreeView() {
   const [knownFolders, setKnownFolders] = useState<string[]>([]);
   const [inlineEditState, setInlineEditState] =
     useState<InlineFolderEditState | null>(null);
+  const [iconPickerTarget, setIconPickerTarget] =
+    useState<FolderIconPickerTarget | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const preloadPicker = () => {
+      void import("../folders/FolderIconPickerModal");
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(preloadPicker);
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(preloadPicker, 300);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     notesService
@@ -433,7 +520,7 @@ export function FolderTreeView() {
     if (parentPath) {
       expandFolder(parentPath);
     }
-    setInlineEditState({ mode: "create", parentPath });
+    setInlineEditState({ mode: "create", parentPath, iconName: null });
   }, [expandFolder]);
 
   const startRenameFolder = useCallback((path: string, currentName: string) => {
@@ -441,8 +528,9 @@ export function FolderTreeView() {
       mode: "rename",
       path,
       initialValue: currentName,
+      iconName: getFolderIconName(folderIcons, path),
     });
-  }, []);
+  }, [folderIcons]);
 
   useEffect(() => {
     const handleExpand = (event: Event) => {
@@ -486,6 +574,7 @@ export function FolderTreeView() {
 
   const handleCancelInlineEdit = useCallback(() => {
     setInlineEditState(null);
+    setIconPickerTarget(null);
     focusTree();
   }, [focusTree]);
 
@@ -493,6 +582,7 @@ export function FolderTreeView() {
     if (inlineEditState?.mode !== "create") return;
 
     const parentPath = inlineEditState.parentPath;
+    const iconName = inlineEditState.iconName;
     const folderName = sanitizeFolderName(name);
 
     if (!folderName) {
@@ -503,9 +593,18 @@ export function FolderTreeView() {
     try {
       await createFolder(parentPath, folderName);
       const newPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+      if (iconName) {
+        try {
+          await setFolderIcon(newPath, iconName);
+        } catch (error) {
+          console.error("Failed to save new folder icon:", error);
+          toast.error("Folder created, but failed to save icon");
+        }
+      }
       expandFolder(newPath);
       selectFolder(newPath);
       setInlineEditState(null);
+      setIconPickerTarget(null);
       focusTree();
     } catch (error) {
       console.error("Failed to create folder:", error);
@@ -518,6 +617,7 @@ export function FolderTreeView() {
     focusTree,
     handleCancelInlineEdit,
     inlineEditState,
+    setFolderIcon,
     selectFolder,
   ]);
 
@@ -525,20 +625,46 @@ export function FolderTreeView() {
     if (inlineEditState?.mode !== "rename") return;
 
     const oldPath = inlineEditState.path;
+    const iconName = inlineEditState.iconName;
+    const previousIconName = getFolderIconName(folderIcons, oldPath);
     const sanitizedName = sanitizeFolderName(newName);
     const currentName = getFolderLeaf(oldPath);
+    const iconChanged = iconName !== previousIconName;
 
-    if (!sanitizedName || sanitizedName === currentName) {
+    if (!sanitizedName) {
       handleCancelInlineEdit();
       return;
     }
 
     try {
-      await renameFolder(oldPath, sanitizedName);
       const newPath = getRenamedFolderPath(oldPath, sanitizedName);
+      if (sanitizedName === currentName) {
+        if (!iconChanged) {
+          handleCancelInlineEdit();
+          return;
+        }
+
+        await setFolderIcon(oldPath, iconName);
+        selectFolder(oldPath);
+        setInlineEditState(null);
+        setIconPickerTarget(null);
+        focusTree();
+        return;
+      }
+
+      await renameFolder(oldPath, sanitizedName);
+      if (iconChanged) {
+        try {
+          await setFolderIcon(newPath, iconName);
+        } catch (error) {
+          console.error("Failed to save renamed folder icon:", error);
+          toast.error("Folder renamed, but failed to save icon");
+        }
+      }
       expandFolder(newPath);
       selectFolder(newPath);
       setInlineEditState(null);
+      setIconPickerTarget(null);
       focusTree();
     } catch (error) {
       console.error("Failed to rename folder:", error);
@@ -549,10 +675,78 @@ export function FolderTreeView() {
     expandFolder,
     focusTree,
     handleCancelInlineEdit,
+    folderIcons,
     inlineEditState,
     renameFolder,
+    setFolderIcon,
     selectFolder,
   ]);
+
+  const pickerValue = useMemo(() => {
+    if (!iconPickerTarget) return null;
+
+    if (iconPickerTarget.kind === "existing") {
+      return getFolderIconName(folderIcons, iconPickerTarget.path);
+    }
+
+    if (iconPickerTarget.kind === "inline-create") {
+      return inlineEditState?.mode === "create" ? inlineEditState.iconName : null;
+    }
+
+    return inlineEditState?.mode === "rename" &&
+      inlineEditState.path === iconPickerTarget.path
+      ? inlineEditState.iconName
+      : null;
+  }, [folderIcons, iconPickerTarget, inlineEditState]);
+
+  const pickerTitle = useMemo(() => {
+    if (!iconPickerTarget) return "Choose Folder Icon";
+    if (iconPickerTarget.kind === "existing") {
+      return `Choose Icon for ${getFolderLeaf(iconPickerTarget.path)}`;
+    }
+    if (iconPickerTarget.kind === "inline-create") {
+      return "Choose Icon for New Folder";
+    }
+    return `Choose Icon for ${getFolderLeaf(iconPickerTarget.path)}`;
+  }, [iconPickerTarget]);
+
+  const handleIconPickerSelect = useCallback(async (iconName: string | null) => {
+    if (!iconPickerTarget) return;
+
+    if (iconPickerTarget.kind === "existing") {
+      try {
+        await setFolderIcon(iconPickerTarget.path, iconName);
+      } catch (error) {
+        console.error("Failed to update folder icon:", error);
+        toast.error("Failed to update folder icon");
+        return;
+      }
+
+      setIconPickerTarget(null);
+      focusTree();
+      return;
+    }
+
+    setInlineEditState((current) => {
+      if (!current) return current;
+
+      if (iconPickerTarget.kind === "inline-create" && current.mode === "create") {
+        return { ...current, iconName };
+      }
+
+      if (
+        iconPickerTarget.kind === "inline-rename" &&
+        current.mode === "rename" &&
+        current.path === iconPickerTarget.path
+      ) {
+        return { ...current, iconName };
+      }
+
+      return current;
+    });
+
+    setIconPickerTarget(null);
+  }, [focusTree, iconPickerTarget, setFolderIcon]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!folderToDelete) return;
@@ -599,7 +793,10 @@ export function FolderTreeView() {
             className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
           >
             <span className="flex items-center gap-2 min-w-0">
-              <FolderIcon className="w-4.25 h-4.25 stroke-[1.6] text-text-muted/80 shrink-0" />
+              <FolderGlyph
+                className="w-4.25 h-4.25 text-text-muted/80 shrink-0"
+                strokeWidth={1.7}
+              />
               <span className="text-sm font-medium text-text truncate">
                 All Notes
               </span>
@@ -614,9 +811,11 @@ export function FolderTreeView() {
           {isCreatingRoot && (
             <InlineFolderRow
               depth={0}
+              iconName={inlineEditState?.mode === "create" ? inlineEditState.iconName : null}
               placeholder="Folder name"
               onSubmit={handleCreateFolder}
               onCancel={handleCancelInlineEdit}
+              onOpenIconPicker={() => setIconPickerTarget({ kind: "inline-create" })}
             />
           )}
 
@@ -625,6 +824,7 @@ export function FolderTreeView() {
               key={folder.path}
               folder={folder}
               depth={0}
+              folderIcons={folderIcons}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={collapsedFolders}
               inlineEditState={inlineEditState}
@@ -635,6 +835,7 @@ export function FolderTreeView() {
               onCreateFolder={handleCreateFolder}
               onStartRenameFolder={startRenameFolder}
               onRenameFolder={handleRenameFolder}
+              onOpenIconPicker={setIconPickerTarget}
               onCancelInlineEdit={handleCancelInlineEdit}
               onDeleteFolder={(path) => {
                 setFolderToDelete(path);
@@ -650,6 +851,26 @@ export function FolderTreeView() {
           ))}
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <FolderIconPickerModal
+          open={iconPickerTarget !== null}
+          value={pickerValue}
+          title={pickerTitle}
+          onOpenChange={(open) => {
+            if (!open) {
+              const shouldRefocusTree = iconPickerTarget?.kind === "existing";
+              setIconPickerTarget(null);
+              if (shouldRefocusTree) {
+                focusTree();
+              }
+            }
+          }}
+          onSelect={(iconName) => {
+            void handleIconPickerSelect(iconName);
+          }}
+        />
+      </Suspense>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

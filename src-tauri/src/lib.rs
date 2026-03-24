@@ -264,6 +264,8 @@ pub struct Settings {
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
     pub ollama_model: Option<String>,
+    #[serde(rename = "folderIcons")]
+    pub folder_icons: Option<HashMap<String, String>>,
 }
 
 // Search result
@@ -888,6 +890,42 @@ fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
     let content = serde_json::to_string_pretty(settings)?;
     std::fs::write(path, content)?;
     Ok(())
+}
+
+fn rewrite_folder_icon_paths(
+    folder_icons: &mut HashMap<String, String>,
+    old_path: &str,
+    new_path: &str,
+) {
+    let old_prefix = format!("{}/", old_path);
+    let new_prefix = format!("{}/", new_path);
+
+    let updates: Vec<(String, String, String)> = folder_icons
+        .iter()
+        .filter_map(|(path, icon_name)| {
+            if path == old_path {
+                Some((path.clone(), new_path.to_string(), icon_name.clone()))
+            } else if path.starts_with(&old_prefix) {
+                Some((
+                    path.clone(),
+                    format!("{}{}", new_prefix, &path[old_prefix.len()..]),
+                    icon_name.clone(),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (old_key, new_key, icon_name) in updates {
+        folder_icons.remove(&old_key);
+        folder_icons.insert(new_key, icon_name);
+    }
+}
+
+fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, String>, path: &str) {
+    let prefix = format!("{}/", path);
+    folder_icons.retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
 }
 
 // Clean up old entries from debounce map (entries older than 5 seconds)
@@ -1519,6 +1557,17 @@ async fn delete_folder(path: String, state: State<'_, AppState>) -> Result<(), S
         cache.retain(|id, _| !id.starts_with(&prefix));
     }
 
+    {
+        let mut settings = state.settings.write().expect("settings write lock");
+        if let Some(ref mut folder_icons) = settings.folder_icons {
+            remove_folder_icon_paths(folder_icons, &path);
+            if folder_icons.is_empty() {
+                settings.folder_icons = None;
+            }
+        }
+        let _ = save_settings(&folder, &settings);
+    }
+
     fs::remove_dir_all(&target)
         .await
         .map_err(|e| e.to_string())?;
@@ -1597,6 +1646,9 @@ async fn rename_folder(
                     *id = new_path.clone();
                 }
             }
+        }
+        if let Some(ref mut folder_icons) = settings.folder_icons {
+            rewrite_folder_icon_paths(folder_icons, &old_path, &new_path);
         }
         // Save settings
         let _ = save_settings(&folder, &settings);
@@ -1797,6 +1849,9 @@ async fn move_folder(
                     *pin_id = format!("{}{}", new_prefix, &pin_id[old_prefix.len()..]);
                 }
             }
+        }
+        if let Some(ref mut folder_icons) = settings.folder_icons {
+            rewrite_folder_icon_paths(folder_icons, &path, &new_path);
         }
         let _ = save_settings(&folder, &settings);
     }
