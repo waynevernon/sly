@@ -1271,6 +1271,27 @@ export function MoreVerticalIcon({ className = "w-4.5 h-4.5" }: IconProps) {
   );
 }
 
+export function GripVerticalIcon({ className = "w-4.5 h-4.5" }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function KeyboardIcon({ className = "w-4.5 h-4.5" }: IconProps) {
   return (
     <svg

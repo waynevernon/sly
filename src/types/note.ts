@@ -3,6 +3,7 @@ export interface NoteMetadata {
   title: string;
   preview: string;
   modified: number;
+  created: number;
 }
 
 export interface Note {
@@ -75,6 +76,18 @@ export interface ThemeColors {
 export type TextDirection = "auto" | "ltr" | "rtl";
 export type EditorWidth = "narrow" | "normal" | "wide" | "full" | "custom";
 export type PaneMode = 1 | 2 | 3;
+export type NoteSortMode =
+  | "modifiedDesc"
+  | "modifiedAsc"
+  | "createdDesc"
+  | "createdAsc"
+  | "titleAsc"
+  | "titleDesc";
+export type FolderSortMode = "manual" | "nameAsc" | "nameDesc";
+export type FolderManualOrder = Record<string, string[]>;
+
+export const DEFAULT_NOTE_SORT_MODE: NoteSortMode = "modifiedDesc";
+export const DEFAULT_FOLDER_SORT_MODE: FolderSortMode = "nameAsc";
 
 export interface NoteTypographySettings {
   baseFontSize: number;
@@ -106,6 +119,9 @@ export interface Settings {
   defaultNoteName?: string;
   ollamaModel?: string;
   folderIcons?: Record<string, string>;
+  noteSortMode?: NoteSortMode;
+  folderSortMode?: FolderSortMode;
+  folderManualOrder?: FolderManualOrder;
 }
 
 export interface FolderNode {

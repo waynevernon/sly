@@ -1,4 +1,10 @@
-import type { NoteMetadata, FolderNode } from "../types/note";
+import {
+  DEFAULT_FOLDER_SORT_MODE,
+  type FolderManualOrder,
+  type FolderNode,
+  type FolderSortMode,
+  type NoteMetadata,
+} from "../types/note";
 
 export interface FolderTreeData {
   rootNotes: NoteMetadata[];
@@ -7,8 +13,10 @@ export interface FolderTreeData {
 
 export function buildFolderTree(
   notes: NoteMetadata[],
-  pinnedIds: Set<string>,
+  _pinnedIds: Set<string>,
   knownFolders?: string[],
+  folderSortMode: FolderSortMode = DEFAULT_FOLDER_SORT_MODE,
+  folderManualOrder: FolderManualOrder = {},
 ): FolderTreeData {
   const rootNotes: NoteMetadata[] = [];
   const folderMap = new Map<string, FolderNode>();
@@ -51,30 +59,42 @@ export function buildFolderTree(
     }
   }
 
+  function compareFolders(
+    left: FolderNode,
+    right: FolderNode,
+    parentPath: string,
+  ): number {
+    if (folderSortMode === "manual") {
+      const positions = new Map(
+        (folderManualOrder[parentPath] || []).map((path, index) => [path, index]),
+      );
+      const leftPosition = positions.get(left.path);
+      const rightPosition = positions.get(right.path);
+
+      if (leftPosition !== undefined && rightPosition !== undefined) {
+        return leftPosition - rightPosition;
+      }
+      if (leftPosition !== undefined) return -1;
+      if (rightPosition !== undefined) return 1;
+    }
+
+    const comparison = left.name.localeCompare(right.name);
+    if (comparison !== 0) {
+      return folderSortMode === "nameDesc" ? -comparison : comparison;
+    }
+    return left.path.localeCompare(right.path);
+  }
+
   function sortNode(node: FolderNode) {
-    node.children.sort((a, b) => a.name.localeCompare(b.name));
-    node.notes.sort((a, b) => {
-      const ap = pinnedIds.has(a.id);
-      const bp = pinnedIds.has(b.id);
-      if (ap !== bp) return ap ? -1 : 1;
-      return b.modified - a.modified;
-    });
+    node.children.sort((a, b) => compareFolders(a, b, node.path));
     node.children.forEach(sortNode);
   }
 
   const topLevelFolders = Array.from(folderMap.values()).filter(
     (f) => !f.path.includes("/"),
   );
-  topLevelFolders.sort((a, b) => a.name.localeCompare(b.name));
+  topLevelFolders.sort((a, b) => compareFolders(a, b, ""));
   topLevelFolders.forEach(sortNode);
-
-  // Sort root notes: pinned first, then by modified desc
-  rootNotes.sort((a, b) => {
-    const ap = pinnedIds.has(a.id);
-    const bp = pinnedIds.has(b.id);
-    if (ap !== bp) return ap ? -1 : 1;
-    return b.modified - a.modified;
-  });
 
   return { rootNotes, folders: topLevelFolders };
 }

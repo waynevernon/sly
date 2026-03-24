@@ -2,6 +2,7 @@ use anyhow::Result;
 use base64::Engine;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
@@ -34,6 +35,7 @@ pub struct NoteMetadata {
     pub title: String,
     pub preview: String,
     pub modified: i64,
+    pub created: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -245,6 +247,37 @@ impl Default for AppearanceSettings {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteSortMode {
+    ModifiedDesc,
+    ModifiedAsc,
+    CreatedDesc,
+    CreatedAsc,
+    TitleAsc,
+    TitleDesc,
+}
+
+impl Default for NoteSortMode {
+    fn default() -> Self {
+        Self::ModifiedDesc
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum FolderSortMode {
+    Manual,
+    NameAsc,
+    NameDesc,
+}
+
+impl Default for FolderSortMode {
+    fn default() -> Self {
+        Self::NameAsc
+    }
+}
+
 // App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -266,6 +299,12 @@ pub struct Settings {
     pub ollama_model: Option<String>,
     #[serde(rename = "folderIcons")]
     pub folder_icons: Option<HashMap<String, String>>,
+    #[serde(rename = "noteSortMode", default)]
+    pub note_sort_mode: NoteSortMode,
+    #[serde(rename = "folderSortMode", default)]
+    pub folder_sort_mode: FolderSortMode,
+    #[serde(rename = "folderManualOrder", default)]
+    pub folder_manual_order: Option<HashMap<String, Vec<String>>>,
 }
 
 // Search result
@@ -892,6 +931,13 @@ fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
     Ok(())
 }
 
+fn metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<i64> {
+    result
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs() as i64)
+}
+
 fn rewrite_folder_icon_paths(
     folder_icons: &mut HashMap<String, String>,
     old_path: &str,
@@ -926,6 +972,137 @@ fn rewrite_folder_icon_paths(
 fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, String>, path: &str) {
     let prefix = format!("{}/", path);
     folder_icons.retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
+}
+
+fn get_parent_folder_path(path: &str) -> String {
+    path.rsplit_once('/')
+        .map(|(parent, _)| parent.to_string())
+        .unwrap_or_default()
+}
+
+fn sanitize_folder_manual_order(folder_manual_order: &mut HashMap<String, Vec<String>>) {
+    for siblings in folder_manual_order.values_mut() {
+        let mut seen = HashSet::new();
+        siblings.retain(|path| seen.insert(path.clone()));
+    }
+    folder_manual_order.retain(|_, siblings| !siblings.is_empty());
+}
+
+fn append_folder_manual_order(
+    folder_manual_order: &mut HashMap<String, Vec<String>>,
+    parent_path: &str,
+    folder_path: &str,
+) {
+    let siblings = folder_manual_order
+        .entry(parent_path.to_string())
+        .or_default();
+    siblings.retain(|path| path != folder_path);
+    siblings.push(folder_path.to_string());
+}
+
+fn remove_folder_manual_order_paths(
+    folder_manual_order: &mut HashMap<String, Vec<String>>,
+    path: &str,
+) {
+    let prefix = format!("{}/", path);
+    folder_manual_order.retain(|parent_path, siblings| {
+        siblings.retain(|folder_path| folder_path != path && !folder_path.starts_with(&prefix));
+        parent_path != path && !parent_path.starts_with(&prefix)
+    });
+    sanitize_folder_manual_order(folder_manual_order);
+}
+
+fn rewrite_folder_manual_order_paths(
+    folder_manual_order: &mut HashMap<String, Vec<String>>,
+    old_path: &str,
+    new_path: &str,
+) {
+    let old_prefix = format!("{}/", old_path);
+    let new_prefix = format!("{}/", new_path);
+    let existing = std::mem::take(folder_manual_order);
+
+    for (parent_path, siblings) in existing {
+        let next_parent_path = if parent_path == old_path {
+            new_path.to_string()
+        } else if parent_path.starts_with(&old_prefix) {
+            format!("{}{}", new_prefix, &parent_path[old_prefix.len()..])
+        } else {
+            parent_path
+        };
+
+        let next_siblings = siblings
+            .into_iter()
+            .map(|folder_path| {
+                if folder_path == old_path {
+                    new_path.to_string()
+                } else if folder_path.starts_with(&old_prefix) {
+                    format!("{}{}", new_prefix, &folder_path[old_prefix.len()..])
+                } else {
+                    folder_path
+                }
+            })
+            .collect();
+
+        folder_manual_order.insert(next_parent_path, next_siblings);
+    }
+
+    sanitize_folder_manual_order(folder_manual_order);
+}
+
+fn note_sort_value_cmp(left: i64, right: i64, descending: bool) -> Ordering {
+    if descending {
+        right.cmp(&left)
+    } else {
+        left.cmp(&right)
+    }
+}
+
+fn compare_note_metadata(
+    left: &NoteMetadata,
+    right: &NoteMetadata,
+    note_sort_mode: NoteSortMode,
+) -> Ordering {
+    let ordering = match note_sort_mode {
+        NoteSortMode::ModifiedDesc => note_sort_value_cmp(left.modified, right.modified, true),
+        NoteSortMode::ModifiedAsc => note_sort_value_cmp(left.modified, right.modified, false),
+        NoteSortMode::CreatedDesc => note_sort_value_cmp(left.created, right.created, true),
+        NoteSortMode::CreatedAsc => note_sort_value_cmp(left.created, right.created, false),
+        NoteSortMode::TitleAsc => left
+            .title
+            .to_lowercase()
+            .cmp(&right.title.to_lowercase())
+            .then_with(|| left.title.cmp(&right.title)),
+        NoteSortMode::TitleDesc => right
+            .title
+            .to_lowercase()
+            .cmp(&left.title.to_lowercase())
+            .then_with(|| right.title.cmp(&left.title)),
+    };
+
+    ordering
+        .then_with(|| right.modified.cmp(&left.modified))
+        .then_with(|| left.id.cmp(&right.id))
+}
+
+fn resolve_created_timestamp(created: Option<i64>, modified: i64) -> i64 {
+    created.unwrap_or(modified)
+}
+
+fn sort_notes(
+    notes: &mut [NoteMetadata],
+    pinned_ids: &HashSet<String>,
+    note_sort_mode: NoteSortMode,
+) {
+    notes.sort_by(|left, right| {
+        let left_pinned = pinned_ids.contains(&left.id);
+        let right_pinned = pinned_ids.contains(&right.id);
+
+        match (left_pinned, right_pinned) {
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
+            _ => compare_note_metadata(left, right, note_sort_mode),
+        }
+    });
 }
 
 // Clean up old entries from debounce map (entries older than 5 seconds)
@@ -1050,7 +1227,7 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
     let path_clone = path.clone();
     let discovered = tokio::task::spawn_blocking(move || {
         use walkdir::WalkDir;
-        let mut results: Vec<(String, String, String, i64)> = Vec::new();
+        let mut results: Vec<(String, String, String, i64, i64)> = Vec::new();
         for entry in WalkDir::new(&path_clone)
             .max_depth(10)
             .into_iter()
@@ -1063,16 +1240,18 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
             }
             if let Some(id) = id_from_abs_path(&path_clone, file_path) {
                 if let Ok(content) = std::fs::read_to_string(file_path) {
-                    let modified = entry
-                        .metadata()
-                        .ok()
-                        .and_then(|m| m.modified().ok())
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| d.as_secs() as i64)
+                    let metadata = entry.metadata().ok();
+                    let modified = metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata_time_secs(metadata.modified()))
                         .unwrap_or(0);
+                    let created = metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata_time_secs(metadata.created()));
+                    let created = resolve_created_timestamp(created, modified);
                     let title = extract_title(&content);
                     let preview = generate_preview(&content);
-                    results.push((id, title, preview, modified));
+                    results.push((id, title, preview, modified, created));
                 }
             }
         }
@@ -1083,35 +1262,30 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
 
     let mut notes: Vec<NoteMetadata> = discovered
         .into_iter()
-        .map(|(id, title, preview, modified)| NoteMetadata {
+        .map(|(id, title, preview, modified, created)| NoteMetadata {
             id,
             title,
             preview,
             modified,
+            created,
         })
         .collect();
 
-    // Load pinned note IDs from settings
-    let pinned_ids: HashSet<String> = {
+    // Load note sort settings
+    let (pinned_ids, note_sort_mode): (HashSet<String>, NoteSortMode) = {
         let settings = state.settings.read().expect("settings read lock");
-        settings
-            .pinned_note_ids
-            .as_ref()
-            .map(|ids| ids.iter().cloned().collect())
-            .unwrap_or_default()
+        (
+            settings
+                .pinned_note_ids
+                .as_ref()
+                .map(|ids| ids.iter().cloned().collect())
+                .unwrap_or_default(),
+            settings.note_sort_mode,
+        )
     };
 
-    // Sort: pinned notes first (by date), then unpinned notes (by date)
-    notes.sort_by(|a, b| {
-        let a_pinned = pinned_ids.contains(&a.id);
-        let b_pinned = pinned_ids.contains(&b.id);
-
-        match (a_pinned, b_pinned) {
-            (true, false) => std::cmp::Ordering::Less, // a pinned, b not -> a first
-            (false, true) => std::cmp::Ordering::Greater, // b pinned, a not -> b first
-            _ => b.modified.cmp(&a.modified), // both same status -> sort by date (newest first)
-        }
-    });
+    // Sort: pinned notes first, then selected mode within pinned/unpinned groups.
+    sort_notes(&mut notes, &pinned_ids, note_sort_mode);
 
     // Update cache efficiently
     {
@@ -1511,6 +1685,20 @@ async fn create_folder(path: String, state: State<'_, AppState>) -> Result<(), S
         .await
         .map_err(|e| e.to_string())?;
 
+    {
+        let mut settings = state.settings.write().expect("settings write lock");
+        let folder_manual_order = settings
+            .folder_manual_order
+            .get_or_insert_with(HashMap::new);
+        let parent_path = get_parent_folder_path(&path);
+        append_folder_manual_order(folder_manual_order, &parent_path, &path);
+        sanitize_folder_manual_order(folder_manual_order);
+        if folder_manual_order.is_empty() {
+            settings.folder_manual_order = None;
+        }
+        let _ = save_settings(&folder, &settings);
+    }
+
     Ok(())
 }
 
@@ -1563,6 +1751,12 @@ async fn delete_folder(path: String, state: State<'_, AppState>) -> Result<(), S
             remove_folder_icon_paths(folder_icons, &path);
             if folder_icons.is_empty() {
                 settings.folder_icons = None;
+            }
+        }
+        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
+            remove_folder_manual_order_paths(folder_manual_order, &path);
+            if folder_manual_order.is_empty() {
+                settings.folder_manual_order = None;
             }
         }
         let _ = save_settings(&folder, &settings);
@@ -1649,6 +1843,12 @@ async fn rename_folder(
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &old_path, &new_path);
+        }
+        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
+            rewrite_folder_manual_order_paths(folder_manual_order, &old_path, &new_path);
+            if folder_manual_order.is_empty() {
+                settings.folder_manual_order = None;
+            }
         }
         // Save settings
         let _ = save_settings(&folder, &settings);
@@ -1852,6 +2052,21 @@ async fn move_folder(
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &path, &new_path);
+        }
+        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
+            rewrite_folder_manual_order_paths(folder_manual_order, &path, &new_path);
+            let old_parent = get_parent_folder_path(&path);
+            let new_parent = target_parent.clone();
+            if old_parent != new_parent {
+                if let Some(old_siblings) = folder_manual_order.get_mut(&old_parent) {
+                    old_siblings.retain(|folder_path| folder_path != &new_path);
+                }
+                append_folder_manual_order(folder_manual_order, &new_parent, &new_path);
+            }
+            sanitize_folder_manual_order(folder_manual_order);
+            if folder_manual_order.is_empty() {
+                settings.folder_manual_order = None;
+            }
         }
         let _ = save_settings(&folder, &settings);
     }
@@ -2175,6 +2390,7 @@ async fn import_file_to_folder(
         title: extracted_title,
         preview,
         modified,
+        created: modified,
     };
 
     // Update notes cache so fallback search sees the imported note immediately
@@ -4199,4 +4415,158 @@ pub fn run() {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn note(id: &str, title: &str, modified: i64, created: i64) -> NoteMetadata {
+        NoteMetadata {
+            id: id.to_string(),
+            title: title.to_string(),
+            preview: String::new(),
+            modified,
+            created,
+        }
+    }
+
+    fn order_map(entries: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
+        entries
+            .iter()
+            .map(|(parent, children)| {
+                (
+                    (*parent).to_string(),
+                    children.iter().map(|child| (*child).to_string()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn resolve_created_timestamp_falls_back_to_modified() {
+        assert_eq!(resolve_created_timestamp(None, 42), 42);
+        assert_eq!(resolve_created_timestamp(Some(7), 42), 7);
+    }
+
+    #[test]
+    fn sort_notes_keeps_pins_first_for_every_mode() {
+        let modes = [
+            NoteSortMode::ModifiedDesc,
+            NoteSortMode::ModifiedAsc,
+            NoteSortMode::CreatedDesc,
+            NoteSortMode::CreatedAsc,
+            NoteSortMode::TitleAsc,
+            NoteSortMode::TitleDesc,
+        ];
+
+        for mode in modes {
+            let mut notes = vec![
+                note("alpha", "Alpha", 30, 30),
+                note("beta", "Beta", 10, 10),
+                note("gamma", "Gamma", 20, 20),
+            ];
+            let pinned_ids = ["beta".to_string()].into_iter().collect();
+
+            sort_notes(&mut notes, &pinned_ids, mode);
+
+            assert_eq!(notes[0].id, "beta");
+        }
+    }
+
+    #[test]
+    fn sort_notes_supports_created_and_title_modes() {
+        let mut created_notes = vec![
+            note("one", "Zulu", 10, 30),
+            note("two", "Alpha", 30, 10),
+            note("three", "Mike", 20, 20),
+        ];
+        sort_notes(
+            &mut created_notes,
+            &HashSet::new(),
+            NoteSortMode::CreatedAsc,
+        );
+        assert_eq!(
+            created_notes
+                .iter()
+                .map(|note| note.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["two", "three", "one"]
+        );
+
+        let mut title_notes = vec![
+            note("one", "Zulu", 10, 10),
+            note("two", "Alpha", 20, 20),
+            note("three", "Mike", 30, 30),
+        ];
+        sort_notes(&mut title_notes, &HashSet::new(), NoteSortMode::TitleDesc);
+        assert_eq!(
+            title_notes
+                .iter()
+                .map(|note| note.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["one", "three", "two"]
+        );
+    }
+
+    #[test]
+    fn folder_manual_order_rewrites_nested_paths() {
+        let mut folder_manual_order = order_map(&[
+            ("", &["docs", "journal"]),
+            ("docs", &["docs/rust", "docs/typescript"]),
+        ]);
+
+        rewrite_folder_manual_order_paths(&mut folder_manual_order, "docs", "work");
+
+        assert_eq!(
+            folder_manual_order.get("").cloned().unwrap_or_default(),
+            vec!["work".to_string(), "journal".to_string()]
+        );
+        assert_eq!(
+            folder_manual_order.get("work").cloned().unwrap_or_default(),
+            vec!["work/rust".to_string(), "work/typescript".to_string()]
+        );
+        assert!(!folder_manual_order.contains_key("docs"));
+    }
+
+    #[test]
+    fn folder_manual_order_removes_deleted_paths_and_descendants() {
+        let mut folder_manual_order = order_map(&[
+            ("", &["docs", "journal"]),
+            ("docs", &["docs/rust", "docs/typescript"]),
+        ]);
+
+        remove_folder_manual_order_paths(&mut folder_manual_order, "docs");
+
+        assert_eq!(
+            folder_manual_order.get("").cloned().unwrap_or_default(),
+            vec!["journal".to_string()]
+        );
+        assert!(!folder_manual_order.contains_key("docs"));
+    }
+
+    #[test]
+    fn folder_manual_order_move_appends_to_new_parent() {
+        let mut folder_manual_order = order_map(&[
+            ("", &["docs", "archive"]),
+            ("docs", &["docs/rust"]),
+            ("archive", &["archive/old"]),
+        ]);
+
+        rewrite_folder_manual_order_paths(&mut folder_manual_order, "docs/rust", "archive/rust");
+        if let Some(old_siblings) = folder_manual_order.get_mut("docs") {
+            old_siblings.retain(|folder_path| folder_path != "archive/rust");
+        }
+        append_folder_manual_order(&mut folder_manual_order, "archive", "archive/rust");
+        sanitize_folder_manual_order(&mut folder_manual_order);
+
+        assert_eq!(
+            folder_manual_order
+                .get("archive")
+                .cloned()
+                .unwrap_or_default(),
+            vec!["archive/old".to_string(), "archive/rust".to_string()]
+        );
+        assert!(!folder_manual_order.contains_key("docs"));
+    }
 }

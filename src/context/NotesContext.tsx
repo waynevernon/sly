@@ -9,12 +9,19 @@ import {
   type ReactNode,
 } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { Note, NoteMetadata } from "../types/note";
+import {
+  DEFAULT_FOLDER_SORT_MODE,
+  DEFAULT_NOTE_SORT_MODE,
+  type FolderManualOrder,
+  type FolderSortMode,
+  type Note,
+  type NoteMetadata,
+  type NoteSortMode,
+  type Settings,
+} from "../types/note";
 import * as notesService from "../services/notes";
 import type { SearchResult } from "../services/notes";
 import {
-  removeFolderIconPaths,
-  rewriteFolderIconPaths,
   sanitizeFolderIcons,
   type FolderIconsMap,
 } from "../lib/folderIcons";
@@ -24,7 +31,11 @@ import {
 interface NotesDataContextValue {
   notes: NoteMetadata[];
   scopedNotes: NoteMetadata[];
+  settings: Settings;
   folderIcons: FolderIconsMap;
+  noteSortMode: NoteSortMode;
+  folderSortMode: FolderSortMode;
+  folderManualOrder: FolderManualOrder;
   selectedNoteId: string | null;
   selectedFolderPath: string | null;
   currentNote: Note | null;
@@ -62,6 +73,12 @@ interface NotesActionsContextValue {
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
   setFolderIcon: (path: string, iconName: string | null) => Promise<void>;
+  setNoteSortMode: (mode: NoteSortMode) => Promise<void>;
+  setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
+  setFolderManualOrder: (
+    parentPath: string,
+    orderedPaths: string[],
+  ) => Promise<void>;
 }
 
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
@@ -77,8 +94,47 @@ function getParentPath(path: string): string | null {
   return lastSlash > 0 ? path.substring(0, lastSlash) : null;
 }
 
+function sanitizeFolderManualOrder(
+  folderManualOrder: FolderManualOrder | null | undefined,
+): FolderManualOrder {
+  if (!folderManualOrder) return {};
+
+  return Object.fromEntries(
+    Object.entries(folderManualOrder)
+      .filter(([parentPath, orderedPaths]) => {
+        if (parentPath !== "" && parentPath.trim().length === 0) return false;
+        return Array.isArray(orderedPaths);
+      })
+      .map(([parentPath, orderedPaths]) => {
+        const uniquePaths = Array.from(
+          new Set(
+            orderedPaths.filter(
+              (path): path is string =>
+                typeof path === "string" && path.trim().length > 0,
+            ),
+          ),
+        );
+        return [parentPath, uniquePaths];
+      })
+      .filter(([, orderedPaths]) => orderedPaths.length > 0),
+  );
+}
+
+function normalizeSettings(settings: Settings | null | undefined): Settings {
+  const nextSettings = settings ? { ...settings } : {};
+  nextSettings.noteSortMode ??= DEFAULT_NOTE_SORT_MODE;
+  nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
+  const folderManualOrder = sanitizeFolderManualOrder(
+    nextSettings.folderManualOrder,
+  );
+  nextSettings.folderManualOrder =
+    Object.keys(folderManualOrder).length > 0 ? folderManualOrder : undefined;
+  return nextSettings;
+}
+
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
+  const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
   const [folderIcons, setFolderIcons] = useState<FolderIconsMap>({});
   const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
     null,
@@ -115,6 +171,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const searchRequestIdRef = useRef(0);
   // Tracks the ID of a newly created note so Editor can focus its title.
   const pendingNewNoteIdRef = useRef<string | null>(null);
+  const settingsRef = useRef<Settings>(settings);
+  settingsRef.current = settings;
 
   const refreshNotes = useCallback(async () => {
     if (!notesFolder) return;
@@ -126,12 +184,79 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder]);
 
-  const syncFolderIcons = useCallback(async () => {
-    const settings = await notesService.getSettings();
-    const nextFolderIcons = sanitizeFolderIcons(settings.folderIcons);
+  const applySettings = useCallback((nextSettings: Settings) => {
+    const normalizedSettings = normalizeSettings(nextSettings);
+    setSettings(normalizedSettings);
+    const nextFolderIcons = sanitizeFolderIcons(normalizedSettings.folderIcons);
     setFolderIcons(nextFolderIcons);
-    return nextFolderIcons;
+    return normalizedSettings;
   }, []);
+
+  const refreshSettings = useCallback(async () => {
+    const nextSettings = await notesService.getSettings();
+    return applySettings(nextSettings);
+  }, [applySettings]);
+
+  const persistSettings = useCallback(
+    async (updater: (currentSettings: Settings) => Settings) => {
+      const nextSettings = normalizeSettings(updater(settingsRef.current));
+      await notesService.updateSettings(nextSettings);
+      return applySettings(nextSettings);
+    },
+    [applySettings],
+  );
+
+  const persistFolderManualOrder = useCallback(
+    async (parentPath: string, orderedPaths: string[]) => {
+      await persistSettings((currentSettings) => {
+        const folderManualOrder = sanitizeFolderManualOrder(
+          currentSettings.folderManualOrder,
+        );
+        if (orderedPaths.length > 0) {
+          folderManualOrder[parentPath] = orderedPaths;
+        } else {
+          delete folderManualOrder[parentPath];
+        }
+
+        return {
+          ...currentSettings,
+          folderManualOrder:
+            Object.keys(folderManualOrder).length > 0
+              ? folderManualOrder
+              : undefined,
+        };
+      });
+    },
+    [persistSettings],
+  );
+
+  const setNoteSortMode = useCallback(
+    async (mode: NoteSortMode) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        noteSortMode: mode,
+      }));
+      await refreshNotes();
+    },
+    [persistSettings, refreshNotes],
+  );
+
+  const setFolderSortMode = useCallback(
+    async (mode: FolderSortMode) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        folderSortMode: mode,
+      }));
+    },
+    [persistSettings],
+  );
+
+  const setFolderManualOrder = useCallback(
+    async (parentPath: string, orderedPaths: string[]) => {
+      await persistFolderManualOrder(parentPath, orderedPaths);
+    },
+    [persistFolderManualOrder],
+  );
 
   // Debounced refresh - coalesces rapid saves into a single refresh
   const scheduleRefresh = useCallback(() => {
@@ -259,17 +384,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           recentlySavedRef.current.add(updated.id);
 
           // Transfer pin status to new ID
-          const currentSettings = await notesService.getSettings();
-          const pinnedIds = currentSettings.pinnedNoteIds || [];
-          if (pinnedIds.includes(savingNoteId)) {
-            const updatedSettings = {
+          await persistSettings((currentSettings) => {
+            const pinnedIds = currentSettings.pinnedNoteIds || [];
+            if (!pinnedIds.includes(savingNoteId)) {
+              return currentSettings;
+            }
+
+            return {
               ...currentSettings,
               pinnedNoteIds: pinnedIds.map((id) =>
-                id === savingNoteId ? updated.id : id
+                id === savingNoteId ? updated.id : id,
               ),
             };
-            await notesService.updateSettings(updatedSettings);
-          }
+          });
         }
 
         // Clear external changes flag - if it was set by our own save, we want to ignore it
@@ -303,7 +430,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (updatedId) recentlySavedRef.current.delete(updatedId);
       }
     },
-    [currentNote, scheduleRefresh]
+    [currentNote, persistSettings, scheduleRefresh]
   );
 
   const deleteNote = useCallback(
@@ -312,14 +439,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await notesService.deleteNote(id);
 
         // Clean up pinned status for deleted note
-        const currentSettings = await notesService.getSettings();
-        const pinnedIds = currentSettings.pinnedNoteIds || [];
+        const pinnedIds = settingsRef.current.pinnedNoteIds || [];
         if (pinnedIds.includes(id)) {
-          const updatedSettings = {
+          await persistSettings((currentSettings) => ({
             ...currentSettings,
-            pinnedNoteIds: pinnedIds.filter((pinId) => pinId !== id),
-          };
-          await notesService.updateSettings(updatedSettings);
+            pinnedNoteIds: (currentSettings.pinnedNoteIds || []).filter(
+              (pinId) => pinId !== id,
+            ),
+          }));
         }
 
         // Only clear selection if we're deleting the currently selected note
@@ -335,7 +462,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : "Failed to delete note");
       }
     },
-    [refreshNotes]
+    [persistSettings, refreshNotes]
   );
 
   const duplicateNote = useCallback(
@@ -365,41 +492,37 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const pinNote = useCallback(
     async (id: string) => {
       try {
-        const currentSettings = await notesService.getSettings();
-        const pinnedIds = currentSettings.pinnedNoteIds || [];
+        const pinnedIds = settingsRef.current.pinnedNoteIds || [];
 
         if (!pinnedIds.includes(id)) {
-          const updatedSettings = {
+          await persistSettings((currentSettings) => ({
             ...currentSettings,
-            pinnedNoteIds: [...pinnedIds, id],
-          };
-          await notesService.updateSettings(updatedSettings);
+            pinnedNoteIds: [...(currentSettings.pinnedNoteIds || []), id],
+          }));
           await refreshNotes();
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to pin note");
       }
     },
-    [refreshNotes]
+    [persistSettings, refreshNotes]
   );
 
   const unpinNote = useCallback(
     async (id: string) => {
       try {
-        const currentSettings = await notesService.getSettings();
-        const pinnedIds = currentSettings.pinnedNoteIds || [];
-
-        const updatedSettings = {
+        await persistSettings((currentSettings) => ({
           ...currentSettings,
-          pinnedNoteIds: pinnedIds.filter((pinId) => pinId !== id),
-        };
-        await notesService.updateSettings(updatedSettings);
+          pinnedNoteIds: (currentSettings.pinnedNoteIds || []).filter(
+            (pinId) => pinId !== id,
+          ),
+        }));
         await refreshNotes();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to unpin note");
       }
     },
-    [refreshNotes]
+    [persistSettings, refreshNotes]
   );
 
   const createNoteInFolder = useCallback(
@@ -432,6 +555,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       try {
         const fullPath = parentPath ? `${parentPath}/${name}` : name;
         await notesService.createFolder(fullPath);
+        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(
@@ -439,14 +563,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes]
+    [refreshNotes, refreshSettings]
   );
 
   const deleteFolderAction = useCallback(
     async (path: string) => {
       try {
         await notesService.deleteFolder(path);
-        setFolderIcons((prev) => removeFolderIconPaths(prev, path));
         // If the selected note was inside the deleted folder, clear selection
         setSelectedNoteId((prevId) => {
           if (prevId && prevId.startsWith(path + "/")) {
@@ -462,6 +585,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
+        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(
@@ -469,7 +593,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes]
+    [refreshNotes, refreshSettings]
   );
 
   const renameFolderAction = useCallback(
@@ -507,8 +631,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
-        setFolderIcons((prev) => rewriteFolderIconPaths(prev, oldPath, newPath));
-
+        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(
@@ -516,7 +639,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes]
+    [refreshNotes, refreshSettings]
   );
 
   const moveNoteAction = useCallback(
@@ -541,12 +664,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
+        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move note");
       }
     },
-    [refreshNotes]
+    [refreshNotes, refreshSettings]
   );
 
   const moveFolderAction = useCallback(
@@ -585,80 +709,81 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           }
           return prevPath;
         });
-        setFolderIcons((prev) => rewriteFolderIconPaths(prev, path, newPath));
-
+        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move folder");
       }
     },
-    [refreshNotes]
+    [refreshNotes, refreshSettings]
   );
 
   const setFolderIcon = useCallback(async (path: string, iconName: string | null) => {
     if (!path) return;
 
     try {
-      const settings = await notesService.getSettings();
-      const nextFolderIcons = sanitizeFolderIcons(settings.folderIcons);
+      await persistSettings((currentSettings) => {
+        const nextFolderIcons = sanitizeFolderIcons(currentSettings.folderIcons);
 
-      if (iconName) {
-        nextFolderIcons[path] = iconName;
-      } else {
-        delete nextFolderIcons[path];
-      }
+        if (iconName) {
+          nextFolderIcons[path] = iconName;
+        } else {
+          delete nextFolderIcons[path];
+        }
 
-      await notesService.updateSettings({
-        ...settings,
-        folderIcons:
-          Object.keys(nextFolderIcons).length > 0 ? nextFolderIcons : undefined,
+        return {
+          ...currentSettings,
+          folderIcons:
+            Object.keys(nextFolderIcons).length > 0
+              ? nextFolderIcons
+              : undefined,
+        };
       });
-      setFolderIcons(nextFolderIcons);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to update folder icon"
       );
       throw err;
     }
-  }, []);
+  }, [persistSettings]);
 
   const setNotesFolder = useCallback(async (path: string) => {
     try {
       await notesService.setNotesFolder(path);
       setNotesFolderState(path);
-      setFolderIcons({});
+      applySettings({});
       setSelectedFolderPath(null);
       setSelectedNoteId(null);
       setCurrentNote(null);
       // Start file watcher after setting folder
       await notesService.startFileWatcher();
-      await syncFolderIcons();
+      await refreshSettings();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to set notes folder"
       );
     }
-  }, [syncFolderIcons]);
+  }, [applySettings, refreshSettings]);
 
   // Update local state only (backend already initialized the folder).
   // Used when the CLI sets the notes folder and emits an event.
   const syncNotesFolder = useCallback(async (path: string) => {
     try {
       setNotesFolderState(path);
-      setFolderIcons({});
+      applySettings({});
       setSelectedFolderPath(null);
       setSelectedNoteId(null);
       setCurrentNote(null);
       const notesList = await notesService.listNotes();
       setNotes(notesList);
       await notesService.startFileWatcher();
-      await syncFolderIcons();
+      await refreshSettings();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to sync notes folder"
       );
     }
-  }, [syncFolderIcons]);
+  }, [applySettings, refreshSettings]);
 
   const search = useCallback(async (query: string) => {
     const requestId = ++searchRequestIdRef.current;
@@ -674,18 +799,37 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const queryLower = trimmedQuery.toLowerCase();
     // Instant local results for responsive UX while full-text search runs.
     const instantResults: SearchResult[] = notesRef.current
-      .filter(
-        (note) =>
-          note.title.toLowerCase().includes(queryLower) ||
-          note.preview.toLowerCase().includes(queryLower),
-      )
+      .map((note) => {
+        const titleLower = note.title.toLowerCase();
+        const previewLower = note.preview.toLowerCase();
+        const titleStarts = titleLower.startsWith(queryLower);
+        const titleIncludes = titleLower.includes(queryLower);
+        const previewIncludes = previewLower.includes(queryLower);
+
+        let score = 0;
+        if (titleStarts) score += 4;
+        if (titleIncludes) score += 2;
+        if (previewIncludes) score += 1;
+
+        return { note, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        if (right.note.modified !== left.note.modified) {
+          return right.note.modified - left.note.modified;
+        }
+        return left.note.title.localeCompare(right.note.title);
+      })
       .slice(0, 20)
-      .map((note) => ({
+      .map(({ note, score }) => ({
         id: note.id,
         title: note.title,
         preview: note.preview,
         modified: note.modified,
-        score: 0,
+        score,
       }));
 
     // Show instant local matches immediately; clear stale results if none match.
@@ -733,11 +877,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (folder) {
           const notesList = await notesService.listNotes();
           setNotes(notesList);
-          await syncFolderIcons();
+          await refreshSettings();
           // Start file watcher
           await notesService.startFileWatcher();
         } else {
-          setFolderIcons({});
+          applySettings({});
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize");
@@ -746,7 +890,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       }
     }
     init();
-  }, []);
+  }, [applySettings, refreshSettings]);
 
   // Listen for file change events and notify if current note changed externally
   useEffect(() => {
@@ -825,7 +969,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     () => ({
       notes,
       scopedNotes,
+      settings,
       folderIcons,
+      noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
+      folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
+      folderManualOrder: settings.folderManualOrder || {},
       selectedNoteId,
       selectedFolderPath,
       currentNote,
@@ -841,6 +989,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [
       notes,
       scopedNotes,
+      settings,
       folderIcons,
       selectedNoteId,
       selectedFolderPath,
@@ -881,6 +1030,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNote: moveNoteAction,
       moveFolder: moveFolderAction,
       setFolderIcon,
+      setNoteSortMode,
+      setFolderSortMode,
+      setFolderManualOrder,
     }),
     [
       selectNote,
@@ -905,6 +1057,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNoteAction,
       moveFolderAction,
       setFolderIcon,
+      setNoteSortMode,
+      setFolderSortMode,
+      setFolderManualOrder,
     ]
   );
 

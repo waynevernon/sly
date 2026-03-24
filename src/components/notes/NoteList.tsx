@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useNotes } from "../../context/NotesContext";
-import type { Settings } from "../../types/note";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,7 +130,6 @@ interface NoteItemWithMenuProps extends NoteItemProps {
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
-  onRefreshSettings: () => Promise<void> | void;
 }
 
 const NoteItemWithMenu = memo(function NoteItemWithMenu({
@@ -146,17 +144,15 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onUnpin,
   onDuplicate,
   onDelete,
-  onRefreshSettings,
   showFolderPrefix = true,
 }: NoteItemWithMenuProps) {
   const handlePin = useCallback(async () => {
     try {
       await (isPinned ? onUnpin(id) : onPin(id));
-      await onRefreshSettings();
     } catch (error) {
       console.error("Failed to pin/unpin note:", error);
     }
-  }, [id, isPinned, onPin, onRefreshSettings, onUnpin]);
+  }, [id, isPinned, onPin, onUnpin]);
 
   const handleCopyFilepath = useCallback(async () => {
     try {
@@ -250,30 +246,17 @@ export function NoteList({
     pinNote,
     unpinNote,
     isLoading,
+    settings,
   } = useNotes();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
-  const [settings, setSettings] = useState<Settings | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    notesService
-      .getSettings()
-      .then(setSettings)
-      .catch((error) => {
-        console.error("Failed to load settings:", error);
-      });
-  }, [items]);
-
   const pinnedIds = useMemo(
-    () => new Set(settings?.pinnedNoteIds || []),
+    () => new Set(settings.pinnedNoteIds || []),
     [settings],
   );
-
-  const refreshSettings = useCallback(() => {
-    notesService.getSettings().then(setSettings);
-  }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!noteToDelete) return;
@@ -352,7 +335,6 @@ export function NoteList({
             onUnpin={unpinNote}
             onDuplicate={duplicateNote}
             onDelete={openDeleteDialogForNote}
-            onRefreshSettings={refreshSettings}
             showFolderPrefix={showFolderPrefix}
           />
         ))}

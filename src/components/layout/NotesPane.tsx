@@ -7,6 +7,17 @@ import { IconButton, Input } from "../ui";
 import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import { getFolderIconName } from "../../lib/folderIcons";
+import { SortMenuButton } from "./SortMenuButton";
+import type { NoteSortMode } from "../../types/note";
+
+const noteSortOptions: { value: NoteSortMode; label: string }[] = [
+  { value: "modifiedDesc", label: "Last Modified (Newest)" },
+  { value: "modifiedAsc", label: "Last Modified (Oldest)" },
+  { value: "createdDesc", label: "Created (Newest)" },
+  { value: "createdAsc", label: "Created (Oldest)" },
+  { value: "titleAsc", label: "Title (A-Z)" },
+  { value: "titleDesc", label: "Title (Z-A)" },
+];
 
 function getFolderLabel(path: string | null): string {
   if (!path) return "All Notes";
@@ -23,12 +34,14 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
     notes,
     scopedNotes,
     folderIcons,
+    noteSortMode,
     selectedFolderPath,
     createNote,
     search,
     searchQuery,
     searchResults,
     clearSearch,
+    setNoteSortMode,
   } = useNotes();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -168,6 +181,16 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
           </div>
         </div>
         <div className="flex items-center gap-px shrink-0">
+          {!searchQuery.trim() && (
+            <SortMenuButton
+              title="Sort Notes"
+              value={noteSortMode}
+              options={noteSortOptions}
+              onChange={(nextMode) => {
+                void setNoteSortMode(nextMode);
+              }}
+            />
+          )}
           <IconButton
             onClick={toggleSearch}
             title="Search Notes"
