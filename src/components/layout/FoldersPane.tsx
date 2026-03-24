@@ -3,6 +3,7 @@ import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
 import { IconButton } from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
+import { Footer } from "./Footer";
 import { SortMenuButton } from "./SortMenuButton";
 
 const folderSortOptions: { value: FolderSortMode; label: string }[] = [
@@ -11,7 +12,11 @@ const folderSortOptions: { value: FolderSortMode; label: string }[] = [
   { value: "nameDesc", label: "Name (Z-A)" },
 ];
 
-export function FoldersPane() {
+interface FoldersPaneProps {
+  onOpenSettings?: () => void;
+}
+
+export function FoldersPane({ onOpenSettings }: FoldersPaneProps) {
   const { folderSortMode, setFolderSortMode } = useNotes();
 
   return (
@@ -43,6 +48,8 @@ export function FoldersPane() {
       <div className="flex-1 overflow-y-auto py-2.5">
         <FolderTreeView />
       </div>
+
+      <Footer onOpenSettings={onOpenSettings} />
     </div>
   );
 }

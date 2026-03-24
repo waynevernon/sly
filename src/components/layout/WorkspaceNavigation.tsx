@@ -156,7 +156,7 @@ export function WorkspaceNavigation({
               : "w-0 opacity-0 -translate-x-3 pointer-events-none",
           )}
         >
-          <FoldersPane />
+          <FoldersPane onOpenSettings={onOpenSettings} />
         </div>
 
         <div
@@ -167,7 +167,7 @@ export function WorkspaceNavigation({
               : "w-0 opacity-0 -translate-x-3 pointer-events-none",
           )}
         >
-          <NotesPane onOpenSettings={onOpenSettings} />
+          <NotesPane />
         </div>
       </div>
 

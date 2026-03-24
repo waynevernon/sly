@@ -11,7 +11,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       <div className="relative">
         <select
           className={cn(
-            "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full items-center justify-between rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2 text-sm text-text",
+            "ui-focus-ring h-[var(--ui-control-height-standard)] w-full rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-sm text-text",
             "disabled:cursor-not-allowed disabled:opacity-50",
             "[&>option]:bg-bg [&>option]:text-text",
             "appearance-none pr-8",

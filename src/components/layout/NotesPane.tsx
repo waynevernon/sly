@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNotes } from "../../context/NotesContext";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
-import { Footer } from "./Footer";
 import { IconButton, Input } from "../ui";
 import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
@@ -25,11 +24,7 @@ function getFolderLabel(path: string | null): string {
   return parts[parts.length - 1];
 }
 
-interface NotesPaneProps {
-  onOpenSettings?: () => void;
-}
-
-export function NotesPane({ onOpenSettings }: NotesPaneProps) {
+export function NotesPane() {
   const {
     notes,
     scopedNotes,
@@ -254,8 +249,6 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
           showFolderPrefix={searchQuery.trim().length > 0 || selectedFolderPath === null}
         />
       </div>
-
-      <Footer onOpenSettings={onOpenSettings} />
     </div>
   );
 }
