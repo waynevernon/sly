@@ -4,7 +4,7 @@ import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import { Footer } from "./Footer";
 import { IconButton, Input } from "../ui";
-import { AddNoteIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
+import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
 
 function getFolderLabel(path: string | null): string {
   if (!path) return "All Notes";
@@ -174,7 +174,7 @@ export function NotesPane({ onOpenSettings }: NotesPaneProps) {
             }}
             title="New Note"
           >
-            <AddNoteIcon className="w-4.75 h-4.75 stroke-[1.5]" />
+            <PlusIcon className="w-4.75 h-4.75 stroke-[1.5]" />
           </IconButton>
         </div>
       </div>
