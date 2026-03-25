@@ -283,6 +283,7 @@ export function WorkspaceNavigation({
             onMouseDown={(e) => startResize(e, "folders")}
           >
             <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
+            <div className="absolute left-0 right-0 h-px bg-border/80" style={{ top: "calc(var(--ui-drag-region-height) + var(--ui-pane-header-height) - 1px)" }} />
           </div>
         )}
 
@@ -305,6 +306,7 @@ export function WorkspaceNavigation({
             onMouseDown={(e) => startResize(e, "notes")}
           >
             <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
+            <div className="absolute left-0 right-0 h-px bg-border/80" style={{ top: "calc(var(--ui-drag-region-height) + var(--ui-pane-header-height) - 1px)" }} />
           </div>
         )}
       </div>

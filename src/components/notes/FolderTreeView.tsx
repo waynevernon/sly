@@ -179,9 +179,8 @@ function InlineFolderRow({
       className={`rounded-md ${
         isSelected ? "bg-bg-muted ring-1 ring-text-muted/20" : "bg-bg-muted/70"
       }`}
-      style={{ marginLeft: `${depth * 12}px` }}
     >
-      <div className="flex items-center gap-1.5 pr-2 py-2">
+      <div className="flex items-center gap-1.5 pr-2 py-2" style={{ paddingLeft: `${depth * 12}px` }}>
         <div className="min-w-0 flex flex-1 items-center gap-2">
           <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
             {showCollapseToggle ? (
@@ -386,9 +385,8 @@ const FolderItem = memo(function FolderItem({
         <div
           ref={setDropRef}
           className={rowClassName}
-          style={{ marginLeft: `${depth * TREE_INDENT_WIDTH}px` }}
         >
-          <div className="flex items-center gap-1.5 pr-2 py-2">
+          <div className="flex items-center gap-1.5 pr-2 py-2" style={{ paddingLeft: `${depth * TREE_INDENT_WIDTH}px` }}>
             <div className="min-w-0 flex flex-1 items-center gap-1.5">
               {hasNestedFolders ? (
                 <button

@@ -76,12 +76,6 @@ export function NotesPane() {
   const heading = searchQuery.trim()
     ? "Search Results"
     : getFolderLabel(selectedFolderPath);
-  const subtitle = searchQuery.trim()
-    ? "Across all notes"
-    : selectedFolderPath
-      ? selectedFolderPath
-      : "Browse every note";
-
   const noteCount = searchQuery.trim() ? displayItems.length : selectedFolderPath ? scopedNotes.length : notes.length;
   const selectedFolderIcon = getFolderIconName(folderIcons, selectedFolderPath);
 
@@ -155,25 +149,20 @@ export function NotesPane() {
   return (
     <div className="h-full bg-bg border-r border-border/80 flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
-      <div className="ui-pane-header items-start border-border/80">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            {!searchQuery.trim() && (
-              <FolderGlyph
-                iconName={selectedFolderIcon}
-                className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
-                strokeWidth={1.7}
-              />
-            )}
-            <div className="font-medium text-base text-text truncate">
-              {heading}
-            </div>
-            <div className="ui-count-badge mt-0.5 pt-px shrink-0">
-              {noteCount}
-            </div>
+      <div className="ui-pane-header border-border/80">
+        <div className="min-w-0 flex items-center gap-1.5">
+          {!searchQuery.trim() && (
+            <FolderGlyph
+              iconName={selectedFolderIcon}
+              className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
+              strokeWidth={1.7}
+            />
+          )}
+          <div className="font-medium text-base text-text truncate">
+            {heading}
           </div>
-          <div className="text-xs text-text-muted truncate mt-0.5">
-            {subtitle}
+          <div className="ui-count-badge mt-0.5 pt-px shrink-0">
+            {noteCount}
           </div>
         </div>
         <div className="ui-pane-header-actions">
