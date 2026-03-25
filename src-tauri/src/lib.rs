@@ -107,7 +107,7 @@ fn default_interface_zoom() -> f32 {
 }
 
 fn default_pane_mode() -> i32 {
-    2
+    3
 }
 
 fn default_note_base_font_size() -> f32 {
