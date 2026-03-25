@@ -27,6 +27,7 @@ const MENU_SETTINGS_ID: &str = "app-settings";
 const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
 const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
 const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
+const MENU_FOCUS_MODE_ID: &str = "view-focus-mode";
 
 // Note metadata for list display
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4086,6 +4087,9 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
         .accelerator("CmdOrCtrl+3")
         .build(app)?;
+    let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
+        .accelerator("CmdOrCtrl+Shift+Enter")
+        .build(app)?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -4144,6 +4148,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &two_pane_item,
             &three_pane_item,
             &PredefinedMenuItem::separator(app)?,
+            &focus_mode_item,
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
     )?;
@@ -4216,6 +4221,10 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_VIEW_3_PANE_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "set-pane-mode", 3_i32);
+        }
+        MENU_FOCUS_MODE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "toggle-focus-mode", ());
         }
         _ => {}
     }

@@ -163,6 +163,7 @@ function AppContent() {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
     let unlistenSetPaneMode: (() => void) | undefined;
+    let unlistenToggleFocusMode: (() => void) | undefined;
 
     listen("open-settings", () => {
       openSettings();
@@ -181,12 +182,20 @@ function AppContent() {
       else unlistenSetPaneMode = fn;
     });
 
+    listen("toggle-focus-mode", () => {
+      toggleFocusMode();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenToggleFocusMode = fn;
+    });
+
     return () => {
       cancelled = true;
       unlistenOpenSettings?.();
       unlistenSetPaneMode?.();
+      unlistenToggleFocusMode?.();
     };
-  }, [applyPaneModeSelection, openSettings]);
+  }, [applyPaneModeSelection, openSettings, toggleFocusMode]);
 
   // Go back to command palette from AI modal
   const handleBackToPalette = useCallback(() => {
