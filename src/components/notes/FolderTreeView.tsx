@@ -15,6 +15,7 @@ import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import {
+  applyFolderDropOrderPlan,
   buildFolderDropOrderPlan,
   buildFolderTree,
   countNotesInFolder,
@@ -76,6 +77,7 @@ type FolderIconPickerTarget =
 interface FolderTreeViewProps {
   dragDelta: { x: number; y: number } | null;
   onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
+  pendingManualFolderDropPlan?: FolderDropOrderPlan | null;
 }
 
 const TREE_INDENT_WIDTH = 12;
@@ -528,6 +530,7 @@ const FolderItem = memo(function FolderItem({
 export function FolderTreeView({
   dragDelta,
   onManualFolderDropPlanChange,
+  pendingManualFolderDropPlan = null,
 }: FolderTreeViewProps) {
   const {
     notes,
@@ -590,6 +593,22 @@ export function FolderTreeView({
         folderManualOrder,
       ),
     [folderManualOrder, folderSortMode, knownFolders, notes],
+  );
+  const visibleCollapsedFolders = useMemo(() => {
+    if (!pendingManualFolderDropPlan?.targetParentPath) {
+      return collapsedFolders;
+    }
+
+    const next = new Set(collapsedFolders);
+    next.delete(pendingManualFolderDropPlan.targetParentPath);
+    return next;
+  }, [collapsedFolders, pendingManualFolderDropPlan]);
+  const displayTree = useMemo(
+    () =>
+      pendingManualFolderDropPlan
+        ? applyFolderDropOrderPlan(tree, pendingManualFolderDropPlan)
+        : tree,
+    [pendingManualFolderDropPlan, tree],
   );
   const { active, over } = useDndContext();
   const activeDragType = active?.data.current?.type;
@@ -963,7 +982,7 @@ export function FolderTreeView({
             />
           )}
 
-          {tree.folders.map((folder) => (
+          {displayTree.folders.map((folder) => (
             <FolderItem
               key={folder.path}
               folder={folder}
@@ -971,7 +990,7 @@ export function FolderTreeView({
               isManualSorting={folderSortMode === "manual"}
               folderIcons={folderIcons}
               selectedFolderPath={selectedFolderPath}
-              collapsedFolders={collapsedFolders}
+              collapsedFolders={visibleCollapsedFolders}
               inlineEditState={inlineEditState}
               projectedDrop={projectedDrop}
               onToggleCollapse={handleToggleCollapse}

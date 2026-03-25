@@ -343,6 +343,63 @@ export function buildFolderDropOrderPlan(
   };
 }
 
+function cloneFolderNode(folder: FolderNode): FolderNode {
+  return {
+    ...folder,
+    notes: [...folder.notes],
+    children: folder.children.map(cloneFolderNode),
+  };
+}
+
+export function applyFolderDropOrderPlan(
+  tree: FolderTreeData,
+  plan: FolderDropOrderPlan,
+): FolderTreeData {
+  const rootFolders = tree.folders.map(cloneFolderNode);
+  const rootNode: FolderNode = {
+    name: "",
+    path: "",
+    notes: [],
+    children: rootFolders,
+  };
+  const folderMap = new Map<string, FolderNode>([["", rootNode]]);
+
+  function indexFolders(folder: FolderNode) {
+    folderMap.set(folder.path, folder);
+    folder.children.forEach(indexFolders);
+  }
+
+  rootFolders.forEach(indexFolders);
+
+  const sourceParent = folderMap.get(plan.sourceParentPath);
+  const activeNode = folderMap.get(plan.activePath);
+  const targetParent = folderMap.get(plan.targetParentPath);
+
+  if (!sourceParent || !activeNode || !targetParent) {
+    return tree;
+  }
+
+  sourceParent.children = sourceParent.children.filter(
+    (folder) => folder.path !== plan.activePath,
+  );
+
+  const insertPath = plan.movedAcrossParents ? plan.newPath : plan.activePath;
+  const insertIndex = Math.max(
+    0,
+    plan.targetOrder.findIndex((path) => path === insertPath),
+  );
+
+  targetParent.children = targetParent.children.filter(
+    (folder) => folder.path !== plan.activePath,
+  );
+  targetParent.children.splice(insertIndex, 0, activeNode);
+
+  return {
+    rootNotes: [...tree.rootNotes],
+    folders: rootNode.children,
+  };
+}
+
 export type TreeItem =
   | { type: "note"; id: string }
   | { type: "folder"; path: string };

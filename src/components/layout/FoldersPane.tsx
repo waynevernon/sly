@@ -17,12 +17,14 @@ interface FoldersPaneProps {
   onOpenSettings?: () => void;
   dragDelta: { x: number; y: number } | null;
   onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
+  pendingManualFolderDropPlan?: FolderDropOrderPlan | null;
 }
 
 export function FoldersPane({
   onOpenSettings,
   dragDelta,
   onManualFolderDropPlanChange,
+  pendingManualFolderDropPlan,
 }: FoldersPaneProps) {
   const { folderSortMode, setFolderSortMode } = useNotes();
 
@@ -56,6 +58,7 @@ export function FoldersPane({
         <FolderTreeView
           dragDelta={dragDelta}
           onManualFolderDropPlanChange={onManualFolderDropPlanChange}
+          pendingManualFolderDropPlan={pendingManualFolderDropPlan}
         />
       </div>
 

@@ -35,6 +35,8 @@ export function WorkspaceNavigation({
   const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null);
   const [manualFolderDropPlan, setManualFolderDropPlan] =
     useState<FolderDropOrderPlan | null>(null);
+  const [pendingManualFolderDropPlan, setPendingManualFolderDropPlan] =
+    useState<FolderDropOrderPlan | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -116,6 +118,8 @@ export function WorkspaceNavigation({
           return;
         }
 
+        setPendingManualFolderDropPlan(nextManualFolderDropPlan);
+
         if (nextManualFolderDropPlan.movedAcrossParents) {
           await moveFolder(folderPath, nextManualFolderDropPlan.targetParentPath);
           await setFolderManualOrder(
@@ -139,6 +143,7 @@ export function WorkspaceNavigation({
             }),
           );
         }
+        setPendingManualFolderDropPlan(null);
         return;
       }
 
@@ -168,12 +173,14 @@ export function WorkspaceNavigation({
       }
     } catch (error) {
       console.error("Failed to move item:", error);
+      setPendingManualFolderDropPlan(null);
     }
   }, [
     clearDragState,
     manualFolderDropPlan,
     moveFolder,
     moveNote,
+    setPendingManualFolderDropPlan,
     setFolderManualOrder,
   ]);
 
@@ -201,6 +208,7 @@ export function WorkspaceNavigation({
             onOpenSettings={onOpenSettings}
             dragDelta={dragDelta}
             onManualFolderDropPlanChange={setManualFolderDropPlan}
+            pendingManualFolderDropPlan={pendingManualFolderDropPlan}
           />
         </div>
 
@@ -216,19 +224,24 @@ export function WorkspaceNavigation({
         </div>
       </div>
 
-      <DragOverlay>
+      <DragOverlay
+        dropAnimation={null}
+        style={{ width: "max-content", height: "max-content" }}
+      >
         {dragLabel && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-bg border border-border rounded-md shadow-lg text-sm text-text">
-            {dragType === "folder" ? (
-              <FolderGlyph
-                iconName={getFolderIconName(folderIcons, dragFolderPath)}
-                className="w-3.5 h-3.5 text-text/70 shrink-0"
-                strokeWidth={1.75}
-              />
-            ) : (
-              <NoteIcon className="w-3.5 h-3.5 stroke-[1.6] opacity-50 shrink-0" />
-            )}
-            {dragLabel}
+          <div className="flex items-center gap-2 rounded-md border border-border/80 bg-bg-secondary/95 px-2.5 py-1.5 text-sm leading-none text-text shadow-lg backdrop-blur-sm">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-visible text-text/70">
+              {dragType === "folder" ? (
+                <FolderGlyph
+                  iconName={getFolderIconName(folderIcons, dragFolderPath)}
+                  className="w-4.25 h-4.25 shrink-0"
+                  strokeWidth={1.75}
+                />
+              ) : (
+                <NoteIcon className="w-4 h-4 stroke-[1.6] opacity-50 shrink-0" />
+              )}
+            </span>
+            <span className="block truncate">{dragLabel}</span>
           </div>
         )}
       </DragOverlay>
