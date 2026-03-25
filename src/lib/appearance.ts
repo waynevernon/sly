@@ -39,6 +39,8 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   editorWidth: "normal",
   interfaceZoom: 1,
   paneMode: 3,
+  foldersPaneWidth: 240,
+  notesPaneWidth: 304,
 };
 
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {

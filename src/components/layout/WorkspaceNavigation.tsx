@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -11,6 +11,7 @@ import {
 } from "@dnd-kit/core";
 import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
+import { useTheme } from "../../context/ThemeContext";
 import type { FolderDropOrderPlan } from "../../lib/folderTree";
 import { cn } from "../../lib/utils";
 import { NoteIcon } from "../icons";
@@ -29,6 +30,68 @@ export function WorkspaceNavigation({
   onOpenSettings,
 }: WorkspaceNavigationProps) {
   const { moveFolder, moveNote, folderIcons, setFolderManualOrder } = useNotes();
+  const { foldersPaneWidth, notesPaneWidth, setPaneWidths } = useTheme();
+
+  const [liveWidths, setLiveWidths] = useState({
+    folders: foldersPaneWidth,
+    notes: notesPaneWidth,
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeDragRef = useRef<{
+    target: "folders" | "notes";
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  // Sync live widths from persisted settings when not dragging
+  useEffect(() => {
+    if (!isResizing) {
+      setLiveWidths({ folders: foldersPaneWidth, notes: notesPaneWidth });
+    }
+  }, [foldersPaneWidth, notesPaneWidth, isResizing]);
+
+  const startResize = useCallback(
+    (e: React.MouseEvent, target: "folders" | "notes") => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startWidth = target === "folders" ? liveWidths.folders : liveWidths.notes;
+      resizeDragRef.current = { target, startX: e.clientX, startWidth };
+      setIsResizing(true);
+
+      const onMouseMove = (ev: MouseEvent) => {
+        const ref = resizeDragRef.current;
+        if (!ref) return;
+        const delta = ev.clientX - ref.startX;
+        const raw = ref.startWidth + delta;
+        if (ref.target === "folders") {
+          const clamped = Math.min(Math.max(raw, 140), 480);
+          setLiveWidths((prev) => ({ ...prev, folders: clamped }));
+        } else {
+          const clamped = Math.min(Math.max(raw, 180), 560);
+          setLiveWidths((prev) => ({ ...prev, notes: clamped }));
+        }
+      };
+
+      const onMouseUp = () => {
+        const ref = resizeDragRef.current;
+        resizeDragRef.current = null;
+        setIsResizing(false);
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        if (ref) {
+          setLiveWidths((prev) => {
+            setPaneWidths(prev.folders, prev.notes);
+            return prev;
+          });
+        }
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    },
+    [liveWidths, setPaneWidths],
+  );
+
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [dragType, setDragType] = useState<"folder" | "note" | null>(null);
   const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
@@ -195,14 +258,16 @@ export function WorkspaceNavigation({
       onDragEnd={handleDragEnd}
       onDragCancel={clearDragState}
     >
-      <div className="h-full flex shrink-0">
+      <div className={cn("h-full flex shrink-0", isResizing && "select-none")}>
         <div
           className={cn(
-            "h-full shrink-0 overflow-hidden transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "h-full shrink-0 overflow-hidden",
+            !isResizing && "transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
             foldersVisible
-              ? "w-[15rem] opacity-100 translate-x-0"
+              ? "opacity-100 translate-x-0"
               : "w-0 opacity-0 -translate-x-3 pointer-events-none",
           )}
+          style={foldersVisible ? { width: liveWidths.folders } : undefined}
         >
           <FoldersPane
             onOpenSettings={onOpenSettings}
@@ -212,16 +277,36 @@ export function WorkspaceNavigation({
           />
         </div>
 
+        {foldersVisible && notesVisible && (
+          <div
+            className="relative w-1 shrink-0 cursor-col-resize group z-10"
+            onMouseDown={(e) => startResize(e, "folders")}
+          >
+            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
+          </div>
+        )}
+
         <div
           className={cn(
-            "h-full shrink-0 overflow-hidden transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "h-full shrink-0 overflow-hidden",
+            !isResizing && "transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
             notesVisible
-              ? "w-[19rem] opacity-100 translate-x-0"
+              ? "opacity-100 translate-x-0"
               : "w-0 opacity-0 -translate-x-3 pointer-events-none",
           )}
+          style={notesVisible ? { width: liveWidths.notes } : undefined}
         >
           <NotesPane />
         </div>
+
+        {notesVisible && (
+          <div
+            className="relative w-1 shrink-0 cursor-col-resize group z-10"
+            onMouseDown={(e) => startResize(e, "notes")}
+          >
+            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
+          </div>
+        )}
       </div>
 
       <DragOverlay

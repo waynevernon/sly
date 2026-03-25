@@ -74,6 +74,9 @@ interface ThemeContextType {
   customEditorWidthPx: number;
   setCustomEditorWidthPx: (px: number) => void;
   setEditorMaxWidthLive: (value: string) => void;
+  foldersPaneWidth: number;
+  notesPaneWidth: number;
+  setPaneWidths: (folders: number, notes: number) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -166,6 +169,14 @@ function normalizeAppearanceSettings(
     paneMode: isPaneMode(next.paneMode)
       ? next.paneMode
       : defaultAppearance.paneMode,
+    foldersPaneWidth:
+      typeof next.foldersPaneWidth === "number" && next.foldersPaneWidth >= 140
+        ? next.foldersPaneWidth
+        : defaultAppearance.foldersPaneWidth,
+    notesPaneWidth:
+      typeof next.notesPaneWidth === "number" && next.notesPaneWidth >= 180
+        ? next.notesPaneWidth
+        : defaultAppearance.notesPaneWidth,
     customLightColors: next.customLightColors,
     customDarkColors: next.customDarkColors,
   };
@@ -428,6 +439,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     document.documentElement.style.setProperty("--editor-max-width", value);
   }, []);
 
+  const setPaneWidths = useCallback(
+    (folders: number, notes: number) => {
+      updateAppearance((prev) => ({
+        ...prev,
+        foldersPaneWidth: Math.min(Math.max(Math.round(folders), 140), 480),
+        notesPaneWidth: Math.min(Math.max(Math.round(notes), 180), 560),
+      }));
+    },
+    [updateAppearance],
+  );
+
   if (!isInitialized) {
     return null;
   }
@@ -466,6 +488,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           appearanceSettings.customEditorWidthPx ?? DEFAULT_CUSTOM_WIDTH_PX,
         setCustomEditorWidthPx,
         setEditorMaxWidthLive,
+        foldersPaneWidth:
+          appearanceSettings.foldersPaneWidth ?? 240,
+        notesPaneWidth:
+          appearanceSettings.notesPaneWidth ?? 304,
+        setPaneWidths,
       }}
     >
       {children}
