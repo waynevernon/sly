@@ -1,12 +1,12 @@
-# Scratch UI Design Language
+# Sly UI Design Language
 
-This is the canonical reference for UI decisions in Scratch.
+This is the canonical reference for UI decisions in Sly.
 
-Use this file when adding or changing any user-facing interface. Keep [ui-audit-2026-03-24.md](/Users/wayne/Source/scratch/docs/ui-audit-2026-03-24.md) as the rationale and backlog snapshot; keep this file as the living source of truth.
+Use this file when adding or changing any user-facing interface. Keep this file as the living source of truth for durable UI guidance.
 
 ## Visual Thesis
 
-Scratch should feel calm, editor-first, dense without clutter, and native rather than ornamental.
+Sly should feel calm, editor-first, dense without clutter, and native rather than ornamental.
 
 The interface should read as:
 
@@ -43,6 +43,14 @@ The interface should read as:
 | `--ui-radius-md` | `8px` | buttons, inputs, menus, popovers |
 | `--ui-radius-lg` | `12px` | dialogs, large floating panels |
 
+Do not introduce ad hoc radii such as `10px` or `18px` unless a surface has a singular, documented reason to break the system.
+
+### Borders and Separators
+
+- Use one quiet `1px` border model for controls and transient surfaces.
+- Use solid separators by default.
+- Use dashed separators only for secondary subsections or warning-state internals, not as a general layout motif.
+
 ### Elevation
 
 | Token | Use |
@@ -74,6 +82,31 @@ Permanent layout regions should not use decorative shadows.
 | `--ui-pane-padding-end` | `12px` | right pane/header inset |
 | `--ui-action-gap` | `2px` | action clusters |
 
+Use a `4px` spacing grid for layout rhythm. Shared pane headers should align to one row model:
+
+- header content row: `36px` to `40px`
+- title/action gap: `6px`
+- action cluster gap: `2px`
+
+### Typography
+
+- app and pane titles: `16px`, medium
+- settings section titles: `20px`, medium
+- primary body copy: `14px`
+- supporting copy: `12px` to `13px`
+- utility counters, pills, and keycaps: `11px` to `12px`
+
+Large `17px` inputs are reserved for command-style surfaces such as the command palette or AI prompt, not routine settings or small inline tools.
+
+### Icons
+
+- standard action icon size: `17px` to `19px`
+- compact inline icon size: `14px` to `16px`
+- default stroke weight: `1.5` to `1.6`
+- use heavier strokes only for very small glyphs
+
+Icons should sharpen affordance and scanning, not decorate space.
+
 ## Hierarchy
 
 Use this visual order consistently:
@@ -86,6 +119,8 @@ Use this visual order consistently:
 
 Settings should belong to the same product language as the workspace shell, not a separate one.
 
+Permanent layout should stay flat and restrained. Elevated surfaces are for transient, interruptive, or selection-driven UI.
+
 ## Component Rules
 
 ### Buttons and Inputs
@@ -96,6 +131,7 @@ Settings should belong to the same product language as the workspace shell, not 
 - Standard inputs and routine buttons are `32px`.
 - Primary CTAs are `40px`.
 - Use a shared destructive tone instead of ad hoc red text styling.
+- Composite widgets may use roving tabindex, but isolated buttons and icon buttons should not be removed from the tab order.
 
 ### Badges and Counts
 
@@ -121,6 +157,15 @@ Settings should belong to the same product language as the workspace shell, not 
 - Dialogs and command surfaces share one container language.
 - They should share backdrop behavior, elevation, corner radius, and content padding.
 - Use the folder icon picker as the quality bar for structured transient UI.
+- Dialog shells should share `Escape` behavior, outside-click behavior, focus trapping, and a consistent title/input/body/footer structure.
+
+### Overlay Families
+
+All transient surfaces should derive from one of three shells:
+
+- menu shell: menus, context menus, dropdowns
+- popover shell: search toolbar, inline editors, suggestion lists
+- dialog shell: command palette, AI modal, picker flows, destructive confirmation
 
 ### Settings
 
@@ -142,6 +187,15 @@ Settings should belong to the same product language as the workspace shell, not 
 - `success`: quiet confirmation
 - `warning`: tinted container with a clear next step
 - `destructive`: tinted emphasis, not plain red text alone
+
+Use the same state grammar across editor save state, Git state, AI state, settings errors, and toasts.
+
+## Empty, Loading, Error, and Success States
+
+- `empty`: one visual, one headline, one supporting sentence, one action
+- `loading`: inline when possible; block only for app initialization or destructive waits
+- `error`: tinted container with an explicit next step
+- `success`: quiet confirmation, not celebratory UI
 
 ## Motion Rules
 

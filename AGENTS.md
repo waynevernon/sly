@@ -1,8 +1,8 @@
-# Scratch - Development Guide
+# Sly - Development Guide
 
 ## Project Overview
 
-Scratch is a cross-platform markdown note-taking app for macOS, Windows, and Linux, built with Tauri v2 (Rust backend) + React/TypeScript/Tailwind (frontend) + TipTap (WYSIWYG editor) + Tantivy (full-text search).
+Sly is a cross-platform markdown note-taking app for macOS, Windows, and Linux. It is built with Tauri v2 (Rust backend) and React/TypeScript/Tailwind on the frontend, with TipTap for editing and Tantivy for search.
 
 ## Tech Stack
 
@@ -10,7 +10,7 @@ Scratch is a cross-platform markdown note-taking app for macOS, Windows, and Lin
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4
 - **Editor**: TipTap with markdown support
 - **Search**: Tantivy full-text search engine
-- **File watching**: notify crate with custom debouncing
+- **File watching**: `notify` with custom debouncing
 
 ## Commands
 
@@ -25,218 +25,154 @@ npm run tauri build  # Build production app
 
 ### CI (`ci.yml`)
 
-Runs on every push to `main` and on PRs. Validates frontend build (`tsc` + Vite) and Rust compilation (`cargo check` + `cargo clippy`) on an Ubuntu runner. Does not build the Tauri app bundle.
+Runs on pushes and pull requests to `main`. Validates the frontend build (`tsc` + Vite) plus Rust compilation (`cargo check` + `cargo clippy`) on Ubuntu. It does not produce release bundles.
 
 ### Release (`release.yml`)
 
-Runs on `v*` tag push or manual `workflow_dispatch`. Builds, signs, and publishes for all platforms in parallel:
+Runs on `v*` tag push or manual `workflow_dispatch`. Builds in parallel for:
 
-- **macOS**: Universal binary (arm64 + x86_64), code-signed and notarized
-- **Windows**: NSIS installer (x64)
-- **Linux**: AppImage and .deb
+- **macOS**: Universal binary (`arm64` + `x86_64`), code-signed and notarized
+- **Windows**: NSIS installer (`x64`)
+- **Linux**: AppImage and `.deb`
 
-Creates a **draft** GitHub release with all artifacts and `latest.json` for the auto-updater.
+Creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
 
 ### Releasing a New Version
 
-1. Bump version in `package.json` and `src-tauri/tauri.conf.json`
+1. Bump version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
 2. Commit the version bump to `main`
 3. Tag and push:
    ```bash
-   git tag v0.5.0 && git push origin v0.5.0
+   git tag v0.1.0 && git push origin v0.1.0
    ```
-4. The release workflow builds all platforms (~20-30 min)
-5. Review the draft release on GitHub, edit release notes
-6. Publish the release — the auto-updater endpoint immediately serves the new `latest.json`
+4. Wait for the release workflow to finish
+5. Review the draft release on GitHub
+6. Publish it so the updater can serve the new `latest.json`
 
 ### GitHub Secrets Required
 
-These must be configured in the repo settings (Settings > Secrets and variables > Actions):
+These must be configured in the repo settings under `Settings > Secrets and variables > Actions`:
 
 | Secret | Purpose |
 |--------|---------|
-| `APPLE_CERTIFICATE` | Base64-encoded .p12 export of Developer ID certificate |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the .p12 file |
-| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Name (TEAMID)` |
+| `APPLE_CERTIFICATE` | Base64-encoded `.p12` export of the Developer ID certificate |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` export |
+| `APPLE_SIGNING_IDENTITY` | Example: `Developer ID Application: Name (TEAMID)` |
 | `APPLE_ID` | Apple Developer account email |
 | `APPLE_PASSWORD` | App-specific password for notarization |
 | `APPLE_TEAM_ID` | Apple Developer Team ID |
-| `TAURI_SIGNING_PRIVATE_KEY` | Contents of Tauri updater signing key |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for Tauri signing key |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of the Tauri updater private key |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the updater key, if one exists |
 
 ### Auto-Updater
 
-The app checks for updates via the Tauri updater plugin, which fetches `latest.json` from GitHub releases:
-- Endpoint: `https://github.com/erictli/scratch/releases/latest/download/latest.json`
-- On startup (after 3s delay) and manually via Settings > About > "Check for Updates"
-- If a newer version is found, a toast appears with an "Update Now" button
-- Config is in `src-tauri/tauri.conf.json` under `plugins.updater`
+The app checks for updates through the Tauri updater plugin:
 
-### Local Build (Manual)
+- Endpoint: `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
+- Check timing: on startup (after a short delay) and manually from Settings > About
+- UX: if a newer version is found, the app shows an "Update Now" toast
+- Config location: `src-tauri/tauri.conf.json` under `plugins.updater`
 
-For local testing without CI, you can still build manually:
+### Local Build
+
+For local testing without CI:
 
 ```bash
 # macOS universal binary (requires signing env vars from .env.build)
 source .env.build
 npm run tauri build -- --target universal-apple-darwin
 
-# Windows (on a Windows machine)
+# Default local build for current platform
 npm run tauri build
 ```
 
 ## Project Structure
 
-```
-scratch/
-├── .github/workflows/
-│   ├── ci.yml                      # CI: build validation on push/PR
-│   └── release.yml                 # Release: multi-platform build + publish
-├── src/                            # React frontend
+```text
+sly/
+├── .github/workflows/             # CI and release automation
+├── src/                           # React frontend
 │   ├── components/
-│   │   ├── editor/                 # TipTap editor + extensions
-│   │   │   ├── Editor.tsx          # Main editor with auto-save, copy-as, format bar, source mode
-│   │   │   ├── LinkEditor.tsx      # Inline link add/edit/remove popup
-│   │   │   ├── CodeBlockView.tsx    # Code block NodeView with language selector & mermaid toggle
-│   │   │   ├── MermaidRenderer.tsx  # Mermaid diagram SVG rendering (beautiful-mermaid)
-│   │   │   ├── lowlight.ts         # Lowlight instance with 20 registered languages
-│   │   │   ├── SlashCommand.tsx    # Slash command extension for TipTap
-│   │   │   └── SlashCommandList.tsx # Slash command popup menu UI
-│   │   ├── layout/                 # Sidebar, main layout
-│   │   │   ├── Sidebar.tsx         # Note list, search, git status, DnD context
-│   │   │   └── FolderPicker.tsx    # Initial folder selection dialog
-│   │   ├── notes/
-│   │   │   ├── NoteList.tsx        # Scrollable note list with context menu
-│   │   │   ├── FolderTreeView.tsx  # Collapsible folder tree with drag-and-drop
-│   │   │   └── FolderNameDialog.tsx # Dialog for creating/renaming folders
-│   │   ├── command-palette/
-│   │   │   └── CommandPalette.tsx  # Cmd+P for notes & commands
-│   │   ├── settings/               # Settings page
-│   │   │   ├── SettingsPage.tsx    # Tabbed settings interface
-│   │   │   ├── GeneralSettingsSection.tsx       # Notes folder picker
-│   │   │   ├── AppearanceSettingsSection.tsx    # Theme & typography
-│   │   │   ├── ShortcutsSettingsSection.tsx     # Keyboard shortcuts reference
-│   │   │   └── AboutSettingsSection.tsx         # App version, updates, and links
-│   │   ├── ai/                     # AI editing components
-│   │   │   ├── AiEditModal.tsx     # AI prompt input modal
-│   │   │   └── AiResponseToast.tsx # AI response display with undo
-│   │   ├── git/
-│   │   │   └── GitStatus.tsx       # Floating git status with commit UI
-│   │   ├── ui/                     # Shared UI components
-│   │   │   ├── Button.tsx          # Button variants (default, ghost, outline, etc.)
-│   │   │   ├── Input.tsx           # Form input
-│   │   │   ├── Tooltip.tsx         # Radix UI tooltip wrapper
-│   │   │   └── index.tsx           # ListItem, CommandItem, ToolbarButton exports
-│   │   └── icons/                  # SVG icon components (30+ icons)
-│   │       └── index.tsx
-│   ├── context/                    # React context providers
-│   │   ├── NotesContext.tsx        # Note CRUD, search, file watching
-│   │   ├── GitContext.tsx          # Git operations wrapper
-│   │   └── ThemeContext.tsx        # Theme mode & typography settings
-│   ├── lib/                        # Utility functions
-│   │   ├── utils.ts                # cn() for className merging
-│   │   └── folderTree.ts           # Build folder tree from flat note list
-│   ├── services/                   # Tauri command wrappers
-│   │   ├── notes.ts                # Note management commands
-│   │   ├── git.ts                  # Git commands
-│   │   └── ai.ts                   # AI CLI command wrappers (Codex/Codex/OpenCode/Ollama)
-│   ├── types/
-│   │   └── note.ts                 # TypeScript types
-│   ├── App.tsx                     # Main app component
-│   └── main.tsx                    # React root & providers
-├── src-tauri/                      # Rust backend
+│   │   ├── editor/                # TipTap editor, toolbars, popovers, syntax helpers
+│   │   ├── layout/                # Multi-pane workspace shell and pane components
+│   │   ├── notes/                 # Note list and folder tree UI
+│   │   ├── folders/               # Folder icons and icon picker
+│   │   ├── settings/              # Settings screens
+│   │   ├── ai/                    # AI edit modal and response toast
+│   │   ├── preview/               # Single-file preview mode
+│   │   ├── ui/                    # Shared UI primitives
+│   │   └── icons/                 # Shared icon components
+│   ├── context/                   # React context providers
+│   ├── lib/                       # Appearance, emoji, folder tree, and utility helpers
+│   ├── services/                  # Tauri command wrappers
+│   ├── types/                     # Shared TypeScript types
+│   ├── App.tsx                    # Main app component
+│   └── main.tsx                   # React entrypoint
+├── src-tauri/                     # Rust backend
 │   ├── src/
-│   │   ├── lib.rs                  # Tauri commands, state, file watcher, search
-│   │   └── git.rs                  # Git CLI wrapper (8 commands)
-│   ├── capabilities/default.json   # Tauri permissions config
-│   └── Cargo.toml                  # Rust dependencies
-└── package.json                    # Node dependencies & scripts
+│   │   ├── lib.rs                 # Tauri commands, state, file watcher, search
+│   │   └── git.rs                 # Git CLI wrapper
+│   ├── capabilities/default.json  # Tauri permissions config
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── docs/                          # Design and supporting documentation
+└── package.json
 ```
 
 ## Key Patterns
 
 ### Tauri Commands
 
-All backend operations go through Tauri commands defined in `src-tauri/src/lib.rs`. Frontend calls them via `invoke()` from `@tauri-apps/api/core`.
+All backend operations go through Tauri commands in `src-tauri/src/lib.rs`. Frontend code calls them via `invoke()` from `@tauri-apps/api/core`.
 
 ### State Management
 
-- `NotesContext` manages all note state, CRUD operations, search, and folder operations
-- `ThemeContext` handles light/dark/system theme, editor typography, text direction, and page width settings
+- `NotesContext` manages note state, CRUD, search, file watching, and folder operations
+- `GitContext` manages Git availability, status, commit, and sync flows
+- `ThemeContext` manages theme mode, theme presets, fonts, typography, text direction, editor width, interface zoom, and pane mode
 
-### Settings
+### Settings Storage
 
-- **App config** (notes folder path): `{APP_DATA}/config.json`
-- **Per-folder settings**: `{NOTES_FOLDER}/.scratch/settings.json`
+- **App config**: `{APP_DATA}/config.json`
+- **Per-folder settings**: `{NOTES_FOLDER}/.sly/settings.json`
 
-The settings page provides UI for:
+The settings UI currently covers:
 
-- Theme mode (light/dark/system)
-- Editor typography (font family, size, line height, bold weight)
-- Text direction (LTR/RTL)
-- Page width (narrow/normal/wide/full)
-- Folder view (opt-in tree view with drag-and-drop)
-- Git integration (optional)
+- Theme mode and theme presets
+- Separate UI / note / code font controls
+- Typography tuning
+- Text direction
+- Editor width
+- Pane mode (`1 / 2 / 3`)
+- Folder icons
+- Note and folder sorting
+- Git integration
 - Keyboard shortcuts reference
-- App version, updates, and project links
+- App version and update checks
 
-Power users can edit the settings JSON directly to customize colors.
+### Editor Features
 
-### Editor
+- Auto-save with debounce
+- Markdown source mode
+- Focus mode
+- Wikilinks
+- Slash commands
+- Mermaid rendering
+- KaTeX math
+- Table editing
+- Syntax-highlighted code blocks
+- Inline link editing
+- Search in note
+- Image insertion
+- Slack-style emoji shortcode insertion
+- AI editing via Claude, Codex, OpenCode, and Ollama CLIs
 
-TipTap editor with extensions and features:
+### Workspace Architecture
 
-**Extensions:**
-- StarterKit (basic formatting)
-- Markdown (bidirectional conversion)
-- Link, Image, TaskList, TaskItem, Table
-- CodeBlockLowlight (syntax highlighting via highlight.js/lowlight, 20 languages)
-- Mermaid diagram rendering (via beautiful-mermaid, sync SVG with CSS variable theming)
-
-**Key Features:**
-- Auto-save with 300ms debounce
-- Copy & Export menu (Markdown/Plain Text/HTML/PDF) via `Cmd+Shift+C`
-- Inline link editor popup (`Cmd+K`) for add/edit/remove
-- Format bar with 13 tools (bold, italic, headings, lists, code, etc.)
-- Slash commands (`/`) for quick block insertion (headings, lists, code, mermaid, etc.)
-- Syntax highlighting for code blocks (20 languages, GitHub color scheme via CSS variables)
-- Mermaid diagram rendering with Edit/Preview toggle (beautiful-mermaid, sync SVG)
-- Code block language selector dropdown
-- Markdown source mode (`Cmd+Shift+M`) to view/edit raw markdown
-- Focus mode (`Cmd+Shift+Enter`) for distraction-free writing with animated transitions
-- RTL text direction support (configurable in settings)
-- Configurable page width (narrow/normal/wide/full)
-- Table editing with right-click context menu (insert/delete rows/columns, merge/split cells)
-- Markdown paste detection and parsing
-- Image insertion from disk
-- External file change detection with auto-reload
-- Find in note (`Cmd+F`) with highlighting
-- "Last saved" status indicator
-- Unsaved changes spinner
-- AI editing with Codex, Codex, OpenCode, and Ollama CLI integration
-
-### Component Architecture
-
-**Context Providers:**
-- `NotesContext` - Dual context pattern (data/actions separated for performance)
-  - Data: notes, selectedNoteId, currentNote, searchResults, etc.
-  - Actions: selectNote, createNote, saveNote, deleteNote, search, moveNote, moveFolder, etc.
-  - Race condition protection during note switches
-  - Recently saved note tracking to ignore own file watcher events
-- `GitContext` - Git operations with loading states and error handling
-  - Auto-refresh status on file changes (1000ms debounce)
-- `ThemeContext` - Theme mode, typography, text direction, and page width with CSS variable application
-
-**Key Components:**
-- `Editor` - Main editor with all editing features
-- `LinkEditor` - Inline popup for link management
-- `CommandPalette` - Cmd+P for quick actions and note search
-- `GitStatus` - Floating commit UI in sidebar
-- `NoteList` - Scrollable list with Radix context menu and smart date formatting
-- `FolderTreeView` - Collapsible folder tree with @dnd-kit drag-and-drop
-- `SettingsPage` - Tabbed settings (General, Appearance, Shortcuts, About)
-- `AiEditModal` - AI prompt input for Codex/Codex/OpenCode/Ollama CLI integration
-- `AiResponseToast` - AI response display with markdown parsing and undo button
+- `WorkspaceNavigation` is the main shell for the multi-pane layout
+- `FoldersPane` owns folder navigation, folder tree, and footer actions
+- `NotesPane` owns note search, sorting, and note list interactions
+- `Editor` remains the primary working plane
 
 ### Command Reference
 
@@ -244,101 +180,65 @@ TipTap editor with extensions and features:
 
 **Folder Management:** `list_folders`, `create_folder`, `delete_folder`, `rename_folder`, `move_folder`
 
-**Configuration:** `get_notes_folder`, `set_notes_folder`, `get_settings`, `update_settings`
+**Configuration:** `get_notes_folder`, `set_notes_folder`, `get_settings`, `update_settings`, `get_appearance_settings`, `update_appearance_settings`
 
-**Search:** `search_notes`, `rebuild_search_index` (Tantivy full-text with prefix fallback)
+**Search:** `search_notes`, `rebuild_search_index`
 
-**File Watching:** `start_file_watcher` (notify crate with 500ms debounce per file)
+**File Watching:** `start_file_watcher`
 
 **Git:** `git_is_available`, `git_get_status`, `git_init_repo`, `git_commit`, `git_push`, `git_add_remote`, `git_push_with_upstream`
 
-**AI:** `ai_check_claude_cli`, `ai_execute_claude`, `ai_check_codex_cli`, `ai_execute_codex`, `ai_check_opencode_cli`, `ai_execute_opencode`, `ai_check_ollama_cli`, `ai_execute_ollama` (shell execution with Codex, Codex, OpenCode, or Ollama CLI)
+**AI:** `ai_check_claude_cli`, `ai_execute_claude`, `ai_check_codex_cli`, `ai_execute_codex`, `ai_check_opencode_cli`, `ai_execute_opencode`, `ai_check_ollama_cli`, `ai_execute_ollama`
 
 **Utilities:** `copy_to_clipboard`, `copy_image_to_assets`, `save_clipboard_image`
 
-**UI Helpers:** `open_folder_dialog`, `open_in_file_manager`, `open_url_safe` (URL scheme validated)
-
-### Search Implementation
-
-The app uses **Tantivy** (Rust full-text search engine) with:
-- Schema: id (string), title (text), content (text), modified (i64)
-- Full-text search with prefix query fallback (query*)
-- Returns top 20 results with scoring
-- Fallback to cache-based search (title/preview matching) if Tantivy fails
-
-### File Watching
-
-Uses `notify` crate with custom debouncing:
-- 500ms debounce per file to batch rapid changes
-- Emits "file-change" events to frontend
-- Frontend filters events for currently edited note to prevent conflicts
-- Debounce map cleanup (5 second retention)
-
-### Permissions
-
-Tauri v2 uses capability-based permissions. Add new permissions to `src-tauri/capabilities/default.json`. Core permissions use `core:` prefix (e.g., `core:menu:default`).
-
-Current capabilities include:
-- File system read/write for notes folder
-- Dialog (folder picker)
-- Clipboard
-- Shell (for git commands)
-- Window management
+**UI Helpers:** `open_folder_dialog`, `open_in_file_manager`, `open_url_safe`, `open_file_preview`
 
 ## Keyboard Shortcuts
 
 - `Cmd+N` - New note
 - `Cmd+P` - Command palette
-- `Cmd+K` - Add/edit link (when in editor)
+- `Cmd+K` - Add/edit link
 - `Cmd+F` - Find in current note
 - `Cmd+Shift+C` - Open Copy & Export menu
 - `Cmd+Shift+M` - Toggle Markdown source mode
 - `Cmd+Shift+Enter` - Toggle Focus mode
 - `Cmd+Shift+F` - Search notes
-- `Cmd+R` - Reload current note (pull external changes)
+- `Cmd+R` - Reload current note
 - `Cmd+,` - Open settings
-- `Cmd+1/2/3/4` - Switch settings tabs (General/Appearance/Shortcuts/About)
+- `Cmd+1/2/3/4` - Switch settings tabs
 - `Cmd+\` - Toggle sidebar
 - `Cmd+B/I` - Bold/Italic
 - `Cmd+=` - Zoom in
 - `Cmd+-` - Zoom out
 - `Cmd+0` - Reset zoom
-- Arrow keys - Navigate note list (when focused)
 
-**Note:** On Windows and Linux, use `Ctrl` instead of `Cmd` for all shortcuts. Full reference available in Settings → Shortcuts tab.
-
-## Notes Storage
-
-Notes are stored as markdown files in a user-selected folder. Filenames are derived from the note title (sanitized for filesystem safety). The first `# Heading` in the content becomes the note title displayed in the sidebar.
-
-### File Watching
-
-The app watches the notes folder for external changes (e.g., from AI agents or other editors). When a file changes externally, the sidebar updates automatically and the editor reloads the content if the current note was modified.
+On Windows and Linux, use `Ctrl` instead of `Cmd`.
 
 ## Development Philosophy
 
 ### Code Quality
-- Clean, minimal codebase with low technical debt
-- Proper React patterns (contexts, hooks, memoization)
-- Type-safe with TypeScript throughout
-- No commented-out code or TODOs in production code
 
-### Performance Optimizations
-- Auto-save debouncing (300ms)
-- Search debouncing (150ms in sidebar)
-- File watcher debouncing (500ms per file)
-- Git status refresh debouncing (1000ms)
-- React.memo for expensive components (NoteList items)
-- useCallback/useMemo for performance-critical paths
+- Keep the codebase clean and direct
+- Prefer shared primitives and shared patterns over local one-offs
+- Maintain type safety throughout the frontend and backend
+- Avoid commented-out code and TODO-driven dead branches in production code
 
-### User Experience
-- Native macOS feel with drag region
-- Keyboard-first navigation
-- Smart date formatting (Today, Yesterday, X days ago)
-- Inline editing (links, commits)
-- Non-blocking operations (async everything)
-- Error handling with user-friendly messages
+### Performance
 
-### UI Design Reference
+- Auto-save is debounced
+- Search is debounced
+- File watcher events are debounced
+- Git status refresh is debounced
+- Expensive list rendering should stay memoized where it matters
 
-Before changing user-facing UI, consult `docs/ui-design-language.md`. Treat it as the canonical design-language reference and `docs/ui-audit-2026-03-24.md` as the supporting rationale/backlog snapshot. Do not duplicate UI rules here unless they are truly repo-wide engineering constraints rather than design-language guidance.
+### UX
+
+- Preserve the editor-first layout
+- Keep interaction keyboard-friendly
+- Favor calm hierarchy over decorative chrome
+- Keep async work non-blocking and surface errors clearly
+
+## UI Design Reference
+
+Before changing user-facing UI, consult `docs/ui-design-language.md`. Treat it as the canonical design-language reference. Do not duplicate UI rules here unless they are repo-wide engineering constraints rather than design-language guidance.
