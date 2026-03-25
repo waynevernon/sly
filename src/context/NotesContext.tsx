@@ -73,6 +73,7 @@ interface NotesActionsContextValue {
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
   setFolderIcon: (path: string, iconName: string | null) => Promise<void>;
+  setCollapsedFolders: (paths: string[]) => Promise<void>;
   setNoteSortMode: (mode: NoteSortMode) => Promise<void>;
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
   setFolderManualOrder: (
@@ -120,10 +121,30 @@ function sanitizeFolderManualOrder(
   );
 }
 
+function sanitizeCollapsedFolders(
+  collapsedFolders: string[] | null | undefined,
+): string[] | undefined {
+  if (collapsedFolders === undefined || collapsedFolders === null) {
+    return undefined;
+  }
+
+  return Array.from(
+    new Set(
+      collapsedFolders.filter(
+        (path): path is string =>
+          typeof path === "string" && path.trim().length > 0,
+      ),
+    ),
+  );
+}
+
 function normalizeSettings(settings: Settings | null | undefined): Settings {
   const nextSettings = settings ? { ...settings } : {};
   nextSettings.noteSortMode ??= DEFAULT_NOTE_SORT_MODE;
   nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
+  nextSettings.collapsedFolders = sanitizeCollapsedFolders(
+    nextSettings.collapsedFolders,
+  );
   const folderManualOrder = sanitizeFolderManualOrder(
     nextSettings.folderManualOrder,
   );
@@ -256,6 +277,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await persistFolderManualOrder(parentPath, orderedPaths);
     },
     [persistFolderManualOrder],
+  );
+
+  const setCollapsedFolders = useCallback(
+    async (paths: string[]) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        collapsedFolders: sanitizeCollapsedFolders(paths),
+      }));
+    },
+    [persistSettings],
   );
 
   // Debounced refresh - coalesces rapid saves into a single refresh
@@ -1030,6 +1061,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNote: moveNoteAction,
       moveFolder: moveFolderAction,
       setFolderIcon,
+      setCollapsedFolders,
       setNoteSortMode,
       setFolderSortMode,
       setFolderManualOrder,
@@ -1057,6 +1089,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNoteAction,
       moveFolderAction,
       setFolderIcon,
+      setCollapsedFolders,
       setNoteSortMode,
       setFolderSortMode,
       setFolderManualOrder,

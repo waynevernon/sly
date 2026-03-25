@@ -53,7 +53,6 @@ import {
 } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 
-const STORAGE_KEY = "sly:collapsedFolders";
 const FolderIconPickerModal = lazy(() =>
   import("../folders/FolderIconPickerModal").then((module) => ({
     default: module.FolderIconPickerModal,
@@ -83,20 +82,13 @@ interface FolderTreeViewProps {
 const TREE_INDENT_WIDTH = 12;
 const DROP_LINE_BASE_OFFSET = 28;
 
-function loadCollapsedFolders(): Set<string> {
+function loadLegacyCollapsedFolders(): Set<string> | null {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? new Set(JSON.parse(saved)) : new Set();
+    const saved = localStorage.getItem("sly:collapsedFolders");
+    if (!saved) return null;
+    return new Set(JSON.parse(saved));
   } catch {
-    return new Set();
-  }
-}
-
-function saveCollapsedFolders(folders: Set<string>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...folders]));
-  } catch {
-    // Ignore localStorage failures.
+    return null;
   }
 }
 
@@ -545,6 +537,8 @@ export function FolderTreeView({
 }: FolderTreeViewProps) {
   const {
     notes,
+    notesFolder,
+    settings,
     folderIcons,
     folderSortMode,
     folderManualOrder,
@@ -556,11 +550,16 @@ export function FolderTreeView({
     renameFolder,
     moveFolder,
     setFolderIcon,
+    setCollapsedFolders: persistCollapsedFolders,
   } = useNotes();
 
-  const [collapsedFolders, setCollapsedFolders] =
-    useState<Set<string>>(loadCollapsedFolders);
+  const [collapsedFolders, setCollapsedFoldersState] = useState<Set<string>>(
+    new Set(),
+  );
   const [knownFolders, setKnownFolders] = useState<string[]>([]);
+  const [hasLoadedKnownFolders, setHasLoadedKnownFolders] = useState(false);
+  const [hasInitializedCollapseState, setHasInitializedCollapseState] =
+    useState(false);
   const [inlineEditState, setInlineEditState] =
     useState<InlineFolderEditState | null>(null);
   const [iconPickerTarget, setIconPickerTarget] =
@@ -568,6 +567,8 @@ export function FolderTreeView({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const treeRef = useRef<HTMLDivElement>(null);
+  const collapsedFoldersRef = useRef<Set<string>>(new Set());
+  collapsedFoldersRef.current = collapsedFolders;
 
   useEffect(() => {
     const preloadPicker = () => {
@@ -584,15 +585,24 @@ export function FolderTreeView({
   }, []);
 
   useEffect(() => {
+    if (!notesFolder) {
+      setKnownFolders([]);
+      setHasLoadedKnownFolders(true);
+      return;
+    }
+
+    setHasLoadedKnownFolders(false);
     notesService
       .listFolders()
-      .then(setKnownFolders)
-      .catch(() => setKnownFolders([]));
-  }, [notes]);
-
-  useEffect(() => {
-    saveCollapsedFolders(collapsedFolders);
-  }, [collapsedFolders]);
+      .then((folders) => {
+        setKnownFolders(folders);
+        setHasLoadedKnownFolders(true);
+      })
+      .catch(() => {
+        setKnownFolders([]);
+        setHasLoadedKnownFolders(true);
+      });
+  }, [notes, notesFolder]);
 
   const tree = useMemo(
     () =>
@@ -605,6 +615,58 @@ export function FolderTreeView({
       ),
     [folderManualOrder, folderSortMode, knownFolders, notes],
   );
+  const allFolderPaths = useMemo(() => {
+    const paths = new Set(knownFolders);
+
+    const visit = (folder: FolderNode) => {
+      paths.add(folder.path);
+      folder.children.forEach(visit);
+    };
+
+    tree.folders.forEach(visit);
+    return [...paths];
+  }, [knownFolders, tree]);
+
+  useEffect(() => {
+    setCollapsedFoldersState(new Set());
+    setHasInitializedCollapseState(false);
+  }, [notesFolder]);
+
+  useEffect(() => {
+    if (hasInitializedCollapseState || !hasLoadedKnownFolders) {
+      return;
+    }
+
+    if (settings.collapsedFolders !== undefined) {
+      setCollapsedFoldersState(new Set(settings.collapsedFolders));
+      setHasInitializedCollapseState(true);
+      return;
+    }
+
+    const legacyCollapsedFolders = loadLegacyCollapsedFolders();
+    const initialCollapsedFolders = legacyCollapsedFolders
+      ? allFolderPaths.filter((path) => legacyCollapsedFolders.has(path))
+      : allFolderPaths;
+
+    setCollapsedFoldersState(new Set(initialCollapsedFolders));
+    setHasInitializedCollapseState(true);
+    void persistCollapsedFolders(initialCollapsedFolders);
+  }, [
+    allFolderPaths,
+    hasInitializedCollapseState,
+    hasLoadedKnownFolders,
+    persistCollapsedFolders,
+    settings.collapsedFolders,
+  ]);
+
+  useEffect(() => {
+    if (!hasInitializedCollapseState || settings.collapsedFolders === undefined) {
+      return;
+    }
+
+    setCollapsedFoldersState(new Set(settings.collapsedFolders));
+  }, [hasInitializedCollapseState, settings.collapsedFolders]);
+
   const visibleCollapsedFolders = useMemo(() => {
     if (!pendingManualFolderDropPlan?.targetParentPath) {
       return collapsedFolders;
@@ -675,10 +737,19 @@ export function FolderTreeView({
     });
   }, []);
 
+  const commitCollapsedFolders = useCallback(
+    (updater: (prev: Set<string>) => Set<string>) => {
+      const next = updater(new Set(collapsedFoldersRef.current));
+      setCollapsedFoldersState(next);
+      void persistCollapsedFolders([...next]);
+    },
+    [persistCollapsedFolders],
+  );
+
   const expandFolder = useCallback((folderPath: string) => {
     if (!folderPath) return;
 
-    setCollapsedFolders((prev) => {
+    commitCollapsedFolders((prev) => {
       const next = new Set(prev);
       const parts = folderPath.split("/");
       for (let index = 1; index <= parts.length; index += 1) {
@@ -686,7 +757,7 @@ export function FolderTreeView({
       }
       return next;
     });
-  }, []);
+  }, [commitCollapsedFolders]);
 
   const startCreateFolder = useCallback((parentPath: string) => {
     if (parentPath) {
@@ -733,7 +804,7 @@ export function FolderTreeView({
   }, [expandFolder, selectedFolderPath]);
 
   const handleToggleCollapse = useCallback((path: string) => {
-    setCollapsedFolders((prev) => {
+    commitCollapsedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(path)) {
         next.delete(path);
@@ -742,7 +813,7 @@ export function FolderTreeView({
       }
       return next;
     });
-  }, []);
+  }, [commitCollapsedFolders]);
 
   const handleCancelInlineEdit = useCallback(() => {
     setInlineEditState(null);

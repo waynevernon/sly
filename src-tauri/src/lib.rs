@@ -284,6 +284,8 @@ pub struct Settings {
     pub ollama_model: Option<String>,
     #[serde(rename = "folderIcons")]
     pub folder_icons: Option<HashMap<String, String>>,
+    #[serde(rename = "collapsedFolders")]
+    pub collapsed_folders: Option<Vec<String>>,
     #[serde(rename = "noteSortMode", default)]
     pub note_sort_mode: NoteSortMode,
     #[serde(rename = "folderSortMode", default)]
@@ -957,6 +959,35 @@ fn rewrite_folder_icon_paths(
 fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, String>, path: &str) {
     let prefix = format!("{}/", path);
     folder_icons.retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
+}
+
+fn sanitize_collapsed_folder_paths(collapsed_folders: &mut Vec<String>) {
+    let mut seen = HashSet::new();
+    collapsed_folders.retain(|path| !path.trim().is_empty() && seen.insert(path.clone()));
+}
+
+fn remove_collapsed_folder_paths(collapsed_folders: &mut Vec<String>, path: &str) {
+    let prefix = format!("{}/", path);
+    collapsed_folders.retain(|folder_path| folder_path != path && !folder_path.starts_with(&prefix));
+    sanitize_collapsed_folder_paths(collapsed_folders);
+}
+
+fn rewrite_collapsed_folder_paths(
+    collapsed_folders: &mut Vec<String>,
+    old_path: &str,
+    new_path: &str,
+) {
+    let old_prefix = format!("{}/", old_path);
+
+    for folder_path in collapsed_folders.iter_mut() {
+        if *folder_path == old_path {
+            *folder_path = new_path.to_string();
+        } else if folder_path.starts_with(&old_prefix) {
+            *folder_path = format!("{}/{}", new_path, &folder_path[old_prefix.len()..]);
+        }
+    }
+
+    sanitize_collapsed_folder_paths(collapsed_folders);
 }
 
 fn get_parent_folder_path(path: &str) -> String {
@@ -1744,6 +1775,9 @@ async fn delete_folder(path: String, state: State<'_, AppState>) -> Result<(), S
                 settings.folder_manual_order = None;
             }
         }
+        if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
+            remove_collapsed_folder_paths(collapsed_folders, &path);
+        }
         let _ = save_settings(&folder, &settings);
     }
 
@@ -1834,6 +1868,9 @@ async fn rename_folder(
             if folder_manual_order.is_empty() {
                 settings.folder_manual_order = None;
             }
+        }
+        if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
+            rewrite_collapsed_folder_paths(collapsed_folders, &old_path, &new_path);
         }
         // Save settings
         let _ = save_settings(&folder, &settings);
@@ -2052,6 +2089,9 @@ async fn move_folder(
             if folder_manual_order.is_empty() {
                 settings.folder_manual_order = None;
             }
+        }
+        if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
+            rewrite_collapsed_folder_paths(collapsed_folders, &path, &new_path);
         }
         let _ = save_settings(&folder, &settings);
     }
@@ -4553,5 +4593,38 @@ mod tests {
             vec!["archive/old".to_string(), "archive/rust".to_string()]
         );
         assert!(!folder_manual_order.contains_key("docs"));
+    }
+
+    #[test]
+    fn collapsed_folder_paths_rewrite_nested_paths() {
+        let mut collapsed_folders = vec![
+            "docs".to_string(),
+            "docs/rust".to_string(),
+            "journal".to_string(),
+        ];
+
+        rewrite_collapsed_folder_paths(&mut collapsed_folders, "docs", "work");
+
+        assert_eq!(
+            collapsed_folders,
+            vec![
+                "work".to_string(),
+                "work/rust".to_string(),
+                "journal".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn collapsed_folder_paths_remove_deleted_paths_and_descendants() {
+        let mut collapsed_folders = vec![
+            "docs".to_string(),
+            "docs/rust".to_string(),
+            "journal".to_string(),
+        ];
+
+        remove_collapsed_folder_paths(&mut collapsed_folders, "docs");
+
+        assert_eq!(collapsed_folders, vec!["journal".to_string()]);
     }
 }

@@ -142,6 +142,7 @@ export interface Settings {
   defaultNoteName?: string;
   ollamaModel?: string;
   folderIcons?: Record<string, string>;
+  collapsedFolders?: string[];
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
   folderManualOrder?: FolderManualOrder;
