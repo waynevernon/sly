@@ -96,7 +96,6 @@ import {
   CopyIcon,
   DownloadIcon,
   ShareIcon,
-  PanelLeftIcon,
   RefreshCwIcon,
   PinIcon,
   SearchIcon,
@@ -115,16 +114,6 @@ function formatDateTime(timestamp: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function formatPaneModeLabel(mode: PaneMode): string {
-  if (mode === 1) return "1 Pane";
-  if (mode === 2) return "2 Panes";
-  return "3 Panes";
-}
-
-function getNextPaneMode(mode: PaneMode): PaneMode {
-  return mode === 3 ? 1 : ((mode + 1) as PaneMode);
 }
 
 function focusAndSelectTitle(editor: TiptapEditor): boolean {
@@ -445,7 +434,6 @@ export interface PreviewModeData {
 
 interface EditorProps {
   paneMode?: PaneMode;
-  onCyclePaneMode?: () => void;
   focusMode?: boolean;
   previewMode?: PreviewModeData;
   onEditorReady?: (editor: TiptapEditor | null) => void;
@@ -455,7 +443,6 @@ interface EditorProps {
 
 export function Editor({
   paneMode = 2,
-  onCyclePaneMode,
   focusMode,
   onEditorReady,
   previewMode,
@@ -1938,22 +1925,13 @@ export function Editor({
       <div
         className={cn(
           "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-between px-[var(--ui-pane-padding-end)]",
-          !navigationVisible && (isMac ? "pl-22" : "pl-4"),
+          !navigationVisible && "ui-titlebar-leading-offset",
         )}
         data-tauri-drag-region
       >
         <div
           className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode || isCollapsingToSinglePane ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
-          {onCyclePaneMode && (
-            <IconButton
-              onClick={onCyclePaneMode}
-              title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
-              className="shrink-0"
-            >
-              <PanelLeftIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-            </IconButton>
-          )}
           <span className="text-xs text-text-muted mb-px truncate">
             {formatDateTime(currentNote.modified)}
           </span>

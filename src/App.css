@@ -45,6 +45,13 @@
   --ui-drag-region-height: 44px;
   --ui-pane-padding-start: 16px;
   --ui-pane-padding-end: 12px;
+  --ui-titlebar-control-gap: 8px;
+  --ui-titlebar-control-offset: 16px;
+  --ui-titlebar-leading-offset: calc(
+    var(--ui-titlebar-control-offset) +
+      var(--ui-control-height-compact) +
+      var(--ui-titlebar-control-gap)
+  );
   --ui-action-gap: 2px;
   --ui-count-badge-height: 20px;
   --ui-count-badge-width: 28px;
@@ -180,6 +187,10 @@ body,
   -webkit-app-region: no-drag;
 }
 
+.platform-mac {
+  --ui-titlebar-control-offset: 80px;
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -297,6 +308,23 @@ body {
 .ui-pane-drag-region {
   height: var(--ui-drag-region-height);
   flex-shrink: 0;
+}
+
+.ui-titlebar-pane-switch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  height: var(--ui-drag-region-height);
+  width: fit-content;
+  align-items: center;
+  padding-left: var(--ui-titlebar-control-offset);
+  padding-right: var(--ui-pane-padding-end);
+}
+
+.ui-titlebar-leading-offset {
+  padding-left: var(--ui-titlebar-leading-offset);
 }
 
 .ui-pane-header {

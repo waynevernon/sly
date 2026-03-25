@@ -4,7 +4,7 @@ import { NotesProvider, useNotes } from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
 import { GitProvider } from "./context/GitContext";
-import { TooltipProvider, Toaster } from "./components/ui";
+import { IconButton, TooltipProvider, Toaster } from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
@@ -18,6 +18,7 @@ import {
   CodexIcon,
   OpenCodeIcon,
   OllamaIcon,
+  PanelLeftIcon,
 } from "./components/icons";
 import { AiEditModal } from "./components/ai/AiEditModal";
 import { AiResponseToast } from "./components/ai/AiResponseToast";
@@ -29,6 +30,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as aiService from "./services/ai";
 import type { AiProvider } from "./services/ai";
+import { isMac, mod } from "./lib/platform";
 
 // Detect preview mode from URL search params
 function getWindowMode(): {
@@ -45,6 +47,38 @@ function getWindowMode(): {
 }
 
 type ViewState = "notes" | "settings";
+
+function formatPaneModeLabel(mode: PaneMode): string {
+  if (mode === 1) return "1 Pane";
+  if (mode === 2) return "2 Panes";
+  return "3 Panes";
+}
+
+function getNextPaneMode(mode: PaneMode): PaneMode {
+  return mode === 3 ? 1 : ((mode + 1) as PaneMode);
+}
+
+function TitlebarPaneSwitch({
+  paneMode,
+  onCyclePaneMode,
+}: {
+  paneMode: PaneMode;
+  onCyclePaneMode: () => void;
+}) {
+  return (
+    <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
+      <div className="titlebar-no-drag flex items-center">
+        <IconButton
+          onClick={onCyclePaneMode}
+          title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
+          className="shrink-0"
+        >
+          <PanelLeftIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+        </IconButton>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const {
@@ -491,7 +525,13 @@ function AppContent() {
 
   return (
     <>
-      <div className="h-screen flex bg-bg overflow-hidden">
+      <div className="relative h-screen flex bg-bg overflow-hidden">
+        {view === "notes" && !focusMode && (
+          <TitlebarPaneSwitch
+            paneMode={paneMode}
+            onCyclePaneMode={cyclePaneMode}
+          />
+        )}
         {view === "settings" ? (
           <SettingsPage onBack={closeSettings} />
         ) : (
@@ -502,7 +542,6 @@ function AppContent() {
             />
             <Editor
               paneMode={paneMode}
-              onCyclePaneMode={cyclePaneMode}
               focusMode={focusMode}
               onEditorReady={(editor) => {
                 editorRef.current = editor;
@@ -654,7 +693,6 @@ function App() {
 
   // Add platform class for OS-specific styling (e.g., keyboard shortcuts)
   useEffect(() => {
-    const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
     document.documentElement.classList.add(
       isMac ? "platform-mac" : "platform-other",
     );
