@@ -145,14 +145,15 @@ function AppContent() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<
     SettingsTab | undefined
   >(undefined);
-  const [settingsOpenCount, setSettingsOpenCount] = useState(0);
+  const [settingsKey, setSettingsKey] = useState(0);
 
   const openSettings = useCallback(
     (tab?: "general" | "editor" | "shortcuts" | "about") => {
+      const validTab = typeof tab === "string" ? tab : undefined;
       setPaletteOpen(false);
       setAiModalOpen(false);
-      setSettingsInitialTab(tab);
-      setSettingsOpenCount((c) => c + 1);
+      setSettingsInitialTab(validTab);
+      setSettingsKey((k) => k + 1);
       setView("settings");
     },
     [],
@@ -563,7 +564,7 @@ function AppContent() {
           />
         )}
         {view === "settings" ? (
-          <SettingsPage key={settingsOpenCount} onBack={closeSettings} initialTab={settingsInitialTab} />
+          <SettingsPage key={settingsKey} onBack={closeSettings} initialTab={settingsInitialTab} />
         ) : (
           <>
             <WorkspaceNavigation
