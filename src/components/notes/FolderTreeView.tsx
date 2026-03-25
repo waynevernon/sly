@@ -181,7 +181,7 @@ function InlineFolderRow({
       }`}
       style={{ marginLeft: `${depth * 12}px` }}
     >
-      <div className="flex items-center gap-1.5 pr-2 py-1.5">
+      <div className="flex items-center gap-1.5 pr-2 py-2">
         <div className="min-w-0 flex flex-1 items-center gap-2">
           <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
             {showCollapseToggle ? (
@@ -191,7 +191,7 @@ function InlineFolderRow({
           <button
             type="button"
             onClick={onOpenIconPicker}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
+            className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
             aria-label="Choose folder icon"
           >
             <FolderGlyph
@@ -388,7 +388,7 @@ const FolderItem = memo(function FolderItem({
           className={rowClassName}
           style={{ marginLeft: `${depth * TREE_INDENT_WIDTH}px` }}
         >
-          <div className="flex items-center gap-1.5 pr-2 py-1.5">
+          <div className="flex items-center gap-1.5 pr-2 py-2">
             <div className="min-w-0 flex flex-1 items-center gap-1.5">
               {hasNestedFolders ? (
                 <button
@@ -414,7 +414,7 @@ const FolderItem = memo(function FolderItem({
                 ref={setDragRef}
                 {...dragAttributes}
                 {...dragListeners}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+                className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
                 aria-label={`Move ${folder.name}`}
               >
                 <FolderGlyph
