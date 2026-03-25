@@ -393,7 +393,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const cyclePaneMode = useCallback(() => {
     const order: PaneMode[] = [1, 2, 3];
     const currentIndex = order.indexOf(appearanceSettings.paneMode);
-    const nextMode = order[(currentIndex + 1) % order.length];
+    const nextMode = order[(currentIndex - 1 + order.length) % order.length];
     setPaneMode(nextMode);
   }, [appearanceSettings.paneMode, setPaneMode]);
 

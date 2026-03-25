@@ -55,7 +55,7 @@ function formatPaneModeLabel(mode: PaneMode): string {
 }
 
 function getNextPaneMode(mode: PaneMode): PaneMode {
-  return mode === 3 ? 1 : ((mode + 1) as PaneMode);
+  return mode === 1 ? 3 : ((mode - 1) as PaneMode);
 }
 
 function TitlebarPaneSwitch({
