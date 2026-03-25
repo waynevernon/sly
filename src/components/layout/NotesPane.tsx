@@ -209,7 +209,7 @@ export function NotesPane() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="ui-scrollbar-subtle flex-1 overflow-y-auto">
         {searchOpen && (
           <div className="sticky top-0 z-10 px-3 pt-2 bg-bg">
             <div className="relative">

@@ -2099,7 +2099,7 @@ export function Editor({
         )}
         <div
           ref={scrollContainerRef}
-          className="absolute inset-0 overflow-y-auto overflow-x-hidden"
+          className="ui-scrollbar-subtle absolute inset-0 overflow-y-auto overflow-x-hidden"
           dir={textDirection}
         >
           {sourceMode ? (

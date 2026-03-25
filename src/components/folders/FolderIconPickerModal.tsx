@@ -282,7 +282,7 @@ export function FolderIconPickerModal({
           <div className="px-4 pb-4">
             <div
               ref={scrollRef}
-              className="h-[22rem] overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
+              className="ui-scrollbar-subtle h-[22rem] overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
             >
               <div ref={gridMeasureRef} className="w-full">
                 {filteredIcons.length === 0 ? (

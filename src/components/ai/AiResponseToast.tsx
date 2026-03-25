@@ -47,7 +47,7 @@ function parseMarkdown(text: string): React.ReactNode {
         elements.push(
           <pre
             key={`code-${index}`}
-            className="bg-bg-secondary rounded px-2 py-1 my-1 overflow-x-auto"
+            className="ui-scrollbar-subtle bg-bg-secondary rounded px-2 py-1 my-1 overflow-x-auto"
           >
             <code className="text-xs font-mono">
               {codeBlockContent.join("\n")}
@@ -120,7 +120,7 @@ function parseMarkdown(text: string): React.ReactNode {
     elements.push(
       <pre
         key={`code-unclosed`}
-        className="bg-bg-secondary rounded px-2 py-1 my-1 overflow-x-auto"
+        className="ui-scrollbar-subtle bg-bg-secondary rounded px-2 py-1 my-1 overflow-x-auto"
       >
         <code className="text-xs font-mono">
           {codeBlockContent.join("\n")}
@@ -222,7 +222,7 @@ export function AiResponseToast({ output, provider }: AiResponseToastProps) {
       <Icon className="w-4.5 h-4.5 shrink-0 mt-px" />
       <div className="flex-1 space-y-2 min-w-0">
         <div className="font-medium text-sm">AI Edit Complete</div>
-        <div className="text-text-muted max-h-60 overflow-y-auto pr-2">
+        <div className="ui-scrollbar-subtle text-text-muted max-h-60 overflow-y-auto pr-2">
           {parseMarkdown(output)}
         </div>
         <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2.5 text-xs text-text-muted">

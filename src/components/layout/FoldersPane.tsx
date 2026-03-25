@@ -54,7 +54,7 @@ export function FoldersPane({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-2.5">
+      <div className="ui-scrollbar-subtle flex-1 overflow-y-auto py-2.5">
         <FolderTreeView
           dragDelta={dragDelta}
           onManualFolderDropPlanChange={onManualFolderDropPlanChange}

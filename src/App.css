@@ -478,6 +478,64 @@ body {
   scrollbar-gutter: stable;
 }
 
+/*
+ * Shared subtle scrollbar treatment for primary app surfaces.
+ * Keep the track transparent and reveal the thumb on intent states.
+ */
+.ui-scrollbar-subtle {
+  --ui-scrollbar-size: 8px;
+  --ui-scrollbar-radius: 999px;
+  --ui-scrollbar-thumb-rest: transparent;
+  --ui-scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--color-text-muted) 34%,
+    transparent
+  );
+  --ui-scrollbar-thumb-active: color-mix(
+    in srgb,
+    var(--color-text-muted) 52%,
+    transparent
+  );
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-scrollbar-thumb-rest) transparent;
+}
+
+.ui-scrollbar-subtle:hover,
+.ui-scrollbar-subtle:focus,
+.ui-scrollbar-subtle:focus-within {
+  scrollbar-color: var(--ui-scrollbar-thumb-hover) transparent;
+}
+
+.ui-scrollbar-subtle::-webkit-scrollbar {
+  width: var(--ui-scrollbar-size);
+  height: var(--ui-scrollbar-size);
+}
+
+.ui-scrollbar-subtle::-webkit-scrollbar-track,
+.ui-scrollbar-subtle::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.ui-scrollbar-subtle::-webkit-scrollbar-thumb {
+  background-color: var(--ui-scrollbar-thumb-rest);
+  border-radius: var(--ui-scrollbar-radius);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition:
+    background-color var(--ui-motion-duration-fade) var(--ui-motion-ease-standard),
+    border-color var(--ui-motion-duration-fade) var(--ui-motion-ease-standard);
+}
+
+.ui-scrollbar-subtle:hover::-webkit-scrollbar-thumb,
+.ui-scrollbar-subtle:focus::-webkit-scrollbar-thumb,
+.ui-scrollbar-subtle:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--ui-scrollbar-thumb-hover);
+}
+
+.ui-scrollbar-subtle::-webkit-scrollbar-thumb:active {
+  background-color: var(--ui-scrollbar-thumb-active);
+}
+
 /* Link tooltip in editor */
 .prose a {
   position: relative;
