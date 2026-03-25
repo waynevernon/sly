@@ -223,6 +223,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Prefer shared primitives and shared patterns over local one-offs
 - Maintain type safety throughout the frontend and backend
 - Avoid commented-out code and TODO-driven dead branches in production code
+- Prefer idiomatic, clean solutions over workarounds; if a workaround is the only viable path, flag it explicitly before proceeding
 
 ### Performance
 
