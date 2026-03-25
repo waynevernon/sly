@@ -53,9 +53,9 @@ export function SortMenuButton<T extends string>({
               <DropdownMenu.RadioItem
                 key={option.value}
                 value={option.value}
-                className={`${menuItemClassName} relative pl-8 pr-2.5`}
+                className={menuItemClassName}
               >
-                <span className="absolute left-2.5 inline-flex h-4 w-4 items-center justify-center text-text-muted">
+                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text-muted">
                   <DropdownMenu.ItemIndicator>
                     <CheckIcon className="w-4 h-4 stroke-[1.8]" />
                   </DropdownMenu.ItemIndicator>

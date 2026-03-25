@@ -43,6 +43,7 @@
   --ui-control-height-standard: 32px;
   --ui-control-height-prominent: 40px;
   --ui-drag-region-height: 44px;
+  --ui-pane-header-height: 36px;
   --ui-pane-padding-start: 16px;
   --ui-pane-padding-end: 12px;
   --ui-titlebar-control-gap: 8px;
@@ -326,23 +327,25 @@ body {
   padding-left: var(--ui-titlebar-leading-offset);
 }
 
-.ui-pane-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-left: var(--ui-pane-padding-start);
-  padding-right: var(--ui-pane-padding-end);
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
+@layer components {
+  .ui-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    height: var(--ui-pane-header-height);
+    padding-left: var(--ui-pane-padding-start);
+    padding-right: var(--ui-pane-padding-end);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
 
-.ui-pane-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-action-gap);
-  flex-shrink: 0;
+  .ui-pane-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-action-gap);
+    flex-shrink: 0;
+  }
 }
 
 .ui-count-badge {

@@ -254,7 +254,7 @@ function FormatBar({
   if (!editor) return null;
 
   return (
-    <div className="flex items-center gap-1 px-3 pb-2 border-b border-border overflow-x-auto scrollbar-none">
+    <div className="flex items-center gap-1 px-4 overflow-x-auto scrollbar-none">
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive("bold")}
@@ -501,8 +501,9 @@ export function Editor({
   }, [hasTransitioned, currentNote]);
 
   const effectivePaneMode = focusMode ? 1 : paneMode;
-  const needsPaneDelay = focusMode && paneMode > 1;
   const navigationVisible = effectivePaneMode > 1;
+  const needsPaneDelay = focusMode && paneMode > 1;
+
   // Source mode state
   const [sourceMode, setSourceMode] = useState(false);
   const [sourceContent, setSourceContent] = useState("");
@@ -1830,10 +1831,8 @@ export function Editor({
     if (previewMode) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
-        <div
-            className="ui-pane-drag-region flex items-end px-4 pb-1"
-            data-tauri-drag-region
-          ></div>
+          <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+          <div className="ui-pane-header" />
           <div className="flex-1 flex items-center justify-center">
             <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
           </div>
@@ -1845,10 +1844,8 @@ export function Editor({
     if (notesCtx?.selectedNoteId) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
-        <div
-            className="ui-pane-drag-region flex items-end px-4 pb-1"
-            data-tauri-drag-region
-          ></div>
+          <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+          <div className="ui-pane-header" />
           <div className="flex-1 flex items-center justify-center">
             <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
           </div>
@@ -1859,11 +1856,8 @@ export function Editor({
     // Folder mode: show empty state with "New Note" button
     return (
       <div className="flex-1 flex flex-col bg-bg">
-        {/* Drag region */}
-        <div
-          className="ui-pane-drag-region flex items-end px-4 pb-1"
-          data-tauri-drag-region
-        ></div>
+        <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+        <div className="ui-pane-header" />
         <div className="flex-1 flex items-center justify-center pb-8">
           <div className="text-center text-text-muted select-none">
             <img
@@ -1899,7 +1893,7 @@ export function Editor({
 
   return (
     <div className="flex-1 flex flex-col bg-bg overflow-hidden">
-      {/* Drag region with sidebar toggle, date and save status */}
+      {/* Drag region with action buttons */}
       <div
         className={cn(
           "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
@@ -2082,16 +2076,18 @@ export function Editor({
         </div>
       </div>
 
-      {/* Format Bar – transition only after initial mount to avoid height animation on note load */}
-      <div
-        className={`${focusMode || sourceMode ? "opacity-0 max-h-0 overflow-hidden pointer-events-none" : "opacity-100 max-h-20"} ${hasTransitioned ? `transition-all duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
-      >
-        <FormatBar
-          editor={editor}
-          onAddLink={handleAddLink}
-          onAddBlockMath={handleAddBlockMath}
-          onAddImage={handleAddImage}
-        />
+      {/* Header with format bar – border aligns with FoldersPane / NotesPane */}
+      <div className={`ui-pane-header px-0 border-border/80 ${focusMode ? "border-transparent" : ""} ${hasTransitioned ? `transition-[border-color] duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}>
+        <div
+          className={`flex-1 ${focusMode || sourceMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
+        >
+          <FormatBar
+            editor={editor}
+            onAddLink={handleAddLink}
+            onAddBlockMath={handleAddBlockMath}
+            onAddImage={handleAddImage}
+          />
+        </div>
       </div>
 
       {/* Editor content area with resize handles overlay */}
