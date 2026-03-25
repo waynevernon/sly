@@ -371,7 +371,9 @@ const FolderItem = memo(function FolderItem({
         placeholder="Folder name"
         noteCount={noteCount}
         isSelected={selectedFolderPath === folder.path}
-        collapseState={isCollapsed ? "collapsed" : "expanded"}
+        collapseState={
+          hasNestedFolders ? (isCollapsed ? "collapsed" : "expanded") : undefined
+        }
         onSubmit={onRenameFolder}
         onCancel={onCancelInlineEdit}
         onOpenIconPicker={() =>
@@ -425,7 +427,7 @@ const FolderItem = memo(function FolderItem({
               >
                 <FolderGlyph
                   iconName={iconName}
-                  open={!isCollapsed}
+                  open={hasNestedFolders && !isCollapsed}
                   className="w-4.25 h-4.25 text-current shrink-0"
                   strokeWidth={1.7}
                 />
