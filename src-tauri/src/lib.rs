@@ -12,7 +12,7 @@ use tantivy::query::QueryParser;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
 use tauri::menu::{
-    AboutMetadata, Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu,
+    Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu,
     HELP_SUBMENU_ID, WINDOW_SUBMENU_ID,
 };
 use tauri::webview::WebviewWindowBuilder;
@@ -28,6 +28,7 @@ const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
 const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
 const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
 const MENU_FOCUS_MODE_ID: &str = "view-focus-mode";
+const MENU_ABOUT_ID: &str = "app-about";
 
 // Note metadata for list display
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4062,18 +4063,6 @@ fn handle_cli_args(app: &AppHandle, args: &[String], cwd: &str) -> bool {
 
 fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let pkg_info = app.package_info();
-    let config = app.config();
-    let about_metadata = AboutMetadata {
-        name: Some(pkg_info.name.clone()),
-        version: Some(pkg_info.version.to_string()),
-        copyright: config.bundle.copyright.clone(),
-        authors: config
-            .bundle
-            .publisher
-            .clone()
-            .map(|publisher| vec![publisher]),
-        ..Default::default()
-    };
 
     let settings_item = MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings...")
         .accelerator("CmdOrCtrl+,")
@@ -4090,6 +4079,8 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
+    let about_item = MenuItemBuilder::with_id(MENU_ABOUT_ID, "About Sly")
+        .build(app)?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -4097,7 +4088,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         pkg_info.name.clone(),
         true,
         &[
-            &PredefinedMenuItem::about(app, None, Some(about_metadata.clone()))?,
+            &about_item,
             &PredefinedMenuItem::separator(app)?,
             &settings_item,
             &PredefinedMenuItem::separator(app)?,
@@ -4171,10 +4162,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         HELP_SUBMENU_ID,
         "Help",
         true,
-        &[
-            #[cfg(not(target_os = "macos"))]
-            &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
-        ],
+        &[],
     )?;
 
     let mut menu = MenuBuilder::new(app);
@@ -4225,6 +4213,10 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_FOCUS_MODE_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "toggle-focus-mode", ());
+        }
+        MENU_ABOUT_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "open-settings-about", ());
         }
         _ => {}
     }

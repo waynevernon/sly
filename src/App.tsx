@@ -13,6 +13,7 @@ import { FolderPicker } from "./components/layout/FolderPicker";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { SettingsPage } from "./components/settings";
 import type { PaneMode } from "./types/note";
+import type { SettingsTab } from "./components/settings/SettingsPage";
 import {
   SpinnerIcon,
   ClaudeIcon,
@@ -141,13 +142,22 @@ function AppContent() {
     });
   }, [selectedNoteId]);
 
-  const openSettings = useCallback(() => {
-    setPaletteOpen(false);
-    setAiModalOpen(false);
-    setView("settings");
-  }, []);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    SettingsTab | undefined
+  >(undefined);
+
+  const openSettings = useCallback(
+    (tab?: "general" | "editor" | "shortcuts" | "about") => {
+      setPaletteOpen(false);
+      setAiModalOpen(false);
+      setSettingsInitialTab(tab);
+      setView("settings");
+    },
+    [],
+  );
 
   const closeSettings = useCallback(() => {
+    setSettingsInitialTab(undefined);
     setView("notes");
   }, []);
 
@@ -162,6 +172,7 @@ function AppContent() {
   useEffect(() => {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
+    let unlistenOpenSettingsAbout: (() => void) | undefined;
     let unlistenSetPaneMode: (() => void) | undefined;
     let unlistenToggleFocusMode: (() => void) | undefined;
 
@@ -170,6 +181,13 @@ function AppContent() {
     }).then((fn) => {
       if (cancelled) fn();
       else unlistenOpenSettings = fn;
+    });
+
+    listen("open-settings-about", () => {
+      openSettings("about");
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenOpenSettingsAbout = fn;
     });
 
     listen<number>("set-pane-mode", (event) => {
@@ -192,6 +210,7 @@ function AppContent() {
     return () => {
       cancelled = true;
       unlistenOpenSettings?.();
+      unlistenOpenSettingsAbout?.();
       unlistenSetPaneMode?.();
       unlistenToggleFocusMode?.();
     };
@@ -542,7 +561,7 @@ function AppContent() {
           />
         )}
         {view === "settings" ? (
-          <SettingsPage onBack={closeSettings} />
+          <SettingsPage onBack={closeSettings} initialTab={settingsInitialTab} />
         ) : (
           <>
             <WorkspaceNavigation

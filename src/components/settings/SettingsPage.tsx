@@ -15,9 +15,10 @@ import { alt, isMac, mod, shortcut } from "../../lib/platform";
 
 interface SettingsPageProps {
   onBack: () => void;
+  initialTab?: SettingsTab;
 }
 
-type SettingsTab = "general" | "editor" | "shortcuts" | "about";
+export type SettingsTab = "general" | "editor" | "shortcuts" | "about";
 
 const tabs: {
   id: SettingsTab;
@@ -51,9 +52,14 @@ const tabs: {
   },
 ];
 
-export function SettingsPage({ onBack }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sync active tab when initialTab prop changes (e.g. settings already open, About menu clicked)
+  useEffect(() => {
+    setActiveTab(initialTab ?? "general");
+  }, [initialTab]);
 
   // Reset scroll position when tab changes
   useEffect(() => {
