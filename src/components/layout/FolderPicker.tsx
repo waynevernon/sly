@@ -39,13 +39,13 @@ export function FolderPicker() {
             className="text-3xl text-text font-sans mb-2 tracking-[-0.01em] animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
-            Welcome to Scratch
+            Welcome to Sly
           </h1>
           <p
             className="text-text-muted mb-6 animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
-            Scratch is an offline-first notes app. Your notes are simply stored
+            Sly is an offline-first notes app. Your notes are simply stored
             on your computer as markdown files.
           </p>
           <div

@@ -219,7 +219,7 @@ export function AiEditModal({
                   >
                     {providerName}
                   </a>{" "}
-                  to install it, then restart Scratch.
+                  to install it, then restart Sly.
                 </div>
               </div>
               <div className="w-full flex justify-between">

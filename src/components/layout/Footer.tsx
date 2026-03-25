@@ -35,7 +35,7 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
   const handleCommit = useCallback(async () => {
     if (isCommitting) return;
     try {
-      const success = await commit("Quick commit from Scratch");
+      const success = await commit("Quick commit from Sly");
       if (success) {
         toast.success("Changes committed");
       } else {

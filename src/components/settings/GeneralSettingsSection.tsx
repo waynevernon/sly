@@ -91,11 +91,11 @@ function cliReducer(state: CliState, action: CliAction): CliState {
 function CliUsageHint() {
   return (
     <p className="text-sm text-text-muted font-mono">
-      scratch file.md # open note
+      sly file.md # open note
       <br />
-      scratch . # open folder
+      sly . # open folder
       <br />
-      scratch # launch app
+      sly # launch app
     </p>
   );
 }
@@ -269,9 +269,7 @@ export function GeneralSettingsSection() {
       await cliService.installCli();
       const status = await cliService.getCliStatus();
       dispatchCli({ type: "operated", status });
-      toast.success(
-        "CLI tool installed. Open a new terminal to use `scratch`.",
-      );
+      toast.success("CLI tool installed. Open a new terminal to use `sly`.");
     } catch (err) {
       dispatchCli({ type: "operate_failed" });
       toast.error(
@@ -763,7 +761,7 @@ export function GeneralSettingsSection() {
             <p className="text-sm text-text-muted mb-4">
               Open notes from the terminal with the{" "}
               <code className="ui-kbd font-mono">
-                scratch
+                sly
               </code>{" "}
               command
             </p>

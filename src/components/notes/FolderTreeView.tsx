@@ -53,7 +53,7 @@ import {
 } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 
-const STORAGE_KEY = "scratch:collapsedFolders";
+const STORAGE_KEY = "sly:collapsedFolders";
 const FolderIconPickerModal = lazy(() =>
   import("../folders/FolderIconPickerModal").then((module) => ({
     default: module.FolderIconPickerModal,

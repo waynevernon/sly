@@ -57,7 +57,7 @@ import { SlashCommand } from "./SlashCommand";
 import { Wikilink, type WikilinkStorage } from "./Wikilink";
 import { WikilinkSuggestion } from "./WikilinkSuggestion";
 import { EditorWidthHandles } from "./EditorWidthHandle";
-import { ScratchBlockMath, normalizeBlockMath } from "./MathExtensions";
+import { SlyBlockMath, normalizeBlockMath } from "./MathExtensions";
 import { cn } from "../../lib/utils";
 import { plainTextFromMarkdown } from "../../lib/plainText";
 import {
@@ -1031,7 +1031,7 @@ export function Editor({
       SlashCommand,
       Wikilink,
       WikilinkSuggestion,
-      ScratchBlockMath.configure({
+      SlyBlockMath.configure({
         katexOptions: {
           throwOnError: false,
           displayMode: true,

@@ -116,7 +116,7 @@ function AppContent() {
   const [aiProvider, setAiProvider] = useState<AiProvider>("claude");
   const editorRef = useRef<TiptapEditor | null>(null);
 
-  // Listen for set-notes-folder event from CLI (scratch .)
+  // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
   useEffect(() => {
     let cancelled = false;
@@ -513,7 +513,7 @@ function AppContent() {
       <div className="h-screen flex items-center justify-center bg-bg-secondary">
         <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
           <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
-          Initializing Scratch...
+          Initializing Sly...
         </div>
       </div>
     );
@@ -644,7 +644,7 @@ function UpdateToast({
     try {
       await update.downloadAndInstall();
       toast.dismiss(toastId);
-      toast.success("Update installed! Restart Scratch to apply.", {
+      toast.success("Update installed! Restart Sly to apply.", {
         duration: Infinity,
         closeButton: true,
       });

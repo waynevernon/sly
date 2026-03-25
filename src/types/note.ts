@@ -135,7 +135,7 @@ export interface AppearanceSettings {
   customDarkColors?: ThemeColors;
 }
 
-// Per-folder settings (stored in .scratch/settings.json)
+// Per-folder settings (stored in .sly/settings.json)
 export interface Settings {
   gitEnabled?: boolean;
   pinnedNoteIds?: string[];

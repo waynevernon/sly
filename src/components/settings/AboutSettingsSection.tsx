@@ -43,7 +43,7 @@ export function AboutSettingsSection() {
         <div>
           <h2 className="text-xl font-medium mb-0.5">Version</h2>
           <p className="text-sm text-text-muted">
-            You are currently using Scratch v{appVersion || "..."}
+            You are currently using Sly v{appVersion || "..."}
           </p>
         </div>
         <Button
@@ -73,35 +73,35 @@ export function AboutSettingsSection() {
       {/* About Section */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-medium mb-1">About Scratch</h2>
+          <h2 className="text-xl font-medium mb-1">About Sly</h2>
           <p className="text-sm text-text-muted mb-4">
-            Scratch is a minimalist markdown scratchpad for capturing quick
+            Sly is a minimalist markdown scratchpad for capturing quick
             thoughts, todos, and ideas. We're offline-first,
             keyboard-optimized, AI-compatible, and open source with no cloud,
-            no accounts, and no subscriptions. Learn more on{" "}
+            no accounts, and no subscriptions. Learn more in{" "}
             <button
-              onClick={() => handleOpenUrl("https://www.ericli.io/scratch")}
+              onClick={() => handleOpenUrl("https://github.com/waynevernon/sly")}
               className="ui-inline-link cursor-pointer"
             >
-              our website
+              the repository
             </button>
             .
           </p>
           <p className="text-sm text-text-muted">
-            Created and maintained by{" "}
+            Adapted and maintained by{" "}
             <button
-              onClick={() => handleOpenUrl("https://ericli.io")}
+              onClick={() => handleOpenUrl("https://github.com/waynevernon")}
               className="ui-inline-link cursor-pointer"
             >
-              Eric Li
+              Wayne Vernon
             </button>{" "}
-            with moral support from his cat, Mochi, and actual support from
-            many contributors on GitHub.
+            as an independent fork of Scratch. Original Scratch work remains
+            credited under the MIT license.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => handleOpenUrl("https://github.com/erictli/scratch")}
+            onClick={() => handleOpenUrl("https://github.com/waynevernon/sly")}
             variant="outline"
             size="md"
             className="gap-1.25"
@@ -111,7 +111,7 @@ export function AboutSettingsSection() {
           </Button>
           <Button
             onClick={() =>
-              handleOpenUrl("https://github.com/erictli/scratch/issues")
+              handleOpenUrl("https://github.com/waynevernon/sly/issues")
             }
             variant="ghost"
             size="md"

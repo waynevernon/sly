@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Scratch",
-  "version": "0.9.1",
-  "identifier": "com.scratch.app",
+  "productName": "Sly",
+  "version": "0.1.0",
+  "identifier": "com.waynevernon.sly",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Scratch",
+        "title": "Sly",
         "width": 1080,
         "height": 720,
         "minWidth": 600,
@@ -65,9 +65,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE3RTQ2NTA4QzJGODdFRTYKUldUbWZ2akNDR1hrcDlud3VQSVhuYVU0cDk5V0RkaVFuVElRSGRVMjlFam9IdFVCNnU1ZlVJOXEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyRjgxODZGNDg4RUYxNDEKUldSQjhZNUlieGo0RWpIUUZ3dTRZWFF0SHdWMC84aXozMTVRVFFkR3F0RjdiZXVPdldYQW9EWUsK",
       "endpoints": [
-        "https://github.com/erictli/scratch/releases/latest/download/latest.json"
+        "https://github.com/waynevernon/sly/releases/latest/download/latest.json"
       ]
     }
   }

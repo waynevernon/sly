@@ -1,12 +1,12 @@
 [package]
-name = "Scratch"
-version = "0.9.1"
+name = "sly"
+version = "0.1.0"
 description = "An offline markdown-based notes app"
-authors = ["erictli"]
+authors = ["Wayne Vernon"]
 edition = "2021"
 
 [lib]
-name = "scratch_lib"
+name = "sly_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
