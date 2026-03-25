@@ -67,7 +67,6 @@
   --editor-base-font-size: 16px;
   --editor-bold-weight: 700;
   --editor-line-height: 1.6;
-  --editor-paragraph-spacing: 1em;
 
   /* Computed header sizes (set by ThemeContext based on base size) */
   --editor-h1-size: 36px;
@@ -1077,16 +1076,16 @@ html.dark {
   margin-bottom: 1.75em;
 }
 
-/* Prose spacing - fixed paragraph spacing */
+/* Prose spacing - no CSS-added paragraph spacing; spacing comes from blank lines in markdown */
 .prose p {
   margin-top: 0;
-  margin-bottom: var(--editor-paragraph-spacing);
+  margin-bottom: 0;
 }
 
 .prose ul,
 .prose ol {
   margin-top: 0;
-  margin-bottom: var(--editor-paragraph-spacing);
+  margin-bottom: 0;
   padding-left: 1.25em;
   padding-inline-start: 1.25em;
 }

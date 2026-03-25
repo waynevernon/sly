@@ -2168,8 +2168,17 @@ export function Editor({
 
                   if (!clickPos) return;
 
-                  // Set the selection to the clicked position
-                  editor.chain().focus().setTextSelection(clickPos.pos).run();
+                  // Only move cursor if the click is outside the current selection;
+                  // preserves highlighted text when right-clicking within a selection.
+                  const { selection } = editor.state;
+                  const clickIsInsideSelection =
+                    selection.from < selection.to &&
+                    clickPos.pos >= selection.from &&
+                    clickPos.pos <= selection.to;
+
+                  if (!clickIsInsideSelection) {
+                    editor.chain().focus().setTextSelection(clickPos.pos).run();
+                  }
 
                   // Check if we're in a table after updating selection
                   if (!editor.isActive("table")) return;

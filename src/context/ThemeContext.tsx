@@ -211,8 +211,6 @@ function applyAppearanceCSSVariables(
   root.style.setProperty("--editor-h4-size", `${baseSize * 1.25}px`);
   root.style.setProperty("--editor-h5-size", `${baseSize}px`);
   root.style.setProperty("--editor-h6-size", `${baseSize}px`);
-  root.style.setProperty("--editor-paragraph-spacing", "0.875em");
-
   if (appearance.editorWidth === "custom") {
     const widthPx = appearance.customEditorWidthPx ?? DEFAULT_CUSTOM_WIDTH_PX;
     root.style.setProperty("--editor-max-width", `${widthPx}px`);

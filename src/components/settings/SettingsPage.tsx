@@ -56,11 +56,6 @@ export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Sync active tab when initialTab prop changes (e.g. settings already open, About menu clicked)
-  useEffect(() => {
-    setActiveTab(initialTab ?? "general");
-  }, [initialTab]);
-
   // Reset scroll position when tab changes
   useEffect(() => {
     if (scrollContainerRef.current) {
