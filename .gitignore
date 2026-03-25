@@ -32,3 +32,6 @@ src-tauri/gen/
 
 # Release artifacts
 latest.json
+
+# Local symlinks
+CLAUDE.md

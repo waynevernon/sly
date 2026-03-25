@@ -131,6 +131,8 @@ export interface AppearanceSettings {
   customEditorWidthPx?: number;
   interfaceZoom: number;
   paneMode: PaneMode;
+  foldersPaneWidth?: number;
+  notesPaneWidth?: number;
   customLightColors?: ThemeColors;
   customDarkColors?: ThemeColors;
 }
