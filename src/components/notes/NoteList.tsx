@@ -199,6 +199,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
       <ContextMenu.Portal>
         <ContextMenu.Content
           className={`${menuSurfaceClassName} min-w-44 z-50`}
+          collisionPadding={8}
         >
           <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
             <PinIcon className="w-4 h-4 stroke-[1.6]" />

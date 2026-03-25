@@ -38,6 +38,7 @@ export function SortMenuButton<T extends string>({
         <DropdownMenu.Content
           sideOffset={8}
           align="end"
+          collisionPadding={8}
           className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
           <DropdownMenu.Label className={menuLabelClassName}>
