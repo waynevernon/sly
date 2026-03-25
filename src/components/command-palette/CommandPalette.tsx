@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { FilePlusCorner } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -43,7 +44,6 @@ import {
   SwatchIcon,
   GitCommitIcon,
   RefreshCwIcon,
-  PlusIcon,
   TrashIcon,
   PinIcon,
   ClaudeIcon,
@@ -152,7 +152,7 @@ export function CommandPalette({
         id: "new-note",
         label: "New Note",
         shortcut: `${mod} N`,
-        icon: <PlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           createNote();
           onClose();

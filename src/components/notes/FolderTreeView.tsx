@@ -12,6 +12,7 @@ import {
 } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
+import { FilePlusCorner } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import {
@@ -42,7 +43,6 @@ import {
   menuSurfaceClassName,
 } from "../ui";
 import {
-  AddNoteIcon,
   ArrowUpIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -179,6 +179,8 @@ function InlineFolderRow({
       : collapseState === "expanded"
         ? ChevronDownIcon
         : null;
+  const isOpen = collapseState === "expanded";
+  const showCollapseToggle = CollapseIcon !== null;
 
   return (
     <div
@@ -190,7 +192,7 @@ function InlineFolderRow({
       <div className="flex items-center gap-1.5 pr-2 py-1.5">
         <div className="min-w-0 flex flex-1 items-center gap-2">
           <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
-            {CollapseIcon ? (
+            {showCollapseToggle ? (
               <CollapseIcon className="w-4 h-4 stroke-[1.6]" />
             ) : null}
           </span>
@@ -202,6 +204,7 @@ function InlineFolderRow({
           >
             <FolderGlyph
               iconName={iconName}
+              open={isOpen}
               className="w-4.25 h-4.25 text-current shrink-0"
               strokeWidth={1.7}
             />
@@ -317,6 +320,7 @@ const FolderItem = memo(function FolderItem({
   const dropLineStyle = projectedDrop
     ? getDropLineStyle(projectedDrop.depth)
     : undefined;
+  const hasNestedFolders = folder.children.length > 0 || isCreatingChild;
 
   const children = !isCollapsed && (isCreatingChild || folder.children.length > 0) && (
     <div className="flex flex-col gap-0.5 pt-0.5">
@@ -392,21 +396,25 @@ const FolderItem = memo(function FolderItem({
         >
           <div className="flex items-center gap-1.5 pr-2 py-1.5">
             <div className="min-w-0 flex flex-1 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleCollapse(folder.path);
-                }}
-                className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
-                aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
-              >
-                {isCollapsed ? (
-                  <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-                ) : (
-                  <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
-                )}
-              </button>
+              {hasNestedFolders ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleCollapse(folder.path);
+                  }}
+                  className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+                  aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
+                >
+                  {isCollapsed ? (
+                    <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                  ) : (
+                    <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
+                  )}
+                </button>
+              ) : (
+                <span className="ml-2 h-5 w-5 shrink-0" aria-hidden="true" />
+              )}
               <button
                 type="button"
                 ref={setDragRef}
@@ -417,6 +425,7 @@ const FolderItem = memo(function FolderItem({
               >
                 <FolderGlyph
                   iconName={iconName}
+                  open={!isCollapsed}
                   className="w-4.25 h-4.25 text-current shrink-0"
                   strokeWidth={1.7}
                 />
@@ -465,7 +474,7 @@ const FolderItem = memo(function FolderItem({
             className={menuItemClassName}
             onSelect={() => onCreateNoteHere(folder.path)}
           >
-            <AddNoteIcon className="w-4 h-4 stroke-[1.6]" />
+            <FilePlusCorner className="w-4 h-4 stroke-[1.6]" />
             New Note
           </ContextMenu.Item>
           <ContextMenu.Item

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { PanelLeft } from "lucide-react";
 import { toast } from "sonner";
 import { NotesProvider, useNotes } from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -18,7 +19,6 @@ import {
   CodexIcon,
   OpenCodeIcon,
   OllamaIcon,
-  PanelLeftIcon,
 } from "./components/icons";
 import { AiEditModal } from "./components/ai/AiEditModal";
 import { AiResponseToast } from "./components/ai/AiResponseToast";
@@ -73,7 +73,7 @@ function TitlebarPaneSwitch({
           title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
           className="shrink-0"
         >
-          <PanelLeftIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+          <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
         </IconButton>
       </div>
     </div>

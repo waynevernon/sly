@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FilePlusCorner } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import { IconButton, Input } from "../ui";
-import { PlusIcon, SearchIcon, SearchOffIcon, XIcon } from "../icons";
+import { SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import { getFolderIconName } from "../../lib/folderIcons";
 import { SortMenuButton } from "./SortMenuButton";
@@ -203,7 +204,7 @@ export function NotesPane() {
             }}
             title="New Note"
           >
-            <PlusIcon className="w-4.75 h-4.75 stroke-[1.5]" />
+            <FilePlusCorner className="w-4.75 h-4.75 stroke-[1.5]" />
           </IconButton>
         </div>
       </div>

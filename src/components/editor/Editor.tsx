@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { TextSearch } from "lucide-react";
 import {
   useEditor,
   EditorContent,
@@ -98,7 +99,6 @@ import {
   ShareIcon,
   RefreshCwIcon,
   PinIcon,
-  SearchIcon,
   MarkdownIcon,
   MarkdownOffIcon,
   FolderPlusIcon,
@@ -492,35 +492,12 @@ export function Editor({
   const [settings, setSettings] = useState<Settings | null>(null);
   // Delay transition classes until after initial mount to avoid format bar height animation on note load
   const [hasTransitioned, setHasTransitioned] = useState(false);
-  const [isCollapsingToSinglePane, setIsCollapsingToSinglePane] =
-    useState(false);
   useEffect(() => {
     if (!hasTransitioned && currentNote) {
       const id = requestAnimationFrame(() => setHasTransitioned(true));
       return () => cancelAnimationFrame(id);
     }
   }, [hasTransitioned, currentNote]);
-
-  const previousPaneModeRef = useRef(paneMode);
-  useEffect(() => {
-    if (focusMode) {
-      previousPaneModeRef.current = paneMode;
-      setIsCollapsingToSinglePane(false);
-      return;
-    }
-
-    if (previousPaneModeRef.current > 1 && paneMode === 1) {
-      setIsCollapsingToSinglePane(true);
-      const timeout = window.setTimeout(() => {
-        setIsCollapsingToSinglePane(false);
-      }, 240);
-      previousPaneModeRef.current = paneMode;
-      return () => window.clearTimeout(timeout);
-    }
-
-    previousPaneModeRef.current = paneMode;
-    setIsCollapsingToSinglePane(false);
-  }, [focusMode, paneMode]);
 
   const effectivePaneMode = focusMode ? 1 : paneMode;
   const needsPaneDelay = focusMode && paneMode > 1;
@@ -1924,18 +1901,11 @@ export function Editor({
       {/* Drag region with sidebar toggle, date and save status */}
       <div
         className={cn(
-          "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-between px-[var(--ui-pane-padding-end)]",
+          "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
           !navigationVisible && "ui-titlebar-leading-offset",
         )}
         data-tauri-drag-region
       >
-        <div
-          className={`titlebar-no-drag flex items-center gap-1 min-w-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode || isCollapsingToSinglePane ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        >
-          <span className="text-xs text-text-muted mb-px truncate">
-            {formatDateTime(currentNote.modified)}
-          </span>
-        </div>
         <div
           className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
@@ -1958,7 +1928,11 @@ export function Editor({
               </div>
             </Tooltip>
           ) : (
-            <Tooltip content="All changes saved">
+            <Tooltip
+              content={`All changes saved${
+                currentNote ? ` • ${formatDateTime(currentNote.modified)}` : ""
+              }`}
+            >
               <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)]">
                 <CircleCheckIcon className="w-4.5 h-4.5 mt-px stroke-[1.5] text-text-muted/40" />
               </div>
@@ -2002,7 +1976,7 @@ export function Editor({
           {currentNote && (
             <Tooltip content={`Find in note (${mod}${isMac ? "" : "+"}F)`}>
               <IconButton onClick={openEditorSearch}>
-                <SearchIcon className="w-4.25 h-4.25 stroke-[1.6]" />
+                <TextSearch className="w-4.25 h-4.25 stroke-[1.6]" />
               </IconButton>
             </Tooltip>
           )}

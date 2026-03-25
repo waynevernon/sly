@@ -1,5 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { CheckIcon, ListOrderedIcon } from "../icons";
+import { ArrowDownWideNarrow } from "lucide-react";
+import { CheckIcon } from "../icons";
 import {
   IconButton,
   menuItemClassName,
@@ -30,7 +31,7 @@ export function SortMenuButton<T extends string>({
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <IconButton title={title}>
-          <ListOrderedIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+          <ArrowDownWideNarrow className="w-4.25 h-4.25 stroke-[1.5]" />
         </IconButton>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
