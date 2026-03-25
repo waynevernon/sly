@@ -4062,8 +4062,6 @@ fn handle_cli_args(app: &AppHandle, args: &[String], cwd: &str) -> bool {
 }
 
 fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let pkg_info = app.package_info();
-
     let settings_item = MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings...")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
@@ -4085,7 +4083,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
         app,
-        pkg_info.name.clone(),
+        app.package_info().name.clone(),
         true,
         &[
             &about_item,
@@ -4157,13 +4155,12 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ],
     )?;
 
-    let help_menu = Submenu::with_id_and_items(
-        app,
-        HELP_SUBMENU_ID,
-        "Help",
-        true,
-        &[],
-    )?;
+    #[cfg(target_os = "macos")]
+    let help_menu = Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[])?;
+
+    #[cfg(not(target_os = "macos"))]
+    let help_menu =
+        Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[&about_item])?;
 
     let mut menu = MenuBuilder::new(app);
 
