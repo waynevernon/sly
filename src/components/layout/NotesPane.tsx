@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FilePlusCorner } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ArrowUpAZ,
+  CalendarArrowDown,
+  CalendarArrowUp,
+  ClockArrowDown,
+  ClockArrowUp,
+  FilePlusCorner,
+} from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
@@ -7,16 +15,61 @@ import { IconButton, Input } from "../ui";
 import { SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import { getFolderIconName } from "../../lib/folderIcons";
-import { SortMenuButton } from "./SortMenuButton";
+import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
 import type { NoteSortMode } from "../../types/note";
 
-const noteSortOptions: { value: NoteSortMode; label: string }[] = [
-  { value: "modifiedDesc", label: "Last Modified (Newest)" },
-  { value: "modifiedAsc", label: "Last Modified (Oldest)" },
-  { value: "createdDesc", label: "Created (Newest)" },
-  { value: "createdAsc", label: "Created (Oldest)" },
-  { value: "titleAsc", label: "Title (A-Z)" },
-  { value: "titleDesc", label: "Title (Z-A)" },
+const noteSortItems: SortMenuItem<NoteSortMode>[] = [
+  {
+    key: "modified",
+    label: "Last Modified",
+    isActive: (value) => value === "modifiedDesc" || value === "modifiedAsc",
+    getNextValue: (value) =>
+      value === "modifiedDesc"
+        ? "modifiedAsc"
+        : value === "modifiedAsc"
+          ? "modifiedDesc"
+          : "modifiedDesc",
+    renderIcon: (value, isActive) => {
+      const isAscending = value === "modifiedAsc";
+      const Icon =
+        isActive && isAscending ? ClockArrowUp : ClockArrowDown;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+  {
+    key: "created",
+    label: "Created",
+    isActive: (value) => value === "createdDesc" || value === "createdAsc",
+    getNextValue: (value) =>
+      value === "createdDesc"
+        ? "createdAsc"
+        : value === "createdAsc"
+          ? "createdDesc"
+          : "createdDesc",
+    renderIcon: (value, isActive) => {
+      const isAscending = value === "createdAsc";
+      const Icon =
+        isActive && isAscending ? CalendarArrowUp : CalendarArrowDown;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+  {
+    key: "title",
+    label: "Title",
+    isActive: (value) => value === "titleAsc" || value === "titleDesc",
+    getNextValue: (value) =>
+      value === "titleAsc"
+        ? "titleDesc"
+        : value === "titleDesc"
+          ? "titleAsc"
+          : "titleAsc",
+    renderIcon: (value, isActive) => {
+      const isDescending = value === "titleDesc";
+      const Icon =
+        isActive && isDescending ? ArrowUpAZ : ArrowDownAZ;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
 ];
 
 function getFolderLabel(path: string | null): string {
@@ -170,7 +223,7 @@ export function NotesPane() {
             <SortMenuButton
               title="Sort Notes"
               value={noteSortMode}
-              options={noteSortOptions}
+              items={noteSortItems}
               onChange={(nextMode) => {
                 void setNoteSortMode(nextMode);
               }}

@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownWideNarrow } from "lucide-react";
-import { CheckIcon } from "../icons";
+import { ListFilter } from "lucide-react";
+import { cn } from "../../lib/utils";
 import {
   IconButton,
   menuItemClassName,
@@ -9,29 +10,32 @@ import {
   menuSurfaceClassName,
 } from "../ui";
 
-interface SortOption<T extends string> {
-  value: T;
+export interface SortMenuItem<T extends string> {
+  key: string;
   label: string;
+  isActive: (value: T) => boolean;
+  getNextValue: (value: T) => T;
+  renderIcon: (value: T, isActive: boolean) => ReactNode;
 }
 
 interface SortMenuButtonProps<T extends string> {
   title: string;
   value: T;
-  options: SortOption<T>[];
+  items: SortMenuItem<T>[];
   onChange: (value: T) => void;
 }
 
 export function SortMenuButton<T extends string>({
   title,
   value,
-  options,
+  items,
   onChange,
 }: SortMenuButtonProps<T>) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <IconButton title={title}>
-          <ArrowDownWideNarrow className="w-4.25 h-4.25 stroke-[1.5]" />
+          <ListFilter className="w-4.25 h-4.25 stroke-[1.5]" />
         </IconButton>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -46,25 +50,28 @@ export function SortMenuButton<T extends string>({
             {title}
           </DropdownMenu.Label>
           <DropdownMenu.Separator className={menuSeparatorClassName} />
-          <DropdownMenu.RadioGroup
-            value={value}
-            onValueChange={(nextValue) => onChange(nextValue as T)}
-          >
-            {options.map((option) => (
-              <DropdownMenu.RadioItem
-                key={option.value}
-                value={option.value}
-                className={menuItemClassName}
+          {items.map((item) => {
+            const isActive = item.isActive(value);
+            return (
+              <DropdownMenu.Item
+                key={item.key}
+                className={cn(menuItemClassName, isActive && "bg-bg-muted")}
+                onSelect={() => {
+                  onChange(item.getNextValue(value));
+                }}
               >
-                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text-muted">
-                  <DropdownMenu.ItemIndicator>
-                    <CheckIcon className="w-4 h-4 stroke-[1.8]" />
-                  </DropdownMenu.ItemIndicator>
+                <span
+                  className={cn(
+                    "inline-flex h-4 w-4 shrink-0 items-center justify-center",
+                    isActive ? "text-text" : "text-text-muted",
+                  )}
+                >
+                  {item.renderIcon(value, isActive)}
                 </span>
-                {option.label}
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
+                {item.label}
+              </DropdownMenu.Item>
+            );
+          })}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

@@ -1,16 +1,38 @@
+import { ArrowDownAZ, ArrowUpAZ, GripVertical } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
 import { IconButton } from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
-import { SortMenuButton } from "./SortMenuButton";
+import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
 import type { FolderDropOrderPlan } from "../../lib/folderTree";
 
-const folderSortOptions: { value: FolderSortMode; label: string }[] = [
-  { value: "manual", label: "Manual" },
-  { value: "nameAsc", label: "Name (A-Z)" },
-  { value: "nameDesc", label: "Name (Z-A)" },
+const folderSortItems: SortMenuItem<FolderSortMode>[] = [
+  {
+    key: "manual",
+    label: "Manual",
+    isActive: (value) => value === "manual",
+    getNextValue: (value) => (value === "manual" ? value : "manual"),
+    renderIcon: () => <GripVertical className="w-4 h-4 stroke-[1.6]" />,
+  },
+  {
+    key: "name",
+    label: "Name",
+    isActive: (value) => value === "nameAsc" || value === "nameDesc",
+    getNextValue: (value) =>
+      value === "nameAsc"
+        ? "nameDesc"
+        : value === "nameDesc"
+          ? "nameAsc"
+          : "nameAsc",
+    renderIcon: (value, isActive) => {
+      const isDescending = value === "nameDesc";
+      const Icon =
+        isActive && isDescending ? ArrowUpAZ : ArrowDownAZ;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
 ];
 
 interface FoldersPaneProps {
@@ -37,7 +59,7 @@ export function FoldersPane({
           <SortMenuButton
             title="Sort Folders"
             value={folderSortMode}
-            options={folderSortOptions}
+            items={folderSortItems}
             onChange={(nextMode) => {
               void setFolderSortMode(nextMode);
             }}
