@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ArrowDownAZ, ArrowUpAZ, GripVertical } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
@@ -49,6 +50,7 @@ export function FoldersPane({
   pendingManualFolderDropPlan,
 }: FoldersPaneProps) {
   const { folderSortMode, setFolderSortMode } = useNotes();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="h-full bg-bg-secondary border-r border-border/80 flex flex-col select-none">
@@ -76,7 +78,10 @@ export function FoldersPane({
         </div>
       </div>
 
-      <div className="ui-scrollbar-subtle flex-1 overflow-y-auto py-2.5">
+      <div
+        ref={scrollContainerRef}
+        className="ui-scrollbar-overlay flex-1 overflow-y-auto py-2.5"
+      >
         <FolderTreeView
           dragDelta={dragDelta}
           onManualFolderDropPlanChange={onManualFolderDropPlanChange}

@@ -254,7 +254,7 @@ function FormatBar({
   if (!editor) return null;
 
   return (
-    <div className="flex items-center gap-1 px-4 overflow-x-auto scrollbar-none">
+    <div className="ui-scrollbar-overlay flex items-center gap-1 px-4 overflow-x-auto">
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive("bold")}
@@ -2134,7 +2134,7 @@ export function Editor({
         )}
         <div
           ref={scrollContainerRef}
-          className="ui-scrollbar-subtle absolute inset-0 overflow-y-auto overflow-x-hidden"
+          className="ui-scrollbar-overlay absolute inset-0 overflow-y-auto overflow-x-hidden"
           dir={textDirection}
         >
           {sourceMode ? (

@@ -97,6 +97,7 @@ export function NotesPane() {
   const [inputValue, setInputValue] = useState(searchQuery);
   const debounceRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setInputValue(searchQuery);
@@ -251,7 +252,10 @@ export function NotesPane() {
         </div>
       </div>
 
-      <div className="ui-scrollbar-subtle flex-1 overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        className="ui-scrollbar-overlay flex-1 overflow-y-auto"
+      >
         {searchOpen && (
           <div className="sticky top-0 z-10 px-3 pt-2 bg-bg">
             <div className="relative">

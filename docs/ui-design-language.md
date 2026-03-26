@@ -29,6 +29,7 @@ The interface should read as:
 - Calm hierarchy: each screen should have one dominant working plane and clearly subordinate secondary surfaces.
 - Dense, not cluttered: fit useful information in view, but remove decorative noise and duplicate controls.
 - Native-feeling interaction: respect platform conventions, especially title bar behavior, keyboard shortcuts, and pane affordances.
+- Scrollbars are the one deliberate exception: Sly uses a shared cross-platform overlay scrollbar treatment for app-owned panes and scroll surfaces.
 - Consistency over cleverness: repeated UI patterns should behave the same way everywhere.
 - Progressive disclosure: keep the default surface simple and reveal advanced controls only when they are relevant.
 - Navigation should recede: folders and note lists are supporting panes; the editor is the primary canvas.
