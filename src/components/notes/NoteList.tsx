@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
@@ -13,6 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Checkbox,
   ListItem,
   destructiveMenuItemClassName,
   menuItemClassName,
@@ -253,6 +262,7 @@ export function NoteList({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pinnedIds = useMemo(
@@ -364,12 +374,14 @@ export function NoteList({
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-            <input
-              type="checkbox"
+          <label
+            htmlFor={dontAskAgainId}
+            className="flex items-center gap-2 pt-1 cursor-pointer select-none"
+          >
+            <Checkbox
+              id={dontAskAgainId}
               checked={dontAskAgain}
-              onChange={(e) => setDontAskAgain(e.target.checked)}
-              className="accent-accent-primary"
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
             />
             <span className="text-sm text-text-muted">Don't ask again</span>
           </label>

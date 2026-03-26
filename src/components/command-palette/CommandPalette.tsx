@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useId,
   useRef,
   useMemo,
   type KeyboardEvent,
@@ -28,6 +29,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Checkbox,
   DialogShell,
 } from "../ui";
 import {
@@ -103,6 +105,7 @@ export function CommandPalette({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const dontAskAgainId = useId();
   const [localSearchResults, setLocalSearchResults] = useState<
     { id: string; title: string; preview: string; modified: number }[]
   >([]);
@@ -803,12 +806,14 @@ export function CommandPalette({
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-            <input
-              type="checkbox"
+          <label
+            htmlFor={dontAskAgainId}
+            className="flex items-center gap-2 pt-1 cursor-pointer select-none"
+          >
+            <Checkbox
+              id={dontAskAgainId}
               checked={dontAskAgain}
-              onChange={(e) => setDontAskAgain(e.target.checked)}
-              className="accent-accent-primary"
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
             />
             <span className="text-sm text-text-muted">Don't ask again</span>
           </label>

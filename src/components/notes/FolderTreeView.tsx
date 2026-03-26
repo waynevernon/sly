@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -37,6 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Checkbox,
   InlineNameEditor,
   destructiveMenuItemClassName,
   menuItemClassName,
@@ -567,6 +569,7 @@ export function FolderTreeView({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const dontAskAgainId = useId();
   const treeRef = useRef<HTMLDivElement>(null);
   const collapsedFoldersRef = useRef<Set<string>>(new Set());
   collapsedFoldersRef.current = collapsedFolders;
@@ -1138,12 +1141,14 @@ export function FolderTreeView({
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-            <input
-              type="checkbox"
+          <label
+            htmlFor={dontAskAgainId}
+            className="flex items-center gap-2 pt-1 cursor-pointer select-none"
+          >
+            <Checkbox
+              id={dontAskAgainId}
               checked={dontAskAgain}
-              onChange={(e) => setDontAskAgain(e.target.checked)}
-              className="accent-accent-primary"
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
             />
             <span className="text-sm text-text-muted">Don't ask again</span>
           </label>

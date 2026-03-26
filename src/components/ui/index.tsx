@@ -13,6 +13,7 @@ export {
   TooltipContent,
 } from "./Tooltip";
 export { Button } from "./Button";
+export { Checkbox } from "./Checkbox";
 export { Input } from "./Input";
 export { InlineNameEditor } from "./InlineNameEditor";
 export { Select } from "./Select";
