@@ -397,7 +397,6 @@ function FormatBar({
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             className="ui-surface-popover z-50 p-2.5"
-            collisionPadding={8}
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
             <GridPicker
@@ -2007,7 +2006,6 @@ export function Editor({
                 className={`${menuSurfaceClassName} min-w-35 z-50`}
                 sideOffset={5}
                 align="end"
-                collisionPadding={8}
                 onCloseAutoFocus={(e) => {
                   // Prevent focus returning to trigger button
                   e.preventDefault();

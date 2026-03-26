@@ -456,7 +456,6 @@ const FolderItem = memo(function FolderItem({
       <ContextMenu.Portal>
         <ContextMenu.Content
           className={`${menuSurfaceClassName} min-w-44 z-50`}
-          collisionPadding={8}
           onCloseAutoFocus={(event) => {
             if (!suppressCloseAutoFocusRef.current) return;
             suppressCloseAutoFocusRef.current = false;
