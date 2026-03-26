@@ -105,6 +105,13 @@ export interface SearchResult {
   score: number;
 }
 
+export interface FileChangeEventPayload {
+  kind: string;
+  path: string;
+  changed_ids: string[];
+  folder_structure_changed: boolean;
+}
+
 export async function searchNotes(query: string): Promise<SearchResult[]> {
   return invoke("search_notes", { query });
 }

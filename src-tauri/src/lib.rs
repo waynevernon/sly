@@ -1,6 +1,9 @@
 use anyhow::Result;
 use base64::Engine;
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{
+    event::{CreateKind, ModifyKind, RemoveKind},
+    Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -12,8 +15,8 @@ use tantivy::query::QueryParser;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
 use tauri::menu::{
-    Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu,
-    HELP_SUBMENU_ID, WINDOW_SUBMENU_ID,
+    Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
+    WINDOW_SUBMENU_ID,
 };
 use tauri::webview::WebviewWindowBuilder;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl};
@@ -822,6 +825,68 @@ fn id_from_abs_path(notes_root: &Path, file_path: &Path) -> Option<String> {
     }
 }
 
+fn is_visible_notes_path(notes_root: &Path, path: &Path) -> bool {
+    let rel = match path.strip_prefix(notes_root) {
+        Ok(rel) => rel,
+        Err(_) => return false,
+    };
+
+    if rel.as_os_str().is_empty() {
+        return false;
+    }
+
+    for component in rel.components() {
+        if let std::path::Component::Normal(name) = component {
+            let name_str = match name.to_str() {
+                Some(value) => value,
+                None => return false,
+            };
+            if EXCLUDED_DIRS.contains(&name_str) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+fn is_visible_folder_structure_path(
+    notes_root: &Path,
+    event_kind: &EventKind,
+    path: &Path,
+) -> bool {
+    if !is_visible_notes_path(notes_root, path) {
+        return false;
+    }
+
+    match event_kind {
+        EventKind::Create(CreateKind::Folder) | EventKind::Remove(RemoveKind::Folder) => true,
+        EventKind::Create(CreateKind::Any | CreateKind::Other) => path.is_dir(),
+        EventKind::Modify(ModifyKind::Name(_)) => {
+            path.is_dir() || path.extension().and_then(|ext| ext.to_str()) != Some("md")
+        }
+        _ => false,
+    }
+}
+
+fn debounce_path(path: &Path, debounce_map: &Mutex<HashMap<PathBuf, Instant>>) -> bool {
+    let mut map = debounce_map.lock().expect("debounce map mutex");
+    let now = Instant::now();
+
+    if map.len() > 100 {
+        map.retain(|_, last| now.duration_since(*last) < Duration::from_secs(5));
+    }
+
+    if let Some(last) = map.get(path) {
+        if now.duration_since(*last) < Duration::from_millis(500) {
+            return false;
+        }
+    }
+
+    map.insert(path.to_path_buf(), now);
+    true
+}
+
 /// Convert a note ID to an absolute file path. Validates against path traversal.
 fn abs_path_from_id(notes_root: &Path, id: &str) -> Result<PathBuf, String> {
     if id.contains('\\') {
@@ -977,7 +1042,8 @@ fn sanitize_collapsed_folder_paths(collapsed_folders: &mut Vec<String>) {
 
 fn remove_collapsed_folder_paths(collapsed_folders: &mut Vec<String>, path: &str) {
     let prefix = format!("{}/", path);
-    collapsed_folders.retain(|folder_path| folder_path != path && !folder_path.starts_with(&prefix));
+    collapsed_folders
+        .retain(|folder_path| folder_path != path && !folder_path.starts_with(&prefix));
     sanitize_collapsed_folder_paths(collapsed_folders);
 }
 
@@ -2569,6 +2635,7 @@ struct FileChangeEvent {
     kind: String,
     path: String,
     changed_ids: Vec<String>,
+    folder_structure_changed: bool,
 }
 
 fn setup_file_watcher(
@@ -2583,68 +2650,68 @@ fn setup_file_watcher(
     let watcher = RecommendedWatcher::new(
         move |res: Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
+                let kind = match event.kind {
+                    EventKind::Create(_) => "created",
+                    EventKind::Modify(_) => "modified",
+                    EventKind::Remove(_) => "deleted",
+                    // Some backends emit Any for renames or unclassified changes.
+                    EventKind::Any => "modified",
+                    _ => return,
+                };
+
+                let mut changed_ids = Vec::new();
+                let mut seen_ids = HashSet::new();
+                let mut folder_structure_changed = false;
+                let mut emitted_path: Option<String> = None;
+
                 for path in event.paths.iter() {
+                    if !debounce_path(path, &debounce_map) {
+                        continue;
+                    }
+
+                    if emitted_path.is_none() {
+                        emitted_path = Some(path.to_string_lossy().into_owned());
+                    }
+
+                    if is_visible_folder_structure_path(&notes_root, &event.kind, path) {
+                        folder_structure_changed = true;
+                    }
+
                     let note_id = match id_from_abs_path(&notes_root, path) {
                         Some(id) => id,
                         None => continue,
                     };
 
-                    // Debounce with cleanup
-                    {
-                        let mut map = debounce_map.lock().expect("debounce map mutex");
-                        let now = Instant::now();
-
-                        if map.len() > 100 {
-                            map.retain(|_, last| {
-                                now.duration_since(*last) < Duration::from_secs(5)
-                            });
-                        }
-
-                        if let Some(last) = map.get(path) {
-                            if now.duration_since(*last) < Duration::from_millis(500) {
-                                continue;
-                            }
-                        }
-                        map.insert(path.clone(), now);
+                    if seen_ids.insert(note_id.clone()) {
+                        changed_ids.push(note_id.clone());
                     }
-
-                    let kind = match event.kind {
-                        notify::EventKind::Create(_) => "created",
-                        notify::EventKind::Modify(_) => "modified",
-                        notify::EventKind::Remove(_) => "deleted",
-                        // Some backends emit Any for renames or unclassified changes
-                        notify::EventKind::Any => "modified",
-                        _ => continue,
-                    };
 
                     // Update search index for external file changes
                     if let Some(state) = app_handle.try_state::<AppState>() {
                         let index = state.search_index.lock().expect("search index mutex");
                         if let Some(ref search_index) = *index {
                             match kind {
-                                "created" | "modified" => {
-                                    match std::fs::read_to_string(path) {
-                                        Ok(content) => {
-                                            let title = extract_title(&content);
-                                            let modified = std::fs::metadata(path)
-                                                .ok()
-                                                .and_then(|m| m.modified().ok())
-                                                .and_then(|t| {
-                                                    t.duration_since(std::time::UNIX_EPOCH).ok()
-                                                })
-                                                .map(|d| d.as_secs() as i64)
-                                                .unwrap_or(0);
-                                            let _ = search_index
-                                                .index_note(&note_id, &title, &content, modified);
-                                        }
-                                        Err(_) => {
-                                            // File gone between event and read — treat as deletion
-                                            if !path.exists() {
-                                                let _ = search_index.delete_note(&note_id);
-                                            }
+                                "created" | "modified" => match std::fs::read_to_string(path) {
+                                    Ok(content) => {
+                                        let title = extract_title(&content);
+                                        let modified = std::fs::metadata(path)
+                                            .ok()
+                                            .and_then(|m| m.modified().ok())
+                                            .and_then(|t| {
+                                                t.duration_since(std::time::UNIX_EPOCH).ok()
+                                            })
+                                            .map(|d| d.as_secs() as i64)
+                                            .unwrap_or(0);
+                                        let _ = search_index
+                                            .index_note(&note_id, &title, &content, modified);
+                                    }
+                                    Err(_) => {
+                                        // File gone between event and read — treat as deletion
+                                        if !path.exists() {
+                                            let _ = search_index.delete_note(&note_id);
                                         }
                                     }
-                                }
+                                },
                                 "deleted" => {
                                     let _ = search_index.delete_note(&note_id);
                                 }
@@ -2652,10 +2719,16 @@ fn setup_file_watcher(
                             }
                         }
                     }
+                }
 
-                    // Determine the actual kind for the frontend event
-                    // (a "modified" event on a non-existent file is really a delete)
-                    let effective_kind = if kind == "modified" && !path.exists() {
+                if folder_structure_changed || !changed_ids.is_empty() {
+                    let effective_kind = if kind == "modified"
+                        && !changed_ids.is_empty()
+                        && emitted_path
+                            .as_ref()
+                            .map(|path| !Path::new(path).exists())
+                            .unwrap_or(false)
+                    {
                         "deleted"
                     } else {
                         kind
@@ -2665,8 +2738,10 @@ fn setup_file_watcher(
                         "file-change",
                         FileChangeEvent {
                             kind: effective_kind.to_string(),
-                            path: path.to_string_lossy().into_owned(),
-                            changed_ids: vec![note_id.clone()],
+                            path: emitted_path
+                                .unwrap_or_else(|| notes_root.to_string_lossy().into_owned()),
+                            changed_ids,
+                            folder_structure_changed,
                         },
                     );
                 }
@@ -4084,8 +4159,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
-    let about_item = MenuItemBuilder::with_id(MENU_ABOUT_ID, "About Sly")
-        .build(app)?;
+    let about_item = MenuItemBuilder::with_id(MENU_ABOUT_ID, "About Sly").build(app)?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -4166,8 +4240,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let help_menu = Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[])?;
 
     #[cfg(not(target_os = "macos"))]
-    let help_menu =
-        Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[&about_item])?;
+    let help_menu = Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[&about_item])?;
 
     let mut menu = MenuBuilder::new(app);
 

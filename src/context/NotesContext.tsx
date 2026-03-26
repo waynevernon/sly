@@ -20,7 +20,10 @@ import {
   type Settings,
 } from "../types/note";
 import * as notesService from "../services/notes";
-import type { SearchResult } from "../services/notes";
+import type {
+  FileChangeEventPayload,
+  SearchResult,
+} from "../services/notes";
 import {
   sanitizeFolderIcons,
   type FolderIconsMap,
@@ -194,6 +197,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const pendingNewNoteIdRef = useRef<string | null>(null);
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
+  const windowRefreshTimeoutRef = useRef<number | null>(null);
 
   const refreshNotes = useCallback(async () => {
     if (!notesFolder) return;
@@ -928,7 +932,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     let isCancelled = false;
     let unlisten: (() => void) | undefined;
 
-    listen<{ changed_ids: string[] }>("file-change", (event) => {
+    listen<FileChangeEventPayload>("file-change", (event) => {
       // Don't process if effect was cleaned up
       if (isCancelled) return;
 
@@ -965,6 +969,43 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       }
     };
   }, [refreshNotes]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (!notesFolder) return;
+
+      if (windowRefreshTimeoutRef.current) {
+        clearTimeout(windowRefreshTimeoutRef.current);
+      }
+
+      windowRefreshTimeoutRef.current = window.setTimeout(() => {
+        windowRefreshTimeoutRef.current = null;
+        void refreshNotes();
+      }, 250);
+    };
+
+    const handleFocus = () => {
+      scheduleRefresh();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleRefresh();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (windowRefreshTimeoutRef.current) {
+        clearTimeout(windowRefreshTimeoutRef.current);
+        windowRefreshTimeoutRef.current = null;
+      }
+    };
+  }, [notesFolder, refreshNotes]);
 
   // Listen for "select-note" events from the backend (CLI, drag-drop, Open With, import from preview)
   useEffect(() => {

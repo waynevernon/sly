@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { listen } from "@tauri-apps/api/event";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { FilePlusCorner } from "lucide-react";
@@ -28,6 +29,7 @@ import {
 } from "../../lib/folderTree";
 import type { FolderNode } from "../../types/note";
 import * as notesService from "../../services/notes";
+import type { FileChangeEventPayload } from "../../services/notes";
 import { getFolderIconName } from "../../lib/folderIcons";
 import {
   AlertDialog,
@@ -573,6 +575,8 @@ export function FolderTreeView({
   const treeRef = useRef<HTMLDivElement>(null);
   const collapsedFoldersRef = useRef<Set<string>>(new Set());
   collapsedFoldersRef.current = collapsedFolders;
+  const folderLoadRequestIdRef = useRef(0);
+  const folderReloadTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const preloadPicker = () => {
@@ -588,25 +592,81 @@ export function FolderTreeView({
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
-  useEffect(() => {
+  const loadKnownFolders = useCallback(async () => {
     if (!notesFolder) {
+      folderLoadRequestIdRef.current += 1;
       setKnownFolders([]);
       setHasLoadedKnownFolders(true);
       return;
     }
 
+    const requestId = ++folderLoadRequestIdRef.current;
     setHasLoadedKnownFolders(false);
-    notesService
-      .listFolders()
-      .then((folders) => {
-        setKnownFolders(folders);
-        setHasLoadedKnownFolders(true);
-      })
-      .catch(() => {
-        setKnownFolders([]);
-        setHasLoadedKnownFolders(true);
-      });
-  }, [notes, notesFolder]);
+
+    try {
+      const folders = await notesService.listFolders();
+      if (requestId !== folderLoadRequestIdRef.current) return;
+      setKnownFolders(folders);
+      setHasLoadedKnownFolders(true);
+    } catch {
+      if (requestId !== folderLoadRequestIdRef.current) return;
+      setKnownFolders([]);
+      setHasLoadedKnownFolders(true);
+    }
+  }, [notesFolder]);
+
+  const scheduleKnownFoldersReload = useCallback(
+    (delay = 120) => {
+      if (folderReloadTimeoutRef.current) {
+        clearTimeout(folderReloadTimeoutRef.current);
+      }
+
+      folderReloadTimeoutRef.current = window.setTimeout(() => {
+        folderReloadTimeoutRef.current = null;
+        void loadKnownFolders();
+      }, delay);
+    },
+    [loadKnownFolders],
+  );
+
+  useEffect(() => {
+    scheduleKnownFoldersReload(0);
+  }, [notes, notesFolder, scheduleKnownFoldersReload]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    listen<FileChangeEventPayload>("file-change", (event) => {
+      if (isCancelled || !event.payload.folder_structure_changed) {
+        return;
+      }
+
+      scheduleKnownFoldersReload();
+    }).then((fn) => {
+      if (isCancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [scheduleKnownFoldersReload]);
+
+  useEffect(() => {
+    return () => {
+      if (folderReloadTimeoutRef.current) {
+        clearTimeout(folderReloadTimeoutRef.current);
+        folderReloadTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const tree = useMemo(
     () =>
@@ -630,6 +690,28 @@ export function FolderTreeView({
     tree.folders.forEach(visit);
     return [...paths];
   }, [knownFolders, tree]);
+
+  useEffect(() => {
+    if (!hasLoadedKnownFolders || !selectedFolderPath) {
+      return;
+    }
+
+    const folders = new Set(knownFolders);
+    if (folders.has(selectedFolderPath)) {
+      return;
+    }
+
+    let fallback = getFolderParentPath(selectedFolderPath);
+    while (fallback) {
+      if (folders.has(fallback)) {
+        selectFolder(fallback);
+        return;
+      }
+      fallback = getFolderParentPath(fallback);
+    }
+
+    selectFolder(null);
+  }, [hasLoadedKnownFolders, knownFolders, selectFolder, selectedFolderPath]);
 
   useEffect(() => {
     setCollapsedFoldersState(new Set());
