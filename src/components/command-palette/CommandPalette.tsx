@@ -728,7 +728,7 @@ export function CommandPalette({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="ui-focus-ring-subtle h-[var(--ui-control-height-prominent)] w-full border-0 bg-transparent px-4 py-3 text-[17px] text-text placeholder:text-text-muted/50"
+            className="h-[var(--ui-control-height-prominent)] w-full border-0 bg-transparent px-4 py-3 text-[17px] text-text placeholder:text-text-muted/50 outline-none"
           />
         </div>
 

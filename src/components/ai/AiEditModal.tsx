@@ -188,7 +188,7 @@ export function AiEditModal({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="ui-focus-ring-subtle h-[var(--ui-control-height-prominent)] flex-1 bg-transparent text-[17px] text-text placeholder:text-text-muted/50 disabled:opacity-50"
+              className="h-[var(--ui-control-height-prominent)] flex-1 bg-transparent text-[17px] text-text placeholder:text-text-muted/50 outline-none disabled:opacity-50"
             />
             {isExecuting && (
               <SpinnerIcon className="w-5 h-5 animate-spin text-text-muted shrink-0" />
