@@ -49,100 +49,50 @@ export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {
     id: "system-sans",
     label: "System Sans",
     stack:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
   "system-serif": {
     id: "system-serif",
     label: "System Serif",
     stack: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
   },
+  "reading-serif": {
+    id: "reading-serif",
+    label: "Reading Serif",
+    stack:
+      'Georgia, Cambria, "Times New Roman", Times, "Liberation Serif", serif',
+  },
   "system-mono": {
     id: "system-mono",
     label: "System Mono",
     stack:
-      'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
+      'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
   },
-  inter: {
-    id: "inter",
-    label: "Inter",
+  "developer-mono": {
+    id: "developer-mono",
+    label: "Developer Mono",
     stack:
-      '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  },
-  "atkinson-hyperlegible": {
-    id: "atkinson-hyperlegible",
-    label: "Atkinson Hyperlegible",
-    stack:
-      '"Atkinson Hyperlegible", "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-  },
-  charter: {
-    id: "charter",
-    label: "Charter",
-    stack: '"Charter", "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif',
-  },
-  "iowan-old-style": {
-    id: "iowan-old-style",
-    label: "Iowan Old Style",
-    stack: '"Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif',
-  },
-  "jetbrains-mono": {
-    id: "jetbrains-mono",
-    label: "JetBrains Mono",
-    stack:
-      '"JetBrains Mono", "SF Mono", SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
-  },
-  "cascadia-code": {
-    id: "cascadia-code",
-    label: "Cascadia Code",
-    stack:
-      '"Cascadia Code", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace',
-  },
-  "ibm-plex-mono": {
-    id: "ibm-plex-mono",
-    label: "IBM Plex Mono",
-    stack:
-      '"IBM Plex Mono", "SF Mono", SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
-  },
-  iosevka: {
-    id: "iosevka",
-    label: "Iosevka",
-    stack:
-      '"Iosevka", "Iosevka Term", "SF Mono", SFMono-Regular, Menlo, Monaco, monospace',
-  },
-  "source-code-pro": {
-    id: "source-code-pro",
-    label: "Source Code Pro",
-    stack:
-      '"Source Code Pro", "SF Mono", SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
+      'Consolas, "Cascadia Mono", "Cascadia Code", "SF Mono", SFMono-Regular, Menlo, Monaco, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
   },
 };
 
 export const UI_FONT_PRESET_IDS: FontPresetId[] = [
   "system-sans",
-  "inter",
-  "atkinson-hyperlegible",
   "system-serif",
-  "charter",
-  "iowan-old-style",
+  "reading-serif",
 ];
 
 export const NOTE_FONT_PRESET_IDS: FontPresetId[] = [
   "system-sans",
-  "inter",
-  "atkinson-hyperlegible",
   "system-serif",
-  "charter",
-  "iowan-old-style",
+  "reading-serif",
   "system-mono",
-  "jetbrains-mono",
+  "developer-mono",
 ];
 
 export const CODE_FONT_PRESET_IDS: FontPresetId[] = [
   "system-mono",
-  "jetbrains-mono",
-  "cascadia-code",
-  "ibm-plex-mono",
-  "iosevka",
-  "source-code-pro",
+  "developer-mono",
 ];
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
@@ -1231,6 +1181,17 @@ const THEME_PRESET_IDS = new Set<ThemePresetId>(
   Object.keys(THEME_PRESETS) as ThemePresetId[],
 );
 const FONT_PRESET_IDS = new Set<FontPresetId>(Object.keys(FONT_PRESETS) as FontPresetId[]);
+const LEGACY_FONT_PRESET_ALIASES: Record<string, FontPresetId> = {
+  inter: "system-sans",
+  "atkinson-hyperlegible": "system-sans",
+  charter: "reading-serif",
+  "iowan-old-style": "reading-serif",
+  "jetbrains-mono": "developer-mono",
+  "cascadia-code": "developer-mono",
+  "ibm-plex-mono": "developer-mono",
+  iosevka: "developer-mono",
+  "source-code-pro": "developer-mono",
+};
 
 export function isThemePresetId(value: string): value is ThemePresetId {
   return THEME_PRESET_IDS.has(value as ThemePresetId);
@@ -1250,6 +1211,11 @@ export function normalizeFontChoice(
 
   if (choice.kind === "custom") {
     return { kind: "custom", value: choice.value ?? "" };
+  }
+
+  const aliasedPreset = LEGACY_FONT_PRESET_ALIASES[choice.value];
+  if (aliasedPreset) {
+    return { kind: "preset", value: aliasedPreset };
   }
 
   if (isFontPresetId(choice.value)) {

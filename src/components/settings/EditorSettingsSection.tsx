@@ -290,7 +290,7 @@ export function AppearanceSettingsSection() {
             label="UI Font"
             value={uiFont}
             presetIds={UI_FONT_PRESET_IDS}
-            customPlaceholder={`"Inter", -apple-system, sans-serif`}
+            customPlaceholder={`system-ui, sans-serif`}
             onChange={setUiFont}
           />
 
@@ -298,7 +298,7 @@ export function AppearanceSettingsSection() {
             label="Note Font"
             value={noteFont}
             presetIds={NOTE_FONT_PRESET_IDS}
-            customPlaceholder={`"Newsreader", Georgia, serif`}
+            customPlaceholder={`Georgia, serif`}
             onChange={setNoteFont}
           />
 
@@ -306,7 +306,7 @@ export function AppearanceSettingsSection() {
             label="Code Font"
             value={codeFont}
             presetIds={CODE_FONT_PRESET_IDS}
-            customPlaceholder={`"Berkeley Mono", monospace`}
+            customPlaceholder={`Consolas, "SF Mono", monospace`}
             onChange={setCodeFont}
           />
 

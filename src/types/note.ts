@@ -58,15 +58,8 @@ export type FontPresetId =
   | "system-sans"
   | "system-serif"
   | "system-mono"
-  | "inter"
-  | "atkinson-hyperlegible"
-  | "charter"
-  | "iowan-old-style"
-  | "jetbrains-mono"
-  | "cascadia-code"
-  | "ibm-plex-mono"
-  | "iosevka"
-  | "source-code-pro";
+  | "reading-serif"
+  | "developer-mono";
 
 export interface FontChoice {
   kind: "preset" | "custom";
