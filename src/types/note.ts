@@ -116,7 +116,6 @@ export interface NoteTypographySettings {
   baseFontSize: number;
   boldWeight: number;
   lineHeight: number;
-  paragraphSpacing: boolean;
 }
 
 export interface AppearanceSettings {
