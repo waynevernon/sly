@@ -36,8 +36,10 @@ export function SortMenuButton<T extends string>({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          side="bottom"
           sideOffset={8}
-          align="end"
+          align="start"
+          avoidCollisions={false}
           className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
           <DropdownMenu.Label className={menuLabelClassName}>
