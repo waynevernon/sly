@@ -298,7 +298,7 @@ export function AppearanceSettingsSection() {
             label="Note Font"
             value={noteFont}
             presetIds={NOTE_FONT_PRESET_IDS}
-            customPlaceholder={`Georgia, serif`}
+            customPlaceholder={`ui-serif, serif`}
             onChange={setNoteFont}
           />
 
@@ -306,7 +306,7 @@ export function AppearanceSettingsSection() {
             label="Code Font"
             value={codeFont}
             presetIds={CODE_FONT_PRESET_IDS}
-            customPlaceholder={`Consolas, "SF Mono", monospace`}
+            customPlaceholder={`ui-monospace, monospace`}
             onChange={setCodeFont}
           />
 

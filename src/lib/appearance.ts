@@ -47,52 +47,39 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {
   "system-sans": {
     id: "system-sans",
-    label: "System Sans",
+    label: "Sans",
     stack:
       'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
   "system-serif": {
     id: "system-serif",
-    label: "System Serif",
+    label: "Serif",
     stack: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-  },
-  "reading-serif": {
-    id: "reading-serif",
-    label: "Reading Serif",
-    stack:
-      'Georgia, Cambria, "Times New Roman", Times, "Liberation Serif", serif',
   },
   "system-mono": {
     id: "system-mono",
-    label: "System Mono",
+    label: "Mono",
     stack:
       'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
-  },
-  "developer-mono": {
-    id: "developer-mono",
-    label: "Developer Mono",
-    stack:
-      'Consolas, "Cascadia Mono", "Cascadia Code", "SF Mono", SFMono-Regular, Menlo, Monaco, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
   },
 };
 
 export const UI_FONT_PRESET_IDS: FontPresetId[] = [
   "system-sans",
   "system-serif",
-  "reading-serif",
+  "system-mono",
 ];
 
 export const NOTE_FONT_PRESET_IDS: FontPresetId[] = [
   "system-sans",
   "system-serif",
-  "reading-serif",
   "system-mono",
-  "developer-mono",
 ];
 
 export const CODE_FONT_PRESET_IDS: FontPresetId[] = [
+  "system-sans",
+  "system-serif",
   "system-mono",
-  "developer-mono",
 ];
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
@@ -1181,17 +1168,6 @@ const THEME_PRESET_IDS = new Set<ThemePresetId>(
   Object.keys(THEME_PRESETS) as ThemePresetId[],
 );
 const FONT_PRESET_IDS = new Set<FontPresetId>(Object.keys(FONT_PRESETS) as FontPresetId[]);
-const LEGACY_FONT_PRESET_ALIASES: Record<string, FontPresetId> = {
-  inter: "system-sans",
-  "atkinson-hyperlegible": "system-sans",
-  charter: "reading-serif",
-  "iowan-old-style": "reading-serif",
-  "jetbrains-mono": "developer-mono",
-  "cascadia-code": "developer-mono",
-  "ibm-plex-mono": "developer-mono",
-  iosevka: "developer-mono",
-  "source-code-pro": "developer-mono",
-};
 
 export function isThemePresetId(value: string): value is ThemePresetId {
   return THEME_PRESET_IDS.has(value as ThemePresetId);
@@ -1211,11 +1187,6 @@ export function normalizeFontChoice(
 
   if (choice.kind === "custom") {
     return { kind: "custom", value: choice.value ?? "" };
-  }
-
-  const aliasedPreset = LEGACY_FONT_PRESET_ALIASES[choice.value];
-  if (aliasedPreset) {
-    return { kind: "preset", value: aliasedPreset };
   }
 
   if (isFontPresetId(choice.value)) {

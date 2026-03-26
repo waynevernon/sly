@@ -57,9 +57,7 @@ export type ThemePresetId =
 export type FontPresetId =
   | "system-sans"
   | "system-serif"
-  | "system-mono"
-  | "reading-serif"
-  | "developer-mono";
+  | "system-mono";
 
 export interface FontChoice {
   kind: "preset" | "custom";
