@@ -153,18 +153,6 @@ export function AppearanceSettingsSection() {
     "resolved",
   );
 
-  const handleNumericChange = (
-    field: "baseFontSize" | "lineHeight",
-    value: string,
-    min: number,
-    max: number,
-  ) => {
-    const parsed = parseFloat(value);
-    if (!Number.isFinite(parsed)) return;
-    const clamped = Math.min(Math.max(parsed, min), max);
-    setNoteTypographySetting(field, clamped);
-  };
-
   const hasCustomizedTypographyOrLayout =
     !fontChoiceEquals(uiFont, DEFAULT_APPEARANCE_SETTINGS.uiFont) ||
     !fontChoiceEquals(noteFont, DEFAULT_APPEARANCE_SETTINGS.noteFont) ||
@@ -287,15 +275,14 @@ export function AppearanceSettingsSection() {
       <section>
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="text-xl font-medium">Typography & Layout</h2>
-          {hasCustomizedTypographyOrLayout && (
-            <Button
-              onClick={resetTypographyAndLayoutSettings}
-              variant="ghost"
-              size="sm"
-            >
-              Reset typography & layout
-            </Button>
-          )}
+          <Button
+            onClick={resetTypographyAndLayoutSettings}
+            variant="ghost"
+            size="sm"
+            className={hasCustomizedTypographyOrLayout ? "" : "invisible"}
+          >
+            Reset typography & layout
+          </Button>
         </div>
 
         <div className="ui-settings-panel pl-4 py-4 pr-4 space-y-4">
@@ -325,17 +312,38 @@ export function AppearanceSettingsSection() {
 
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">Note Size</label>
-            <div className="relative w-40">
-              <Input
-                type="number"
-                min="12"
-                max="24"
-                value={noteTypography.baseFontSize}
-                onChange={(e) =>
-                  handleNumericChange("baseFontSize", e.target.value, 12, 24)
+            <div className="flex items-center gap-1 w-40">
+              <IconButton
+                variant="outline"
+                size="md"
+                onClick={() =>
+                  setNoteTypographySetting(
+                    "baseFontSize",
+                    Math.max(12, noteTypography.baseFontSize - 1),
+                  )
                 }
-                className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
+                disabled={noteTypography.baseFontSize <= 12}
+                title="Decrease font size"
+              >
+                <MinusIcon className="w-4 h-4" />
+              </IconButton>
+              <span className="text-sm font-medium tabular-nums flex-1 text-center">
+                {noteTypography.baseFontSize}
+              </span>
+              <IconButton
+                variant="outline"
+                size="md"
+                onClick={() =>
+                  setNoteTypographySetting(
+                    "baseFontSize",
+                    Math.min(24, noteTypography.baseFontSize + 1),
+                  )
+                }
+                disabled={noteTypography.baseFontSize >= 24}
+                title="Increase font size"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </IconButton>
             </div>
           </div>
 
@@ -358,18 +366,38 @@ export function AppearanceSettingsSection() {
 
           <div className="flex items-center justify-between">
             <label className="text-sm text-text font-medium">Line Height</label>
-            <div className="relative w-40">
-              <Input
-                type="number"
-                min="1.0"
-                max="2.5"
-                step="0.1"
-                value={noteTypography.lineHeight}
-                onChange={(e) =>
-                  handleNumericChange("lineHeight", e.target.value, 1.0, 2.5)
+            <div className="flex items-center gap-1 w-40">
+              <IconButton
+                variant="outline"
+                size="md"
+                onClick={() =>
+                  setNoteTypographySetting(
+                    "lineHeight",
+                    Math.round((noteTypography.lineHeight - 0.1) * 10) / 10,
+                  )
                 }
-                className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
+                disabled={noteTypography.lineHeight <= 1.0}
+                title="Decrease line height"
+              >
+                <MinusIcon className="w-4 h-4" />
+              </IconButton>
+              <span className="text-sm font-medium tabular-nums flex-1 text-center">
+                {noteTypography.lineHeight.toFixed(1)}
+              </span>
+              <IconButton
+                variant="outline"
+                size="md"
+                onClick={() =>
+                  setNoteTypographySetting(
+                    "lineHeight",
+                    Math.round((noteTypography.lineHeight + 0.1) * 10) / 10,
+                  )
+                }
+                disabled={noteTypography.lineHeight >= 2.5}
+                title="Increase line height"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </IconButton>
             </div>
           </div>
 
