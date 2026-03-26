@@ -5,10 +5,12 @@ import {
   SwatchIcon,
   KeyboardIcon,
   InfoIcon,
+  WorkflowIcon,
 } from "../icons";
 import { Button, IconButton } from "../ui";
 import { GeneralSettingsSection } from "./GeneralSettingsSection";
 import { AppearanceSettingsSection } from "./EditorSettingsSection";
+import { ExtensionsSettingsSection } from "./ExtensionsSettingsSection";
 import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
 import { AboutSettingsSection } from "./AboutSettingsSection";
 import { alt, isMac, mod, shortcut } from "../../lib/platform";
@@ -18,7 +20,7 @@ interface SettingsPageProps {
   initialTab?: SettingsTab;
 }
 
-export type SettingsTab = "general" | "editor" | "shortcuts" | "about";
+export type SettingsTab = "general" | "editor" | "extensions" | "shortcuts" | "about";
 
 const tabs: {
   id: SettingsTab;
@@ -39,16 +41,22 @@ const tabs: {
     shortcutLabel: shortcut(mod, alt, "2"),
   },
   {
+    id: "extensions",
+    label: "Extensions",
+    icon: WorkflowIcon,
+    shortcutLabel: shortcut(mod, alt, "3"),
+  },
+  {
     id: "shortcuts",
     label: "Shortcuts",
     icon: KeyboardIcon,
-    shortcutLabel: shortcut(mod, alt, "3"),
+    shortcutLabel: shortcut(mod, alt, "4"),
   },
   {
     id: "about",
     label: "About",
     icon: InfoIcon,
-    shortcutLabel: shortcut(mod, alt, "4"),
+    shortcutLabel: shortcut(mod, alt, "5"),
   },
 ];
 
@@ -78,8 +86,11 @@ export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
         setActiveTab("editor");
       } else if (e.code === "Digit3") {
         e.preventDefault();
-        setActiveTab("shortcuts");
+        setActiveTab("extensions");
       } else if (e.code === "Digit4") {
+        e.preventDefault();
+        setActiveTab("shortcuts");
+      } else if (e.code === "Digit5") {
         e.preventDefault();
         setActiveTab("about");
       }
@@ -146,6 +157,7 @@ export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
           <div className="w-full max-w-[56rem] mx-auto px-8 pb-8">
             {activeTab === "general" && <GeneralSettingsSection />}
             {activeTab === "editor" && <AppearanceSettingsSection />}
+            {activeTab === "extensions" && <ExtensionsSettingsSection />}
             {activeTab === "shortcuts" && <ShortcutsSettingsSection />}
             {activeTab === "about" && <AboutSettingsSection />}
           </div>

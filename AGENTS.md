@@ -206,7 +206,7 @@ The settings UI currently covers:
 - `Cmd+Shift+F` - Search notes
 - `Cmd+R` - Reload current note
 - `Cmd+,` - Open settings
-- `Cmd+1/2/3/4` - Switch settings tabs
+- `Cmd+1/2/3/4/5` - Switch settings tabs
 - `Cmd+\` - Toggle sidebar
 - `Cmd+B/I` - Bold/Italic
 - `Cmd+=` - Zoom in

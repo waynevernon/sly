@@ -114,11 +114,16 @@ const shortcuts: Shortcut[] = [
   },
   {
     keys: [mod, alt, "3"],
-    description: "Go to Shortcuts settings tab",
+    description: "Go to Extensions settings tab",
     category: "Settings",
   },
   {
     keys: [mod, alt, "4"],
+    description: "Go to Shortcuts settings tab",
+    category: "Settings",
+  },
+  {
+    keys: [mod, alt, "5"],
     description: "Go to About settings tab",
     category: "Settings",
   },
