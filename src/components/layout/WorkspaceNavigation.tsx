@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
+  type Modifier,
   PointerSensor,
   useSensor,
   useSensors,
@@ -23,6 +24,52 @@ import { NotesPane } from "./NotesPane";
 interface WorkspaceNavigationProps {
   paneMode: PaneMode;
   onOpenSettings?: () => void;
+}
+
+const NOTE_DRAG_CURSOR_INSET_X = 12;
+const NOTE_DRAG_CURSOR_INSET_Y = 8;
+
+function getEventClientCoordinates(event: Event | null): {
+  x: number;
+  y: number;
+} | null {
+  if (!event) return null;
+
+  const pointerLikeEvent = event as Event & {
+    clientX?: number;
+    clientY?: number;
+  };
+  if (
+    typeof pointerLikeEvent.clientX === "number" &&
+    typeof pointerLikeEvent.clientY === "number"
+  ) {
+    return {
+      x: pointerLikeEvent.clientX,
+      y: pointerLikeEvent.clientY,
+    };
+  }
+
+  const touchLikeEvent = event as Event & {
+    touches?: ArrayLike<{ clientX: number; clientY: number }>;
+    changedTouches?: ArrayLike<{ clientX: number; clientY: number }>;
+  };
+  const touch = touchLikeEvent.touches?.[0] ?? touchLikeEvent.changedTouches?.[0];
+  if (touch) {
+    return {
+      x: touch.clientX,
+      y: touch.clientY,
+    };
+  }
+
+  return null;
+}
+
+function getOverlayHotspot(overlaySize: number, inset: number): number {
+  if (overlaySize <= 0) {
+    return inset;
+  }
+
+  return Math.min(inset, overlaySize / 2);
 }
 
 export function WorkspaceNavigation({
@@ -139,6 +186,42 @@ export function WorkspaceNavigation({
       setDragFolderPath(path);
     }
   }, []);
+
+  const noteDragOverlayModifier = useCallback<Modifier>(
+    ({ active, activatorEvent, activeNodeRect, overlayNodeRect, transform }) => {
+      if (
+        active?.data.current?.type !== "note" ||
+        !activeNodeRect ||
+        !overlayNodeRect
+      ) {
+        return transform;
+      }
+
+      const pointer = getEventClientCoordinates(activatorEvent);
+      if (!pointer) {
+        return transform;
+      }
+
+      const sourceOffsetX = pointer.x - activeNodeRect.left;
+      const sourceOffsetY = pointer.y - activeNodeRect.top;
+
+      const overlayHotspotX = getOverlayHotspot(
+        overlayNodeRect.width,
+        NOTE_DRAG_CURSOR_INSET_X,
+      );
+      const overlayHotspotY = getOverlayHotspot(
+        overlayNodeRect.height,
+        NOTE_DRAG_CURSOR_INSET_Y,
+      );
+
+      return {
+        ...transform,
+        x: transform.x + sourceOffsetX - overlayHotspotX,
+        y: transform.y + sourceOffsetY - overlayHotspotY,
+      };
+    },
+    [],
+  );
 
   const handleDragMove = useCallback((event: DragMoveEvent) => {
     setDragDelta({ x: event.delta.x, y: event.delta.y });
@@ -313,6 +396,7 @@ export function WorkspaceNavigation({
 
       <DragOverlay
         dropAnimation={null}
+        modifiers={[noteDragOverlayModifier]}
         style={{ width: "max-content", height: "max-content" }}
       >
         {dragLabel && (
