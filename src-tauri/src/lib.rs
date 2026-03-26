@@ -93,11 +93,11 @@ fn default_theme_mode() -> String {
 }
 
 fn default_light_preset_id() -> String {
-    "github-light-default".to_string()
+    "nord-light".to_string()
 }
 
 fn default_dark_preset_id() -> String {
-    "github-dark-default".to_string()
+    "nord".to_string()
 }
 
 fn default_editor_width() -> String {

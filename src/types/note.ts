@@ -20,6 +20,7 @@ export type ThemePresetId =
   | "github-light-colorblind"
   | "github-light-high-contrast"
   | "ayu-light"
+  | "nord-light"
   | "solarized-light"
   | "gruvbox-light"
   | "gruvbox-material-light"

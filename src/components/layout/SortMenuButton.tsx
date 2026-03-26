@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ListFilter } from "lucide-react";
 import { cn } from "../../lib/utils";
 import {
   IconButton,
+  TooltipContent,
+  TooltipRoot,
+  TooltipTrigger,
   menuItemClassName,
   menuLabelClassName,
   menuSeparatorClassName,
@@ -31,19 +34,56 @@ export function SortMenuButton<T extends string>({
   items,
   onChange,
 }: SortMenuButtonProps<T>) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [suppressTooltip, setSuppressTooltip] = useState(false);
+
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <IconButton title={title}>
-          <ListFilter className="w-4.25 h-4.25 stroke-[1.5]" />
-        </IconButton>
-      </DropdownMenu.Trigger>
+    <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
+      <TooltipRoot
+        open={tooltipOpen && !menuOpen && !suppressTooltip}
+        onOpenChange={(open) => {
+          if (suppressTooltip) {
+            setTooltipOpen(false);
+            return;
+          }
+          setTooltipOpen(open);
+        }}
+        delayDuration={200}
+      >
+        <TooltipTrigger asChild>
+          <DropdownMenu.Trigger asChild>
+            <IconButton
+              aria-label={title}
+              onPointerDown={() => {
+                setTooltipOpen(false);
+                setSuppressTooltip(true);
+              }}
+              onPointerLeave={() => {
+                setTooltipOpen(false);
+                setSuppressTooltip(false);
+              }}
+              onBlur={() => {
+                setTooltipOpen(false);
+                setSuppressTooltip(false);
+              }}
+            >
+              <ListFilter className="w-4.25 h-4.25 stroke-[1.5]" />
+            </IconButton>
+          </DropdownMenu.Trigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{title}</TooltipContent>
+      </TooltipRoot>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           side="bottom"
           sideOffset={8}
           align="start"
           avoidCollisions={false}
+          onCloseAutoFocus={(event) => {
+            setTooltipOpen(false);
+            event.preventDefault();
+          }}
           className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
           <DropdownMenu.Label className={menuLabelClassName}>
