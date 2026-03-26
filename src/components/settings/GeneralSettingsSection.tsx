@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useGit } from "../../context/GitContext";
 import { useTheme } from "../../context/ThemeContext";
+import * as notesService from "../../services/notes";
 import { Button } from "../ui";
 import { Input } from "../ui";
 import {
@@ -14,8 +15,6 @@ import {
   CloudPlusIcon,
   ChevronRightIcon,
 } from "../icons";
-import type { Settings } from "../../types/note";
-
 // Format remote URL for display - extract user/repo from full URL
 function formatRemoteUrl(url: string | null): string {
   if (!url) return "Connected";
@@ -72,12 +71,12 @@ export function GeneralSettingsSection() {
   useEffect(() => {
     const loadTemplate = async () => {
       try {
-        const settings = await invoke<Settings>("get_settings");
+        const settings = await notesService.getSettings();
         const template = settings.defaultNoteName || "Untitled";
         setNoteTemplate(template);
 
         // Update preview
-        const preview = await invoke<string>("preview_note_name", { template });
+        const preview = await notesService.previewNoteName(template);
         setPreviewNoteName(preview);
       } catch (error) {
         console.error("Failed to load template:", error);
@@ -90,9 +89,7 @@ export function GeneralSettingsSection() {
   useEffect(() => {
     const updatePreview = async () => {
       try {
-        const preview = await invoke<string>("preview_note_name", {
-          template: noteTemplate,
-        });
+        const preview = await notesService.previewNoteName(noteTemplate);
         setPreviewNoteName(preview);
       } catch (error) {
         setPreviewNoteName("Invalid template");
@@ -105,12 +102,8 @@ export function GeneralSettingsSection() {
 
   const handleSaveTemplate = async () => {
     try {
-      const settings = await invoke<Settings>("get_settings");
-      await invoke("update_settings", {
-        newSettings: {
-          ...settings,
-          defaultNoteName: noteTemplate || undefined,
-        },
+      await notesService.patchSettings({
+        defaultNoteName: noteTemplate || null,
       });
       toast.success("Default name saved");
     } catch (error) {

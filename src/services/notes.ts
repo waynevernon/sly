@@ -4,6 +4,7 @@ import type {
   Note,
   NoteMetadata,
   Settings,
+  SettingsPatch,
 } from "../types/note";
 
 export async function getNotesFolder(): Promise<string | null> {
@@ -77,6 +78,10 @@ export async function updateSettings(settings: Settings): Promise<void> {
   return invoke("update_settings", { newSettings: settings });
 }
 
+export async function patchSettings(patch: SettingsPatch): Promise<void> {
+  return invoke("patch_settings", { patch });
+}
+
 export async function getAppearanceSettings(): Promise<AppearanceSettings> {
   return invoke("get_appearance_settings");
 }
@@ -118,4 +123,8 @@ export async function searchNotes(query: string): Promise<SearchResult[]> {
 
 export async function startFileWatcher(): Promise<void> {
   return invoke("start_file_watcher");
+}
+
+export async function previewNoteName(template: string): Promise<string> {
+  return invoke("preview_note_name", { template });
 }

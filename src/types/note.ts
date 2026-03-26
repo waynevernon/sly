@@ -152,6 +152,18 @@ export interface Settings {
   folderManualOrder?: FolderManualOrder;
 }
 
+export interface SettingsPatch {
+  gitEnabled?: boolean | null;
+  pinnedNoteIds?: string[] | null;
+  defaultNoteName?: string | null;
+  ollamaModel?: string | null;
+  folderIcons?: Record<string, string> | null;
+  collapsedFolders?: string[] | null;
+  noteSortMode?: NoteSortMode;
+  folderSortMode?: FolderSortMode;
+  folderManualOrder?: FolderManualOrder | null;
+}
+
 export interface FolderNode {
   name: string;
   path: string;

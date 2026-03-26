@@ -17,15 +17,24 @@ Sly is a cross-platform markdown note-taking app for macOS, Windows, and Linux. 
 ```bash
 npm run dev          # Start Vite dev server only
 npm run build        # Build frontend (tsc + vite)
+npm run lint         # Run lightweight frontend lint checks
+npm run test         # Run frontend unit/component tests once
+npm run verify       # Run lint + frontend tests + frontend build
 npm run tauri dev    # Run full app in development mode
 npm run tauri build  # Build production app
+cargo test           # Run Rust unit tests
 ```
 
 ## CI/CD
 
 ### CI (`ci.yml`)
 
-Runs on pushes and pull requests to `main`. Validates the frontend build (`tsc` + Vite) plus Rust compilation (`cargo check` + `cargo clippy`) on Ubuntu. It does not produce release bundles.
+Runs on pushes and pull requests to `main`. It has two lightweight gates on Ubuntu:
+
+- **Frontend job**: `npm ci`, `npm run lint`, `npm run test`, `npm run build`
+- **Rust job**: `cargo test`, `cargo check`, `cargo clippy --all-targets --all-features -- -D warnings`
+
+It does not produce release bundles.
 
 ### Release (`release.yml`)
 
@@ -125,6 +134,8 @@ sly/
 
 All backend operations go through Tauri commands in `src-tauri/src/lib.rs`. Frontend code calls them via `invoke()` from `@tauri-apps/api/core`.
 
+Prefer service wrappers in `src/services/` over calling `invoke()` directly from components. Tests should usually target those service wrappers, context logic, and pure helpers rather than raw command calls from UI code.
+
 ### State Management
 
 - `NotesContext` manages note state, CRUD, search, file watching, and folder operations
@@ -180,7 +191,7 @@ The settings UI currently covers:
 
 **Folder Management:** `list_folders`, `create_folder`, `delete_folder`, `rename_folder`, `move_folder`
 
-**Configuration:** `get_notes_folder`, `set_notes_folder`, `get_settings`, `update_settings`, `get_appearance_settings`, `update_appearance_settings`
+**Configuration:** `get_notes_folder`, `set_notes_folder`, `get_settings`, `patch_settings`, `update_settings`, `get_appearance_settings`, `update_appearance_settings`, `preview_note_name`
 
 **Search:** `search_notes`, `rebuild_search_index`
 
@@ -224,6 +235,34 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Maintain type safety throughout the frontend and backend
 - Avoid commented-out code and TODO-driven dead branches in production code
 - Prefer idiomatic, clean solutions over workarounds; if a workaround is the only viable path, flag it explicitly before proceeding
+- Prefer small, testable helper functions over large monolithic branches when logic is easy to isolate
+
+### Testing
+
+- Keep testing lightweight. This is a solo side project, so favor a small number of high-value automated checks over broad, fragile coverage.
+- Default stack:
+  - Frontend linting with ESLint
+  - Frontend unit/component tests with Vitest + React Testing Library
+  - Rust unit tests with `cargo test`
+  - GitHub Actions as the automatic enforcement layer
+- Do not hide tests inside `npm run build`. `build` stays build-only. Use `npm run verify` for the full frontend local check when needed.
+- Prefer testing service wrappers, context behavior, pure helpers, and small settings flows before reaching for large UI integration tests.
+- Avoid snapshot-heavy tests and brittle DOM tests. Use semantic queries and test user-visible behavior or command payloads.
+- Mock Tauri APIs in frontend tests. Do not require a real desktop shell for routine coverage.
+- Add or update tests when:
+  - fixing a bug with a clear reproduction path
+  - adding logic-heavy behavior in contexts, services, search, settings, folder ordering, or filename/path handling
+  - changing persistence rules, command payloads, or sanitization/validation logic
+- You do not need a new test for every presentational UI tweak. Visual polish changes can rely on manual review unless they introduce meaningful behavior.
+- For Rust, prefer unit tests around pure helpers and validation logic over full command integration tests.
+- For frontend, avoid deep editor internals unless the app-owned wrapper logic is isolated and stable enough to test cheaply.
+- Before opening or merging a PR, the expected local confidence path is:
+  - `npm run verify`
+  - `cargo test`
+  - `cargo check`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+- GitHub Actions runs the automated suite on push and pull request. Keep that path green and treat CI as the default gate.
+- If lint produces warnings from older code, do not expand scope into a repo-wide cleanup unless the task is specifically about that. Fix nearby warnings opportunistically.
 
 ### Performance
 

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   SpinnerIcon,
   ClaudeIcon,
@@ -8,8 +7,8 @@ import {
   OllamaIcon,
 } from "../icons";
 import * as aiService from "../../services/ai";
+import * as notesService from "../../services/notes";
 import type { AiProvider } from "../../services/ai";
-import type { Settings } from "../../types/note";
 import { DialogShell } from "../ui";
 
 interface AiEditModalProps {
@@ -103,7 +102,8 @@ export function AiEditModal({
   // Load Ollama model from settings when modal opens
   useEffect(() => {
     if (!open || provider !== "ollama") return;
-    invoke<Settings>("get_settings")
+    notesService
+      .getSettings()
       .then((settings) =>
         setOllamaModel(settings.ollamaModel || "qwen3:8b"),
       )
@@ -138,12 +138,8 @@ export function AiEditModal({
 
     // Save the model to settings in the background for next time
     if (provider === "ollama" && ollamaModel.trim()) {
-      invoke<Settings>("get_settings")
-        .then((settings) =>
-          invoke("update_settings", {
-            newSettings: { ...settings, ollamaModel: ollamaModel.trim() },
-          }),
-        )
+      notesService
+        .patchSettings({ ollamaModel: ollamaModel.trim() })
         .catch(() => {});
     }
 

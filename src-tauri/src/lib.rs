@@ -306,6 +306,29 @@ pub struct Settings {
     pub folder_manual_order: Option<HashMap<String, Vec<String>>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsPatch {
+    #[serde(default)]
+    pub git_enabled: Option<Option<bool>>,
+    #[serde(default)]
+    pub pinned_note_ids: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub default_note_name: Option<Option<String>>,
+    #[serde(default)]
+    pub ollama_model: Option<Option<String>>,
+    #[serde(default)]
+    pub folder_icons: Option<Option<HashMap<String, String>>>,
+    #[serde(default)]
+    pub collapsed_folders: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub note_sort_mode: Option<NoteSortMode>,
+    #[serde(default)]
+    pub folder_sort_mode: Option<FolderSortMode>,
+    #[serde(default)]
+    pub folder_manual_order: Option<Option<HashMap<String, Vec<String>>>>,
+}
+
 // Search result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
@@ -990,6 +1013,36 @@ fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
     let content = serde_json::to_string_pretty(settings)?;
     std::fs::write(path, content)?;
     Ok(())
+}
+
+fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
+    if let Some(git_enabled) = patch.git_enabled {
+        settings.git_enabled = git_enabled;
+    }
+    if let Some(pinned_note_ids) = patch.pinned_note_ids {
+        settings.pinned_note_ids = pinned_note_ids;
+    }
+    if let Some(default_note_name) = patch.default_note_name {
+        settings.default_note_name = default_note_name;
+    }
+    if let Some(ollama_model) = patch.ollama_model {
+        settings.ollama_model = ollama_model;
+    }
+    if let Some(folder_icons) = patch.folder_icons {
+        settings.folder_icons = folder_icons;
+    }
+    if let Some(collapsed_folders) = patch.collapsed_folders {
+        settings.collapsed_folders = collapsed_folders;
+    }
+    if let Some(note_sort_mode) = patch.note_sort_mode {
+        settings.note_sort_mode = note_sort_mode;
+    }
+    if let Some(folder_sort_mode) = patch.folder_sort_mode {
+        settings.folder_sort_mode = folder_sort_mode;
+    }
+    if let Some(folder_manual_order) = patch.folder_manual_order {
+        settings.folder_manual_order = folder_manual_order;
+    }
 }
 
 fn metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<i64> {
@@ -2254,6 +2307,26 @@ fn update_settings(new_settings: Settings, state: State<AppState>) -> Result<(),
 }
 
 #[tauri::command]
+fn patch_settings(patch: SettingsPatch, state: State<AppState>) -> Result<(), String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+
+    let next_settings = {
+        let mut settings = state.settings.write().expect("settings write lock");
+        apply_settings_patch(&mut settings, patch);
+        settings.clone()
+    };
+
+    save_settings(&folder, &next_settings).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn update_git_enabled(
     enabled: Option<bool>,
     expected_folder: String,
@@ -2584,29 +2657,17 @@ async fn fallback_search(
     let mut results: Vec<SearchResult> = Vec::new();
 
     for (id, title, preview, modified) in cache_data {
-        let title_lower = title.to_lowercase();
-
-        let mut score = 0.0f32;
-        if title_lower.contains(&query_lower) {
-            score += 50.0;
-        }
-
         // Read file content asynchronously and search in it
         let file_path = match abs_path_from_id(&folder_path, &id) {
             Ok(p) => p,
             Err(_) => continue,
         };
-        if let Ok(content) = tokio::fs::read_to_string(&file_path).await {
-            let content_lower = content.to_lowercase();
-            if content_lower.contains(&query_lower) {
-                // Higher score if in title, lower if only in content
-                if score == 0.0 {
-                    score += 10.0;
-                } else {
-                    score += 5.0;
-                }
-            }
-        }
+        let content = match tokio::fs::read_to_string(&file_path).await {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+
+        let score = score_fallback_search_match(&title, &content, &query_lower);
 
         if score > 0.0 {
             results.push(SearchResult {
@@ -2627,6 +2688,25 @@ async fn fallback_search(
     results.truncate(20);
 
     Ok(results)
+}
+
+fn score_fallback_search_match(title: &str, content: &str, query_lower: &str) -> f32 {
+    let title_lower = title.to_lowercase();
+    let content_lower = content.to_lowercase();
+
+    let mut score = 0.0f32;
+    if title_lower.contains(query_lower) {
+        score += 50.0;
+    }
+    if content_lower.contains(query_lower) {
+        if score == 0.0 {
+            score += 10.0;
+        } else {
+            score += 5.0;
+        }
+    }
+
+    score
 }
 
 // File watcher event payload
@@ -4461,6 +4541,7 @@ pub fn run() {
             get_appearance_settings,
             update_appearance_settings,
             update_settings,
+            patch_settings,
             update_git_enabled,
             preview_note_name,
             write_file,
@@ -4704,5 +4785,65 @@ mod tests {
         remove_collapsed_folder_paths(&mut collapsed_folders, "docs");
 
         assert_eq!(collapsed_folders, vec!["journal".to_string()]);
+    }
+
+    #[test]
+    fn validate_folder_path_rejects_reserved_names_and_traversal() {
+        assert!(validate_folder_path("notes/personal").is_ok());
+        assert!(validate_folder_path("notes/../private").is_err());
+        assert!(validate_folder_path(".sly").is_err());
+        assert!(validate_folder_path("assets/images").is_err());
+    }
+
+    #[test]
+    fn sanitize_filename_normalizes_empty_and_invalid_characters() {
+        assert_eq!(sanitize_filename("  My:/Note  "), "My--Note");
+        assert_eq!(sanitize_filename(" \u{00A0}\u{FEFF} "), "Untitled");
+    }
+
+    #[test]
+    fn preview_note_name_replaces_counter_placeholder() {
+        let preview = preview_note_name("Daily-{counter}".to_string()).unwrap();
+        assert_eq!(preview, "Daily-1");
+    }
+
+    #[test]
+    fn apply_settings_patch_updates_only_requested_fields() {
+        let mut settings = Settings {
+            git_enabled: Some(true),
+            pinned_note_ids: Some(vec!["alpha".to_string()]),
+            default_note_name: Some("Untitled".to_string()),
+            ollama_model: Some("qwen3:8b".to_string()),
+            folder_icons: None,
+            collapsed_folders: None,
+            note_sort_mode: NoteSortMode::TitleAsc,
+            folder_sort_mode: FolderSortMode::NameDesc,
+            folder_manual_order: None,
+        };
+
+        apply_settings_patch(
+            &mut settings,
+            SettingsPatch {
+                default_note_name: Some(Some("Daily".to_string())),
+                ollama_model: Some(None),
+                ..SettingsPatch::default()
+            },
+        );
+
+        assert_eq!(settings.default_note_name.as_deref(), Some("Daily"));
+        assert_eq!(settings.ollama_model, None);
+        assert_eq!(settings.git_enabled, Some(true));
+        assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
+    }
+
+    #[test]
+    fn fallback_search_scoring_prefers_title_matches() {
+        let title_score =
+            score_fallback_search_match("Alpha planning", "body text", "alpha");
+        let body_score =
+            score_fallback_search_match("Meeting notes", "alpha in body", "alpha");
+
+        assert!(title_score > body_score);
+        assert_eq!(body_score, 10.0);
     }
 }
