@@ -507,6 +507,7 @@ export function Editor({
   const [sourceMode, setSourceMode] = useState(false);
   const [sourceContent, setSourceContent] = useState("");
   const sourceTimeoutRef = useRef<number | null>(null);
+  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -549,6 +550,19 @@ export function Editor({
     },
     [],
   );
+
+  const syncSourceTextareaHeight = useCallback(() => {
+    const textarea = sourceTextareaRef.current;
+    const scrollContainer = scrollContainerRef.current;
+    if (!textarea || !scrollContainer) return;
+
+    textarea.style.height = "0px";
+    const nextHeight = Math.max(
+      textarea.scrollHeight,
+      scrollContainer.clientHeight,
+    );
+    textarea.style.height = `${nextHeight}px`;
+  }, []);
 
   // Load settings when note changes or notes are refreshed (e.g., after pin/unpin)
   useEffect(() => {
@@ -1416,6 +1430,31 @@ export function Editor({
     scrollContainerRef.current?.scrollTo(0, 0);
   }, []);
 
+  useEffect(() => {
+    if (!sourceMode) return;
+
+    syncSourceTextareaHeight();
+    sourceTextareaRef.current?.focus();
+
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncSourceTextareaHeight();
+    });
+
+    resizeObserver.observe(scrollContainer);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [sourceMode, syncSourceTextareaHeight]);
+
+  useEffect(() => {
+    if (!sourceMode) return;
+    syncSourceTextareaHeight();
+  }, [sourceMode, sourceContent, syncSourceTextareaHeight]);
+
   // Cleanup on unmount - flush pending saves
   useEffect(() => {
     return () => {
@@ -2102,15 +2141,16 @@ export function Editor({
             /* Markdown source textarea */
             <div className="h-full">
               <textarea
+                ref={sourceTextareaRef}
                 value={sourceContent}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 dir={textDirection}
-                className="w-full h-full resize-none bg-transparent px-6 pt-8 pb-24 text-text outline-none"
+                className="block w-full resize-none overflow-hidden bg-transparent px-6 pt-8 pb-24 text-text outline-none"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",
+                  minHeight: "100%",
                   marginLeft: "auto",
                   marginRight: "auto",
-                  display: "block",
                   fontFamily: "var(--font-mono)",
                   fontSize: "var(--editor-base-font-size)",
                   lineHeight: "var(--editor-line-height)",
