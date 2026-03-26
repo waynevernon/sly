@@ -96,12 +96,13 @@ export function CommandPalette({
     unpinNote,
     notesFolder,
   } = useNotes();
-  const { setTheme } = useTheme();
+  const { setTheme, confirmDeletions, setConfirmDeletions } = useTheme();
   const { status, gitAvailable, gitEnabled, commit, sync, isSyncing } = useGit();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   const [localSearchResults, setLocalSearchResults] = useState<
     { id: string; title: string; preview: string; modified: number }[]
   >([]);
@@ -258,7 +259,18 @@ export function CommandPalette({
           id: "delete-note",
           label: "Delete Current Note",
           icon: <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
-          action: () => {
+          action: async () => {
+            if (!confirmDeletions) {
+              try {
+                await deleteNote(currentNote.id);
+                onClose();
+              } catch (error) {
+                console.error("Failed to delete note:", error);
+                toast.error("Failed to delete note");
+              }
+              return;
+            }
+            setDontAskAgain(false);
             setNoteToDelete(currentNote.id);
             setDeleteDialogOpen(true);
           },
@@ -647,6 +659,7 @@ export function CommandPalette({
 
   const handleDeleteConfirm = useCallback(async () => {
     if (noteToDelete) {
+      if (dontAskAgain) setConfirmDeletions(false);
       try {
         await deleteNote(noteToDelete);
         setNoteToDelete(null);
@@ -657,7 +670,7 @@ export function CommandPalette({
         toast.error("Failed to delete note");
       }
     }
-  }, [noteToDelete, deleteNote, onClose]);
+  }, [noteToDelete, deleteNote, onClose, dontAskAgain, setConfirmDeletions]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -790,6 +803,15 @@ export function CommandPalette({
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={dontAskAgain}
+              onChange={(e) => setDontAskAgain(e.target.checked)}
+              className="accent-accent-primary"
+            />
+            <span className="text-sm text-text-muted">Don't ask again</span>
+          </label>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>

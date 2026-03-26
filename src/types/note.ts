@@ -135,6 +135,7 @@ export interface AppearanceSettings {
   notesPaneWidth?: number;
   customLightColors?: ThemeColors;
   customDarkColors?: ThemeColors;
+  confirmDeletions?: boolean;
 }
 
 // Per-folder settings (stored in .sly/settings.json)

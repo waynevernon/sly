@@ -41,6 +41,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   paneMode: 3,
   foldersPaneWidth: 240,
   notesPaneWidth: 304,
+  confirmDeletions: true,
 };
 
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {

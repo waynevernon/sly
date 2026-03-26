@@ -15,6 +15,7 @@ import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { FilePlusCorner } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
+import { useTheme } from "../../context/ThemeContext";
 import {
   applyFolderDropOrderPlan,
   buildFolderDropOrderPlan,
@@ -562,8 +563,10 @@ export function FolderTreeView({
     useState<InlineFolderEditState | null>(null);
   const [iconPickerTarget, setIconPickerTarget] =
     useState<FolderIconPickerTarget | null>(null);
+  const { confirmDeletions, setConfirmDeletions } = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
   const collapsedFoldersRef = useRef<Set<string>>(new Set());
   collapsedFoldersRef.current = collapsedFolders;
@@ -992,6 +995,7 @@ export function FolderTreeView({
   const handleDeleteConfirm = useCallback(async () => {
     if (!folderToDelete) return;
 
+    if (dontAskAgain) setConfirmDeletions(false);
     try {
       await deleteFolder(folderToDelete);
       setFolderToDelete(null);
@@ -1000,7 +1004,7 @@ export function FolderTreeView({
       console.error("Failed to delete folder:", error);
       toast.error("Failed to delete folder");
     }
-  }, [deleteFolder, folderToDelete]);
+  }, [deleteFolder, folderToDelete, dontAskAgain, setConfirmDeletions]);
 
   useEffect(() => {
     onManualFolderDropPlanChange?.(manualFolderDropPlan);
@@ -1083,6 +1087,14 @@ export function FolderTreeView({
               onOpenIconPicker={setIconPickerTarget}
               onCancelInlineEdit={handleCancelInlineEdit}
               onDeleteFolder={(path) => {
+                if (!confirmDeletions) {
+                  void deleteFolder(path).catch((error) => {
+                    console.error("Failed to delete folder:", error);
+                    toast.error("Failed to delete folder");
+                  });
+                  return;
+                }
+                setDontAskAgain(false);
                 setFolderToDelete(path);
                 setDeleteDialogOpen(true);
               }}
@@ -1126,6 +1138,15 @@ export function FolderTreeView({
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={dontAskAgain}
+              onChange={(e) => setDontAskAgain(e.target.checked)}
+              className="accent-accent-primary"
+            />
+            <span className="text-sm text-text-muted">Don't ask again</span>
+          </label>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction

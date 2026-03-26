@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useNotes } from "../../context/NotesContext";
+import { useTheme } from "../../context/ThemeContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -248,8 +249,10 @@ export function NoteList({
     settings,
   } = useNotes();
 
+  const { confirmDeletions, setConfirmDeletions } = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pinnedIds = useMemo(
@@ -260,6 +263,7 @@ export function NoteList({
   const handleDeleteConfirm = useCallback(async () => {
     if (!noteToDelete) return;
 
+    if (dontAskAgain) setConfirmDeletions(false);
     try {
       await deleteNote(noteToDelete);
       setNoteToDelete(null);
@@ -267,12 +271,24 @@ export function NoteList({
     } catch (error) {
       console.error("Failed to delete note:", error);
     }
-  }, [deleteNote, noteToDelete]);
+  }, [deleteNote, noteToDelete, dontAskAgain, setConfirmDeletions]);
 
-  const openDeleteDialogForNote = useCallback((noteId: string) => {
-    setNoteToDelete(noteId);
-    setDeleteDialogOpen(true);
-  }, []);
+  const openDeleteDialogForNote = useCallback(
+    async (noteId: string) => {
+      if (!confirmDeletions) {
+        try {
+          await deleteNote(noteId);
+        } catch (error) {
+          console.error("Failed to delete note:", error);
+        }
+        return;
+      }
+      setDontAskAgain(false);
+      setNoteToDelete(noteId);
+      setDeleteDialogOpen(true);
+    },
+    [confirmDeletions, deleteNote],
+  );
 
   useEffect(() => {
     const handleFocusNoteList = () => {
@@ -348,6 +364,15 @@ export function NoteList({
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={dontAskAgain}
+              onChange={(e) => setDontAskAgain(e.target.checked)}
+              className="accent-accent-primary"
+            />
+            <span className="text-sm text-text-muted">Don't ask again</span>
+          </label>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>

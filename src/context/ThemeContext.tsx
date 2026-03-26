@@ -77,6 +77,8 @@ interface ThemeContextType {
   foldersPaneWidth: number;
   notesPaneWidth: number;
   setPaneWidths: (folders: number, notes: number) => void;
+  confirmDeletions: boolean;
+  setConfirmDeletions: (v: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -179,6 +181,7 @@ function normalizeAppearanceSettings(
         : defaultAppearance.notesPaneWidth,
     customLightColors: next.customLightColors,
     customDarkColors: next.customDarkColors,
+    confirmDeletions: next.confirmDeletions ?? true,
   };
 }
 
@@ -448,6 +451,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
+  const setConfirmDeletions = useCallback(
+    (v: boolean) => {
+      updateAppearance((prev) => ({ ...prev, confirmDeletions: v }));
+    },
+    [updateAppearance],
+  );
+
   if (!isInitialized) {
     return null;
   }
@@ -491,6 +501,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         notesPaneWidth:
           appearanceSettings.notesPaneWidth ?? 304,
         setPaneWidths,
+        confirmDeletions: appearanceSettings.confirmDeletions ?? true,
+        setConfirmDeletions,
       }}
     >
       {children}

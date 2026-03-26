@@ -112,6 +112,10 @@ fn default_pane_mode() -> i32 {
     3
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn default_note_base_font_size() -> f32 {
     15.0
 }
@@ -221,6 +225,8 @@ pub struct AppearanceSettings {
     pub custom_light_colors: Option<ThemeColors>,
     #[serde(default)]
     pub custom_dark_colors: Option<ThemeColors>,
+    #[serde(default = "default_true")]
+    pub confirm_deletions: bool,
 }
 
 impl Default for AppearanceSettings {
@@ -240,6 +246,7 @@ impl Default for AppearanceSettings {
             pane_mode: default_pane_mode(),
             custom_light_colors: None,
             custom_dark_colors: None,
+            confirm_deletions: true,
         }
     }
 }

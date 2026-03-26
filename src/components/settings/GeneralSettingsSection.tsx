@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useGit } from "../../context/GitContext";
+import { useTheme } from "../../context/ThemeContext";
 import { Button } from "../ui";
 import { Input } from "../ui";
 import {
@@ -45,6 +46,7 @@ function getRemoteWebUrl(url: string | null): string | null {
 
 export function GeneralSettingsSection() {
   const { notesFolder, setNotesFolder } = useNotes();
+  const { confirmDeletions, setConfirmDeletions } = useTheme();
   const {
     status,
     gitAvailable,
@@ -583,6 +585,37 @@ export function GeneralSettingsSection() {
               </p>
             </div>
           </details>
+        </div>
+      </section>
+
+      <div className="ui-settings-separator" />
+
+      {/* Deletion Behavior */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex flex-col gap-0.75">
+            <h2 className="text-xl font-medium">Deletion</h2>
+            <p className="text-sm text-text-muted max-w-lg">
+              Show a confirmation dialog before permanently deleting notes or
+              folders
+            </p>
+          </div>
+          <div className="ui-settings-toggle-group">
+            <Button
+              onClick={() => setConfirmDeletions(false)}
+              variant={!confirmDeletions ? "primary" : "ghost"}
+              size="xs"
+            >
+              Off
+            </Button>
+            <Button
+              onClick={() => setConfirmDeletions(true)}
+              variant={confirmDeletions ? "primary" : "ghost"}
+              size="xs"
+            >
+              On
+            </Button>
+          </div>
         </div>
       </section>
 
