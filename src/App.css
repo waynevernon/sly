@@ -1079,10 +1079,15 @@ html.dark {
   margin-bottom: 1.75em;
 }
 
-/* Prose spacing - no CSS-added paragraph spacing; spacing comes from blank lines in markdown */
+/* Prose spacing - no CSS-added paragraph spacing by default; spacing comes from blank lines in markdown */
 .prose p {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+/* Paragraph spacing enabled via Appearance setting */
+[data-paragraph-spacing="1"] .prose p {
+  margin-bottom: 0.875em;
 }
 
 .prose ul,

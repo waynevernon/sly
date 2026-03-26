@@ -152,6 +152,10 @@ function normalizeAppearanceSettings(
         typeof next.noteTypography?.lineHeight === "number"
           ? next.noteTypography.lineHeight
           : defaultAppearance.noteTypography.lineHeight,
+      paragraphSpacing:
+        typeof next.noteTypography?.paragraphSpacing === "boolean"
+          ? next.noteTypography.paragraphSpacing
+          : defaultAppearance.noteTypography.paragraphSpacing,
     },
     textDirection: isTextDirection(next.textDirection)
       ? next.textDirection
@@ -214,6 +218,7 @@ function applyAppearanceCSSVariables(
   root.style.setProperty("--editor-h4-size", `${baseSize * 1.25}px`);
   root.style.setProperty("--editor-h5-size", `${baseSize}px`);
   root.style.setProperty("--editor-h6-size", `${baseSize}px`);
+  root.dataset.paragraphSpacing = appearance.noteTypography.paragraphSpacing ? "1" : "0";
   if (appearance.editorWidth === "custom") {
     const widthPx = appearance.customEditorWidthPx ?? DEFAULT_CUSTOM_WIDTH_PX;
     root.style.setProperty("--editor-max-width", `${widthPx}px`);

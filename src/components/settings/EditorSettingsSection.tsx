@@ -163,6 +163,8 @@ export function AppearanceSettingsSection() {
       DEFAULT_APPEARANCE_SETTINGS.noteTypography.boldWeight ||
     noteTypography.lineHeight !==
       DEFAULT_APPEARANCE_SETTINGS.noteTypography.lineHeight ||
+    noteTypography.paragraphSpacing !==
+      DEFAULT_APPEARANCE_SETTINGS.noteTypography.paragraphSpacing ||
     textDirection !== DEFAULT_APPEARANCE_SETTINGS.textDirection ||
     editorWidth !== DEFAULT_APPEARANCE_SETTINGS.editorWidth ||
     paneMode !== DEFAULT_APPEARANCE_SETTINGS.paneMode ||
@@ -398,6 +400,32 @@ export function AppearanceSettingsSection() {
               >
                 <PlusIcon className="w-4 h-4" />
               </IconButton>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-text font-medium">
+              Paragraph Spacing
+            </label>
+            <div className="ui-settings-toggle-group">
+              <Button
+                onClick={() =>
+                  setNoteTypographySetting("paragraphSpacing", false)
+                }
+                variant={!noteTypography.paragraphSpacing ? "primary" : "ghost"}
+                size="xs"
+              >
+                Off
+              </Button>
+              <Button
+                onClick={() =>
+                  setNoteTypographySetting("paragraphSpacing", true)
+                }
+                variant={noteTypography.paragraphSpacing ? "primary" : "ghost"}
+                size="xs"
+              >
+                On
+              </Button>
             </div>
           </div>
 

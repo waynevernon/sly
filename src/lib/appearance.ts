@@ -25,6 +25,7 @@ export const DEFAULT_NOTE_TYPOGRAPHY: NoteTypographySettings = {
   baseFontSize: 15,
   boldWeight: 600,
   lineHeight: 1.6,
+  paragraphSpacing: false,
 };
 
 export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
