@@ -169,6 +169,9 @@ export function ListItem({
     .replace(/\u00A0/g, " ")
     .trim();
   const hasSubtitle = cleanSubtitle && cleanSubtitle.length > 0;
+  const cleanMeta = meta?.trim();
+  const hasMeta = Boolean(cleanMeta);
+  const hasSecondaryRow = hasMeta || Boolean(hasSubtitle);
   const isActive = selectionState === "active";
   const isSelected = selectionState !== "none";
 
@@ -179,46 +182,49 @@ export function ListItem({
       role="button"
       tabIndex={-1}
       className={cn(
-        "w-full text-left px-2.5 py-2.25 transition-colors cursor-pointer select-none rounded-md",
+        "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-md",
         "focus:outline-none focus-visible:outline-none",
+        hasSecondaryRow ? "py-2.25" : "py-1.75",
         isActive
           ? "bg-bg-muted group-focus-visible/notelist:ring-1 group-focus-visible/notelist:ring-text-muted"
           : selectionState === "selected"
             ? "bg-bg-muted/75 hover:bg-bg-muted"
-          : "hover:bg-bg-muted"
+            : "hover:bg-bg-muted"
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 min-w-0">
-          {isPinned && (
-            <PinIcon className="w-4.25 h-4.25 stroke-[1.6] fill-current text-text-muted shrink-0" />
-          )}
-          <span className={cn("text-sm font-medium truncate text-text")}>
-            {title}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        {meta && (
-          <div
-            className={cn(
-              "text-xs whitespace-nowrap",
-              isSelected ? "text-text" : "text-text-muted"
-            )}
-          >
-            {meta}
-          </div>
+      <div className="flex items-center gap-1 min-w-0">
+        {isPinned && (
+          <PinIcon className="w-4.25 h-4.25 stroke-[1.6] fill-current text-text-muted shrink-0" />
         )}
-        <p
-          className={cn(
-            "text-xs line-clamp-1 min-h-5",
-            hasSubtitle ? "text-text-muted" : "text-transparent",
-            isSelected ? "opacity-100" : "opacity-70"
-          )}
-        >
-          {hasSubtitle ? cleanSubtitle : "\u00A0"}
-        </p>
+        <span className={cn("text-sm font-medium truncate text-text")}>
+          {title}
+        </span>
       </div>
+      {hasSecondaryRow && (
+        <div className="flex items-center gap-1 min-w-0">
+          {hasMeta && (
+            <div
+              className={cn(
+                "text-xs whitespace-nowrap shrink-0",
+                isSelected ? "text-text" : "text-text-muted"
+              )}
+            >
+              {cleanMeta}
+            </div>
+          )}
+          {hasSubtitle && (
+            <p
+              className={cn(
+                "text-xs line-clamp-1 min-w-0",
+                "text-text-muted",
+                isSelected ? "opacity-100" : "opacity-70"
+              )}
+            >
+              {cleanSubtitle}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ArrowDownAZ,
   ArrowUpAZ,
@@ -10,11 +11,24 @@ import {
   History,
 } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
-import type { NoteScope } from "../../types/note";
+import type { NoteListDateMode, NoteScope } from "../../types/note";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
-import { IconButton, Input } from "../ui";
-import { SearchIcon, SearchOffIcon, TrashIcon, XIcon } from "../icons";
+import {
+  IconButton,
+  Input,
+  menuItemClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+  menuSurfaceClassName,
+} from "../ui";
+import {
+  ChevronRightIcon,
+  SearchIcon,
+  SearchOffIcon,
+  TrashIcon,
+  XIcon,
+} from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import { getFolderIconName } from "../../lib/folderIcons";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
@@ -81,11 +95,26 @@ function getScopeLabel(scope: NoteScope, path: string | null): string {
   return parts[parts.length - 1];
 }
 
+function getDateModeLabel(mode: NoteListDateMode): string {
+  switch (mode) {
+    case "created":
+      return "Created";
+    case "off":
+      return "None";
+    default:
+      return "Modified";
+  }
+}
+
 export function NotesPane() {
   const {
+    notes,
     scopedNotes,
     folderIcons,
     noteSortMode,
+    noteListDateMode,
+    showNoteListFolderPath,
+    showNoteListPreview,
     selectedScope,
     selectedNoteIds,
     selectedFolderPath,
@@ -96,6 +125,7 @@ export function NotesPane() {
     searchResults,
     clearSearch,
     setNoteSortMode,
+    setNoteListViewOptions,
   } = useNotes();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -121,16 +151,18 @@ export function NotesPane() {
 
   const displayItems = useMemo<NoteListItem[]>(() => {
     if (searchQuery.trim()) {
+      const notesById = new Map(notes.map((note) => [note.id, note] as const));
       return searchResults.map((result) => ({
         id: result.id,
         title: result.title,
         preview: result.preview,
         modified: result.modified,
+        created: notesById.get(result.id)?.created ?? result.modified,
       }));
     }
 
     return scopedNotes;
-  }, [scopedNotes, searchQuery, searchResults]);
+  }, [notes, scopedNotes, searchQuery, searchResults]);
 
   const heading = searchQuery.trim()
     ? "Search Results"
@@ -265,7 +297,106 @@ export function NotesPane() {
                   onChange={(nextMode) => {
                     void setNoteSortMode(nextMode);
                   }}
-                />
+                >
+                  <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  <DropdownMenu.Label className={menuLabelClassName}>
+                    View
+                  </DropdownMenu.Label>
+                  <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger
+                      className={menuItemClassName}
+                    >
+                      <span className="inline-flex h-4 w-4 shrink-0" />
+                      <span>Date</span>
+                      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
+                        {getDateModeLabel(noteListDateMode)}
+                        <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                      </span>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.SubContent
+                        sideOffset={6}
+                        className={`${menuSurfaceClassName} min-w-44 z-50`}
+                      >
+                        <DropdownMenu.RadioGroup
+                          value={noteListDateMode}
+                          onValueChange={(value) => {
+                            void setNoteListViewOptions({
+                              noteListDateMode: value as NoteListDateMode,
+                            });
+                          }}
+                        >
+                          <DropdownMenu.RadioItem
+                            value="modified"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListDateMode === "modified" && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>Modified Time</span>
+                          </DropdownMenu.RadioItem>
+                          <DropdownMenu.RadioItem
+                            value="created"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListDateMode === "created" && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>Created Time</span>
+                          </DropdownMenu.RadioItem>
+                          <DropdownMenu.RadioItem
+                            value="off"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListDateMode === "off" && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>None</span>
+                          </DropdownMenu.RadioItem>
+                        </DropdownMenu.RadioGroup>
+                      </DropdownMenu.SubContent>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Sub>
+                  <DropdownMenu.CheckboxItem
+                    checked={showNoteListFolderPath}
+                    className={menuItemClassName}
+                    onCheckedChange={(checked) => {
+                      void setNoteListViewOptions({
+                        showNoteListFolderPath: checked === true,
+                      });
+                    }}
+                  >
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                      <DropdownMenu.ItemIndicator>
+                        <span className="text-xs leading-none">✓</span>
+                      </DropdownMenu.ItemIndicator>
+                    </span>
+                    <span>Folder Path</span>
+                  </DropdownMenu.CheckboxItem>
+                  <DropdownMenu.CheckboxItem
+                    checked={showNoteListPreview}
+                    className={menuItemClassName}
+                    onCheckedChange={(checked) => {
+                      void setNoteListViewOptions({
+                        showNoteListPreview: checked === true,
+                      });
+                    }}
+                  >
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                      <DropdownMenu.ItemIndicator>
+                        <span className="text-xs leading-none">✓</span>
+                      </DropdownMenu.ItemIndicator>
+                    </span>
+                    <span>Text Preview</span>
+                  </DropdownMenu.CheckboxItem>
+                </SortMenuButton>
               )}
               <IconButton
                 onClick={toggleSearch}

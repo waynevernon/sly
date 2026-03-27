@@ -37,6 +37,7 @@ export interface NoteListItem {
   title: string;
   preview: string;
   modified: number;
+  created: number;
 }
 
 interface NoteListProps {
@@ -87,6 +88,7 @@ interface NoteItemProps {
   title: string;
   preview?: string;
   modified: number;
+  created: number;
   selectionState: SelectionState;
   isPinned: boolean;
   onSelect: (
@@ -98,6 +100,9 @@ interface NoteItemProps {
     },
   ) => void;
   showFolderPrefix?: boolean;
+  noteListDateMode: "modified" | "created" | "off";
+  showNoteListFolderPath: boolean;
+  showNoteListPreview: boolean;
 }
 
 const NoteItem = memo(function NoteItem({
@@ -105,10 +110,14 @@ const NoteItem = memo(function NoteItem({
   title,
   preview,
   modified,
+  created,
   selectionState,
   isPinned,
   onSelect,
   showFolderPrefix = true,
+  noteListDateMode,
+  showNoteListFolderPath,
+  showNoteListPreview,
 }: NoteItemProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -119,15 +128,21 @@ const NoteItem = memo(function NoteItem({
   }, [selectionState]);
 
   const folder =
-    showFolderPrefix && id.includes("/")
+    showFolderPrefix && showNoteListFolderPath && id.includes("/")
       ? id.substring(0, id.lastIndexOf("/"))
       : null;
-  const previewText = cleanPreviewText(preview);
+  const previewText = showNoteListPreview ? cleanPreviewText(preview) : "";
   const displayPreview = folder
     ? previewText
       ? `${folder}/ · ${previewText}`
       : `${folder}/`
     : previewText;
+  const timestamp =
+    noteListDateMode === "created"
+      ? created
+      : noteListDateMode === "modified"
+        ? modified
+        : null;
 
   return (
     <div
@@ -142,8 +157,8 @@ const NoteItem = memo(function NoteItem({
     >
       <ListItem
         title={cleanTitle(title)}
-        subtitle={displayPreview}
-        meta={formatDate(modified)}
+        subtitle={displayPreview || undefined}
+        meta={timestamp === null ? undefined : formatDate(timestamp)}
         selectionState={selectionState}
         isPinned={isPinned}
       />
@@ -167,6 +182,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   title,
   preview,
   modified,
+  created,
   selectionState,
   isPinned,
   selectedNoteIds,
@@ -179,6 +195,9 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onClearSelection,
   onFocusList,
   showFolderPrefix = true,
+  noteListDateMode,
+  showNoteListFolderPath,
+  showNoteListPreview,
 }: NoteItemWithMenuProps) {
   const isPartOfBatchSelection =
     selectedNoteIds.length > 1 && selectedNoteIds.includes(id);
@@ -236,10 +255,14 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             title={title}
             preview={preview}
             modified={modified}
+            created={created}
             selectionState={selectionState}
             isPinned={isPinned}
             onSelect={onSelect}
             showFolderPrefix={showFolderPrefix}
+            noteListDateMode={noteListDateMode}
+            showNoteListFolderPath={showNoteListFolderPath}
+            showNoteListPreview={showNoteListPreview}
           />
         </div>
       </ContextMenu.Trigger>
@@ -335,6 +358,9 @@ export function NoteList({
     pinNote,
     unpinNote,
     isLoading,
+    noteListDateMode,
+    showNoteListFolderPath,
+    showNoteListPreview,
     settings,
   } = useNotes();
 
@@ -505,6 +531,7 @@ export function NoteList({
               title={item.title}
               preview={item.preview}
               modified={item.modified}
+              created={item.created}
               selectionState={selectionState}
               isPinned={pinnedIds.has(item.id)}
               selectedNoteIds={selectedNoteIds}
@@ -519,6 +546,9 @@ export function NoteList({
               onClearSelection={clearNoteSelection}
               onFocusList={focusList}
               showFolderPrefix={showFolderPrefix}
+              noteListDateMode={noteListDateMode}
+              showNoteListFolderPath={showNoteListFolderPath}
+              showNoteListPreview={showNoteListPreview}
             />
           );
         })}

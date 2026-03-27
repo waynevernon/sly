@@ -96,6 +96,7 @@ export interface ThemeColors {
 export type TextDirection = "auto" | "ltr" | "rtl";
 export type EditorWidth = "narrow" | "normal" | "wide" | "full" | "custom";
 export type PaneMode = 1 | 2 | 3;
+export type NoteListDateMode = "modified" | "created" | "off";
 export type NoteSortMode =
   | "modifiedDesc"
   | "modifiedAsc"
@@ -149,6 +150,9 @@ export interface Settings {
   ollamaModel?: string;
   folderIcons?: Record<string, string>;
   collapsedFolders?: string[];
+  noteListDateMode?: NoteListDateMode;
+  showNoteListFolderPath?: boolean;
+  showNoteListPreview?: boolean;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
   folderManualOrder?: FolderManualOrder;
@@ -163,6 +167,9 @@ export interface SettingsPatch {
   ollamaModel?: string | null;
   folderIcons?: Record<string, string> | null;
   collapsedFolders?: string[] | null;
+  noteListDateMode?: NoteListDateMode;
+  showNoteListFolderPath?: boolean | null;
+  showNoteListPreview?: boolean | null;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
   folderManualOrder?: FolderManualOrder | null;

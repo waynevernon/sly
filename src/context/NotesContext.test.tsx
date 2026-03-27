@@ -215,6 +215,37 @@ describe("NotesContext", () => {
     expect(result.current.folderManualOrder).toEqual({});
   });
 
+  it("persists note list view settings together with normalized defaults", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.noteListDateMode).toBe("modified");
+    expect(result.current.showNoteListFolderPath).toBe(true);
+    expect(result.current.showNoteListPreview).toBe(true);
+
+    await act(async () => {
+      await result.current.setNoteListViewOptions({
+        noteListDateMode: "off",
+        showNoteListFolderPath: false,
+        showNoteListPreview: false,
+      });
+    });
+
+    expect(notesService.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        noteListDateMode: "off",
+        showNoteListFolderPath: false,
+        showNoteListPreview: false,
+      }),
+    );
+    expect(result.current.noteListDateMode).toBe("off");
+    expect(result.current.showNoteListFolderPath).toBe(false);
+    expect(result.current.showNoteListPreview).toBe(false);
+  });
+
   it("tracks single and toggled note selections separately from the active note", async () => {
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,

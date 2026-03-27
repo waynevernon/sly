@@ -282,6 +282,15 @@ pub enum FolderSortMode {
     NameDesc,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteListDateMode {
+    #[default]
+    Modified,
+    Created,
+    Off,
+}
+
 // App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -309,6 +318,12 @@ pub struct Settings {
     pub folder_icons: Option<HashMap<String, String>>,
     #[serde(rename = "collapsedFolders")]
     pub collapsed_folders: Option<Vec<String>>,
+    #[serde(rename = "noteListDateMode", default)]
+    pub note_list_date_mode: NoteListDateMode,
+    #[serde(rename = "showNoteListFolderPath", default = "default_true")]
+    pub show_note_list_folder_path: bool,
+    #[serde(rename = "showNoteListPreview", default = "default_true")]
+    pub show_note_list_preview: bool,
     #[serde(rename = "noteSortMode", default)]
     pub note_sort_mode: NoteSortMode,
     #[serde(rename = "folderSortMode", default)]
@@ -336,6 +351,12 @@ pub struct SettingsPatch {
     pub folder_icons: Option<Option<HashMap<String, String>>>,
     #[serde(default)]
     pub collapsed_folders: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub note_list_date_mode: Option<NoteListDateMode>,
+    #[serde(default)]
+    pub show_note_list_folder_path: Option<Option<bool>>,
+    #[serde(default)]
+    pub show_note_list_preview: Option<Option<bool>>,
     #[serde(default)]
     pub note_sort_mode: Option<NoteSortMode>,
     #[serde(default)]
@@ -1146,6 +1167,15 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(collapsed_folders) = patch.collapsed_folders {
         settings.collapsed_folders = collapsed_folders;
     }
+    if let Some(note_list_date_mode) = patch.note_list_date_mode {
+        settings.note_list_date_mode = note_list_date_mode;
+    }
+    if let Some(show_note_list_folder_path) = patch.show_note_list_folder_path {
+        settings.show_note_list_folder_path = show_note_list_folder_path.unwrap_or(true);
+    }
+    if let Some(show_note_list_preview) = patch.show_note_list_preview {
+        settings.show_note_list_preview = show_note_list_preview.unwrap_or(true);
+    }
     if let Some(note_sort_mode) = patch.note_sort_mode {
         settings.note_sort_mode = note_sort_mode;
     }
@@ -1776,8 +1806,7 @@ async fn delete_notes(ids: Vec<String>, state: State<'_, AppState>) -> Result<()
         let mut settings = state.settings.write().expect("settings write lock");
         let mut settings_changed = false;
         if let Some(ref mut pinned_note_ids) = settings.pinned_note_ids {
-            settings_changed =
-                prune_deleted_pinned_note_ids(pinned_note_ids, &deleted_id_set);
+            settings_changed = prune_deleted_pinned_note_ids(pinned_note_ids, &deleted_id_set);
         }
         if settings_changed {
             let _ = save_settings(&folder, &settings);
@@ -5063,10 +5092,15 @@ mod tests {
         let mut settings = Settings {
             git_enabled: Some(true),
             pinned_note_ids: Some(vec!["alpha".to_string()]),
+            recent_note_ids: Some(vec!["alpha".to_string()]),
+            show_recent_notes: Some(true),
             default_note_name: Some("Untitled".to_string()),
             ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
             collapsed_folders: None,
+            note_list_date_mode: NoteListDateMode::Modified,
+            show_note_list_folder_path: true,
+            show_note_list_preview: true,
             note_sort_mode: NoteSortMode::TitleAsc,
             folder_sort_mode: FolderSortMode::NameDesc,
             folder_manual_order: None,
@@ -5077,6 +5111,9 @@ mod tests {
             SettingsPatch {
                 default_note_name: Some(Some("Daily".to_string())),
                 ollama_model: Some(None),
+                note_list_date_mode: Some(NoteListDateMode::Off),
+                show_note_list_folder_path: Some(Some(false)),
+                show_note_list_preview: Some(Some(false)),
                 ..SettingsPatch::default()
             },
         );
@@ -5084,15 +5121,16 @@ mod tests {
         assert_eq!(settings.default_note_name.as_deref(), Some("Daily"));
         assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.git_enabled, Some(true));
+        assert_eq!(settings.note_list_date_mode, NoteListDateMode::Off);
+        assert!(!settings.show_note_list_folder_path);
+        assert!(!settings.show_note_list_preview);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
     }
 
     #[test]
     fn fallback_search_scoring_prefers_title_matches() {
-        let title_score =
-            score_fallback_search_match("Alpha planning", "body text", "alpha");
-        let body_score =
-            score_fallback_search_match("Meeting notes", "alpha in body", "alpha");
+        let title_score = score_fallback_search_match("Alpha planning", "body text", "alpha");
+        let body_score = score_fallback_search_match("Meeting notes", "alpha in body", "alpha");
 
         assert!(title_score > body_score);
         assert_eq!(body_score, 10.0);
@@ -5133,7 +5171,10 @@ mod tests {
         )
         .unwrap_err();
 
-        assert_eq!(error, "A note with that name already exists in the target folder");
+        assert_eq!(
+            error,
+            "A note with that name already exists in the target folder"
+        );
     }
 
     #[test]
@@ -5162,18 +5203,11 @@ mod tests {
 
     #[test]
     fn prune_deleted_pinned_note_ids_removes_all_deleted_entries() {
-        let mut pinned_note_ids = vec![
-            "alpha".to_string(),
-            "beta".to_string(),
-            "gamma".to_string(),
-        ];
-        let deleted_note_ids =
-            HashSet::from(["alpha".to_string(), "gamma".to_string()]);
+        let mut pinned_note_ids =
+            vec!["alpha".to_string(), "beta".to_string(), "gamma".to_string()];
+        let deleted_note_ids = HashSet::from(["alpha".to_string(), "gamma".to_string()]);
 
-        let changed = prune_deleted_pinned_note_ids(
-            &mut pinned_note_ids,
-            &deleted_note_ids,
-        );
+        let changed = prune_deleted_pinned_note_ids(&mut pinned_note_ids, &deleted_note_ids);
 
         assert!(changed);
         assert_eq!(pinned_note_ids, vec!["beta".to_string()]);
@@ -5182,10 +5216,7 @@ mod tests {
     #[test]
     fn apply_note_move_results_updates_cache_entries() {
         let mut notes_cache = HashMap::from([
-            (
-                "alpha".to_string(),
-                note("alpha", "Alpha", 10, 10),
-            ),
+            ("alpha".to_string(), note("alpha", "Alpha", 10, 10)),
             (
                 "archive/beta".to_string(),
                 note("archive/beta", "Beta", 20, 20),
@@ -5208,7 +5239,9 @@ mod tests {
 
         assert!(!notes_cache.contains_key("alpha"));
         assert_eq!(
-            notes_cache.get("work/alpha").map(|metadata| metadata.id.as_str()),
+            notes_cache
+                .get("work/alpha")
+                .map(|metadata| metadata.id.as_str()),
             Some("work/alpha")
         );
         assert!(notes_cache.contains_key("archive/beta"));

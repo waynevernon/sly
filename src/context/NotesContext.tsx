@@ -15,6 +15,7 @@ import {
   type FolderManualOrder,
   type FolderSortMode,
   type Note,
+  type NoteListDateMode,
   type NoteMetadata,
   type NoteScope,
   type NoteSortMode,
@@ -37,6 +38,9 @@ interface NotesDataContextValue {
   scopedNotes: NoteMetadata[];
   recentNotes: NoteMetadata[];
   showRecentNotes: boolean;
+  noteListDateMode: NoteListDateMode;
+  showNoteListFolderPath: boolean;
+  showNoteListPreview: boolean;
   settings: Settings;
   folderIcons: FolderIconsMap;
   noteSortMode: NoteSortMode;
@@ -90,6 +94,11 @@ interface NotesActionsContextValue {
   setFolderIcon: (path: string, iconName: string | null) => Promise<void>;
   setCollapsedFolders: (paths: string[]) => Promise<void>;
   setNoteSortMode: (mode: NoteSortMode) => Promise<void>;
+  setNoteListViewOptions: (options: {
+    noteListDateMode?: NoteListDateMode;
+    showNoteListFolderPath?: boolean;
+    showNoteListPreview?: boolean;
+  }) => Promise<void>;
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
   setFolderManualOrder: (
     parentPath: string,
@@ -269,6 +278,9 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
   nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
   nextSettings.showRecentNotes ??= true;
+  nextSettings.noteListDateMode ??= "modified";
+  nextSettings.showNoteListFolderPath ??= true;
+  nextSettings.showNoteListPreview ??= true;
   nextSettings.collapsedFolders = sanitizeCollapsedFolders(
     nextSettings.collapsedFolders,
   );
@@ -329,6 +341,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const windowRefreshTimeoutRef = useRef<number | null>(null);
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
   const showRecentNotes = settings.showRecentNotes ?? true;
+  const noteListDateMode = settings.noteListDateMode ?? "modified";
+  const showNoteListFolderPath = settings.showNoteListFolderPath ?? true;
+  const showNoteListPreview = settings.showNoteListPreview ?? true;
 
   const refreshNotes = useCallback(async () => {
     if (!notesFolder) return;
@@ -440,6 +455,28 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await refreshNotes();
     },
     [persistSettings, refreshNotes],
+  );
+
+  const setNoteListViewOptions = useCallback(
+    async ({
+      noteListDateMode,
+      showNoteListFolderPath,
+      showNoteListPreview,
+    }: {
+      noteListDateMode?: NoteListDateMode;
+      showNoteListFolderPath?: boolean;
+      showNoteListPreview?: boolean;
+    }) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        ...(noteListDateMode !== undefined ? { noteListDateMode } : {}),
+        ...(showNoteListFolderPath !== undefined
+          ? { showNoteListFolderPath }
+          : {}),
+        ...(showNoteListPreview !== undefined ? { showNoteListPreview } : {}),
+      }));
+    },
+    [persistSettings],
   );
 
   const setFolderSortMode = useCallback(
@@ -1741,6 +1778,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       scopedNotes,
       recentNotes,
       showRecentNotes,
+      noteListDateMode,
+      showNoteListFolderPath,
+      showNoteListPreview,
       settings,
       folderIcons,
       noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
@@ -1765,6 +1805,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       scopedNotes,
       recentNotes,
       showRecentNotes,
+      noteListDateMode,
+      showNoteListFolderPath,
+      showNoteListPreview,
       settings,
       folderIcons,
       selectedScope,
@@ -1817,6 +1860,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderIcon,
       setCollapsedFolders,
       setNoteSortMode,
+      setNoteListViewOptions,
       setFolderSortMode,
       setFolderManualOrder,
       setShowRecentNotes,
@@ -1853,6 +1897,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderIcon,
       setCollapsedFolders,
       setNoteSortMode,
+      setNoteListViewOptions,
       setFolderSortMode,
       setFolderManualOrder,
       setShowRecentNotes,

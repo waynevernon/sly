@@ -89,10 +89,12 @@ export function FoldersPane({
                 void setShowRecentNotes(checked === true);
               }}
             >
-              <DropdownMenu.ItemIndicator className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                <span className="text-xs leading-none">✓</span>
-              </DropdownMenu.ItemIndicator>
-              <span className="ml-0.5">Recent Notes</span>
+              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                <DropdownMenu.ItemIndicator>
+                  <span className="text-xs leading-none">✓</span>
+                </DropdownMenu.ItemIndicator>
+              </span>
+              <span>Recent Notes</span>
             </DropdownMenu.CheckboxItem>
           </SortMenuButton>
           <IconButton

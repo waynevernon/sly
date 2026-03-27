@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult } from "../../services/notes";
 import { NotesPane } from "./NotesPane";
 
+const noteListSpy = vi.fn();
+
 vi.mock("../../context/NotesContext", () => ({
   useNotes: vi.fn(),
 }));
@@ -14,22 +16,26 @@ vi.mock("../notes/NoteList", () => ({
     emptyMessage,
     showFolderPrefix,
   }: {
-    items: Array<{ id: string; title: string }>;
+    items: Array<{ id: string; title: string; created: number }>;
     emptyMessage: string;
     showFolderPrefix?: boolean;
-  }) => (
-    <div>
-      <div data-testid="empty-message">{emptyMessage}</div>
-      <div data-testid="show-folder-prefix">
-        {showFolderPrefix ? "true" : "false"}
+  }) => {
+    noteListSpy({ items, emptyMessage, showFolderPrefix });
+    return (
+      <div>
+        <div data-testid="empty-message">{emptyMessage}</div>
+        <div data-testid="show-folder-prefix">
+          {showFolderPrefix ? "true" : "false"}
+        </div>
+        <div data-testid="note-items">{JSON.stringify(items)}</div>
+        <ul>
+          {items.map((item) => (
+            <li key={item.id}>{item.title}</li>
+          ))}
+        </ul>
       </div>
-      <ul>
-        {items.map((item) => (
-          <li key={item.id}>{item.title}</li>
-        ))}
-      </ul>
-    </div>
-  ),
+    );
+  },
 }));
 
 type NotesHookValue = ReturnType<
@@ -69,6 +75,9 @@ function makeNotesHookValue(
     ],
     folderIcons: {},
     noteSortMode: "modifiedDesc",
+    noteListDateMode: "modified",
+    showNoteListFolderPath: true,
+    showNoteListPreview: true,
     showRecentNotes: true,
     selectedScope: { type: "all" },
     selectedFolderPath: null,
@@ -79,12 +88,14 @@ function makeNotesHookValue(
     searchResults: [] as SearchResult[],
     clearSearch: vi.fn(),
     setNoteSortMode: vi.fn(),
+    setNoteListViewOptions: vi.fn(),
     ...overrides,
   } as never;
 }
 
 describe("NotesPane", () => {
   beforeEach(async () => {
+    noteListSpy.mockClear();
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
@@ -146,9 +157,33 @@ describe("NotesPane", () => {
     expect(screen.getByText("Search Results")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("Alpha remote")).toBeInTheDocument();
+    expect(screen.getByTestId("note-items")).toHaveTextContent('"created":2');
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No results found",
     );
+  });
+
+  it("falls back to modified time for created timestamps missing from notes cache", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notes: [],
+        searchQuery: "alp",
+        searchResults: [
+          {
+            id: "alpha",
+            title: "Alpha remote",
+            preview: "fresh",
+            modified: 6,
+            score: 10,
+          },
+        ],
+      }),
+    );
+
+    render(<NotesPane />);
+
+    expect(screen.getByTestId("note-items")).toHaveTextContent('"created":6');
   });
 
   it("renders the recent notes heading and keeps folder prefixes visible", async () => {
@@ -191,5 +226,40 @@ describe("NotesPane", () => {
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No recent notes yet",
     );
+  });
+
+  it("shows the view controls and routes note-list preference changes", async () => {
+    const user = userEvent.setup();
+    const notesContext = await import("../../context/NotesContext");
+    const setNoteListViewOptions = vi.fn();
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        setNoteListViewOptions,
+      }),
+    );
+
+    render(<NotesPane />);
+
+    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
+    expect(screen.getByText("View")).toBeInTheDocument();
+    expect(screen.getByText("Date")).toBeInTheDocument();
+    expect(screen.getByText("Modified")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: /Date/ }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Created Time" }));
+    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Folder Path" }));
+    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Text Preview" }));
+
+    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(1, {
+      noteListDateMode: "created",
+    });
+    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(2, {
+      showNoteListFolderPath: false,
+    });
+    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(3, {
+      showNoteListPreview: false,
+    });
   });
 });
