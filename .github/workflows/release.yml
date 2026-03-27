@@ -71,7 +71,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "Sly v__VERSION__"
-          releaseBody: "See https://github.com/waynevernon/sly/releases/tag/v__VERSION__ for what's new in this release."
+          releaseBody: "https://github.com/waynevernon/sly/releases/tag/v__VERSION__"
           releaseDraft: true
           prerelease: false
           updaterJsonPreferNsis: true
