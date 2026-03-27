@@ -92,28 +92,30 @@ export function SortMenuButton<T extends string>({
             {title}
           </DropdownMenu.Label>
           <DropdownMenu.Separator className={menuSeparatorClassName} />
-          {items.map((item) => {
-            const isActive = item.isActive(value);
-            return (
-              <DropdownMenu.Item
-                key={item.key}
-                className={cn(menuItemClassName, isActive && "bg-bg-muted")}
-                onSelect={() => {
-                  onChange(item.getNextValue(value));
-                }}
-              >
-                <span
-                  className={cn(
-                    "inline-flex h-4 w-4 shrink-0 items-center justify-center",
-                    isActive ? "text-text" : "text-text-muted",
-                  )}
+          <div className="flex flex-col gap-1">
+            {items.map((item) => {
+              const isActive = item.isActive(value);
+              return (
+                <DropdownMenu.Item
+                  key={item.key}
+                  className={cn(menuItemClassName, isActive && "bg-bg-muted")}
+                  onSelect={() => {
+                    onChange(item.getNextValue(value));
+                  }}
                 >
-                  {item.renderIcon(value, isActive)}
-                </span>
-                {item.label}
-              </DropdownMenu.Item>
-            );
-          })}
+                  <span
+                    className={cn(
+                      "inline-flex h-4 w-4 shrink-0 items-center justify-center",
+                      isActive ? "text-text" : "text-text-muted",
+                    )}
+                  >
+                    {item.renderIcon(value, isActive)}
+                  </span>
+                  {item.label}
+                </DropdownMenu.Item>
+              );
+            })}
+          </div>
           {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
