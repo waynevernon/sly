@@ -345,4 +345,293 @@ describe("NotesContext", () => {
       expect(result.current.searchResults).toEqual([]);
     });
   });
+
+  it("tracks recent notes in most-recent-first order and caps the list at five", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      { id: "alpha", title: "Alpha", preview: "", modified: 6, created: 6 },
+      { id: "beta", title: "Beta", preview: "", modified: 5, created: 5 },
+      { id: "gamma", title: "Gamma", preview: "", modified: 4, created: 4 },
+      { id: "delta", title: "Delta", preview: "", modified: 3, created: 3 },
+      { id: "epsilon", title: "Epsilon", preview: "", modified: 2, created: 2 },
+      { id: "zeta", title: "Zeta", preview: "", modified: 1, created: 1 },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "gamma", "delta", "epsilon", "zeta"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(6);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "alpha",
+        "beta",
+        "gamma",
+        "delta",
+        "epsilon",
+      ]);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("gamma");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "gamma",
+        "alpha",
+        "beta",
+        "delta",
+        "epsilon",
+      ]);
+    });
+  });
+
+  it("does not update recent notes when opening a note fails", async () => {
+    vi.mocked(notesService.readNote).mockRejectedValue(new Error("boom"));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    vi.mocked(notesService.updateSettings).mockClear();
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    expect(result.current.settings.recentNoteIds).toBeUndefined();
+    expect(notesService.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("remaps recent note ids when a note is renamed on save", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["alpha", "beta"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+    vi.mocked(notesService.saveNote).mockResolvedValue({
+      id: "alpha-renamed",
+      title: "alpha-renamed",
+      content: "renamed",
+      path: "/notes/alpha-renamed.md",
+      modified: 2,
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    vi.mocked(notesService.updateSettings).mockClear();
+
+    await act(async () => {
+      await result.current.saveNote("renamed", "alpha");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "alpha-renamed",
+        "beta",
+      ]);
+    });
+  });
+
+  it("prunes deleted notes from recent note ids", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.deleteNote).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ]);
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.deleteNote("beta");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual(["alpha"]);
+    });
+  });
+
+  it("remaps recent note ids when a note is moved", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.moveNote).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "work/beta",
+          title: "Beta note",
+          preview: "shipping",
+          modified: 1,
+          created: 1,
+        },
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ]);
+      return "work/beta";
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.moveNote("beta", "work");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "work/beta",
+        "alpha",
+      ]);
+    });
+  });
+
+  it("remaps recent note ids when a folder is renamed", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+      {
+        id: "docs/beta",
+        title: "Beta",
+        preview: "",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["docs/alpha", "docs/beta"],
+    });
+    vi.mocked(notesService.renameFolder).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "archive/alpha",
+          title: "Alpha",
+          preview: "",
+          modified: 2,
+          created: 2,
+        },
+        {
+          id: "archive/beta",
+          title: "Beta",
+          preview: "",
+          modified: 1,
+          created: 1,
+        },
+      ]);
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.renameFolder("docs", "archive");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "archive/alpha",
+        "archive/beta",
+      ]);
+    });
+  });
+
+  it("shows recent scope in stored recent order instead of note sort order", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+  });
+
+  it("defaults showRecentNotes on and can hide the recent scope", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.showRecentNotes).toBe(true);
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    await act(async () => {
+      await result.current.setShowRecentNotes(false);
+    });
+
+    expect(result.current.showRecentNotes).toBe(false);
+    expect(result.current.selectedScope).toEqual({ type: "all" });
+  });
 });

@@ -7,8 +7,10 @@ import {
   ClockArrowDown,
   ClockArrowUp,
   FilePlusCorner,
+  History,
 } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
+import type { NoteScope } from "../../types/note";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import { IconButton, Input } from "../ui";
@@ -72,7 +74,8 @@ const noteSortItems: SortMenuItem<NoteSortMode>[] = [
   },
 ];
 
-function getFolderLabel(path: string | null): string {
+function getScopeLabel(scope: NoteScope, path: string | null): string {
+  if (scope.type === "recent") return "Recent Notes";
   if (!path) return "All Notes";
   const parts = path.split("/");
   return parts[parts.length - 1];
@@ -80,10 +83,10 @@ function getFolderLabel(path: string | null): string {
 
 export function NotesPane() {
   const {
-    notes,
     scopedNotes,
     folderIcons,
     noteSortMode,
+    selectedScope,
     selectedNoteIds,
     selectedFolderPath,
     createNote,
@@ -131,8 +134,8 @@ export function NotesPane() {
 
   const heading = searchQuery.trim()
     ? "Search Results"
-    : getFolderLabel(selectedFolderPath);
-  const noteCount = searchQuery.trim() ? displayItems.length : selectedFolderPath ? scopedNotes.length : notes.length;
+    : getScopeLabel(selectedScope, selectedFolderPath);
+  const noteCount = displayItems.length;
   const selectedFolderIcon = getFolderIconName(folderIcons, selectedFolderPath);
   const selectionCount = selectedNoteIds.length;
   const hasBatchSelection = selectionCount > 1;
@@ -210,11 +213,15 @@ export function NotesPane() {
       <div className="ui-pane-header border-border/80">
         <div className="min-w-0 flex items-center gap-1.5">
           {!searchQuery.trim() && !hasBatchSelection && (
-            <FolderGlyph
-              iconName={selectedFolderIcon}
-              className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
-              strokeWidth={1.7}
-            />
+            selectedScope.type === "recent" ? (
+              <History className="w-4.5 h-4.5 text-text-muted/80 shrink-0 stroke-[1.7]" />
+            ) : (
+              <FolderGlyph
+                iconName={selectedFolderIcon}
+                className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
+                strokeWidth={1.7}
+              />
+            )
           )}
           <div className="font-medium text-base text-text truncate">
             {hasBatchSelection ? `${selectionCount} selected` : heading}
@@ -321,11 +328,15 @@ export function NotesPane() {
           emptyMessage={
             searchQuery.trim()
               ? "No results found"
-              : selectedFolderPath
+              : selectedScope.type === "recent"
+                ? "No recent notes yet"
+                : selectedFolderPath
                 ? "No notes in this folder"
                 : "No notes yet"
           }
-          showFolderPrefix={searchQuery.trim().length > 0 || selectedFolderPath === null}
+          showFolderPrefix={
+            searchQuery.trim().length > 0 || selectedScope.type !== "folder"
+          }
         />
       </div>
     </div>

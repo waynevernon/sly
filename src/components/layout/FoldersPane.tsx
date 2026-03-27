@@ -1,9 +1,15 @@
 import { useRef } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ArrowDownAZ, ArrowUpAZ, GripVertical } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
-import { IconButton } from "../ui";
+import {
+  IconButton,
+  menuItemClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+} from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
@@ -49,7 +55,12 @@ export function FoldersPane({
   onManualFolderDropPlanChange,
   pendingManualFolderDropPlan,
 }: FoldersPaneProps) {
-  const { folderSortMode, setFolderSortMode } = useNotes();
+  const {
+    folderSortMode,
+    showRecentNotes,
+    setFolderSortMode,
+    setShowRecentNotes,
+  } = useNotes();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -65,7 +76,25 @@ export function FoldersPane({
             onChange={(nextMode) => {
               void setFolderSortMode(nextMode);
             }}
-          />
+          >
+            <DropdownMenu.Separator className={menuSeparatorClassName} />
+            <DropdownMenu.Label className={menuLabelClassName}>
+              View
+            </DropdownMenu.Label>
+            <DropdownMenu.Separator className={menuSeparatorClassName} />
+            <DropdownMenu.CheckboxItem
+              checked={showRecentNotes}
+              className={menuItemClassName}
+              onCheckedChange={(checked) => {
+                void setShowRecentNotes(checked === true);
+              }}
+            >
+              <DropdownMenu.ItemIndicator className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                <span className="text-xs leading-none">✓</span>
+              </DropdownMenu.ItemIndicator>
+              <span className="ml-0.5">Recent Notes</span>
+            </DropdownMenu.CheckboxItem>
+          </SortMenuButton>
           <IconButton
             variant="ghost"
             title="New Folder"

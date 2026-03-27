@@ -12,12 +12,17 @@ vi.mock("../notes/NoteList", () => ({
   NoteList: ({
     items,
     emptyMessage,
+    showFolderPrefix,
   }: {
     items: Array<{ id: string; title: string }>;
     emptyMessage: string;
+    showFolderPrefix?: boolean;
   }) => (
     <div>
       <div data-testid="empty-message">{emptyMessage}</div>
+      <div data-testid="show-folder-prefix">
+        {showFolderPrefix ? "true" : "false"}
+      </div>
       <ul>
         {items.map((item) => (
           <li key={item.id}>{item.title}</li>
@@ -53,9 +58,21 @@ function makeNotesHookValue(
         created: 2,
       },
     ],
+    recentNotes: [
+      {
+        id: "alpha",
+        title: "Alpha note",
+        preview: "planning",
+        modified: 2,
+        created: 2,
+      },
+    ],
     folderIcons: {},
     noteSortMode: "modifiedDesc",
+    showRecentNotes: true,
+    selectedScope: { type: "all" },
     selectedFolderPath: null,
+    selectedNoteIds: [],
     createNote: vi.fn(),
     search: vi.fn(),
     searchQuery: "",
@@ -131,6 +148,48 @@ describe("NotesPane", () => {
     expect(screen.getByText("Alpha remote")).toBeInTheDocument();
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No results found",
+    );
+  });
+
+  it("renders the recent notes heading and keeps folder prefixes visible", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "recent" },
+        selectedFolderPath: null,
+        scopedNotes: [
+          {
+            id: "work/alpha",
+            title: "Alpha note",
+            preview: "planning",
+            modified: 2,
+            created: 2,
+          },
+        ],
+      }),
+    );
+
+    render(<NotesPane />);
+
+    expect(screen.getByText("Recent Notes")).toBeInTheDocument();
+    expect(screen.getByText("Alpha note")).toBeInTheDocument();
+    expect(screen.getByTestId("show-folder-prefix")).toHaveTextContent("true");
+  });
+
+  it("shows the recent notes empty state", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "recent" },
+        selectedFolderPath: null,
+        scopedNotes: [],
+      }),
+    );
+
+    render(<NotesPane />);
+
+    expect(screen.getByTestId("empty-message")).toHaveTextContent(
+      "No recent notes yet",
     );
   });
 });

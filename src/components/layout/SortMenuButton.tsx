@@ -26,6 +26,7 @@ interface SortMenuButtonProps<T extends string> {
   value: T;
   items: SortMenuItem<T>[];
   onChange: (value: T) => void;
+  children?: ReactNode;
 }
 
 export function SortMenuButton<T extends string>({
@@ -33,6 +34,7 @@ export function SortMenuButton<T extends string>({
   value,
   items,
   onChange,
+  children,
 }: SortMenuButtonProps<T>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
@@ -112,6 +114,7 @@ export function SortMenuButton<T extends string>({
               </DropdownMenu.Item>
             );
           })}
+          {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

@@ -16,6 +16,7 @@ import {
   type FolderSortMode,
   type Note,
   type NoteMetadata,
+  type NoteScope,
   type NoteSortMode,
   type Settings,
 } from "../types/note";
@@ -34,11 +35,14 @@ import {
 interface NotesDataContextValue {
   notes: NoteMetadata[];
   scopedNotes: NoteMetadata[];
+  recentNotes: NoteMetadata[];
+  showRecentNotes: boolean;
   settings: Settings;
   folderIcons: FolderIconsMap;
   noteSortMode: NoteSortMode;
   folderSortMode: FolderSortMode;
   folderManualOrder: FolderManualOrder;
+  selectedScope: NoteScope;
   selectedNoteId: string | null;
   selectedNoteIds: string[];
   selectedFolderPath: string | null;
@@ -61,6 +65,7 @@ interface NotesActionsContextValue {
   clearNoteSelection: () => void;
   selectAllVisibleNotes: () => void;
   selectFolder: (path: string | null) => void;
+  selectRecentNotes: () => void;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
@@ -90,6 +95,7 @@ interface NotesActionsContextValue {
     parentPath: string,
     orderedPaths: string[],
   ) => Promise<void>;
+  setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
 }
 
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
@@ -103,6 +109,115 @@ function getParentFolderPath(noteId: string): string | null {
 function getParentPath(path: string): string | null {
   const lastSlash = path.lastIndexOf("/");
   return lastSlash > 0 ? path.substring(0, lastSlash) : null;
+}
+
+const RECENT_NOTES_LIMIT = 5;
+
+function normalizeNoteIds(
+  noteIds: Array<string | null | undefined>,
+): string[] {
+  return Array.from(
+    new Set(
+      noteIds.filter(
+        (id): id is string => typeof id === "string" && id.trim().length > 0,
+      ),
+    ),
+  );
+}
+
+function sanitizeRecentNoteIds(
+  recentNoteIds: string[] | null | undefined,
+): string[] | undefined {
+  if (recentNoteIds === undefined || recentNoteIds === null) {
+    return undefined;
+  }
+
+  const normalizedIds = normalizeNoteIds(recentNoteIds).slice(
+    0,
+    RECENT_NOTES_LIMIT,
+  );
+  return normalizedIds.length > 0 ? normalizedIds : undefined;
+}
+
+function areNoteIdListsEqual(left: string[], right: string[]) {
+  return (
+    left.length === right.length &&
+    left.every((id, index) => id === right[index])
+  );
+}
+
+function getFolderPathFromScope(scope: NoteScope): string | null {
+  return scope.type === "folder" ? scope.path : null;
+}
+
+function getScopedNotes(
+  notes: NoteMetadata[],
+  scope: NoteScope,
+  recentNoteIds: string[] | null | undefined,
+): NoteMetadata[] {
+  if (scope.type === "all") {
+    return notes;
+  }
+
+  if (scope.type === "recent") {
+    const recentSet = sanitizeRecentNoteIds(recentNoteIds) ?? [];
+    if (recentSet.length === 0) return [];
+
+    const notesById = new Map(notes.map((note) => [note.id, note] as const));
+    return recentSet
+      .map((noteId) => notesById.get(noteId) ?? null)
+      .filter((note): note is NoteMetadata => note !== null);
+  }
+
+  return notes.filter((note) => getParentFolderPath(note.id) === scope.path);
+}
+
+function prependRecentNoteId(
+  recentNoteIds: string[] | null | undefined,
+  noteId: string,
+): string[] {
+  return sanitizeRecentNoteIds([noteId, ...(recentNoteIds ?? [])]) ?? [];
+}
+
+function replaceNoteIds(
+  noteIds: string[] | null | undefined,
+  replacements: Map<string, string>,
+): string[] {
+  return normalizeNoteIds(
+    (noteIds ?? []).map((noteId) => replacements.get(noteId) ?? noteId),
+  );
+}
+
+function replaceNoteIdsByPrefix(
+  noteIds: string[] | null | undefined,
+  oldPrefix: string,
+  newPrefix: string,
+): string[] {
+  return normalizeNoteIds(
+    (noteIds ?? []).map((noteId) =>
+      noteId.startsWith(oldPrefix)
+        ? `${newPrefix}${noteId.substring(oldPrefix.length)}`
+        : noteId,
+    ),
+  );
+}
+
+function removeNoteIds(
+  noteIds: string[] | null | undefined,
+  idsToRemove: Set<string>,
+): string[] {
+  return normalizeNoteIds(
+    (noteIds ?? []).filter((noteId) => !idsToRemove.has(noteId)),
+  );
+}
+
+function removeNoteIdsByPrefix(
+  noteIds: string[] | null | undefined,
+  prefix: string,
+): string[] {
+  return normalizeNoteIds(
+    (noteIds ?? []).filter((noteId) => !noteId.startsWith(prefix)),
+  );
 }
 
 function sanitizeFolderManualOrder(
@@ -152,6 +267,8 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   const nextSettings = settings ? { ...settings } : {};
   nextSettings.noteSortMode ??= DEFAULT_NOTE_SORT_MODE;
   nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
+  nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
+  nextSettings.showRecentNotes ??= true;
   nextSettings.collapsedFolders = sanitizeCollapsedFolders(
     nextSettings.collapsedFolders,
   );
@@ -167,9 +284,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
   const [folderIcons, setFolderIcons] = useState<FolderIconsMap>({});
-  const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
-    null,
-  );
+  const [selectedScope, setSelectedScope] = useState<NoteScope>({ type: "all" });
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
@@ -199,8 +314,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   searchQueryRef.current = searchQuery;
   const searchResultsRef = useRef<SearchResult[]>([]);
   searchResultsRef.current = searchResults;
-  const selectedFolderPathRef = useRef<string | null>(null);
-  selectedFolderPathRef.current = selectedFolderPath;
+  const selectedScopeRef = useRef<NoteScope>(selectedScope);
+  selectedScopeRef.current = selectedScope;
   const selectionAnchorIdRef = useRef<string | null>(null);
   const selectionRangeEndIdRef = useRef<string | null>(null);
   // Monotonic counter to ignore stale async note selection responses.
@@ -212,6 +327,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
   const windowRefreshTimeoutRef = useRef<number | null>(null);
+  const selectedFolderPath = getFolderPathFromScope(selectedScope);
+  const showRecentNotes = settings.showRecentNotes ?? true;
 
   const refreshNotes = useCallback(async () => {
     if (!notesFolder) return;
@@ -274,15 +391,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       return searchResultsRef.current.map((result) => result.id);
     }
 
-    if (selectedFolderPathRef.current === null) {
-      return notesRef.current.map((note) => note.id);
-    }
-
-    return notesRef.current
-      .filter(
-        (note) => getParentFolderPath(note.id) === selectedFolderPathRef.current,
-      )
-      .map((note) => note.id);
+    return getScopedNotes(
+      notesRef.current,
+      selectedScopeRef.current,
+      settingsRef.current.recentNoteIds,
+    ).map((note) => note.id);
   }, []);
 
   const setSelectionState = useCallback(
@@ -346,6 +459,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [persistFolderManualOrder],
   );
 
+  const setShowRecentNotes = useCallback(
+    async (showRecentNotes: boolean) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        showRecentNotes,
+      }));
+      setSelectedScope((prevScope) =>
+        !showRecentNotes && prevScope.type === "recent"
+          ? { type: "all" }
+          : prevScope,
+      );
+    },
+    [persistSettings],
+  );
+
   const setCollapsedFolders = useCallback(
     async (paths: string[]) => {
       await persistSettings((currentSettings) => ({
@@ -367,21 +495,78 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }, 300);
   }, [refreshNotes]);
 
-  const selectFolder = useCallback((path: string | null) => {
-    setSelectedFolderPath(path);
-    if (
-      path &&
-      selectedNoteIdRef.current &&
-      getParentFolderPath(selectedNoteIdRef.current) !== path
-    ) {
-      setSelectedNoteId(null);
-      setSelectionState([], { anchorId: null, rangeEndId: null });
-      setCurrentNote(null);
-    }
-    if (path) {
-      window.dispatchEvent(new CustomEvent("expand-folder", { detail: path }));
-    }
-  }, [setSelectionState]);
+  const selectScope = useCallback(
+    (scope: NoteScope) => {
+      setSelectedScope(scope);
+
+      const activeNoteId = selectedNoteIdRef.current;
+      if (scope.type !== "all" && activeNoteId) {
+        const visibleNoteIds = new Set(
+          getScopedNotes(
+            notesRef.current,
+            scope,
+            settingsRef.current.recentNoteIds,
+          ).map((note) => note.id),
+        );
+        if (!visibleNoteIds.has(activeNoteId)) {
+          setSelectedNoteId(null);
+          setSelectionState([], { anchorId: null, rangeEndId: null });
+          setCurrentNote(null);
+        }
+      }
+
+      if (scope.type === "folder") {
+        window.dispatchEvent(
+          new CustomEvent("expand-folder", { detail: scope.path }),
+        );
+      }
+    },
+    [setSelectionState],
+  );
+
+  const selectFolder = useCallback(
+    (path: string | null) => {
+      selectScope(path ? { type: "folder", path } : { type: "all" });
+    },
+    [selectScope],
+  );
+
+  const selectRecentNotes = useCallback(() => {
+    selectScope({ type: "recent" });
+  }, [selectScope]);
+
+  const updateRecentNoteIds = useCallback(
+    async (updater: (currentRecentNoteIds: string[]) => string[]) => {
+      const currentRecentNoteIds = settingsRef.current.recentNoteIds ?? [];
+      const nextRecentNoteIds = sanitizeRecentNoteIds(
+        updater(currentRecentNoteIds),
+      ) ?? [];
+
+      if (areNoteIdListsEqual(currentRecentNoteIds, nextRecentNoteIds)) {
+        return;
+      }
+
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        recentNoteIds:
+          nextRecentNoteIds.length > 0 ? nextRecentNoteIds : undefined,
+      }));
+    },
+    [persistSettings],
+  );
+
+  const recordRecentNoteView = useCallback(
+    async (noteId: string) => {
+      try {
+        await updateRecentNoteIds((currentRecentNoteIds) =>
+          prependRecentNoteId(currentRecentNoteIds, noteId),
+        );
+      } catch (error) {
+        console.error("Failed to update recent notes:", error);
+      }
+    },
+    [updateRecentNoteIds],
+  );
 
   const selectNote = useCallback(async (id: string) => {
     const requestId = ++selectRequestIdRef.current;
@@ -399,11 +584,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setHasExternalChanges(false);
       const parentFolder = getParentFolderPath(id);
       if (
-        selectedFolderPathRef.current !== null &&
+        selectedScopeRef.current.type === "folder" &&
         !searchQueryRef.current.trim() &&
-        parentFolder !== selectedFolderPathRef.current
+        parentFolder !== selectedScopeRef.current.path
       ) {
-        setSelectedFolderPath(parentFolder);
+        setSelectedScope(
+          parentFolder ? { type: "folder", path: parentFolder } : { type: "all" },
+        );
       }
       // Expand parent folders so the note is visible in the tree
       if (parentFolder) {
@@ -416,11 +603,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       const note = await notesService.readNote(id);
       if (requestId !== selectRequestIdRef.current) return;
       setCurrentNote(note);
+      void recordRecentNoteView(note.id);
     } catch (err) {
       if (requestId !== selectRequestIdRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to load note");
     }
-  }, [getVisibleNoteIds, setSelectionState]);
+  }, [getVisibleNoteIds, recordRecentNoteView, setSelectionState]);
 
   const toggleNoteSelection = useCallback(
     (id: string) => {
@@ -508,7 +696,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const createNote = useCallback(async () => {
     try {
-      const targetFolder = selectedFolderPathRef.current ?? undefined;
+      const targetFolder = getFolderPathFromScope(selectedScopeRef.current) ?? undefined;
       const note = await notesService.createNote(targetFolder);
       selectRequestIdRef.current += 1;
       pendingNewNoteIdRef.current = note.id;
@@ -519,19 +707,22 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setSelectedNoteId(note.id);
       setSelectionState([note.id], { anchorId: note.id, rangeEndId: note.id });
       const parentFolder = getParentFolderPath(note.id);
-      if (selectedFolderPathRef.current !== null) {
-        setSelectedFolderPath(parentFolder);
+      if (selectedScopeRef.current.type === "folder") {
+        setSelectedScope(
+          parentFolder ? { type: "folder", path: parentFolder } : { type: "all" },
+        );
       }
       // Clear search when creating a new note
       setSearchQuery("");
       setSearchResults([]);
+      void recordRecentNoteView(note.id);
       setTimeout(() => {
         recentlySavedRef.current.delete(note.id);
       }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create note");
     }
-  }, [refreshNotes, setSelectionState]);
+  }, [recordRecentNoteView, refreshNotes, setSelectionState]);
 
   const consumePendingNewNote = useCallback((id: string) => {
     if (pendingNewNoteIdRef.current !== id) {
@@ -560,20 +751,26 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (updated.id !== savingNoteId) {
           recentlySavedRef.current.add(updated.id);
 
-          // Transfer pin status to new ID
-          await persistSettings((currentSettings) => {
-            const pinnedIds = currentSettings.pinnedNoteIds || [];
-            if (!pinnedIds.includes(savingNoteId)) {
-              return currentSettings;
-            }
-
-            return {
+          const pinnedIds = settingsRef.current.pinnedNoteIds || [];
+          const recentNoteIds = settingsRef.current.recentNoteIds || [];
+          if (
+            pinnedIds.includes(savingNoteId) ||
+            recentNoteIds.includes(savingNoteId)
+          ) {
+            await persistSettings((currentSettings) => ({
               ...currentSettings,
-              pinnedNoteIds: pinnedIds.map((id) =>
-                id === savingNoteId ? updated.id : id,
+              pinnedNoteIds: normalizeNoteIds(
+                (currentSettings.pinnedNoteIds || []).map((id) =>
+                  id === savingNoteId ? updated.id : id,
+                ),
               ),
-            };
-          });
+              recentNoteIds: sanitizeRecentNoteIds(
+                (currentSettings.recentNoteIds || []).map((id) =>
+                  id === savingNoteId ? updated.id : id,
+                ),
+              ),
+            }));
+          }
         }
 
         // Clear external changes flag - if it was set by our own save, we want to ignore it
@@ -626,11 +823,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
         // Clean up pinned status for deleted note
         const pinnedIds = settingsRef.current.pinnedNoteIds || [];
-        if (pinnedIds.includes(id)) {
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (pinnedIds.includes(id) || recentNoteIds.includes(id)) {
           await persistSettings((currentSettings) => ({
             ...currentSettings,
-            pinnedNoteIds: (currentSettings.pinnedNoteIds || []).filter(
-              (pinId) => pinId !== id,
+            pinnedNoteIds: normalizeNoteIds(
+              (currentSettings.pinnedNoteIds || []).filter((pinId) => pinId !== id),
+            ),
+            recentNoteIds: sanitizeRecentNoteIds(
+              (currentSettings.recentNoteIds || []).filter(
+                (recentId) => recentId !== id,
+              ),
             ),
           }));
         }
@@ -670,6 +873,23 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     try {
       await notesService.deleteNotes(noteIds);
       const deletedSet = new Set(noteIds);
+      const pinnedIds = settingsRef.current.pinnedNoteIds || [];
+      const recentNoteIds = settingsRef.current.recentNoteIds || [];
+      if (
+        pinnedIds.some((id) => deletedSet.has(id)) ||
+        recentNoteIds.some((id) => deletedSet.has(id))
+      ) {
+        await persistSettings((currentSettings) => ({
+          ...currentSettings,
+          pinnedNoteIds: removeNoteIds(
+            currentSettings.pinnedNoteIds,
+            deletedSet,
+          ),
+          recentNoteIds: sanitizeRecentNoteIds(
+            removeNoteIds(currentSettings.recentNoteIds, deletedSet),
+          ),
+        }));
+      }
       if (
         selectedNoteIdRef.current &&
         deletedSet.has(selectedNoteIdRef.current)
@@ -681,7 +901,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         anchorId: selectedNoteIdRef.current,
         rangeEndId: selectedNoteIdRef.current,
       });
-      await refreshSettings();
       await refreshNotes();
       await refreshActiveSearchResults();
     } catch (err) {
@@ -692,9 +911,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [
     deleteNote,
+    persistSettings,
     refreshActiveSearchResults,
     refreshNotes,
-    refreshSettings,
     setSelectionState,
   ]);
 
@@ -713,9 +932,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           rangeEndId: newNote.id,
         });
         const parentFolder = getParentFolderPath(newNote.id);
-        if (selectedFolderPathRef.current !== null) {
-          setSelectedFolderPath(parentFolder);
+        if (selectedScopeRef.current.type === "folder") {
+          setSelectedScope(
+            parentFolder ? { type: "folder", path: parentFolder } : { type: "all" },
+          );
         }
+        void recordRecentNoteView(newNote.id);
         setTimeout(() => {
           recentlySavedRef.current.delete(newNote.id);
         }, 1000);
@@ -723,7 +945,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : "Failed to duplicate note");
       }
     },
-    [refreshNotes, setSelectionState]
+    [recordRecentNoteView, refreshNotes, setSelectionState]
   );
 
   const pinNote = useCallback(
@@ -773,9 +995,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setCurrentNote(note);
         setSelectedNoteId(note.id);
         setSelectionState([note.id], { anchorId: note.id, rangeEndId: note.id });
-        setSelectedFolderPath(folderPath);
+        setSelectedScope({ type: "folder", path: folderPath });
         setSearchQuery("");
         setSearchResults([]);
+        void recordRecentNoteView(note.id);
         setTimeout(() => {
           recentlySavedRef.current.delete(note.id);
         }, 1000);
@@ -785,7 +1008,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes, setSelectionState]
+    [recordRecentNoteView, refreshNotes, setSelectionState]
   );
 
   const createFolderAction = useCallback(
@@ -808,37 +1031,50 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async (path: string) => {
       try {
         await notesService.deleteFolder(path);
+        const folderPrefix = `${path}/`;
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (recentNoteIds.some((noteId) => noteId.startsWith(folderPrefix))) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            recentNoteIds: sanitizeRecentNoteIds(
+              removeNoteIdsByPrefix(currentSettings.recentNoteIds, folderPrefix),
+            ),
+          }));
+        }
         // If the selected note was inside the deleted folder, clear selection
         setSelectedNoteId((prevId) => {
-          if (prevId && prevId.startsWith(path + "/")) {
+          if (prevId && prevId.startsWith(folderPrefix)) {
             setCurrentNote(null);
             return null;
           }
           return prevId;
         });
         setSelectedNoteIds((prevIds) =>
-          prevIds.filter((noteId) => !noteId.startsWith(path + "/")),
+          prevIds.filter((noteId) => !noteId.startsWith(folderPrefix)),
         );
         if (
           selectionAnchorIdRef.current &&
-          selectionAnchorIdRef.current.startsWith(path + "/")
+          selectionAnchorIdRef.current.startsWith(folderPrefix)
         ) {
           selectionAnchorIdRef.current = null;
         }
         if (
           selectionRangeEndIdRef.current &&
-          selectionRangeEndIdRef.current.startsWith(path + "/")
+          selectionRangeEndIdRef.current.startsWith(folderPrefix)
         ) {
           selectionRangeEndIdRef.current = selectionAnchorIdRef.current;
         }
-        setSelectedFolderPath((prevPath) => {
-          if (!prevPath) return prevPath;
-          if (prevPath === path || prevPath.startsWith(path + "/")) {
-            return getParentPath(path);
+        setSelectedScope((prevScope) => {
+          if (prevScope.type !== "folder") return prevScope;
+          if (
+            prevScope.path === path ||
+            prevScope.path.startsWith(folderPrefix)
+          ) {
+            const nextPath = getParentPath(path);
+            return nextPath ? { type: "folder", path: nextPath } : { type: "all" };
           }
-          return prevPath;
+          return prevScope;
         });
-        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(
@@ -846,7 +1082,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes, refreshSettings]
+    [persistSettings, refreshNotes]
   );
 
   const renameFolderAction = useCallback(
@@ -862,6 +1098,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             : newName;
         const oldPrefix = oldPath + "/";
         const newPrefix = newPath + "/";
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (recentNoteIds.some((noteId) => noteId.startsWith(oldPrefix))) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            recentNoteIds: sanitizeRecentNoteIds(
+              replaceNoteIdsByPrefix(
+                currentSettings.recentNoteIds,
+                oldPrefix,
+                newPrefix,
+              ),
+            ),
+          }));
+        }
 
         // Update selectedNoteId if it was inside the renamed folder
         setSelectedNoteId((prevId) => {
@@ -897,15 +1146,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           selectionRangeEndIdRef.current =
             newPrefix + selectionRangeEndIdRef.current.substring(oldPrefix.length);
         }
-        setSelectedFolderPath((prevPath) => {
-          if (!prevPath) return prevPath;
-          if (prevPath === oldPath) return newPath;
-          if (prevPath.startsWith(oldPrefix)) {
-            return newPrefix + prevPath.substring(oldPrefix.length);
+        setSelectedScope((prevScope) => {
+          if (prevScope.type !== "folder") return prevScope;
+          if (prevScope.path === oldPath) {
+            return { type: "folder", path: newPath };
           }
-          return prevPath;
+          if (prevScope.path.startsWith(oldPrefix)) {
+            return {
+              type: "folder",
+              path: `${newPrefix}${prevScope.path.substring(oldPrefix.length)}`,
+            };
+          }
+          return prevScope;
         });
-        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(
@@ -913,13 +1166,25 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [refreshNotes, refreshSettings]
+    [persistSettings, refreshNotes]
   );
 
   const moveNoteAction = useCallback(
     async (id: string, targetFolder: string) => {
       try {
         const newId = await notesService.moveNote(id, targetFolder);
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (recentNoteIds.includes(id)) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            recentNoteIds: sanitizeRecentNoteIds(
+              replaceNoteIds(
+                currentSettings.recentNoteIds,
+                new Map([[id, newId]]),
+              ),
+            ),
+          }));
+        }
         // Update selection if we moved the selected note
         setSelectedNoteId((prevId) => {
           if (prevId === id) {
@@ -941,20 +1206,24 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (selectionRangeEndIdRef.current === id) {
           selectionRangeEndIdRef.current = newId;
         }
-        setSelectedFolderPath((prevPath) => {
-          if (prevPath && getParentFolderPath(id) === prevPath) {
-            return targetFolder || null;
+        setSelectedScope((prevScope) => {
+          if (
+            prevScope.type === "folder" &&
+            getParentFolderPath(id) === prevScope.path
+          ) {
+            return targetFolder
+              ? { type: "folder", path: targetFolder }
+              : { type: "all" };
           }
-          return prevPath;
+          return prevScope;
         });
-        await refreshSettings();
         await refreshNotes();
         await refreshActiveSearchResults();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move note");
       }
     },
-    [refreshActiveSearchResults, refreshNotes, refreshSettings]
+    [persistSettings, refreshActiveSearchResults, refreshNotes]
   );
 
   const moveSelectedNotes = useCallback(
@@ -971,6 +1240,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         const moveMap = new Map(
           moveResults.map((result) => [result.from, result.to] as const),
         );
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (recentNoteIds.some((noteId) => moveMap.has(noteId))) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            recentNoteIds: sanitizeRecentNoteIds(
+              replaceNoteIds(currentSettings.recentNoteIds, moveMap),
+            ),
+          }));
+        }
 
         if (
           selectedNoteIdRef.current &&
@@ -1002,16 +1280,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             selectionRangeEndIdRef.current,
         });
 
-        setSelectedFolderPath((prevPath) => {
+        setSelectedScope((prevScope) => {
           const activeId = selectedNoteIdRef.current;
-          if (!prevPath || !activeId) return prevPath;
-          if (getParentFolderPath(activeId) === prevPath) {
-            return targetFolder || null;
+          if (prevScope.type !== "folder" || !activeId) return prevScope;
+          if (getParentFolderPath(activeId) === prevScope.path) {
+            return targetFolder
+              ? { type: "folder", path: targetFolder }
+              : { type: "all" };
           }
-          return prevPath;
+          return prevScope;
         });
 
-        await refreshSettings();
         await refreshNotes();
         await refreshActiveSearchResults();
       } catch (err) {
@@ -1021,7 +1300,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [moveNoteAction, refreshActiveSearchResults, refreshNotes, refreshSettings, setSelectionState],
+    [moveNoteAction, persistSettings, refreshActiveSearchResults, refreshNotes, setSelectionState],
   );
 
   const moveFolderAction = useCallback(
@@ -1038,6 +1317,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           : folderName;
         const oldPrefix = path + "/";
         const newPrefix = newPath + "/";
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (recentNoteIds.some((noteId) => noteId.startsWith(oldPrefix))) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            recentNoteIds: sanitizeRecentNoteIds(
+              replaceNoteIdsByPrefix(
+                currentSettings.recentNoteIds,
+                oldPrefix,
+                newPrefix,
+              ),
+            ),
+          }));
+        }
 
         // Update selectedNoteId if it was inside the moved folder
         setSelectedNoteId((prevId) => {
@@ -1073,21 +1365,25 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           selectionRangeEndIdRef.current =
             newPrefix + selectionRangeEndIdRef.current.substring(oldPrefix.length);
         }
-        setSelectedFolderPath((prevPath) => {
-          if (!prevPath) return prevPath;
-          if (prevPath === path) return newPath;
-          if (prevPath.startsWith(oldPrefix)) {
-            return newPrefix + prevPath.substring(oldPrefix.length);
+        setSelectedScope((prevScope) => {
+          if (prevScope.type !== "folder") return prevScope;
+          if (prevScope.path === path) {
+            return { type: "folder", path: newPath };
           }
-          return prevPath;
+          if (prevScope.path.startsWith(oldPrefix)) {
+            return {
+              type: "folder",
+              path: `${newPrefix}${prevScope.path.substring(oldPrefix.length)}`,
+            };
+          }
+          return prevScope;
         });
-        await refreshSettings();
         await refreshNotes();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move folder");
       }
     },
-    [refreshNotes, refreshSettings]
+    [persistSettings, refreshNotes]
   );
 
   const setFolderIcon = useCallback(async (path: string, iconName: string | null) => {
@@ -1124,7 +1420,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await notesService.setNotesFolder(path);
       setNotesFolderState(path);
       applySettings({});
-      setSelectedFolderPath(null);
+      setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
       setCurrentNote(null);
@@ -1144,7 +1440,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     try {
       setNotesFolderState(path);
       applySettings({});
-      setSelectedFolderPath(null);
+      setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
       setCurrentNote(null);
@@ -1371,15 +1667,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder, refreshNotes]);
 
-  const scopedNotes = useMemo(() => {
-    if (selectedFolderPath === null) {
-      return notes;
-    }
+  const recentNotes = useMemo(
+    () => getScopedNotes(notes, { type: "recent" }, settings.recentNoteIds),
+    [notes, settings.recentNoteIds],
+  );
 
-    return notes.filter(
-      (note) => getParentFolderPath(note.id) === selectedFolderPath,
-    );
-  }, [notes, selectedFolderPath]);
+  const scopedNotes = useMemo(
+    () => getScopedNotes(notes, selectedScope, settings.recentNoteIds),
+    [notes, selectedScope, settings.recentNoteIds],
+  );
+
+  useEffect(() => {
+    if (!showRecentNotes && selectedScope.type === "recent") {
+      setSelectedScope({ type: "all" });
+    }
+  }, [selectedScope, showRecentNotes]);
 
   useEffect(() => {
     const visibleNoteIds = getVisibleNoteIds();
@@ -1428,7 +1730,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     notes,
     searchQuery,
     searchResults,
-    selectedFolderPath,
+    selectedScope,
     selectedNoteId,
   ]);
 
@@ -1437,11 +1739,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     () => ({
       notes,
       scopedNotes,
+      recentNotes,
+      showRecentNotes,
       settings,
       folderIcons,
       noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
       folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
       folderManualOrder: settings.folderManualOrder || {},
+      selectedScope,
       selectedNoteId,
       selectedNoteIds,
       selectedFolderPath,
@@ -1458,8 +1763,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [
       notes,
       scopedNotes,
+      recentNotes,
+      showRecentNotes,
       settings,
       folderIcons,
+      selectedScope,
       selectedNoteId,
       selectedNoteIds,
       selectedFolderPath,
@@ -1484,6 +1792,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearNoteSelection,
       selectAllVisibleNotes,
       selectFolder,
+      selectRecentNotes,
       createNote,
       consumePendingNewNote,
       saveNote,
@@ -1510,6 +1819,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setFolderSortMode,
       setFolderManualOrder,
+      setShowRecentNotes,
     }),
     [
       selectNote,
@@ -1518,6 +1828,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearNoteSelection,
       selectAllVisibleNotes,
       selectFolder,
+      selectRecentNotes,
       createNote,
       consumePendingNewNote,
       saveNote,
@@ -1544,6 +1855,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setFolderSortMode,
       setFolderManualOrder,
+      setShowRecentNotes,
     ]
   );
 

@@ -297,6 +297,10 @@ pub struct Settings {
     pub git_enabled: Option<bool>,
     #[serde(rename = "pinnedNoteIds")]
     pub pinned_note_ids: Option<Vec<String>>,
+    #[serde(rename = "recentNoteIds")]
+    pub recent_note_ids: Option<Vec<String>>,
+    #[serde(rename = "showRecentNotes")]
+    pub show_recent_notes: Option<bool>,
     #[serde(rename = "defaultNoteName")]
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
@@ -320,6 +324,10 @@ pub struct SettingsPatch {
     pub git_enabled: Option<Option<bool>>,
     #[serde(default)]
     pub pinned_note_ids: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub recent_note_ids: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub show_recent_notes: Option<Option<bool>>,
     #[serde(default)]
     pub default_note_name: Option<Option<String>>,
     #[serde(default)]

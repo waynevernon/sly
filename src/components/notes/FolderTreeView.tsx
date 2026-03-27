@@ -14,7 +14,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
-import { FilePlusCorner } from "lucide-react";
+import { FilePlusCorner, History } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -540,13 +540,17 @@ export function FolderTreeView({
 }: FolderTreeViewProps) {
   const {
     notes,
+    recentNotes,
     notesFolder,
     settings,
     folderIcons,
     folderSortMode,
     folderManualOrder,
+    showRecentNotes,
+    selectedScope,
     selectedFolderPath,
     selectFolder,
+    selectRecentNotes,
     createNoteInFolder,
     createFolder,
     deleteFolder,
@@ -1111,12 +1115,31 @@ export function FolderTreeView({
         data-folder-tree
         className="flex flex-col gap-1 px-1.5 pb-1.5 outline-none"
       >
+        {showRecentNotes && (
+          <button
+            type="button"
+            onClick={selectRecentNotes}
+            className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              selectedScope.type === "recent"
+                ? "bg-bg-muted"
+                : "hover:bg-bg-muted/80"
+            }`}
+          >
+            <span className="flex items-center gap-2 min-w-0 flex-1">
+              <History className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
+              <span className="text-sm font-medium text-text truncate">
+                Recent Notes
+              </span>
+            </span>
+            <FolderRowTrailing count={recentNotes.length} />
+          </button>
+        )}
         <div
           ref={setRootDropRef}
           className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
             isOverRoot && isContainerDropActive
               ? "bg-accent/12 ring-1 ring-accent/60"
-              : selectedFolderPath === null
+              : selectedScope.type === "all"
                 ? "bg-bg-muted"
                 : "hover:bg-bg-muted/80"
           }`}

@@ -105,6 +105,10 @@ export type NoteSortMode =
   | "titleDesc";
 export type FolderSortMode = "manual" | "nameAsc" | "nameDesc";
 export type FolderManualOrder = Record<string, string[]>;
+export type NoteScope =
+  | { type: "all" }
+  | { type: "recent" }
+  | { type: "folder"; path: string };
 
 export const DEFAULT_NOTE_SORT_MODE: NoteSortMode = "modifiedDesc";
 export const DEFAULT_FOLDER_SORT_MODE: FolderSortMode = "nameAsc";
@@ -139,6 +143,8 @@ export interface AppearanceSettings {
 export interface Settings {
   gitEnabled?: boolean;
   pinnedNoteIds?: string[];
+  recentNoteIds?: string[];
+  showRecentNotes?: boolean;
   defaultNoteName?: string;
   ollamaModel?: string;
   folderIcons?: Record<string, string>;
@@ -151,6 +157,8 @@ export interface Settings {
 export interface SettingsPatch {
   gitEnabled?: boolean | null;
   pinnedNoteIds?: string[] | null;
+  recentNoteIds?: string[] | null;
+  showRecentNotes?: boolean | null;
   defaultNoteName?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, string> | null;
