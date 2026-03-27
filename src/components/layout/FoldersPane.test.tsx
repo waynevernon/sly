@@ -1,6 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "../ui";
 import { FoldersPane } from "./FoldersPane";
 
 vi.mock("../../context/NotesContext", () => ({
@@ -47,11 +48,13 @@ describe("FoldersPane", () => {
     );
 
     render(
-      <FoldersPane
-        dragDelta={null}
-        onManualFolderDropPlanChange={vi.fn()}
-        pendingManualFolderDropPlan={null}
-      />,
+      <TooltipProvider>
+        <FoldersPane
+          dragDelta={null}
+          onManualFolderDropPlanChange={vi.fn()}
+          pendingManualFolderDropPlan={null}
+        />
+      </TooltipProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: "Sort Folders" }));

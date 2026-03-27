@@ -93,7 +93,7 @@ describe("NoteList", () => {
 
     render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
 
-    const row = screen.getByRole("button", { name: "Alpha note" });
+    const row = screen.getByRole("button", { name: /Alpha note/ });
     expect(row).toHaveClass("py-1.75");
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
@@ -167,11 +167,10 @@ describe("NoteList", () => {
   it("combines date, folder path, and preview when multiple view settings are enabled", async () => {
     render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
 
-    const row = screen.getByRole("button", { name: "Alpha note" });
+    const row = screen.getByRole("button", { name: /Alpha note/ });
     expect(row).toHaveClass("py-2.25");
     expect(screen.getByText("3 days ago")).toBeInTheDocument();
-    expect(screen.getByText("work/")).toBeInTheDocument();
-    expect(screen.getByText("planning")).toBeInTheDocument();
+    expect(screen.getByText("work/ · planning")).toBeInTheDocument();
   });
 
   it("appends the filename to the folder path when both are enabled", async () => {
@@ -203,7 +202,6 @@ describe("NoteList", () => {
 
     render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
 
-    expect(screen.getByText("work/alpha.md")).toBeInTheDocument();
-    expect(screen.getByText("planning")).toBeInTheDocument();
+    expect(screen.getByText("work/alpha.md · planning")).toBeInTheDocument();
   });
 });

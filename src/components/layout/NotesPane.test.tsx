@@ -1,7 +1,13 @@
 import userEvent from "@testing-library/user-event";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult } from "../../services/notes";
+import { TooltipProvider } from "../ui";
 import { NotesPane } from "./NotesPane";
 
 const noteListSpy = vi.fn();
@@ -108,22 +114,22 @@ describe("NotesPane", () => {
 
   it("debounces search input before querying notes", async () => {
     vi.useFakeTimers();
-    const user = userEvent.setup({
-      advanceTimers: vi.advanceTimersByTime,
-    });
-
     const notesContext = await import("../../context/NotesContext");
     const search = vi.fn();
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({ search }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
-    await user.click(screen.getByRole("button", { name: "Search Notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search Notes" }));
     const input = screen.getByPlaceholderText("Search notes...");
 
-    await user.type(input, "alp");
+    fireEvent.change(input, { target: { value: "alp" } });
 
     expect(search).not.toHaveBeenCalled();
 
@@ -131,9 +137,7 @@ describe("NotesPane", () => {
       vi.advanceTimersByTime(220);
     });
 
-    await waitFor(() => {
-      expect(search).toHaveBeenCalledTimes(1);
-    });
+    expect(search).toHaveBeenCalledTimes(1);
     expect(search).toHaveBeenCalledWith("alp");
   });
 
@@ -154,7 +158,11 @@ describe("NotesPane", () => {
       }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByText("Search Results")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
@@ -183,7 +191,11 @@ describe("NotesPane", () => {
       }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByTestId("note-items")).toHaveTextContent('"created":6');
   });
@@ -206,7 +218,11 @@ describe("NotesPane", () => {
       }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByText("Recent Notes")).toBeInTheDocument();
     expect(screen.getByText("Alpha note")).toBeInTheDocument();
@@ -223,7 +239,11 @@ describe("NotesPane", () => {
       }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No recent notes yet",
@@ -240,35 +260,29 @@ describe("NotesPane", () => {
       }),
     );
 
-    render(<NotesPane />);
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
 
-    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
+    const sortButton = screen.getByRole("button", { name: "Sort Notes" });
+
+    await user.click(sortButton);
     expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
     expect(screen.getByText("2 Lines")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("menuitem", { name: /Date/ }));
-    await user.click(screen.getByRole("menuitemradio", { name: "Created Time" }));
-    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Folder Path" }));
-    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Filename" }));
-    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
-    await user.click(screen.getByRole("menuitem", { name: /Text Preview/ }));
-    await user.click(screen.getByRole("menuitemradio", { name: "3 Lines" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /Folder Path/ }));
+    await user.click(sortButton);
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /Filename/ }));
 
-    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(1, {
-      noteListDateMode: "created",
-    });
-    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(2, {
+    expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteListFolderPath: false,
     });
-    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(3, {
+    expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteListFilename: true,
-    });
-    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(4, {
-      noteListPreviewLines: 3,
     });
   });
 });

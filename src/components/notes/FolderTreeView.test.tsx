@@ -138,7 +138,7 @@ describe("FolderTreeView", () => {
 
     expect(
       screen.getByRole("button", { name: /Recent Notes/i }).className,
-    ).toContain("bg-bg-muted");
+    ).toMatch(/(^|\s)bg-bg-muted($|\s)/);
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
@@ -154,7 +154,7 @@ describe("FolderTreeView", () => {
 
     expect(
       screen.getByRole("button", { name: /Recent Notes/i }).className,
-    ).not.toContain("bg-bg-muted");
+    ).not.toMatch(/(^|\s)bg-bg-muted($|\s)/);
     expect(
       screen.getByRole("button", { name: /All Notes/i }).parentElement?.className,
     ).toContain("bg-bg-muted");

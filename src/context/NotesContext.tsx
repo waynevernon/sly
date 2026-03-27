@@ -361,6 +361,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!notesFolder) return;
     try {
       const notesList = await notesService.listNotes();
+      notesRef.current = notesList;
       setNotes(notesList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load notes");
@@ -483,24 +484,37 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListFolderPath?: boolean;
       showNoteListPreview?: boolean;
     }) => {
-      await persistSettings((currentSettings) => ({
-        ...currentSettings,
-        ...(noteListDateMode !== undefined ? { noteListDateMode } : {}),
-        ...(noteListPreviewLines !== undefined
-          ? {
-              showNoteListPreview: noteListPreviewLines > 0,
-              noteListPreviewLines:
-                noteListPreviewLines > 0
-                  ? noteListPreviewLines
-                  : currentSettings.noteListPreviewLines ?? 2,
-            }
-          : {}),
-        ...(showNoteListFilename !== undefined ? { showNoteListFilename } : {}),
-        ...(showNoteListFolderPath !== undefined
-          ? { showNoteListFolderPath }
-          : {}),
-        ...(showNoteListPreview !== undefined ? { showNoteListPreview } : {}),
-      }));
+      await persistSettings((currentSettings) => {
+        const nextSettings: Settings = { ...currentSettings };
+
+        if (noteListDateMode !== undefined) {
+          nextSettings.noteListDateMode = noteListDateMode;
+        }
+
+        if (noteListPreviewLines !== undefined) {
+          nextSettings.showNoteListPreview = noteListPreviewLines !== 0;
+          if (noteListPreviewLines === 0) {
+            nextSettings.noteListPreviewLines =
+              currentSettings.noteListPreviewLines ?? 2;
+          } else {
+            nextSettings.noteListPreviewLines = noteListPreviewLines;
+          }
+        }
+
+        if (showNoteListFilename !== undefined) {
+          nextSettings.showNoteListFilename = showNoteListFilename;
+        }
+
+        if (showNoteListFolderPath !== undefined) {
+          nextSettings.showNoteListFolderPath = showNoteListFolderPath;
+        }
+
+        if (showNoteListPreview !== undefined) {
+          nextSettings.showNoteListPreview = showNoteListPreview;
+        }
+
+        return nextSettings;
+      });
     },
     [persistSettings],
   );
