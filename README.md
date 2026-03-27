@@ -1,16 +1,15 @@
-# Sly
+<p align="left">
+  <img src="./docs/assets/app-icon.png" alt="Sly app icon" width="160" />
+</p>
 
+# Sly
 Sly is an editor-first markdown notes app for macOS, Windows, and Linux. It keeps your notes on disk as plain markdown files, stays fast and keyboard-friendly, and adds optional AI and Git workflows without locking your notes into a cloud service.
 
 Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project created by Eric Li.
 
-<p align="center">
-  <img src="./docs/assets/app-icon.png" alt="Sly app icon" width="160" />
-</p>
-
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey) ![Windows](https://img.shields.io/badge/platform-Windows-blue) ![Linux](https://img.shields.io/badge/platform-Linux-orange)
 
-[View on GitHub](https://github.com/waynevernon/sly) · [Releases](https://github.com/waynevernon/sly/releases) · [Report an Issue](https://github.com/waynevernon/sly/issues)
+[Releases](https://github.com/waynevernon/sly/releases) · [Report an Issue](https://github.com/waynevernon/sly/issues)
 
 ![Sly screenshot](./docs/assets/screenshot.png)
 
