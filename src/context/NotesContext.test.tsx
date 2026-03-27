@@ -73,6 +73,7 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.getSettings).mockResolvedValue({});
+    vi.mocked(notesService.updateSettings).mockResolvedValue();
     vi.mocked(notesService.startFileWatcher).mockResolvedValue();
     vi.mocked(notesService.searchNotes).mockResolvedValue([]);
   });
@@ -162,5 +163,53 @@ describe("NotesContext", () => {
     expect(result.current.searchQuery).toBe("bet");
     expect(result.current.searchResults.map((note) => note.id)).toContain("beta");
     expect(result.current.searchResults.map((note) => note.id)).not.toContain("alpha");
+  });
+
+  it("persists sanitized manual folder order", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.setFolderManualOrder("", ["docs", "docs", "", "journal"]);
+    });
+
+    expect(notesService.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderManualOrder: {
+          "": ["docs", "journal"],
+        },
+      }),
+    );
+    expect(result.current.folderManualOrder).toEqual({
+      "": ["docs", "journal"],
+    });
+  });
+
+  it("removes manual folder order entries when cleared", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      folderManualOrder: {
+        "": ["docs"],
+      },
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.setFolderManualOrder("", []);
+    });
+
+    expect(notesService.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderManualOrder: undefined,
+      }),
+    );
+    expect(result.current.folderManualOrder).toEqual({});
   });
 });
