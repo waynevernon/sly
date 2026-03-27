@@ -92,7 +92,7 @@ export function SortMenuButton<T extends string>({
             {title}
           </DropdownMenu.Label>
           <DropdownMenu.Separator className={menuSeparatorClassName} />
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {items.map((item) => {
               const isActive = item.isActive(value);
               return (

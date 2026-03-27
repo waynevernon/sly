@@ -121,7 +121,7 @@ export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
         </div>
 
         {/* Navigation tabs */}
-        <nav className="flex-1 p-2.5 flex flex-col gap-1">
+        <nav className="flex-1 p-2.5 flex flex-col gap-0.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
