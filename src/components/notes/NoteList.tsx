@@ -81,6 +81,11 @@ function formatDate(timestamp: number): string {
   });
 }
 
+function getNoteFilename(id: string): string {
+  const baseName = id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
+  return `${baseName}.md`;
+}
+
 type SelectionState = "none" | "selected" | "active";
 
 interface NoteItemProps {
@@ -101,8 +106,9 @@ interface NoteItemProps {
   ) => void;
   showFolderPrefix?: boolean;
   noteListDateMode: "modified" | "created" | "off";
+  noteListPreviewLines: 0 | 1 | 2 | 3;
+  showNoteListFilename: boolean;
   showNoteListFolderPath: boolean;
-  showNoteListPreview: boolean;
 }
 
 const NoteItem = memo(function NoteItem({
@@ -116,8 +122,9 @@ const NoteItem = memo(function NoteItem({
   onSelect,
   showFolderPrefix = true,
   noteListDateMode,
+  noteListPreviewLines,
+  showNoteListFilename,
   showNoteListFolderPath,
-  showNoteListPreview,
 }: NoteItemProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -131,12 +138,14 @@ const NoteItem = memo(function NoteItem({
     showFolderPrefix && showNoteListFolderPath && id.includes("/")
       ? id.substring(0, id.lastIndexOf("/"))
       : null;
-  const previewText = showNoteListPreview ? cleanPreviewText(preview) : "";
-  const displayPreview = folder
-    ? previewText
-      ? `${folder}/ · ${previewText}`
+  const filename = showNoteListFilename ? getNoteFilename(id) : "";
+  const previewText =
+    noteListPreviewLines > 0 ? cleanPreviewText(preview) : "";
+  const pathLabel = folder
+    ? filename
+      ? `${folder}/${filename}`
       : `${folder}/`
-    : previewText;
+    : filename;
   const timestamp =
     noteListDateMode === "created"
       ? created
@@ -157,8 +166,10 @@ const NoteItem = memo(function NoteItem({
     >
       <ListItem
         title={cleanTitle(title)}
-        subtitle={displayPreview || undefined}
+        subtitlePrefix={pathLabel || undefined}
+        subtitle={previewText || undefined}
         meta={timestamp === null ? undefined : formatDate(timestamp)}
+        subtitleLines={noteListPreviewLines > 0 ? noteListPreviewLines : 1}
         selectionState={selectionState}
         isPinned={isPinned}
       />
@@ -196,8 +207,9 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onFocusList,
   showFolderPrefix = true,
   noteListDateMode,
+  noteListPreviewLines,
+  showNoteListFilename,
   showNoteListFolderPath,
-  showNoteListPreview,
 }: NoteItemWithMenuProps) {
   const isPartOfBatchSelection =
     selectedNoteIds.length > 1 && selectedNoteIds.includes(id);
@@ -261,8 +273,9 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             onSelect={onSelect}
             showFolderPrefix={showFolderPrefix}
             noteListDateMode={noteListDateMode}
+            noteListPreviewLines={noteListPreviewLines}
+            showNoteListFilename={showNoteListFilename}
             showNoteListFolderPath={showNoteListFolderPath}
-            showNoteListPreview={showNoteListPreview}
           />
         </div>
       </ContextMenu.Trigger>
@@ -359,8 +372,9 @@ export function NoteList({
     unpinNote,
     isLoading,
     noteListDateMode,
+    noteListPreviewLines,
+    showNoteListFilename,
     showNoteListFolderPath,
-    showNoteListPreview,
     settings,
   } = useNotes();
 
@@ -547,8 +561,9 @@ export function NoteList({
               onFocusList={focusList}
               showFolderPrefix={showFolderPrefix}
               noteListDateMode={noteListDateMode}
+              noteListPreviewLines={noteListPreviewLines}
+              showNoteListFilename={showNoteListFilename}
               showNoteListFolderPath={showNoteListFolderPath}
-              showNoteListPreview={showNoteListPreview}
             />
           );
         })}

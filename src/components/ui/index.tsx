@@ -146,7 +146,9 @@ IconButton.displayName = "IconButton";
 // List item for sidebar
 interface ListItemProps {
   title: string;
+  subtitlePrefix?: string;
   subtitle?: string;
+  subtitleLines?: 1 | 2 | 3;
   meta?: string;
   selectionState?: "none" | "selected" | "active";
   isPinned?: boolean;
@@ -156,13 +158,20 @@ interface ListItemProps {
 
 export function ListItem({
   title,
+  subtitlePrefix,
   subtitle,
+  subtitleLines = 1,
   meta,
   selectionState = "none",
   isPinned = false,
   onClick,
   onContextMenu,
 }: ListItemProps & { onContextMenu?: (e: React.MouseEvent) => void }) {
+  const cleanSubtitlePrefix = subtitlePrefix
+    ?.replace(/&nbsp;/g, " ")
+    .replace(/\u00A0/g, " ")
+    .trim();
+  const hasSubtitlePrefix = Boolean(cleanSubtitlePrefix);
   // Clean subtitle: treat whitespace-only or &nbsp; as empty
   const cleanSubtitle = subtitle
     ?.replace(/&nbsp;/g, " ")
@@ -171,9 +180,20 @@ export function ListItem({
   const hasSubtitle = cleanSubtitle && cleanSubtitle.length > 0;
   const cleanMeta = meta?.trim();
   const hasMeta = Boolean(cleanMeta);
-  const hasSecondaryRow = hasMeta || Boolean(hasSubtitle);
+  const hasSecondaryRow = hasMeta || hasSubtitlePrefix || Boolean(hasSubtitle);
+  const subtitleLineClampClass =
+    subtitleLines === 3
+      ? "line-clamp-3"
+      : subtitleLines === 2
+        ? "line-clamp-2"
+        : "line-clamp-1";
   const isActive = selectionState === "active";
   const isSelected = selectionState !== "none";
+  const inlineSubtitle = hasSubtitlePrefix
+    ? hasSubtitle
+      ? `${cleanSubtitlePrefix} · ${cleanSubtitle}`
+      : cleanSubtitlePrefix
+    : cleanSubtitle;
 
   return (
     <div
@@ -201,7 +221,12 @@ export function ListItem({
         </span>
       </div>
       {hasSecondaryRow && (
-        <div className="flex items-center gap-1 min-w-0">
+        <div
+          className={cn(
+            "gap-1 min-w-0 w-full",
+            subtitleLines > 1 ? "flex items-start" : "flex items-center",
+          )}
+        >
           {hasMeta && (
             <div
               className={cn(
@@ -212,15 +237,16 @@ export function ListItem({
               {cleanMeta}
             </div>
           )}
-          {hasSubtitle && (
+          {(hasSubtitlePrefix || hasSubtitle) && (
             <p
               className={cn(
-                "text-xs line-clamp-1 min-w-0",
+                "text-xs min-w-0 flex-1",
+                subtitleLineClampClass,
                 "text-text-muted",
                 isSelected ? "opacity-100" : "opacity-70"
               )}
             >
-              {cleanSubtitle}
+              {inlineSubtitle}
             </p>
           )}
         </div>

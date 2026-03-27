@@ -110,6 +110,10 @@ fn default_dark_preset_id() -> String {
     "nord".to_string()
 }
 
+fn default_note_list_preview_lines() -> u8 {
+    2
+}
+
 fn default_editor_width() -> String {
     "normal".to_string()
 }
@@ -320,10 +324,17 @@ pub struct Settings {
     pub collapsed_folders: Option<Vec<String>>,
     #[serde(rename = "noteListDateMode", default)]
     pub note_list_date_mode: NoteListDateMode,
+    #[serde(rename = "showNoteListFilename", default)]
+    pub show_note_list_filename: bool,
     #[serde(rename = "showNoteListFolderPath", default = "default_true")]
     pub show_note_list_folder_path: bool,
     #[serde(rename = "showNoteListPreview", default = "default_true")]
     pub show_note_list_preview: bool,
+    #[serde(
+        rename = "noteListPreviewLines",
+        default = "default_note_list_preview_lines"
+    )]
+    pub note_list_preview_lines: u8,
     #[serde(rename = "noteSortMode", default)]
     pub note_sort_mode: NoteSortMode,
     #[serde(rename = "folderSortMode", default)]
@@ -354,9 +365,13 @@ pub struct SettingsPatch {
     #[serde(default)]
     pub note_list_date_mode: Option<NoteListDateMode>,
     #[serde(default)]
+    pub show_note_list_filename: Option<Option<bool>>,
+    #[serde(default)]
     pub show_note_list_folder_path: Option<Option<bool>>,
     #[serde(default)]
     pub show_note_list_preview: Option<Option<bool>>,
+    #[serde(default)]
+    pub note_list_preview_lines: Option<u8>,
     #[serde(default)]
     pub note_sort_mode: Option<NoteSortMode>,
     #[serde(default)]
@@ -1170,11 +1185,17 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(note_list_date_mode) = patch.note_list_date_mode {
         settings.note_list_date_mode = note_list_date_mode;
     }
+    if let Some(show_note_list_filename) = patch.show_note_list_filename {
+        settings.show_note_list_filename = show_note_list_filename.unwrap_or(false);
+    }
     if let Some(show_note_list_folder_path) = patch.show_note_list_folder_path {
         settings.show_note_list_folder_path = show_note_list_folder_path.unwrap_or(true);
     }
     if let Some(show_note_list_preview) = patch.show_note_list_preview {
         settings.show_note_list_preview = show_note_list_preview.unwrap_or(true);
+    }
+    if let Some(note_list_preview_lines) = patch.note_list_preview_lines {
+        settings.note_list_preview_lines = note_list_preview_lines.clamp(1, 3);
     }
     if let Some(note_sort_mode) = patch.note_sort_mode {
         settings.note_sort_mode = note_sort_mode;
@@ -5099,8 +5120,10 @@ mod tests {
             folder_icons: None,
             collapsed_folders: None,
             note_list_date_mode: NoteListDateMode::Modified,
+            show_note_list_filename: false,
             show_note_list_folder_path: true,
             show_note_list_preview: true,
+            note_list_preview_lines: 2,
             note_sort_mode: NoteSortMode::TitleAsc,
             folder_sort_mode: FolderSortMode::NameDesc,
             folder_manual_order: None,
@@ -5112,8 +5135,10 @@ mod tests {
                 default_note_name: Some(Some("Daily".to_string())),
                 ollama_model: Some(None),
                 note_list_date_mode: Some(NoteListDateMode::Off),
+                show_note_list_filename: Some(Some(true)),
                 show_note_list_folder_path: Some(Some(false)),
                 show_note_list_preview: Some(Some(false)),
+                note_list_preview_lines: Some(3),
                 ..SettingsPatch::default()
             },
         );
@@ -5122,8 +5147,10 @@ mod tests {
         assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.git_enabled, Some(true));
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Off);
+        assert!(settings.show_note_list_filename);
         assert!(!settings.show_note_list_folder_path);
         assert!(!settings.show_note_list_preview);
+        assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
     }
 

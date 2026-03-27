@@ -76,6 +76,8 @@ function makeNotesHookValue(
     folderIcons: {},
     noteSortMode: "modifiedDesc",
     noteListDateMode: "modified",
+    noteListPreviewLines: 2,
+    showNoteListFilename: false,
     showNoteListFolderPath: true,
     showNoteListPreview: true,
     showRecentNotes: true,
@@ -244,13 +246,17 @@ describe("NotesPane", () => {
     expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
+    expect(screen.getByText("2 Lines")).toBeInTheDocument();
 
     await user.click(screen.getByRole("menuitem", { name: /Date/ }));
     await user.click(screen.getByRole("menuitemradio", { name: "Created Time" }));
     await user.click(screen.getByRole("button", { name: "Sort Notes" }));
     await user.click(screen.getByRole("menuitemcheckbox", { name: "Folder Path" }));
     await user.click(screen.getByRole("button", { name: "Sort Notes" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Text Preview" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Filename" }));
+    await user.click(screen.getByRole("button", { name: "Sort Notes" }));
+    await user.click(screen.getByRole("menuitem", { name: /Text Preview/ }));
+    await user.click(screen.getByRole("menuitemradio", { name: "3 Lines" }));
 
     expect(setNoteListViewOptions).toHaveBeenNthCalledWith(1, {
       noteListDateMode: "created",
@@ -259,7 +265,10 @@ describe("NotesPane", () => {
       showNoteListFolderPath: false,
     });
     expect(setNoteListViewOptions).toHaveBeenNthCalledWith(3, {
-      showNoteListPreview: false,
+      showNoteListFilename: true,
+    });
+    expect(setNoteListViewOptions).toHaveBeenNthCalledWith(4, {
+      noteListPreviewLines: 3,
     });
   });
 });

@@ -223,25 +223,32 @@ describe("NotesContext", () => {
     });
 
     expect(result.current.noteListDateMode).toBe("modified");
+    expect(result.current.noteListPreviewLines).toBe(2);
+    expect(result.current.showNoteListFilename).toBe(false);
     expect(result.current.showNoteListFolderPath).toBe(true);
     expect(result.current.showNoteListPreview).toBe(true);
 
     await act(async () => {
       await result.current.setNoteListViewOptions({
         noteListDateMode: "off",
+        noteListPreviewLines: 0,
+        showNoteListFilename: true,
         showNoteListFolderPath: false,
-        showNoteListPreview: false,
       });
     });
 
     expect(notesService.updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({
         noteListDateMode: "off",
-        showNoteListFolderPath: false,
+        noteListPreviewLines: 2,
         showNoteListPreview: false,
+        showNoteListFilename: true,
+        showNoteListFolderPath: false,
       }),
     );
     expect(result.current.noteListDateMode).toBe("off");
+    expect(result.current.noteListPreviewLines).toBe(0);
+    expect(result.current.showNoteListFilename).toBe(true);
     expect(result.current.showNoteListFolderPath).toBe(false);
     expect(result.current.showNoteListPreview).toBe(false);
   });

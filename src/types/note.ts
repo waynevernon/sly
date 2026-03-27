@@ -97,6 +97,7 @@ export type TextDirection = "auto" | "ltr" | "rtl";
 export type EditorWidth = "narrow" | "normal" | "wide" | "full" | "custom";
 export type PaneMode = 1 | 2 | 3;
 export type NoteListDateMode = "modified" | "created" | "off";
+export type NoteListPreviewLines = 1 | 2 | 3;
 export type NoteSortMode =
   | "modifiedDesc"
   | "modifiedAsc"
@@ -151,8 +152,10 @@ export interface Settings {
   folderIcons?: Record<string, string>;
   collapsedFolders?: string[];
   noteListDateMode?: NoteListDateMode;
+  showNoteListFilename?: boolean;
   showNoteListFolderPath?: boolean;
   showNoteListPreview?: boolean;
+  noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
   folderManualOrder?: FolderManualOrder;
@@ -168,8 +171,10 @@ export interface SettingsPatch {
   folderIcons?: Record<string, string> | null;
   collapsedFolders?: string[] | null;
   noteListDateMode?: NoteListDateMode;
+  showNoteListFilename?: boolean | null;
   showNoteListFolderPath?: boolean | null;
   showNoteListPreview?: boolean | null;
+  noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
   folderManualOrder?: FolderManualOrder | null;

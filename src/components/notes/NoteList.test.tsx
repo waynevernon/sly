@@ -53,6 +53,8 @@ function makeNotesHookValue(
     isLoading: false,
     settings: {},
     noteListDateMode: "modified",
+    noteListPreviewLines: 2,
+    showNoteListFilename: false,
     showNoteListFolderPath: true,
     showNoteListPreview: true,
     ...overrides,
@@ -83,8 +85,9 @@ describe("NoteList", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
         noteListDateMode: "off",
+        showNoteListFilename: false,
         showNoteListFolderPath: false,
-        showNoteListPreview: false,
+        noteListPreviewLines: 0,
       }),
     );
 
@@ -103,7 +106,7 @@ describe("NoteList", () => {
       makeNotesHookValue({
         noteListDateMode: "created",
         showNoteListFolderPath: false,
-        showNoteListPreview: false,
+        noteListPreviewLines: 0,
       }),
     );
 
@@ -112,13 +115,30 @@ describe("NoteList", () => {
     expect(screen.getByText("Yesterday")).toBeInTheDocument();
   });
 
+  it("renders the filename in the metadata line when enabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        noteListDateMode: "off",
+        showNoteListFilename: true,
+        showNoteListFolderPath: false,
+        noteListPreviewLines: 0,
+      }),
+    );
+
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+
+    expect(screen.getByText("alpha.md")).toBeInTheDocument();
+    expect(screen.queryByText("work/")).not.toBeInTheDocument();
+  });
+
   it("renders only the folder path when preview and date are off", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
         noteListDateMode: "off",
         showNoteListFolderPath: true,
-        showNoteListPreview: false,
+        noteListPreviewLines: 0,
       }),
     );
 
@@ -134,7 +154,7 @@ describe("NoteList", () => {
       makeNotesHookValue({
         noteListDateMode: "off",
         showNoteListFolderPath: false,
-        showNoteListPreview: true,
+        noteListPreviewLines: 2,
       }),
     );
 
@@ -150,6 +170,40 @@ describe("NoteList", () => {
     const row = screen.getByRole("button", { name: "Alpha note" });
     expect(row).toHaveClass("py-2.25");
     expect(screen.getByText("3 days ago")).toBeInTheDocument();
-    expect(screen.getByText("work/ · planning")).toBeInTheDocument();
+    expect(screen.getByText("work/")).toBeInTheDocument();
+    expect(screen.getByText("planning")).toBeInTheDocument();
+  });
+
+  it("appends the filename to the folder path when both are enabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        noteListDateMode: "off",
+        showNoteListFilename: true,
+        showNoteListFolderPath: true,
+        noteListPreviewLines: 0,
+      }),
+    );
+
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+
+    expect(screen.getByText("work/alpha.md")).toBeInTheDocument();
+  });
+
+  it("gives multi-line preview modes full preview lines by stacking the path label", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        noteListDateMode: "off",
+        noteListPreviewLines: 3,
+        showNoteListFilename: true,
+        showNoteListFolderPath: true,
+      }),
+    );
+
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+
+    expect(screen.getByText("work/alpha.md")).toBeInTheDocument();
+    expect(screen.getByText("planning")).toBeInTheDocument();
   });
 });

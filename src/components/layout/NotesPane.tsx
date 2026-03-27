@@ -11,7 +11,11 @@ import {
   History,
 } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
-import type { NoteListDateMode, NoteScope } from "../../types/note";
+import type {
+  NoteListDateMode,
+  NoteListPreviewLines,
+  NoteScope,
+} from "../../types/note";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import {
@@ -106,6 +110,11 @@ function getDateModeLabel(mode: NoteListDateMode): string {
   }
 }
 
+function getPreviewLinesLabel(lines: 0 | NoteListPreviewLines): string {
+  if (lines === 0) return "None";
+  return lines === 1 ? "1 Line" : `${lines} Lines`;
+}
+
 export function NotesPane() {
   const {
     notes,
@@ -113,8 +122,9 @@ export function NotesPane() {
     folderIcons,
     noteSortMode,
     noteListDateMode,
+    noteListPreviewLines,
+    showNoteListFilename,
     showNoteListFolderPath,
-    showNoteListPreview,
     selectedScope,
     selectedNoteIds,
     selectedFolderPath,
@@ -381,11 +391,11 @@ export function NotesPane() {
                     <span>Folder Path</span>
                   </DropdownMenu.CheckboxItem>
                   <DropdownMenu.CheckboxItem
-                    checked={showNoteListPreview}
+                    checked={showNoteListFilename}
                     className={menuItemClassName}
                     onCheckedChange={(checked) => {
                       void setNoteListViewOptions({
-                        showNoteListPreview: checked === true,
+                        showNoteListFilename: checked === true,
                       });
                     }}
                   >
@@ -394,8 +404,81 @@ export function NotesPane() {
                         <span className="text-xs leading-none">✓</span>
                       </DropdownMenu.ItemIndicator>
                     </span>
-                    <span>Text Preview</span>
+                    <span>Filename</span>
                   </DropdownMenu.CheckboxItem>
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger className={menuItemClassName}>
+                      <span className="inline-flex h-4 w-4 shrink-0" />
+                      <span>Text Preview</span>
+                      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
+                        {getPreviewLinesLabel(noteListPreviewLines)}
+                        <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                      </span>
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.SubContent
+                        sideOffset={6}
+                        className={`${menuSurfaceClassName} min-w-44 z-50`}
+                      >
+                        <DropdownMenu.RadioGroup
+                          value={String(noteListPreviewLines)}
+                          onValueChange={(value) => {
+                            void setNoteListViewOptions({
+                              noteListPreviewLines:
+                                value === "0"
+                                  ? 0
+                                  : (Number(value) as NoteListPreviewLines),
+                            });
+                          }}
+                        >
+                          <DropdownMenu.RadioItem
+                            value="3"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListPreviewLines === 3 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>3 Lines</span>
+                          </DropdownMenu.RadioItem>
+                          <DropdownMenu.RadioItem
+                            value="2"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListPreviewLines === 2 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>2 Lines</span>
+                          </DropdownMenu.RadioItem>
+                          <DropdownMenu.RadioItem
+                            value="1"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListPreviewLines === 1 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>1 Line</span>
+                          </DropdownMenu.RadioItem>
+                          <DropdownMenu.RadioItem
+                            value="0"
+                            className={menuItemClassName}
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                              {noteListPreviewLines === 0 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span>None</span>
+                          </DropdownMenu.RadioItem>
+                        </DropdownMenu.RadioGroup>
+                      </DropdownMenu.SubContent>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Sub>
                 </SortMenuButton>
               )}
               <IconButton

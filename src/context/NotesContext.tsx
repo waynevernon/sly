@@ -16,6 +16,7 @@ import {
   type FolderSortMode,
   type Note,
   type NoteListDateMode,
+  type NoteListPreviewLines,
   type NoteMetadata,
   type NoteScope,
   type NoteSortMode,
@@ -39,6 +40,8 @@ interface NotesDataContextValue {
   recentNotes: NoteMetadata[];
   showRecentNotes: boolean;
   noteListDateMode: NoteListDateMode;
+  noteListPreviewLines: 0 | NoteListPreviewLines;
+  showNoteListFilename: boolean;
   showNoteListFolderPath: boolean;
   showNoteListPreview: boolean;
   settings: Settings;
@@ -96,6 +99,8 @@ interface NotesActionsContextValue {
   setNoteSortMode: (mode: NoteSortMode) => Promise<void>;
   setNoteListViewOptions: (options: {
     noteListDateMode?: NoteListDateMode;
+    noteListPreviewLines?: 0 | NoteListPreviewLines;
+    showNoteListFilename?: boolean;
     showNoteListFolderPath?: boolean;
     showNoteListPreview?: boolean;
   }) => Promise<void>;
@@ -279,8 +284,10 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
   nextSettings.showRecentNotes ??= true;
   nextSettings.noteListDateMode ??= "modified";
+  nextSettings.showNoteListFilename ??= false;
   nextSettings.showNoteListFolderPath ??= true;
   nextSettings.showNoteListPreview ??= true;
+  nextSettings.noteListPreviewLines ??= 2;
   nextSettings.collapsedFolders = sanitizeCollapsedFolders(
     nextSettings.collapsedFolders,
   );
@@ -342,6 +349,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
   const showRecentNotes = settings.showRecentNotes ?? true;
   const noteListDateMode = settings.noteListDateMode ?? "modified";
+  const noteListPreviewLines =
+    settings.showNoteListPreview === false
+      ? 0
+      : settings.noteListPreviewLines ?? 2;
+  const showNoteListFilename = settings.showNoteListFilename ?? false;
   const showNoteListFolderPath = settings.showNoteListFolderPath ?? true;
   const showNoteListPreview = settings.showNoteListPreview ?? true;
 
@@ -460,16 +472,30 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const setNoteListViewOptions = useCallback(
     async ({
       noteListDateMode,
+      noteListPreviewLines,
+      showNoteListFilename,
       showNoteListFolderPath,
       showNoteListPreview,
     }: {
       noteListDateMode?: NoteListDateMode;
+      noteListPreviewLines?: 0 | NoteListPreviewLines;
+      showNoteListFilename?: boolean;
       showNoteListFolderPath?: boolean;
       showNoteListPreview?: boolean;
     }) => {
       await persistSettings((currentSettings) => ({
         ...currentSettings,
         ...(noteListDateMode !== undefined ? { noteListDateMode } : {}),
+        ...(noteListPreviewLines !== undefined
+          ? {
+              showNoteListPreview: noteListPreviewLines > 0,
+              noteListPreviewLines:
+                noteListPreviewLines > 0
+                  ? noteListPreviewLines
+                  : currentSettings.noteListPreviewLines ?? 2,
+            }
+          : {}),
+        ...(showNoteListFilename !== undefined ? { showNoteListFilename } : {}),
         ...(showNoteListFolderPath !== undefined
           ? { showNoteListFolderPath }
           : {}),
@@ -1779,6 +1805,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       recentNotes,
       showRecentNotes,
       noteListDateMode,
+      noteListPreviewLines,
+      showNoteListFilename,
       showNoteListFolderPath,
       showNoteListPreview,
       settings,
@@ -1806,6 +1834,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       recentNotes,
       showRecentNotes,
       noteListDateMode,
+      noteListPreviewLines,
+      showNoteListFilename,
       showNoteListFolderPath,
       showNoteListPreview,
       settings,
