@@ -223,4 +223,14 @@ describe("NoteList", () => {
 
     expect(screen.getByText("planning")).toHaveClass("line-clamp-3");
   });
+
+  it("styles preview text more prominently than the metadata line", async () => {
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+
+    expect(screen.getByText("planning")).toHaveClass("text-text", "opacity-75");
+    expect(screen.getByText("3 days ago · work/")).toHaveClass(
+      "text-text-muted",
+      "opacity-60",
+    );
+  });
 });

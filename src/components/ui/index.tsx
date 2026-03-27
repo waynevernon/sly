@@ -230,8 +230,8 @@ export function ListItem({
                 className={cn(
                   "text-xs min-w-0 w-full",
                   subtitleLineClampClass,
-                  "text-text-muted",
-                  isSelected ? "opacity-100" : "opacity-70"
+                  "text-text",
+                  isSelected ? "opacity-90" : "opacity-75"
                 )}
               >
                 {inlineSubtitle}
@@ -241,7 +241,8 @@ export function ListItem({
               <div
                 className={cn(
                   "text-xs whitespace-nowrap shrink-0",
-                  isSelected ? "text-text" : "text-text-muted"
+                  "text-text-muted",
+                  isSelected ? "opacity-80" : "opacity-60"
                 )}
               >
                 {cleanMeta}
