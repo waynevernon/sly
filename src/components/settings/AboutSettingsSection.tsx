@@ -6,6 +6,11 @@ import { showUpdateToast } from "../../App";
 import { Button } from "../ui";
 import { RefreshCwIcon, SpinnerIcon, GithubIcon } from "../icons";
 
+const REPOSITORY_URL = "https://github.com/waynevernon/sly";
+const ISSUES_URL = "https://github.com/waynevernon/sly/issues";
+const AUTHOR_URL = "https://github.com/waynevernon";
+const UPSTREAM_URL = "https://github.com/erictli/scratch";
+
 export function AboutSettingsSection() {
   const [appVersion, setAppVersion] = useState<string>("");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -75,12 +80,13 @@ export function AboutSettingsSection() {
         <div>
           <h2 className="text-xl font-medium mb-1">About Sly</h2>
           <p className="text-sm text-text-muted mb-4">
-            Sly is a minimalist markdown scratchpad for capturing quick
-            thoughts, todos, and ideas. We're offline-first,
-            keyboard-optimized, AI-compatible, and open source with no cloud,
-            no accounts, and no subscriptions. Learn more in{" "}
+            Sly is an editor-first markdown notes app for local files, fast
+            capture, and focused writing. It keeps your notes on your own disk
+            as plain markdown, stays keyboard-friendly, and adds optional AI
+            and Git workflows without locking your notes into a cloud service.
+            Learn more in{" "}
             <button
-              onClick={() => handleOpenUrl("https://github.com/waynevernon/sly")}
+              onClick={() => handleOpenUrl(REPOSITORY_URL)}
               className="ui-inline-link cursor-pointer"
             >
               the repository
@@ -88,20 +94,27 @@ export function AboutSettingsSection() {
             .
           </p>
           <p className="text-sm text-text-muted">
-            Adapted and maintained by{" "}
+            Sly is developed by{" "}
             <button
-              onClick={() => handleOpenUrl("https://github.com/waynevernon")}
+              onClick={() => handleOpenUrl(AUTHOR_URL)}
               className="ui-inline-link cursor-pointer"
             >
               Wayne Vernon
-            </button>{" "}
-            as an independent fork of Scratch. Original Scratch work remains
-            credited under the MIT license.
+            </button>
+            {" "}as an independent fork of{" "}
+            <button
+              onClick={() => handleOpenUrl(UPSTREAM_URL)}
+              className="ui-inline-link cursor-pointer"
+            >
+              Scratch
+            </button>
+            , the original project created by Eric Li. Scratch&apos;s original
+            work remains credited and respected under the MIT license.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => handleOpenUrl("https://github.com/waynevernon/sly")}
+            onClick={() => handleOpenUrl(REPOSITORY_URL)}
             variant="outline"
             size="md"
             className="gap-1.25"
@@ -110,14 +123,12 @@ export function AboutSettingsSection() {
             View on GitHub
           </Button>
           <Button
-            onClick={() =>
-              handleOpenUrl("https://github.com/waynevernon/sly/issues")
-            }
+            onClick={() => handleOpenUrl(ISSUES_URL)}
             variant="ghost"
             size="md"
             className="gap-1.25 text-text"
           >
-            Submit Feedback
+            Report an Issue
           </Button>
         </div>
       </section>

@@ -198,6 +198,73 @@ Use the same state grammar across editor save state, Git state, AI state, settin
 - `error`: tinted container with an explicit next step
 - `success`: quiet confirmation, not celebratory UI
 
+## Copy and Launch Surfaces
+
+- Product-facing copy should be calm, concrete, and specific about what Sly does: local markdown notes, editor-first workflow, keyboard-friendly interaction, optional AI, optional Git.
+- About screens, readmes, release copy, and menu labels should reuse the same core phrasing instead of drifting into separate tones.
+- Credit upstream work plainly and professionally. Attribution should be visible, but it should not overpower Sly's own product identity.
+- Empty-state illustrations can add warmth, but the message and action must still work without mascot-specific jokes or lore.
+
+## App Icon Guidance
+
+- Treat the dog and its background tile as one locked composition. Do not rebalance the dog's position, scale, or spacing inside the dark tile when adjusting the macOS icon fit.
+- The only safe fit adjustment is transparent margin around the fully composed rounded tile.
+- Start from a clean square source image at `1024x1024`. Do not start from a screenshot, fake transparency, or artwork that already bakes in outer padding from a previous export.
+- Apply the rounded-corner mask to the full icon tile first, then add transparent outer margin as a separate step.
+- Tauri does not solve the macOS optical fit for us. `tauri icon` only repackages the supplied transparent source into `icns`, `ico`, and PNG sizes. The whitespace has to be correct in the source artwork.
+- For Sly's current icon, the correct outer fit target is an Apple-style visible footprint of about `224x224` on a `256x256` canvas. Scaled to the source asset, that means the rounded tile should occupy `896x896` inside the `1024x1024` PNG, leaving `64px` of transparent margin on each side.
+- Re-rounding is fine when regenerating the source, but it should preserve the same overall Apple-style rounded-square silhouette rather than switching to a plain rounded rectangle.
+- When validating the icon, compare it against current macOS app icons in the Dock. The target is optical parity with native icons, not maximum fill.
+- Keep a repo-side preview image in `docs/assets/app-icon.png` aligned with the current generated source so release documentation and launch materials reflect the shipped icon.
+
+### Icon Refresh Workflow
+
+When replacing the app icon, follow this process exactly:
+
+1. Start from a fresh square source image, typically `1024x1024`, such as `~/Downloads/assets/icon.png`.
+2. If needed, generate a new macOS-ready source by:
+   - applying the rounded-corner mask to the full tile
+   - adding transparent outer margin around the rounded tile
+   - leaving the dog-to-background composition unchanged
+3. Save that final source as a standalone PNG. Example working file:
+   - `~/Downloads/assets/icon-macos-fit-source.png`
+4. Copy the final source to the repo preview image:
+   - `cp ~/Downloads/assets/icon-macos-fit-source.png /Users/wayne/Source/sly/docs/assets/app-icon.png`
+5. Regenerate the Tauri icon bundle:
+
+```bash
+npx tauri icon ~/Downloads/assets/icon-macos-fit-source.png --output /Users/wayne/Source/sly/src-tauri/icons
+```
+
+6. Remove the extra mobile icon folders if they were generated and you do not want them in the repo:
+
+```bash
+rm -rf /Users/wayne/Source/sly/src-tauri/icons/android /Users/wayne/Source/sly/src-tauri/icons/ios
+```
+
+7. Clear local build output and macOS icon caches before checking the result:
+
+```bash
+rm -rf /Users/wayne/Source/sly/dist
+rm -rf /Users/wayne/Source/sly/node_modules/.vite
+rm -rf /Users/wayne/Source/sly/src-tauri/target
+rm -rf ~/Library/Caches/com.waynevernon.sly
+rm -rf ~/Library/Saved\ Application\ State/com.waynevernon.sly.savedState
+rm -rf ~/Library/Caches/com.apple.iconservices*
+rm -rf ~/Library/Caches/com.apple.dock.iconcache*
+killall Dock || true
+killall Finder || true
+```
+
+8. Fully quit Sly and relaunch with:
+
+```bash
+npm run tauri dev
+```
+
+9. Validate the icon in the Dock, not just in Finder previews or the generated PNGs.
+10. If the Dock fit is wrong, adjust only the outer transparent margin and repeat the process. Do not shrink or enlarge the dog relative to its background tile.
+
 ## Motion Rules
 
 - Avoid mixing unrelated durations for nearby interactions.

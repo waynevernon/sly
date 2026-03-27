@@ -27,16 +27,16 @@ export function FolderPicker() {
       <div className="h-10 shrink-0" data-tauri-drag-region />
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-lg select-none">
+        <div className="text-center p-8 max-w-lg select-none -mt-4">
           <img
             src="/folders-dark.png"
             alt="Folders"
-            className="w-48 h-auto mx-auto invert dark:invert-0 mb-2 animate-fade-in-up"
+            className="w-88 max-w-[min(34rem,90vw)] h-auto mx-auto mb-0 animate-fade-in-up"
             style={{ animationDelay: "0ms" }}
           />
 
           <h1
-            className="text-3xl text-text font-sans mb-2 tracking-[-0.01em] animate-fade-in-up"
+            className="text-3xl text-text font-sans mb-1.5 tracking-[-0.01em] animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
             Welcome to Sly
@@ -45,8 +45,8 @@ export function FolderPicker() {
             className="text-text-muted mb-6 animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
-            Sly is an offline-first notes app. Your notes are simply stored
-            on your computer as markdown files.
+            Choose a folder to keep your notes in plain markdown files on your
+            computer.
           </p>
           <div
             className="animate-fade-in-up"

@@ -46,17 +46,60 @@ Runs on `v*` tag push or manual `workflow_dispatch`. Builds in parallel for:
 
 Creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
 
+Current release posture before 1.0:
+
+- **macOS** is the primary validated platform
+- **Windows** and **Linux** artifacts are built in CI, but they are still considered manually untested until explicitly checked before release
+
 ### Releasing a New Version
 
-1. Bump version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
-2. Commit the version bump to `main`
-3. Tag and push:
+1. Bump the version everywhere it is user-visible or locked:
+   - `package.json`
+   - `package-lock.json`
+   - `src-tauri/Cargo.toml`
+   - `src-tauri/Cargo.lock`
+   - `src-tauri/tauri.conf.json`
+2. Run the expected local confidence checks before tagging:
    ```bash
-   git tag v0.1.0 && git push origin v0.1.0
+   npm run verify
+   cargo test
+   cargo check
+   cargo clippy --all-targets --all-features -- -D warnings
    ```
-4. Wait for the release workflow to finish
-5. Review the draft release on GitHub
-6. Publish it so the updater can serve the new `latest.json`
+3. Commit the release bump to `main`.
+4. Create and push the version tag:
+   ```bash
+   git push origin main
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+5. Monitor both GitHub Actions workflows and do not publish until both are green:
+   ```bash
+   gh run list --limit 6
+   gh run watch <ci-run-id> --exit-status
+   gh run watch <release-run-id> --exit-status
+   ```
+6. If either workflow fails, inspect the failing job, fix the issue on `main`, push the fix, and retag only when the release path is clean again. Do not publish a failed or partial draft release.
+7. After the release workflow succeeds, open the draft GitHub release and replace the placeholder body with release notes written in the same format as recent releases:
+   - use `### Improvements` and `### Bug Fixes` headings
+   - write only user-relevant changes
+   - group related polish into a single bullet when that reads better than listing tiny commits
+   - use the commits since the previous tag as the source of truth, with scratch notes as supporting input
+   - keep the tone concise and release-focused rather than implementation-focused
+8. Before publishing, review `README.md` and update it for any meaningful product changes in the release:
+   - keep the most important user-facing capabilities near the top
+   - use concise UX writing rather than internal implementation language
+   - avoid long feature inventories; roll closely related features into a single bullet when possible
+   - preserve a clear hierarchy so the README reflects the app as it exists now, not as an accumulated changelog
+9. Publish the release so the updater can serve the new `latest.json`.
+
+Helpful commands while drafting release notes:
+
+```bash
+git log --oneline --reverse v0.9.0..HEAD
+gh release view v0.9.0 --json name,body
+gh release edit v1.0.0 --title "Sly v1.0.0" --notes-file <file> --draft=false --latest --verify-tag
+```
 
 ### GitHub Secrets Required
 
@@ -154,10 +197,15 @@ The settings UI currently covers:
 - Typography tuning
 - Text direction
 - Editor width
+- Interface zoom
 - Pane mode (`1 / 2 / 3`)
+- Note preview line density
+- Confirm-delete behavior
 - Folder icons
 - Note and folder sorting
 - Git integration
+- AI provider detection
+- CLI tool installation on supported platforms
 - Keyboard shortcuts reference
 - App version and update checks
 
@@ -217,7 +265,8 @@ The settings UI currently covers:
 - `Cmd+Shift+F` - Search notes
 - `Cmd+R` - Reload current note
 - `Cmd+,` - Open settings
-- `Cmd+1/2/3/4/5` - Switch settings tabs
+- `Cmd+Opt+1/2/3/4/5` - Switch settings tabs
+- `Cmd+1/2/3` - Switch pane layout
 - `Cmd+\` - Toggle sidebar
 - `Cmd+B/I` - Bold/Italic
 - `Cmd+=` - Zoom in

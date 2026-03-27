@@ -1,0 +1,49 @@
+{
+  "gitEnabled": false,
+  "pinnedNoteIds": [
+    "Field Notes/Sly profile",
+    "Product/Launch/1.0 screenshot checklist"
+  ],
+  "recentNoteIds": [
+    "Field Notes/Sly profile",
+    "Product/Launch/1.0 screenshot checklist",
+    "Product/Design/Icon direction",
+    "Inbox/Friday capture",
+    "Writing/On the trail at blue hour"
+  ],
+  "showRecentNotes": true,
+  "defaultNoteName": "Untitled",
+  "ollamaModel": null,
+  "folderIcons": {
+    "Inbox": "inbox",
+    "Product": "rocket",
+    "Product/Launch": "flag",
+    "Product/Design": "palette",
+    "Field Notes": "paw-print",
+    "Writing": "pencil-line",
+    "Reference": "book-open",
+    "Archive": "archive"
+  },
+  "collapsedFolders": [],
+  "noteListDateMode": "modified",
+  "showNoteListFilename": false,
+  "showNoteListFolderPath": true,
+  "showNoteListPreview": true,
+  "noteListPreviewLines": 2,
+  "noteSortMode": "modifiedDesc",
+  "folderSortMode": "manual",
+  "folderManualOrder": {
+    "": [
+      "Inbox",
+      "Product",
+      "Field Notes",
+      "Writing",
+      "Reference",
+      "Archive"
+    ],
+    "Product": [
+      "Product/Launch",
+      "Product/Design"
+    ]
+  }
+}

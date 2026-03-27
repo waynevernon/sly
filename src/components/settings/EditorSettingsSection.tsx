@@ -546,67 +546,62 @@ export function AppearanceSettingsSection() {
               className="prose prose-lg dark:prose-invert max-w-xl mx-auto"
               dir={textDirection}
             >
-              <h1>Kibble Maximization Protocol</h1>
+              <h1>Sly&apos;s Border Collie Routine</h1>
               <p>
-                A comprehensive strategy document for getting your humans to
-                increase daily food portions.{" "}
-                <strong>Time-tested methods</strong> that actually work.
+                A compact daily plan for a border collie who thrives on motion,
+                focus, and a clear job. <strong>Simple routines</strong> keep
+                Sly sharp and settled.
               </p>
 
               <h2>Primary Techniques</h2>
               <ul>
                 <li>
-                  <strong>The Sad Eyes Method</strong> - Sit near food bowl,
-                  stare longingly
+                  <strong>Morning Walk</strong> - Start the day with a brisk lap
+                  around the block
                 </li>
                 <li>
-                  <strong>Strategic Meowing</strong> - Begin at 5 AM for maximum
-                  effectiveness
+                  <strong>Recall Reps</strong> - Practice quick training before
+                  breakfast
                 </li>
                 <li>
-                  <strong>Bowl Inspection</strong> - Loudly inspect empty bowl,
-                  then stare at human
+                  <strong>Frisbee Sets</strong> - Mix short sprints with calm
+                  resets
                 </li>
                 <li>
-                  <strong>The Figure Eight</strong> - Weave between their legs
-                  while they cook
+                  <strong>Evening Cooldown</strong> - Finish with sniffing,
+                  puzzles, and rest
                 </li>
               </ul>
 
               <h2>Advanced Protocol</h2>
               <p>
-                For optimal results, combine multiple techniques. The most
-                successful combination involves the Sad Eyes Method followed
-                immediately by Strategic Meowing.
+                The best days combine exercise with problem-solving. A walk,
+                then a few minutes of focused training, gives Sly both.
               </p>
 
               <pre>
                 <code>
-                  {`function acquireFood() {
-  while (bowl.isEmpty()) {
-    meow();
-    rubAgainstLegs();
-    if (human.isInKitchen) {
-      stareIntently();
-    }
+                  {`function buildGreatDay() {
+  while (sly.hasEnergy()) {
+    walk();
+    train();
+    if (field.hasDisc()) sprint();
   }
+  settle();
 }`}
                 </code>
               </pre>
 
               <h2>Common Mistakes to Avoid</h2>
               <ol>
-                <li>Never accept the first "no" - persistence is key</li>
-                <li>
-                  Maintain consistency in meal times (your schedule, not theirs)
-                </li>
-                <li>Don&apos;t forget to knock things off counters periodically</li>
+                <li>Skipping the morning walk and expecting calm by noon</li>
+                <li>Running endless fetch without pauses to reset focus</li>
+                <li>Forgetting that rest is part of the routine too</li>
               </ol>
 
               <p>
-                Remember: <em>humans are trainable</em>. With dedication and the
-                right approach, you can increase portions by up to 40% within
-                the first month.
+                Remember: <em>border collies need motion and purpose</em>. Give
+                Sly both, and the whole house has a better day.
               </p>
             </div>
           </div>

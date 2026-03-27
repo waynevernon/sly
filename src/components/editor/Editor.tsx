@@ -1897,17 +1897,17 @@ export function Editor({
         <div className="ui-pane-drag-region" data-tauri-drag-region></div>
         <div className="ui-pane-header" />
         <div className="flex-1 flex items-center justify-center pb-8">
-          <div className="text-center text-text-muted select-none">
+          <div className="text-center text-text-muted select-none -mt-3">
             <img
               src="/note-dark.png"
               alt="Note"
-              className="w-42 h-auto mx-auto mb-1 invert dark:invert-0"
+              className="w-80 max-w-[min(30rem,86vw)] h-auto mx-auto -mb-1"
             />
             <h1 className="text-2xl text-text font-sans mb-1 tracking-[-0.01em] ">
-              What's on your mind?
+              Start writing
             </h1>
             <p className="text-sm">
-              Pick up where you left off, or start something new
+              Open a note from the sidebar, or begin a new one here.
             </p>
             {createNote && (
               <Button

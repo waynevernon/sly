@@ -32,6 +32,11 @@ const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
 const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
 const MENU_FOCUS_MODE_ID: &str = "view-focus-mode";
 const MENU_ABOUT_ID: &str = "app-about";
+const MENU_VIEW_GITHUB_ID: &str = "help-view-github";
+const MENU_REPORT_ISSUE_ID: &str = "help-report-issue";
+
+const REPOSITORY_URL: &str = "https://github.com/waynevernon/sly";
+const ISSUES_URL: &str = "https://github.com/waynevernon/sly/issues";
 
 // Note metadata for list display
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4578,6 +4583,9 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
     let about_item = MenuItemBuilder::with_id(MENU_ABOUT_ID, "About Sly").build(app)?;
+    let github_item = MenuItemBuilder::with_id(MENU_VIEW_GITHUB_ID, "View on GitHub").build(app)?;
+    let report_issue_item =
+        MenuItemBuilder::with_id(MENU_REPORT_ISSUE_ID, "Report an Issue").build(app)?;
 
     #[cfg(target_os = "macos")]
     let app_menu = Submenu::with_items(
@@ -4655,10 +4663,27 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     )?;
 
     #[cfg(target_os = "macos")]
-    let help_menu = Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[])?;
+    let help_menu = Submenu::with_id_and_items(
+        app,
+        HELP_SUBMENU_ID,
+        "Help",
+        true,
+        &[&github_item, &report_issue_item],
+    )?;
 
     #[cfg(not(target_os = "macos"))]
-    let help_menu = Submenu::with_id_and_items(app, HELP_SUBMENU_ID, "Help", true, &[&about_item])?;
+    let help_menu = Submenu::with_id_and_items(
+        app,
+        HELP_SUBMENU_ID,
+        "Help",
+        true,
+        &[
+            &about_item,
+            &PredefinedMenuItem::separator(app)?,
+            &github_item,
+            &report_issue_item,
+        ],
+    )?;
 
     let mut menu = MenuBuilder::new(app);
 
@@ -4687,6 +4712,12 @@ fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+fn open_external_url(url: &'static str) {
+    tauri::async_runtime::spawn(async move {
+        let _ = open_url_safe(url.to_string()).await;
+    });
+}
+
 fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     match event.id().as_ref() {
         MENU_SETTINGS_ID => {
@@ -4712,6 +4743,12 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_ABOUT_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "open-settings-about", ());
+        }
+        MENU_VIEW_GITHUB_ID => {
+            open_external_url(REPOSITORY_URL);
+        }
+        MENU_REPORT_ISSUE_ID => {
+            open_external_url(ISSUES_URL);
         }
         _ => {}
     }
@@ -5035,7 +5072,8 @@ mod tests {
 
     #[test]
     fn generate_preview_combines_multiple_body_lines() {
-        let content = "# Title\nFirst preview sentence.\n\nSecond preview sentence.\nThird preview sentence.";
+        let content =
+            "# Title\nFirst preview sentence.\n\nSecond preview sentence.\nThird preview sentence.";
 
         let preview = generate_preview(content);
 
