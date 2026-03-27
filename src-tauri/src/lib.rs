@@ -60,6 +60,13 @@ pub struct Note {
     pub modified: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteMoveResult {
+    pub from: String,
+    pub to: String,
+}
+
 // Theme color customization
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -947,6 +954,103 @@ fn abs_path_from_id(notes_root: &Path, id: &str) -> Result<PathBuf, String> {
     Ok(file_path)
 }
 
+fn dedupe_note_ids(ids: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::with_capacity(ids.len());
+
+    for id in ids {
+        if seen.insert(id.clone()) {
+            deduped.push(id.clone());
+        }
+    }
+
+    deduped
+}
+
+fn leaf_from_note_id(id: &str) -> &str {
+    id.rsplit('/').next().unwrap_or(id)
+}
+
+fn build_note_move_results(
+    ids: &[String],
+    target_folder: &str,
+) -> Result<Vec<NoteMoveResult>, String> {
+    if !target_folder.is_empty() {
+        validate_folder_path(target_folder)?;
+    }
+
+    let mut final_ids = HashSet::new();
+    let mut move_results = Vec::new();
+
+    for id in dedupe_note_ids(ids) {
+        let leaf = leaf_from_note_id(&id);
+        let next_id = if target_folder.is_empty() {
+            leaf.to_string()
+        } else {
+            format!("{}/{}", target_folder, leaf)
+        };
+
+        if !final_ids.insert(next_id.clone()) {
+            return Err("A note with that name already exists in the target folder".to_string());
+        }
+
+        move_results.push(NoteMoveResult {
+            from: id,
+            to: next_id,
+        });
+    }
+
+    Ok(move_results)
+}
+
+fn prune_deleted_pinned_note_ids(
+    pinned_note_ids: &mut Vec<String>,
+    deleted_note_ids: &HashSet<String>,
+) -> bool {
+    let initial_len = pinned_note_ids.len();
+    pinned_note_ids.retain(|id| !deleted_note_ids.contains(id));
+    pinned_note_ids.len() != initial_len
+}
+
+fn apply_note_move_results_to_pinned_ids(
+    pinned_note_ids: &mut [String],
+    move_results: &[NoteMoveResult],
+) -> bool {
+    let move_map: HashMap<&str, &str> = move_results
+        .iter()
+        .filter(|result| result.from != result.to)
+        .map(|result| (result.from.as_str(), result.to.as_str()))
+        .collect();
+
+    let mut changed = false;
+    for pinned_id in pinned_note_ids.iter_mut() {
+        if let Some(next_id) = move_map.get(pinned_id.as_str()) {
+            if pinned_id != next_id {
+                *pinned_id = (*next_id).to_string();
+                changed = true;
+            }
+        }
+    }
+
+    changed
+}
+
+fn apply_note_move_results_to_cache(
+    notes_cache: &mut HashMap<String, NoteMetadata>,
+    move_results: &[NoteMoveResult],
+) {
+    for result in move_results {
+        if result.from == result.to {
+            continue;
+        }
+
+        if let Some(mut metadata) = notes_cache.remove(&result.from) {
+            metadata.id = result.to.clone();
+            notes_cache.insert(result.to.clone(), metadata);
+        }
+    }
+}
+
 // Get app config file path (in app data directory)
 fn get_app_config_path(app: &AppHandle) -> Result<PathBuf> {
     let app_data = app.path().app_data_dir()?;
@@ -1634,6 +1738,62 @@ async fn delete_note(id: String, state: State<'_, AppState>) -> Result<(), Strin
 }
 
 #[tauri::command]
+async fn delete_notes(ids: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+
+    let folder_path = PathBuf::from(&folder);
+    let deleted_ids = dedupe_note_ids(&ids);
+    if deleted_ids.is_empty() {
+        return Ok(());
+    }
+
+    for id in &deleted_ids {
+        let file_path = abs_path_from_id(&folder_path, id)?;
+        if file_path.exists() {
+            fs::remove_file(&file_path)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    let deleted_id_set: HashSet<String> = deleted_ids.iter().cloned().collect();
+
+    {
+        let mut settings = state.settings.write().expect("settings write lock");
+        let mut settings_changed = false;
+        if let Some(ref mut pinned_note_ids) = settings.pinned_note_ids {
+            settings_changed =
+                prune_deleted_pinned_note_ids(pinned_note_ids, &deleted_id_set);
+        }
+        if settings_changed {
+            let _ = save_settings(&folder, &settings);
+        }
+    }
+
+    {
+        let mut cache = state.notes_cache.write().expect("cache write lock");
+        for id in &deleted_ids {
+            cache.remove(id);
+        }
+    }
+
+    {
+        let index = state.search_index.lock().expect("search index mutex");
+        if let Some(ref search_index) = *index {
+            let _ = search_index.rebuild_index(&folder_path);
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn create_note(
     target_folder: Option<String>,
     state: State<'_, AppState>,
@@ -2118,6 +2278,87 @@ async fn move_note(
     }
 
     Ok(new_id)
+}
+
+#[tauri::command]
+async fn move_notes(
+    ids: Vec<String>,
+    target_folder: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<NoteMoveResult>, String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let folder_root = PathBuf::from(&folder);
+    let move_results = build_note_move_results(&ids, &target_folder)?;
+
+    if move_results.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    for result in &move_results {
+        let source_path = abs_path_from_id(&folder_root, &result.from)?;
+        if !source_path.exists() {
+            return Err("Note not found".to_string());
+        }
+
+        if result.from == result.to {
+            continue;
+        }
+
+        let dest_path = abs_path_from_id(&folder_root, &result.to)?;
+        if dest_path.exists() {
+            return Err("A note with that name already exists in the target folder".to_string());
+        }
+    }
+
+    for result in &move_results {
+        if result.from == result.to {
+            continue;
+        }
+
+        let source_path = abs_path_from_id(&folder_root, &result.from)?;
+        let dest_path = abs_path_from_id(&folder_root, &result.to)?;
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+
+        tokio::fs::rename(&source_path, &dest_path)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    {
+        let mut settings = state.settings.write().expect("settings write lock");
+        let mut settings_changed = false;
+        if let Some(ref mut pinned_note_ids) = settings.pinned_note_ids {
+            settings_changed =
+                apply_note_move_results_to_pinned_ids(pinned_note_ids, &move_results);
+        }
+        if settings_changed {
+            let _ = save_settings(&folder, &settings);
+        }
+    }
+
+    {
+        let mut cache = state.notes_cache.write().expect("cache write lock");
+        apply_note_move_results_to_cache(&mut cache, &move_results);
+    }
+
+    {
+        let index = state.search_index.lock().expect("search index mutex");
+        if let Some(ref search_index) = *index {
+            let _ = search_index.rebuild_index(&folder_root);
+        }
+    }
+
+    Ok(move_results)
 }
 
 #[tauri::command]
@@ -4530,12 +4771,14 @@ pub fn run() {
             read_note,
             save_note,
             delete_note,
+            delete_notes,
             create_note,
             list_folders,
             create_folder,
             delete_folder,
             rename_folder,
             move_note,
+            move_notes,
             move_folder,
             get_settings,
             get_appearance_settings,
@@ -4845,5 +5088,121 @@ mod tests {
 
         assert!(title_score > body_score);
         assert_eq!(body_score, 10.0);
+    }
+
+    #[test]
+    fn build_note_move_results_keeps_no_ops_and_preserves_order() {
+        let results = build_note_move_results(
+            &[
+                "alpha".to_string(),
+                "work/beta".to_string(),
+                "alpha".to_string(),
+            ],
+            "",
+        )
+        .unwrap();
+
+        assert_eq!(
+            results,
+            vec![
+                NoteMoveResult {
+                    from: "alpha".to_string(),
+                    to: "alpha".to_string(),
+                },
+                NoteMoveResult {
+                    from: "work/beta".to_string(),
+                    to: "beta".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn build_note_move_results_rejects_target_collisions_within_batch() {
+        let error = build_note_move_results(
+            &["docs/alpha".to_string(), "archive/alpha".to_string()],
+            "work",
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "A note with that name already exists in the target folder");
+    }
+
+    #[test]
+    fn apply_note_move_results_updates_pinned_note_ids() {
+        let mut pinned_note_ids = vec!["alpha".to_string(), "archive/beta".to_string()];
+        let changed = apply_note_move_results_to_pinned_ids(
+            &mut pinned_note_ids,
+            &[
+                NoteMoveResult {
+                    from: "alpha".to_string(),
+                    to: "work/alpha".to_string(),
+                },
+                NoteMoveResult {
+                    from: "archive/beta".to_string(),
+                    to: "archive/beta".to_string(),
+                },
+            ],
+        );
+
+        assert!(changed);
+        assert_eq!(
+            pinned_note_ids,
+            vec!["work/alpha".to_string(), "archive/beta".to_string()]
+        );
+    }
+
+    #[test]
+    fn prune_deleted_pinned_note_ids_removes_all_deleted_entries() {
+        let mut pinned_note_ids = vec![
+            "alpha".to_string(),
+            "beta".to_string(),
+            "gamma".to_string(),
+        ];
+        let deleted_note_ids =
+            HashSet::from(["alpha".to_string(), "gamma".to_string()]);
+
+        let changed = prune_deleted_pinned_note_ids(
+            &mut pinned_note_ids,
+            &deleted_note_ids,
+        );
+
+        assert!(changed);
+        assert_eq!(pinned_note_ids, vec!["beta".to_string()]);
+    }
+
+    #[test]
+    fn apply_note_move_results_updates_cache_entries() {
+        let mut notes_cache = HashMap::from([
+            (
+                "alpha".to_string(),
+                note("alpha", "Alpha", 10, 10),
+            ),
+            (
+                "archive/beta".to_string(),
+                note("archive/beta", "Beta", 20, 20),
+            ),
+        ]);
+
+        apply_note_move_results_to_cache(
+            &mut notes_cache,
+            &[
+                NoteMoveResult {
+                    from: "alpha".to_string(),
+                    to: "work/alpha".to_string(),
+                },
+                NoteMoveResult {
+                    from: "archive/beta".to_string(),
+                    to: "archive/beta".to_string(),
+                },
+            ],
+        );
+
+        assert!(!notes_cache.contains_key("alpha"));
+        assert_eq!(
+            notes_cache.get("work/alpha").map(|metadata| metadata.id.as_str()),
+            Some("work/alpha")
+        );
+        assert!(notes_cache.contains_key("archive/beta"));
     }
 }

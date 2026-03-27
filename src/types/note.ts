@@ -14,6 +14,11 @@ export interface Note {
   modified: number;
 }
 
+export interface NoteMoveResult {
+  from: string;
+  to: string;
+}
+
 export type ThemeMode = "light" | "dark" | "system";
 export type ThemePresetId =
   | "github-light-default"

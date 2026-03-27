@@ -76,7 +76,7 @@ export function WorkspaceNavigation({
   paneMode,
   onOpenSettings,
 }: WorkspaceNavigationProps) {
-  const { moveFolder, moveNote, folderIcons, setFolderManualOrder } = useNotes();
+  const { moveFolder, moveNote, moveSelectedNotes, folderIcons, setFolderManualOrder } = useNotes();
   const { foldersPaneWidth, notesPaneWidth, setPaneWidths } = useTheme();
 
   const [liveWidths, setLiveWidths] = useState({
@@ -166,11 +166,18 @@ export function WorkspaceNavigation({
 
     const data = event.active.data.current;
     if (data?.type === "note") {
-      const noteId = data.id as string;
-      const leaf = noteId.includes("/")
-        ? noteId.substring(noteId.lastIndexOf("/") + 1)
-        : noteId;
-      setDragLabel(leaf);
+      const noteIds = Array.isArray(data.ids)
+        ? (data.ids as string[])
+        : [(data.id as string) ?? ""];
+      if (noteIds.length > 1) {
+        setDragLabel(`${noteIds.length} notes`);
+      } else {
+        const noteId = noteIds[0];
+        const leaf = noteId.includes("/")
+          ? noteId.substring(noteId.lastIndexOf("/") + 1)
+          : noteId;
+        setDragLabel(leaf);
+      }
       setDragType("note");
       setDragFolderPath(null);
       return;
@@ -240,12 +247,24 @@ export function WorkspaceNavigation({
         if (!overData) return;
 
         const targetFolder = (overData.path as string) || "";
+        const noteIds = Array.isArray(activeData.ids)
+          ? (activeData.ids as string[])
+          : [activeData.id as string];
         const noteId = activeData.id as string;
         const noteParent = noteId.includes("/")
           ? noteId.substring(0, noteId.lastIndexOf("/"))
           : "";
-        if (noteParent === targetFolder) return;
-        await moveNote(noteId, targetFolder);
+        if (
+          noteIds.length === 1 &&
+          noteParent === targetFolder
+        ) {
+          return;
+        }
+        if (noteIds.length > 1) {
+          await moveSelectedNotes(targetFolder);
+        } else {
+          await moveNote(noteId, targetFolder);
+        }
         if (targetFolder) {
           window.dispatchEvent(
             new CustomEvent("expand-folder", { detail: targetFolder }),
@@ -326,6 +345,7 @@ export function WorkspaceNavigation({
     manualFolderDropPlan,
     moveFolder,
     moveNote,
+    moveSelectedNotes,
     setPendingManualFolderDropPlan,
     setFolderManualOrder,
   ]);

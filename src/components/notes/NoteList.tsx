@@ -30,7 +30,7 @@ import {
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
-import { CopyIcon, PinIcon, TrashIcon } from "../icons";
+import { CopyIcon, PinIcon, TrashIcon, XIcon } from "../icons";
 
 export interface NoteListItem {
   id: string;
@@ -80,14 +80,23 @@ function formatDate(timestamp: number): string {
   });
 }
 
+type SelectionState = "none" | "selected" | "active";
+
 interface NoteItemProps {
   id: string;
   title: string;
   preview?: string;
   modified: number;
-  isSelected: boolean;
+  selectionState: SelectionState;
   isPinned: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (
+    id: string,
+    event: {
+      shiftKey: boolean;
+      metaKey: boolean;
+      ctrlKey: boolean;
+    },
+  ) => void;
   showFolderPrefix?: boolean;
 }
 
@@ -96,19 +105,18 @@ const NoteItem = memo(function NoteItem({
   title,
   preview,
   modified,
-  isSelected,
+  selectionState,
   isPinned,
   onSelect,
   showFolderPrefix = true,
 }: NoteItemProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const handleClick = useCallback(() => onSelect(id), [id, onSelect]);
 
   useEffect(() => {
-    if (isSelected) {
+    if (selectionState === "active") {
       ref.current?.scrollIntoView({ block: "nearest" });
     }
-  }, [isSelected]);
+  }, [selectionState]);
 
   const folder =
     showFolderPrefix && id.includes("/")
@@ -122,24 +130,36 @@ const NoteItem = memo(function NoteItem({
     : previewText;
 
   return (
-    <div ref={ref}>
+    <div
+      ref={ref}
+      onClick={(event) =>
+        onSelect(id, {
+          shiftKey: event.shiftKey,
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey,
+        })
+      }
+    >
       <ListItem
         title={cleanTitle(title)}
         subtitle={displayPreview}
         meta={formatDate(modified)}
-        isSelected={isSelected}
+        selectionState={selectionState}
         isPinned={isPinned}
-        onClick={handleClick}
       />
     </div>
   );
 });
 
 interface NoteItemWithMenuProps extends NoteItemProps {
+  selectedNoteIds: string[];
+  dragIds: string[];
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (ids: string[]) => void;
+  onClearSelection: () => void;
+  onFocusList: () => void;
 }
 
 const NoteItemWithMenu = memo(function NoteItemWithMenu({
@@ -147,15 +167,22 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   title,
   preview,
   modified,
-  isSelected,
+  selectionState,
   isPinned,
+  selectedNoteIds,
+  dragIds,
   onSelect,
   onPin,
   onUnpin,
   onDuplicate,
   onDelete,
+  onClearSelection,
+  onFocusList,
   showFolderPrefix = true,
 }: NoteItemWithMenuProps) {
+  const isPartOfBatchSelection =
+    selectedNoteIds.length > 1 && selectedNoteIds.includes(id);
+
   const handlePin = useCallback(async () => {
     try {
       await (isPinned ? onUnpin(id) : onPin(id));
@@ -182,7 +209,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
     isDragging,
   } = useDraggable({
     id: `note:${id}`,
-    data: { type: "note", id },
+    data: { type: "note", id, ids: dragIds },
   });
 
   return (
@@ -193,13 +220,23 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
           {...attributes}
           {...listeners}
           className={isDragging ? "opacity-40" : ""}
+          onContextMenu={() => {
+            onFocusList();
+            if (!isPartOfBatchSelection) {
+              onSelect(id, {
+                shiftKey: false,
+                metaKey: false,
+                ctrlKey: false,
+              });
+            }
+          }}
         >
           <NoteItem
             id={id}
             title={title}
             preview={preview}
             modified={modified}
-            isSelected={isSelected}
+            selectionState={selectionState}
             isPinned={isPinned}
             onSelect={onSelect}
             showFolderPrefix={showFolderPrefix}
@@ -210,37 +247,75 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
         <ContextMenu.Content
           className={`${menuSurfaceClassName} min-w-44 z-50`}
         >
-          <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
-            <PinIcon className="w-4 h-4 stroke-[1.6]" />
-            {isPinned ? "Unpin" : "Pin"}
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            className={menuItemClassName}
-            onSelect={() => onDuplicate(id)}
-          >
-            <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-            Duplicate
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            className={menuItemClassName}
-            onSelect={handleCopyFilepath}
-          >
-            <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-            Copy Filepath
-          </ContextMenu.Item>
-          <ContextMenu.Separator className={menuSeparatorClassName} />
-          <ContextMenu.Item
-            className={destructiveMenuItemClassName}
-            onSelect={() => onDelete(id)}
-          >
-            <TrashIcon className="w-4 h-4 stroke-[1.6]" />
-            Delete
-          </ContextMenu.Item>
+          {isPartOfBatchSelection ? (
+            <>
+              <ContextMenu.Item
+                className={destructiveMenuItemClassName}
+                onSelect={() => onDelete(selectedNoteIds)}
+              >
+                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                Delete Selected Notes
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={onClearSelection}
+              >
+                <XIcon className="w-4 h-4 stroke-[1.6]" />
+                Clear Selection
+              </ContextMenu.Item>
+            </>
+          ) : (
+            <>
+              <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
+                <PinIcon className="w-4 h-4 stroke-[1.6]" />
+                {isPinned ? "Unpin" : "Pin"}
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onDuplicate(id)}
+              >
+                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                Duplicate
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={handleCopyFilepath}
+              >
+                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                Copy Filepath
+              </ContextMenu.Item>
+              <ContextMenu.Separator className={menuSeparatorClassName} />
+              <ContextMenu.Item
+                className={destructiveMenuItemClassName}
+                onSelect={() => onDelete([id])}
+              >
+                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                Delete
+              </ContextMenu.Item>
+            </>
+          )}
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
   );
 });
+
+function getDeleteDialogCopy(noteIds: string[]) {
+  if (noteIds.length === 1) {
+    return {
+      title: "Delete note?",
+      description:
+        "This will permanently delete the note and all its content. This action cannot be undone.",
+      actionLabel: "Delete",
+    };
+  }
+
+  return {
+    title: `Delete ${noteIds.length} notes?`,
+    description: `This will permanently delete ${noteIds.length} selected notes and all of their content. This action cannot be undone.`,
+    actionLabel: `Delete ${noteIds.length}`,
+  };
+}
 
 export function NoteList({
   items,
@@ -249,8 +324,13 @@ export function NoteList({
 }: NoteListProps) {
   const {
     selectedNoteId,
+    selectedNoteIds,
     selectNote,
+    toggleNoteSelection,
+    selectNoteRange,
+    clearNoteSelection,
     deleteNote,
+    deleteSelectedNotes,
     duplicateNote,
     pinNote,
     unpinNote,
@@ -260,7 +340,7 @@ export function NoteList({
 
   const { confirmDeletions, setConfirmDeletions } = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [noteIdsToDelete, setNoteIdsToDelete] = useState<string[]>([]);
   const [dontAskAgain, setDontAskAgain] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -269,58 +349,111 @@ export function NoteList({
     () => new Set(settings.pinnedNoteIds || []),
     [settings],
   );
+  const selectedNoteIdSet = useMemo(
+    () => new Set(selectedNoteIds),
+    [selectedNoteIds],
+  );
+
+  const focusList = useCallback(() => {
+    containerRef.current?.focus();
+  }, []);
+
+  const handleSelect = useCallback(
+    (
+      id: string,
+      event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+    ) => {
+      focusList();
+      if (event.shiftKey) {
+        selectNoteRange(id);
+        return;
+      }
+      if (event.metaKey || event.ctrlKey) {
+        toggleNoteSelection(id);
+        return;
+      }
+      void selectNote(id);
+    },
+    [focusList, selectNote, selectNoteRange, toggleNoteSelection],
+  );
+
+  const runDelete = useCallback(
+    async (noteIds: string[]) => {
+      if (noteIds.length <= 1) {
+        if (noteIds[0]) {
+          await deleteNote(noteIds[0]);
+        }
+      } else {
+        await deleteSelectedNotes();
+      }
+    },
+    [deleteNote, deleteSelectedNotes],
+  );
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!noteToDelete) return;
+    if (noteIdsToDelete.length === 0) return;
 
     if (dontAskAgain) setConfirmDeletions(false);
     try {
-      await deleteNote(noteToDelete);
-      setNoteToDelete(null);
+      await runDelete(noteIdsToDelete);
+      setNoteIdsToDelete([]);
       setDeleteDialogOpen(false);
     } catch (error) {
-      console.error("Failed to delete note:", error);
+      console.error("Failed to delete note(s):", error);
     }
-  }, [deleteNote, noteToDelete, dontAskAgain, setConfirmDeletions]);
+  }, [
+    dontAskAgain,
+    noteIdsToDelete,
+    runDelete,
+    setConfirmDeletions,
+  ]);
 
-  const openDeleteDialogForNote = useCallback(
-    async (noteId: string) => {
+  const openDeleteDialogForNotes = useCallback(
+    async (noteIds: string[]) => {
+      if (noteIds.length === 0) return;
+
+      focusList();
+
       if (!confirmDeletions) {
         try {
-          await deleteNote(noteId);
+          await runDelete(noteIds);
         } catch (error) {
-          console.error("Failed to delete note:", error);
+          console.error("Failed to delete note(s):", error);
         }
         return;
       }
+
       setDontAskAgain(false);
-      setNoteToDelete(noteId);
+      setNoteIdsToDelete(noteIds);
       setDeleteDialogOpen(true);
     },
-    [confirmDeletions, deleteNote],
+    [confirmDeletions, focusList, runDelete],
   );
 
   useEffect(() => {
     const handleFocusNoteList = () => {
-      containerRef.current?.focus();
+      focusList();
     };
 
     window.addEventListener("focus-note-list", handleFocusNoteList);
     return () =>
       window.removeEventListener("focus-note-list", handleFocusNoteList);
-  }, []);
+  }, [focusList]);
 
   useEffect(() => {
     const handleRequestDelete = (event: Event) => {
-      const customEvent = event as CustomEvent<string>;
+      const customEvent = event as CustomEvent<string | string[]>;
       if (!customEvent.detail) return;
-      openDeleteDialogForNote(customEvent.detail);
+      const noteIds = Array.isArray(customEvent.detail)
+        ? customEvent.detail
+        : [customEvent.detail];
+      void openDeleteDialogForNotes(noteIds);
     };
 
     window.addEventListener("request-delete-note", handleRequestDelete);
     return () =>
       window.removeEventListener("request-delete-note", handleRequestDelete);
-  }, [openDeleteDialogForNote]);
+  }, [openDeleteDialogForNotes]);
 
   if (isLoading && items.length === 0) {
     return (
@@ -338,6 +471,8 @@ export function NoteList({
     );
   }
 
+  const deleteDialogCopy = getDeleteDialogCopy(noteIdsToDelete);
+
   return (
     <>
       <div
@@ -345,33 +480,56 @@ export function NoteList({
         tabIndex={0}
         data-note-list
         className="group/notelist flex flex-col gap-1 p-1.5 outline-none"
+        onMouseDown={(event) => {
+          if (event.button === 0 || event.button === 2) {
+            focusList();
+          }
+        }}
       >
-        {items.map((item) => (
-          <NoteItemWithMenu
-            key={item.id}
-            id={item.id}
-            title={item.title}
-            preview={item.preview}
-            modified={item.modified}
-            isSelected={selectedNoteId === item.id}
-            isPinned={pinnedIds.has(item.id)}
-            onSelect={selectNote}
-            onPin={pinNote}
-            onUnpin={unpinNote}
-            onDuplicate={duplicateNote}
-            onDelete={openDeleteDialogForNote}
-            showFolderPrefix={showFolderPrefix}
-          />
-        ))}
+        {items.map((item) => {
+          const selectionState: SelectionState =
+            selectedNoteId === item.id
+              ? "active"
+              : selectedNoteIdSet.has(item.id)
+                ? "selected"
+                : "none";
+          const dragIds =
+            selectedNoteIds.length > 1 && selectedNoteIdSet.has(item.id)
+              ? selectedNoteIds
+              : [item.id];
+
+          return (
+            <NoteItemWithMenu
+              key={item.id}
+              id={item.id}
+              title={item.title}
+              preview={item.preview}
+              modified={item.modified}
+              selectionState={selectionState}
+              isPinned={pinnedIds.has(item.id)}
+              selectedNoteIds={selectedNoteIds}
+              dragIds={dragIds}
+              onSelect={handleSelect}
+              onPin={pinNote}
+              onUnpin={unpinNote}
+              onDuplicate={duplicateNote}
+              onDelete={(ids) => {
+                void openDeleteDialogForNotes(ids);
+              }}
+              onClearSelection={clearNoteSelection}
+              onFocusList={focusList}
+              showFolderPrefix={showFolderPrefix}
+            />
+          );
+        })}
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete note?</AlertDialogTitle>
+            <AlertDialogTitle>{deleteDialogCopy.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the note and all its content. This
-              action cannot be undone.
+              {deleteDialogCopy.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <label
@@ -388,7 +546,7 @@ export function NoteList({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>
-              Delete
+              {deleteDialogCopy.actionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

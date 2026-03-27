@@ -12,7 +12,7 @@ import { useNotes } from "../../context/NotesContext";
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import { IconButton, Input } from "../ui";
-import { SearchIcon, SearchOffIcon, XIcon } from "../icons";
+import { SearchIcon, SearchOffIcon, TrashIcon, XIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import { getFolderIconName } from "../../lib/folderIcons";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
@@ -84,8 +84,10 @@ export function NotesPane() {
     scopedNotes,
     folderIcons,
     noteSortMode,
+    selectedNoteIds,
     selectedFolderPath,
     createNote,
+    clearNoteSelection,
     search,
     searchQuery,
     searchResults,
@@ -132,6 +134,8 @@ export function NotesPane() {
     : getFolderLabel(selectedFolderPath);
   const noteCount = searchQuery.trim() ? displayItems.length : selectedFolderPath ? scopedNotes.length : notes.length;
   const selectedFolderIcon = getFolderIconName(folderIcons, selectedFolderPath);
+  const selectionCount = selectedNoteIds.length;
+  const hasBatchSelection = selectionCount > 1;
 
   const handleSearchChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,7 +209,7 @@ export function NotesPane() {
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="min-w-0 flex items-center gap-1.5">
-          {!searchQuery.trim() && (
+          {!searchQuery.trim() && !hasBatchSelection && (
             <FolderGlyph
               iconName={selectedFolderIcon}
               className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
@@ -213,42 +217,70 @@ export function NotesPane() {
             />
           )}
           <div className="font-medium text-base text-text truncate">
-            {heading}
+            {hasBatchSelection ? `${selectionCount} selected` : heading}
           </div>
-          <div className="ui-count-badge mt-0.5 pt-px shrink-0">
-            {noteCount}
-          </div>
+          {!hasBatchSelection && (
+            <div className="ui-count-badge mt-0.5 pt-px shrink-0">
+              {noteCount}
+            </div>
+          )}
         </div>
         <div className="ui-pane-header-actions">
-          {!searchQuery.trim() && (
-            <SortMenuButton
-              title="Sort Notes"
-              value={noteSortMode}
-              items={noteSortItems}
-              onChange={(nextMode) => {
-                void setNoteSortMode(nextMode);
-              }}
-            />
+          {hasBatchSelection ? (
+            <>
+              <IconButton
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("request-delete-note", {
+                      detail: selectedNoteIds,
+                    }),
+                  );
+                }}
+                title="Delete Selected Notes"
+                variant="ghost"
+              >
+                <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+              </IconButton>
+              <IconButton
+                onClick={clearNoteSelection}
+                title="Clear Selection"
+              >
+                <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+              </IconButton>
+            </>
+          ) : (
+            <>
+              {!searchQuery.trim() && (
+                <SortMenuButton
+                  title="Sort Notes"
+                  value={noteSortMode}
+                  items={noteSortItems}
+                  onChange={(nextMode) => {
+                    void setNoteSortMode(nextMode);
+                  }}
+                />
+              )}
+              <IconButton
+                onClick={toggleSearch}
+                title="Search Notes"
+              >
+                {searchOpen ? (
+                  <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                ) : (
+                  <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                )}
+              </IconButton>
+              <IconButton
+                variant="ghost"
+                onClick={() => {
+                  void createNote();
+                }}
+                title="New Note"
+              >
+                <FilePlusCorner className="w-4.75 h-4.75 stroke-[1.5]" />
+              </IconButton>
+            </>
           )}
-          <IconButton
-            onClick={toggleSearch}
-            title="Search Notes"
-          >
-            {searchOpen ? (
-              <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
-            ) : (
-              <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
-            )}
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            onClick={() => {
-              void createNote();
-            }}
-            title="New Note"
-          >
-            <FilePlusCorner className="w-4.75 h-4.75 stroke-[1.5]" />
-          </IconButton>
         </div>
       </div>
 

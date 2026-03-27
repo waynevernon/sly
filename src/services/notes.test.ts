@@ -52,4 +52,40 @@ describe("notes service", () => {
       notesService.previewNoteName("Daily-{counter}"),
     ).resolves.toBe("Daily-1");
   });
+
+  it("routes delete_notes with the provided ids", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+
+    await notesService.deleteNotes(["alpha", "beta"]);
+
+    expect(calls).toEqual([
+      {
+        cmd: "delete_notes",
+        payload: { ids: ["alpha", "beta"] },
+      },
+    ]);
+  });
+
+  it("routes move_notes with the provided ids and target folder", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return [{ from: "alpha", to: "archive/alpha" }];
+    });
+
+    await expect(
+      notesService.moveNotes(["alpha"], "archive"),
+    ).resolves.toEqual([{ from: "alpha", to: "archive/alpha" }]);
+
+    expect(calls).toEqual([
+      {
+        cmd: "move_notes",
+        payload: { ids: ["alpha"], targetFolder: "archive" },
+      },
+    ]);
+  });
 });

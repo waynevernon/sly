@@ -23,12 +23,14 @@ vi.mock("../services/notes", () => ({
   readNote: vi.fn(),
   saveNote: vi.fn(),
   deleteNote: vi.fn(),
+  deleteNotes: vi.fn(),
   createNote: vi.fn(),
   listFolders: vi.fn(),
   createFolder: vi.fn(),
   deleteFolder: vi.fn(),
   renameFolder: vi.fn(),
   moveNote: vi.fn(),
+  moveNotes: vi.fn(),
   moveFolder: vi.fn(),
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
@@ -211,5 +213,136 @@ describe("NotesContext", () => {
       }),
     );
     expect(result.current.folderManualOrder).toEqual({});
+  });
+
+  it("tracks single and toggled note selections separately from the active note", async () => {
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    expect(result.current.selectedNoteId).toBe("alpha");
+    expect(result.current.selectedNoteIds).toEqual(["alpha"]);
+
+    act(() => {
+      result.current.toggleNoteSelection("beta");
+    });
+
+    expect(result.current.selectedNoteId).toBe("alpha");
+    expect(result.current.selectedNoteIds).toEqual(["alpha", "beta"]);
+  });
+
+  it("selects visible ranges and can clear back to the active note", async () => {
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    act(() => {
+      result.current.selectNoteRange("beta");
+    });
+
+    expect(result.current.selectedNoteIds).toEqual(["alpha", "beta"]);
+
+    act(() => {
+      result.current.clearNoteSelection();
+    });
+
+    expect(result.current.selectedNoteIds).toEqual(["alpha"]);
+  });
+
+  it("selects all visible notes", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.selectAllVisibleNotes();
+    });
+
+    expect(result.current.selectedNoteIds).toEqual(["alpha", "beta"]);
+  });
+
+  it("refreshes active search results after deleting selected notes", async () => {
+    vi.mocked(notesService.searchNotes)
+      .mockResolvedValueOnce([
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          score: 10,
+        },
+        {
+          id: "beta",
+          title: "Beta note",
+          preview: "shipping",
+          modified: 1,
+          score: 8,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    vi.mocked(notesService.deleteNotes).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([]);
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.notes).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.search("a");
+      await result.current.selectNote("alpha");
+    });
+
+    act(() => {
+      result.current.toggleNoteSelection("beta");
+    });
+
+    await act(async () => {
+      await result.current.deleteSelectedNotes();
+    });
+
+    await waitFor(() => {
+      expect(notesService.deleteNotes).toHaveBeenCalledWith(["alpha", "beta"]);
+      expect(result.current.searchResults).toEqual([]);
+    });
   });
 });

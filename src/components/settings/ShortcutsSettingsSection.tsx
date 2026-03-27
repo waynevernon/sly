@@ -28,6 +28,16 @@ const shortcuts: Shortcut[] = [
     category: "Notes",
   },
   {
+    keys: [mod, "A"],
+    description: "Select all visible notes",
+    category: "Notes",
+  },
+  {
+    keys: ["Shift", "↑ / ↓"],
+    description: "Extend note selection",
+    category: "Notes",
+  },
+  {
     keys: ["Delete"],
     description: "Delete current note",
     category: "Notes",
@@ -40,6 +50,11 @@ const shortcuts: Shortcut[] = [
   {
     keys: [mod, "R"],
     description: "Reload current note",
+    category: "Notes",
+  },
+  {
+    keys: ["Escape"],
+    description: "Clear multi-note selection",
     category: "Notes",
   },
   {

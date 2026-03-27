@@ -148,9 +148,9 @@ interface ListItemProps {
   title: string;
   subtitle?: string;
   meta?: string;
-  isSelected?: boolean;
+  selectionState?: "none" | "selected" | "active";
   isPinned?: boolean;
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
   /** Optional status icon to display next to meta */
 }
 
@@ -158,7 +158,7 @@ export function ListItem({
   title,
   subtitle,
   meta,
-  isSelected = false,
+  selectionState = "none",
   isPinned = false,
   onClick,
   onContextMenu,
@@ -169,6 +169,8 @@ export function ListItem({
     .replace(/\u00A0/g, " ")
     .trim();
   const hasSubtitle = cleanSubtitle && cleanSubtitle.length > 0;
+  const isActive = selectionState === "active";
+  const isSelected = selectionState !== "none";
 
   return (
     <div
@@ -179,8 +181,10 @@ export function ListItem({
       className={cn(
         "w-full text-left px-2.5 py-2.25 transition-colors cursor-pointer select-none rounded-md",
         "focus:outline-none focus-visible:outline-none",
-        isSelected
-          ? "bg-bg-muted group-focus/notelist:ring-1 group-focus/notelist:ring-text-muted"
+        isActive
+          ? "bg-bg-muted group-focus-visible/notelist:ring-1 group-focus-visible/notelist:ring-text-muted"
+          : selectionState === "selected"
+            ? "bg-bg-muted/75 hover:bg-bg-muted"
           : "hover:bg-bg-muted"
       )}
     >

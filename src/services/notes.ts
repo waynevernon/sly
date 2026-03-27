@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AppearanceSettings,
   Note,
+  NoteMoveResult,
   NoteMetadata,
   Settings,
   SettingsPatch,
@@ -31,6 +32,10 @@ export async function deleteNote(id: string): Promise<void> {
   return invoke("delete_note", { id });
 }
 
+export async function deleteNotes(ids: string[]): Promise<void> {
+  return invoke("delete_notes", { ids });
+}
+
 export async function createNote(targetFolder?: string): Promise<Note> {
   return invoke("create_note", { targetFolder: targetFolder ?? null });
 }
@@ -53,6 +58,13 @@ export async function renameFolder(oldPath: string, newName: string): Promise<vo
 
 export async function moveNote(id: string, targetFolder: string): Promise<string> {
   return invoke("move_note", { id, targetFolder });
+}
+
+export async function moveNotes(
+  ids: string[],
+  targetFolder: string,
+): Promise<NoteMoveResult[]> {
+  return invoke("move_notes", { ids, targetFolder });
 }
 
 export async function moveFolder(path: string, targetParent: string): Promise<void> {

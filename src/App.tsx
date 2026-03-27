@@ -89,7 +89,11 @@ function AppContent() {
     duplicateNote,
     scopedNotes,
     selectedNoteId,
+    selectedNoteIds,
     selectNote,
+    selectNoteRange,
+    clearNoteSelection,
+    selectAllVisibleNotes,
     searchQuery,
     searchResults,
     reloadCurrentNote,
@@ -301,6 +305,9 @@ function AppContent() {
       const isInEditor = !!target.closest(".ProseMirror");
       const isInInput =
         target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      const isInNoteList =
+        !!target.closest("[data-note-list]") ||
+        !!document.activeElement?.closest("[data-note-list]");
       const isEditorEmpty =
         isInEditor && currentNoteRef.current?.content.trim() === "";
 
@@ -412,17 +419,34 @@ function AppContent() {
         return;
       }
 
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "a" &&
+        !isInEditor &&
+        !isInInput &&
+        isInNoteList
+      ) {
+        e.preventDefault();
+        selectAllVisibleNotes();
+        return;
+      }
+
       // Delete current note (note list focused, or editor on empty note)
       if (
-        selectedNoteId &&
+        (selectedNoteId || selectedNoteIds.length > 0) &&
         !isInInput &&
         (e.key === "Delete" ||
           (e.key === "Backspace" && (e.metaKey || e.ctrlKey))) &&
-        (!isInEditor || isEditorEmpty)
+        ((!isInEditor && isInNoteList) || isEditorEmpty)
       ) {
         e.preventDefault();
         window.dispatchEvent(
-          new CustomEvent("request-delete-note", { detail: selectedNoteId }),
+          new CustomEvent("request-delete-note", {
+            detail:
+              selectedNoteIds.length > 1
+                ? selectedNoteIds
+                : selectedNoteId ?? selectedNoteIds[0],
+          }),
         );
         return;
       }
@@ -456,7 +480,8 @@ function AppContent() {
         ((!isInEditor && !isInInput) || isEditorEmpty) &&
         paneModeRef.current >= 2 &&
         !focusMode &&
-        !isInFolderTree
+        !isInFolderTree &&
+        isInNoteList
       ) {
         e.preventDefault();
         const currentIndex = displayItems.findIndex(
@@ -472,7 +497,11 @@ function AppContent() {
             currentIndex > 0 ? currentIndex - 1 : displayItems.length - 1;
         }
 
-        selectNote(displayItems[newIndex].id);
+        if (e.shiftKey) {
+          selectNoteRange(displayItems[newIndex].id);
+        } else {
+          selectNote(displayItems[newIndex].id);
+        }
         window.dispatchEvent(new CustomEvent("focus-note-list"));
         return;
       }
@@ -494,6 +523,12 @@ function AppContent() {
         if (!focusMode && paneModeRef.current >= 2) {
           window.dispatchEvent(new CustomEvent("focus-note-list"));
         }
+        return;
+      }
+
+      if (e.key === "Escape" && isInNoteList && selectedNoteIds.length > 1) {
+        e.preventDefault();
+        clearNoteSelection();
         return;
       }
     };
@@ -526,7 +561,11 @@ function AppContent() {
     paneMode,
     reloadCurrentNote,
     selectedNoteId,
+    selectedNoteIds,
     selectNote,
+    selectNoteRange,
+    clearNoteSelection,
+    selectAllVisibleNotes,
     setPaneMode,
     openSettings,
     toggleFocusMode,
