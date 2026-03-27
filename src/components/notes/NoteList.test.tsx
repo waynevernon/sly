@@ -169,8 +169,8 @@ describe("NoteList", () => {
 
     const row = screen.getByRole("button", { name: /Alpha note/ });
     expect(row).toHaveClass("py-2.25");
-    expect(screen.getByText("3 days ago")).toBeInTheDocument();
-    expect(screen.getByText("work/ · planning")).toBeInTheDocument();
+    expect(screen.getByText("planning")).toBeInTheDocument();
+    expect(screen.getByText("3 days ago · work/")).toBeInTheDocument();
   });
 
   it("appends the filename to the folder path when both are enabled", async () => {
@@ -189,11 +189,11 @@ describe("NoteList", () => {
     expect(screen.getByText("work/alpha.md")).toBeInTheDocument();
   });
 
-  it("gives multi-line preview modes full preview lines by stacking the path label", async () => {
+  it("renders preview lines above the metadata line in multi-line modes", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
-        noteListDateMode: "off",
+        noteListDateMode: "modified",
         noteListPreviewLines: 3,
         showNoteListFilename: true,
         showNoteListFolderPath: true,
@@ -202,6 +202,25 @@ describe("NoteList", () => {
 
     render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
 
-    expect(screen.getByText("work/alpha.md · planning")).toBeInTheDocument();
+    const preview = screen.getByText("planning");
+    const meta = screen.getByText("3 days ago · work/alpha.md");
+    const metaRow = meta.parentElement;
+    expect(
+      preview.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(metaRow).toHaveClass("flex-col", "items-start");
+  });
+
+  it("keeps the 3-line preview mode clamped to exactly three lines", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        noteListPreviewLines: 3,
+      }),
+    );
+
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+
+    expect(screen.getByText("planning")).toHaveClass("line-clamp-3");
   });
 });

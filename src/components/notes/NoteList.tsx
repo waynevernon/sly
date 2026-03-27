@@ -154,6 +154,9 @@ const NoteItem = memo(function NoteItem({
         : null;
   const subtitleLines: 1 | 2 | 3 | undefined =
     noteListPreviewLines === 0 ? undefined : noteListPreviewLines;
+  const metaText = [timestamp === null ? null : formatDate(timestamp), pathLabel]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
@@ -168,10 +171,10 @@ const NoteItem = memo(function NoteItem({
     >
       <ListItem
         title={cleanTitle(title)}
-        subtitlePrefix={pathLabel || undefined}
         subtitle={previewText || undefined}
-        meta={timestamp === null ? undefined : formatDate(timestamp)}
+        meta={metaText || undefined}
         subtitleLines={subtitleLines}
+        secondaryOrder="subtitle-first"
         selectionState={selectionState}
         isPinned={isPinned}
       />

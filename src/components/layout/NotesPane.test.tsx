@@ -273,6 +273,9 @@ describe("NotesPane", () => {
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
     expect(screen.getByText("2 Lines")).toBeInTheDocument();
+    expect(screen.getByRole("menu").textContent).toMatch(
+      /Text Preview.*2 Lines.*Date.*Modified.*Folder Path.*Filename/s,
+    );
 
     await user.click(screen.getByRole("menuitemcheckbox", { name: /Folder Path/ }));
     await user.click(sortButton);

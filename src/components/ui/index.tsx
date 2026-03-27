@@ -150,6 +150,7 @@ interface ListItemProps {
   subtitle?: string;
   subtitleLines?: 1 | 2 | 3;
   meta?: string;
+  secondaryOrder?: "meta-first" | "subtitle-first";
   selectionState?: "none" | "selected" | "active";
   isPinned?: boolean;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
@@ -162,6 +163,7 @@ export function ListItem({
   subtitle,
   subtitleLines = 1,
   meta,
+  secondaryOrder = "meta-first",
   selectionState = "none",
   isPinned = false,
   onClick,
@@ -220,37 +222,65 @@ export function ListItem({
           {title}
         </span>
       </div>
-      {hasSecondaryRow && (
-        <div
-          className={cn(
-            "gap-1 min-w-0 w-full",
-            subtitleLines > 1 ? "flex items-start" : "flex items-center",
-          )}
-        >
-          {hasMeta && (
-            <div
-              className={cn(
-                "text-xs whitespace-nowrap shrink-0",
-                isSelected ? "text-text" : "text-text-muted"
-              )}
-            >
-              {cleanMeta}
-            </div>
-          )}
-          {(hasSubtitlePrefix || hasSubtitle) && (
-            <p
-              className={cn(
-                "text-xs min-w-0 flex-1",
-                subtitleLineClampClass,
-                "text-text-muted",
-                isSelected ? "opacity-100" : "opacity-70"
-              )}
-            >
-              {inlineSubtitle}
-            </p>
-          )}
-        </div>
-      )}
+      {hasSecondaryRow &&
+        (secondaryOrder === "subtitle-first" ? (
+          <div className="mt-0.5 flex min-w-0 w-full flex-col items-start gap-0.5">
+            {(hasSubtitlePrefix || hasSubtitle) && (
+              <p
+                className={cn(
+                  "text-xs min-w-0 w-full",
+                  subtitleLineClampClass,
+                  "text-text-muted",
+                  isSelected ? "opacity-100" : "opacity-70"
+                )}
+              >
+                {inlineSubtitle}
+              </p>
+            )}
+            {hasMeta && (
+              <div
+                className={cn(
+                  "text-xs whitespace-nowrap shrink-0",
+                  isSelected ? "text-text" : "text-text-muted"
+                )}
+              >
+                {cleanMeta}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "min-w-0 w-full",
+              subtitleLines > 1
+                ? "flex items-start gap-1"
+                : "flex items-center gap-1",
+            )}
+          >
+            {hasMeta && (
+              <div
+                className={cn(
+                  "text-xs whitespace-nowrap shrink-0",
+                  isSelected ? "text-text" : "text-text-muted"
+                )}
+              >
+                {cleanMeta}
+              </div>
+            )}
+            {(hasSubtitlePrefix || hasSubtitle) && (
+              <p
+                className={cn(
+                  "text-xs min-w-0 flex-1",
+                  subtitleLineClampClass,
+                  "text-text-muted",
+                  isSelected ? "opacity-100" : "opacity-70"
+                )}
+              >
+                {inlineSubtitle}
+              </p>
+            )}
+          </div>
+        ))}
     </div>
   );
 }

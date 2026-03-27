@@ -142,6 +142,9 @@ fn default_note_line_height() -> f32 {
     1.6
 }
 
+const NOTE_PREVIEW_MAX_CHARS: usize = 180;
+const NOTE_PREVIEW_ELLIPSIS: &str = "...";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FontChoice {
@@ -711,17 +714,59 @@ fn extract_title(content: &str) -> String {
 // Utility: Generate preview from content (strip markdown formatting)
 fn generate_preview(content: &str) -> String {
     let body = strip_frontmatter(content);
-    // Skip the first line (title), find first non-empty line
+    let preview_limit = NOTE_PREVIEW_MAX_CHARS;
+    let preview_limit_without_ellipsis =
+        preview_limit.saturating_sub(NOTE_PREVIEW_ELLIPSIS.chars().count());
+    let mut preview = String::new();
+
+    // Skip the first line (title), then collect enough body text to fill the UI clamp.
     for line in body.lines().skip(1) {
         let trimmed = line.trim();
         if !trimmed.is_empty() {
             let stripped = strip_markdown(trimmed);
             if !stripped.is_empty() {
-                return stripped.chars().take(100).collect();
+                let normalized = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
+                if normalized.is_empty() {
+                    continue;
+                }
+
+                let prefix_len = if preview.is_empty() { 0 } else { 1 };
+                let next_len = preview.chars().count() + prefix_len + normalized.chars().count();
+
+                if next_len <= preview_limit {
+                    if !preview.is_empty() {
+                        preview.push(' ');
+                    }
+                    preview.push_str(&normalized);
+                    continue;
+                }
+
+                let remaining = preview_limit_without_ellipsis
+                    .saturating_sub(preview.chars().count() + prefix_len);
+
+                if !preview.is_empty() {
+                    preview.push(' ');
+                }
+
+                if remaining > 0 {
+                    let chunk: String = normalized.chars().take(remaining).collect();
+                    preview.push_str(chunk.trim_end());
+                }
+
+                while preview.ends_with(' ') {
+                    preview.pop();
+                }
+
+                if !preview.is_empty() {
+                    preview.push_str(NOTE_PREVIEW_ELLIPSIS);
+                }
+
+                return preview;
             }
         }
     }
-    String::new()
+
+    preview
 }
 
 // Strip common markdown formatting from text
@@ -2849,13 +2894,7 @@ async fn import_file_to_folder(
         }
     }
 
-    let preview = content
-        .lines()
-        .skip(1)
-        .filter(|l| !l.trim().is_empty())
-        .take(3)
-        .collect::<Vec<_>>()
-        .join(" ");
+    let preview = generate_preview(&content);
 
     let metadata = NoteMetadata {
         id: final_id,
@@ -4992,6 +5031,32 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["one", "three", "two"]
         );
+    }
+
+    #[test]
+    fn generate_preview_combines_multiple_body_lines() {
+        let content = "# Title\nFirst preview sentence.\n\nSecond preview sentence.\nThird preview sentence.";
+
+        let preview = generate_preview(content);
+
+        assert_eq!(
+            preview,
+            "First preview sentence. Second preview sentence. Third preview sentence."
+        );
+    }
+
+    #[test]
+    fn generate_preview_adds_ellipsis_when_truncated() {
+        let content = format!(
+            "# Title\n{}\n{}\n",
+            "alpha ".repeat(40).trim_end(),
+            "beta ".repeat(40).trim_end()
+        );
+
+        let preview = generate_preview(&content);
+
+        assert!(preview.ends_with("..."));
+        assert!(preview.chars().count() <= NOTE_PREVIEW_MAX_CHARS);
     }
 
     #[test]
