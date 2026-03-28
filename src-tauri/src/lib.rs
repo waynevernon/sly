@@ -2323,9 +2323,8 @@ async fn rename_folder(
 
     // Compute old and new path prefixes for updating IDs
     let old_prefix = format!("{}/", old_path);
-    let new_path = if old_path.contains('/') {
-        let parent = &old_path[..old_path.rfind('/').unwrap()];
-        format!("{}/{}", parent, sanitized_name)
+    let new_path = if let Some(pos) = old_path.rfind('/') {
+        format!("{}/{}", &old_path[..pos], sanitized_name)
     } else {
         sanitized_name.clone()
     };

@@ -1,5 +1,28 @@
-import { useMemo } from "react";
+import { Component, useMemo } from "react";
+import type { ReactNode } from "react";
 import { renderMermaidSVG } from "beautiful-mermaid";
+
+class MermaidErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-xs text-text-muted italic px-2 pt-6 pb-3 text-center">
+          Mermaid diagram could not be rendered
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface MermaidRendererProps {
   code: string;
@@ -44,9 +67,11 @@ export function MermaidRenderer({ code }: MermaidRendererProps) {
   }
 
   return (
-    <div
-      className="mermaid-diagram flex justify-center py-2"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <MermaidErrorBoundary>
+      <div
+        className="mermaid-diagram flex justify-center py-2"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </MermaidErrorBoundary>
   );
 }
