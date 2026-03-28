@@ -27,10 +27,19 @@ import {
   type FolderDropOrderPlan,
   type ProjectedFolderDrop,
 } from "../../lib/folderTree";
-import type { FolderNode } from "../../types/note";
+import type {
+  FolderAppearance,
+  FolderNode,
+} from "../../types/note";
 import * as notesService from "../../services/notes";
 import type { FileChangeEventPayload } from "../../services/notes";
-import { getFolderIconName } from "../../lib/folderIcons";
+import {
+  areFolderAppearancesEqual,
+  getFolderAppearance,
+  resolveFolderAppearanceIconColor,
+  resolveFolderAppearanceTextColor,
+  type FolderAppearanceMap,
+} from "../../lib/folderIcons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,12 +74,12 @@ const FolderIconPickerModal = lazy(() =>
 );
 
 type InlineFolderEditState =
-  | { mode: "create"; parentPath: string; iconName: string | null }
+  | { mode: "create"; parentPath: string; appearance: FolderAppearance | null }
   | {
       mode: "rename";
       path: string;
       initialValue: string;
-      iconName: string | null;
+      appearance: FolderAppearance | null;
     };
 
 type FolderIconPickerTarget =
@@ -124,6 +133,22 @@ function getDropLineStyle(depth: number): CSSProperties {
   };
 }
 
+function getFolderTextStyle(
+  folderAppearance: FolderAppearance | null | undefined,
+  resolvedTheme: "light" | "dark",
+): CSSProperties | undefined {
+  const color = resolveFolderAppearanceTextColor(folderAppearance, resolvedTheme);
+  return color ? { color } : undefined;
+}
+
+function getFolderIconStyle(
+  folderAppearance: FolderAppearance | null | undefined,
+  resolvedTheme: "light" | "dark",
+): CSSProperties | undefined {
+  const color = resolveFolderAppearanceIconColor(folderAppearance, resolvedTheme);
+  return color ? { color } : undefined;
+}
+
 function FolderCountBadge({ count }: { count: number }) {
   return <span className="ui-count-badge">{count}</span>;
 }
@@ -148,11 +173,12 @@ function FolderRowTrailing({
 interface InlineFolderRowProps {
   depth: number;
   initialValue?: string;
-  iconName?: string | null;
+  appearance?: FolderAppearance | null;
   placeholder: string;
   noteCount?: number;
   isSelected?: boolean;
   collapseState?: "expanded" | "collapsed";
+  resolvedTheme: "light" | "dark";
   onSubmit: (name: string) => Promise<void> | void;
   onCancel: () => void;
   onOpenIconPicker: () => void;
@@ -161,11 +187,12 @@ interface InlineFolderRowProps {
 function InlineFolderRow({
   depth,
   initialValue = "",
-  iconName = null,
+  appearance = null,
   placeholder,
   noteCount,
   isSelected = false,
   collapseState,
+  resolvedTheme,
   onSubmit,
   onCancel,
   onOpenIconPicker,
@@ -178,6 +205,8 @@ function InlineFolderRow({
         : null;
   const isOpen = collapseState === "expanded";
   const showCollapseToggle = CollapseIcon !== null;
+  const textStyle = getFolderTextStyle(appearance, resolvedTheme);
+  const iconStyle = getFolderIconStyle(appearance, resolvedTheme);
 
   return (
     <div
@@ -196,10 +225,11 @@ function InlineFolderRow({
             type="button"
             onClick={onOpenIconPicker}
             className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
-            aria-label="Choose folder icon"
+            aria-label="Customize folder style"
+            style={iconStyle}
           >
             <FolderGlyph
-              iconName={iconName}
+              icon={appearance?.icon ?? null}
               open={isOpen}
               className="w-4.25 h-4.25 text-current shrink-0"
               strokeWidth={1.7}
@@ -211,6 +241,7 @@ function InlineFolderRow({
             onSubmit={onSubmit}
             onCancel={onCancel}
             className="h-7 flex-1 border-border/80 bg-bg px-2.5 py-1.5 text-sm font-medium"
+            style={textStyle}
           />
         </div>
         {typeof noteCount === "number" && (
@@ -225,11 +256,12 @@ interface FolderItemProps {
   folder: FolderNode;
   depth: number;
   isManualSorting: boolean;
-  folderIcons: Record<string, string>;
+  folderAppearances: FolderAppearanceMap;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
   projectedDrop: ProjectedFolderDrop | null;
+  resolvedTheme: "light" | "dark";
   onToggleCollapse: (path: string) => void;
   onSelectFolder: (path: string) => void;
   onCreateNoteHere: (path: string) => void;
@@ -247,11 +279,12 @@ const FolderItem = memo(function FolderItem({
   folder,
   depth,
   isManualSorting,
-  folderIcons,
+  folderAppearances,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
   projectedDrop,
+  resolvedTheme,
   onToggleCollapse,
   onSelectFolder,
   onCreateNoteHere,
@@ -267,7 +300,9 @@ const FolderItem = memo(function FolderItem({
   const suppressCloseAutoFocusRef = useRef(false);
   const isCollapsed = collapsedFolders.has(folder.path);
   const noteCount = countNotesInFolder(folder);
-  const iconName = getFolderIconName(folderIcons, folder.path);
+  const folderAppearance = getFolderAppearance(folderAppearances, folder.path);
+  const folderTextStyle = getFolderTextStyle(folderAppearance, resolvedTheme);
+  const folderIconStyle = getFolderIconStyle(folderAppearance, resolvedTheme);
   const parentPath = getFolderParentPath(folder.path);
   const isRenaming =
     inlineEditState?.mode === "rename" && inlineEditState.path === folder.path;
@@ -323,8 +358,9 @@ const FolderItem = memo(function FolderItem({
       {isCreatingChild && (
         <InlineFolderRow
           depth={depth + 1}
-          iconName={inlineEditState?.mode === "create" ? inlineEditState.iconName : null}
+          appearance={inlineEditState?.mode === "create" ? inlineEditState.appearance : null}
           placeholder="Folder name"
+          resolvedTheme={resolvedTheme}
           onSubmit={onCreateFolder}
           onCancel={onCancelInlineEdit}
           onOpenIconPicker={() => onOpenIconPicker({ kind: "inline-create" })}
@@ -337,11 +373,12 @@ const FolderItem = memo(function FolderItem({
           folder={child}
           depth={depth + 1}
           isManualSorting={isManualSorting}
-          folderIcons={folderIcons}
+          folderAppearances={folderAppearances}
           selectedFolderPath={selectedFolderPath}
           collapsedFolders={collapsedFolders}
           inlineEditState={inlineEditState}
           projectedDrop={projectedDrop}
+          resolvedTheme={resolvedTheme}
           onToggleCollapse={onToggleCollapse}
           onSelectFolder={onSelectFolder}
           onCreateNoteHere={onCreateNoteHere}
@@ -363,13 +400,14 @@ const FolderItem = memo(function FolderItem({
       <InlineFolderRow
         depth={depth}
         initialValue={inlineEditState?.mode === "rename" ? inlineEditState.initialValue : ""}
-        iconName={inlineEditState?.mode === "rename" ? inlineEditState.iconName : null}
+        appearance={inlineEditState?.mode === "rename" ? inlineEditState.appearance : null}
         placeholder="Folder name"
         noteCount={noteCount}
         isSelected={selectedFolderPath === folder.path}
         collapseState={
           hasNestedFolders ? (isCollapsed ? "collapsed" : "expanded") : undefined
         }
+        resolvedTheme={resolvedTheme}
         onSubmit={onRenameFolder}
         onCancel={onCancelInlineEdit}
         onOpenIconPicker={() =>
@@ -419,9 +457,10 @@ const FolderItem = memo(function FolderItem({
                 {...dragListeners}
                 className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
                 aria-label={`Move ${folder.name}`}
+                style={folderIconStyle}
               >
                 <FolderGlyph
-                  iconName={iconName}
+                  icon={folderAppearance?.icon ?? null}
                   open={hasNestedFolders && !isCollapsed}
                   className="w-4.25 h-4.25 text-current shrink-0"
                   strokeWidth={1.7}
@@ -432,7 +471,10 @@ const FolderItem = memo(function FolderItem({
                 onClick={() => onSelectFolder(folder.path)}
                 className="min-w-0 flex-1 text-left"
               >
-                <span className="text-sm text-text truncate block">
+                <span
+                  className="text-sm text-text truncate block"
+                  style={folderTextStyle}
+                >
                   {folder.name}
                 </span>
               </button>
@@ -500,7 +542,7 @@ const FolderItem = memo(function FolderItem({
             onSelect={() => onOpenIconPicker({ kind: "existing", path: folder.path })}
           >
             <SwatchIcon className="w-4 h-4 stroke-[1.6]" />
-            Change Icon
+            Customize Folder
           </ContextMenu.Item>
           {folder.path.includes("/") && (
             <>
@@ -543,7 +585,7 @@ export function FolderTreeView({
     recentNotes,
     notesFolder,
     settings,
-    folderIcons,
+    folderAppearances,
     folderSortMode,
     folderManualOrder,
     showRecentNotes,
@@ -556,7 +598,7 @@ export function FolderTreeView({
     deleteFolder,
     renameFolder,
     moveFolder,
-    setFolderIcon,
+    setFolderAppearance,
     setCollapsedFolders: persistCollapsedFolders,
   } = useNotes();
 
@@ -571,7 +613,7 @@ export function FolderTreeView({
     useState<InlineFolderEditState | null>(null);
   const [iconPickerTarget, setIconPickerTarget] =
     useState<FolderIconPickerTarget | null>(null);
-  const { confirmDeletions, setConfirmDeletions } = useTheme();
+  const { confirmDeletions, resolvedTheme, setConfirmDeletions } = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
@@ -853,7 +895,7 @@ export function FolderTreeView({
     if (parentPath) {
       expandFolder(parentPath);
     }
-    setInlineEditState({ mode: "create", parentPath, iconName: null });
+    setInlineEditState({ mode: "create", parentPath, appearance: null });
   }, [expandFolder]);
 
   const startRenameFolder = useCallback((path: string, currentName: string) => {
@@ -861,9 +903,9 @@ export function FolderTreeView({
       mode: "rename",
       path,
       initialValue: currentName,
-      iconName: getFolderIconName(folderIcons, path),
+      appearance: getFolderAppearance(folderAppearances, path),
     });
-  }, [folderIcons]);
+  }, [folderAppearances]);
 
   useEffect(() => {
     const handleExpand = (event: Event) => {
@@ -915,7 +957,7 @@ export function FolderTreeView({
     if (inlineEditState?.mode !== "create") return;
 
     const parentPath = inlineEditState.parentPath;
-    const iconName = inlineEditState.iconName;
+    const folderAppearance = inlineEditState.appearance;
     const folderName = sanitizeFolderName(name);
 
     if (!folderName) {
@@ -926,12 +968,12 @@ export function FolderTreeView({
     try {
       await createFolder(parentPath, folderName);
       const newPath = parentPath ? `${parentPath}/${folderName}` : folderName;
-      if (iconName) {
+      if (folderAppearance) {
         try {
-          await setFolderIcon(newPath, iconName);
+          await setFolderAppearance(newPath, folderAppearance);
         } catch (error) {
-          console.error("Failed to save new folder icon:", error);
-          toast.error("Folder created, but failed to save icon");
+          console.error("Failed to save new folder style:", error);
+          toast.error("Folder created, but failed to save style");
         }
       }
       expandFolder(newPath);
@@ -950,7 +992,7 @@ export function FolderTreeView({
     focusTree,
     handleCancelInlineEdit,
     inlineEditState,
-    setFolderIcon,
+    setFolderAppearance,
     selectFolder,
   ]);
 
@@ -958,11 +1000,17 @@ export function FolderTreeView({
     if (inlineEditState?.mode !== "rename") return;
 
     const oldPath = inlineEditState.path;
-    const iconName = inlineEditState.iconName;
-    const previousIconName = getFolderIconName(folderIcons, oldPath);
+    const folderAppearance = inlineEditState.appearance;
+    const previousFolderAppearance = getFolderAppearance(
+      folderAppearances,
+      oldPath,
+    );
     const sanitizedName = sanitizeFolderName(newName);
     const currentName = getFolderLeaf(oldPath);
-    const iconChanged = iconName !== previousIconName;
+    const appearanceChanged = !areFolderAppearancesEqual(
+      folderAppearance,
+      previousFolderAppearance,
+    );
 
     if (!sanitizedName) {
       handleCancelInlineEdit();
@@ -972,12 +1020,12 @@ export function FolderTreeView({
     try {
       const newPath = getRenamedFolderPath(oldPath, sanitizedName);
       if (sanitizedName === currentName) {
-        if (!iconChanged) {
+        if (!appearanceChanged) {
           handleCancelInlineEdit();
           return;
         }
 
-        await setFolderIcon(oldPath, iconName);
+        await setFolderAppearance(oldPath, folderAppearance);
         selectFolder(oldPath);
         setInlineEditState(null);
         setIconPickerTarget(null);
@@ -986,12 +1034,12 @@ export function FolderTreeView({
       }
 
       await renameFolder(oldPath, sanitizedName);
-      if (iconChanged) {
+      if (appearanceChanged) {
         try {
-          await setFolderIcon(newPath, iconName);
+          await setFolderAppearance(newPath, folderAppearance);
         } catch (error) {
-          console.error("Failed to save renamed folder icon:", error);
-          toast.error("Folder renamed, but failed to save icon");
+          console.error("Failed to save renamed folder style:", error);
+          toast.error("Folder renamed, but failed to save style");
         }
       }
       expandFolder(newPath);
@@ -1008,50 +1056,52 @@ export function FolderTreeView({
     expandFolder,
     focusTree,
     handleCancelInlineEdit,
-    folderIcons,
+    folderAppearances,
     inlineEditState,
     renameFolder,
-    setFolderIcon,
+    setFolderAppearance,
     selectFolder,
   ]);
 
-  const pickerValue = useMemo(() => {
+  const pickerValue = useMemo<FolderAppearance | null>(() => {
     if (!iconPickerTarget) return null;
 
     if (iconPickerTarget.kind === "existing") {
-      return getFolderIconName(folderIcons, iconPickerTarget.path);
+      return getFolderAppearance(folderAppearances, iconPickerTarget.path);
     }
 
     if (iconPickerTarget.kind === "inline-create") {
-      return inlineEditState?.mode === "create" ? inlineEditState.iconName : null;
+      return inlineEditState?.mode === "create" ? inlineEditState.appearance : null;
     }
 
     return inlineEditState?.mode === "rename" &&
       inlineEditState.path === iconPickerTarget.path
-      ? inlineEditState.iconName
+      ? inlineEditState.appearance
       : null;
-  }, [folderIcons, iconPickerTarget, inlineEditState]);
+  }, [folderAppearances, iconPickerTarget, inlineEditState]);
 
   const pickerTitle = useMemo(() => {
-    if (!iconPickerTarget) return "Choose Folder Icon";
+    if (!iconPickerTarget) return "Customize Folder";
     if (iconPickerTarget.kind === "existing") {
-      return `Choose Icon for ${getFolderLeaf(iconPickerTarget.path)}`;
+      return `Customize ${getFolderLeaf(iconPickerTarget.path)}`;
     }
     if (iconPickerTarget.kind === "inline-create") {
-      return "Choose Icon for New Folder";
+      return "Customize New Folder";
     }
-    return `Choose Icon for ${getFolderLeaf(iconPickerTarget.path)}`;
+    return `Customize ${getFolderLeaf(iconPickerTarget.path)}`;
   }, [iconPickerTarget]);
 
-  const handleIconPickerSelect = useCallback(async (iconName: string | null) => {
+  const handleIconPickerApply = useCallback(async (
+    folderAppearance: FolderAppearance | null,
+  ) => {
     if (!iconPickerTarget) return;
 
     if (iconPickerTarget.kind === "existing") {
       try {
-        await setFolderIcon(iconPickerTarget.path, iconName);
+        await setFolderAppearance(iconPickerTarget.path, folderAppearance);
       } catch (error) {
-        console.error("Failed to update folder icon:", error);
-        toast.error("Failed to update folder icon");
+        console.error("Failed to update folder style:", error);
+        toast.error("Failed to update folder style");
         return;
       }
 
@@ -1064,7 +1114,7 @@ export function FolderTreeView({
       if (!current) return current;
 
       if (iconPickerTarget.kind === "inline-create" && current.mode === "create") {
-        return { ...current, iconName };
+        return { ...current, appearance: folderAppearance };
       }
 
       if (
@@ -1072,14 +1122,14 @@ export function FolderTreeView({
         current.mode === "rename" &&
         current.path === iconPickerTarget.path
       ) {
-        return { ...current, iconName };
+        return { ...current, appearance: folderAppearance };
       }
 
       return current;
     });
 
     setIconPickerTarget(null);
-  }, [focusTree, iconPickerTarget, setFolderIcon]);
+  }, [focusTree, iconPickerTarget, setFolderAppearance]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!folderToDelete) return;
@@ -1166,8 +1216,13 @@ export function FolderTreeView({
           {isCreatingRoot && (
             <InlineFolderRow
               depth={0}
-              iconName={inlineEditState?.mode === "create" ? inlineEditState.iconName : null}
+              appearance={
+                inlineEditState?.mode === "create"
+                  ? inlineEditState.appearance
+                  : null
+              }
               placeholder="Folder name"
+              resolvedTheme={resolvedTheme}
               onSubmit={handleCreateFolder}
               onCancel={handleCancelInlineEdit}
               onOpenIconPicker={() => setIconPickerTarget({ kind: "inline-create" })}
@@ -1180,11 +1235,12 @@ export function FolderTreeView({
               folder={folder}
               depth={0}
               isManualSorting={folderSortMode === "manual"}
-              folderIcons={folderIcons}
+              folderAppearances={folderAppearances}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={visibleCollapsedFolders}
               inlineEditState={inlineEditState}
               projectedDrop={projectedDrop}
+              resolvedTheme={resolvedTheme}
               onToggleCollapse={handleToggleCollapse}
               onSelectFolder={selectFolder}
               onCreateNoteHere={createNoteInFolder}
@@ -1231,8 +1287,8 @@ export function FolderTreeView({
               }
             }
           }}
-          onSelect={(iconName) => {
-            void handleIconPickerSelect(iconName);
+          onApply={(folderAppearance) => {
+            void handleIconPickerApply(folderAppearance);
           }}
         />
       </Suspense>

@@ -15,14 +15,62 @@
   "defaultNoteName": "Untitled",
   "ollamaModel": null,
   "folderIcons": {
-    "Inbox": "inbox",
-    "Product": "rocket",
-    "Product/Launch": "flag",
-    "Product/Design": "palette",
-    "Field Notes": "paw-print",
-    "Writing": "pencil-line",
-    "Reference": "book-open",
-    "Archive": "archive"
+    "Inbox": {
+      "icon": {
+        "kind": "lucide",
+        "name": "inbox"
+      },
+      "colorId": "blue"
+    },
+    "Product": {
+      "icon": {
+        "kind": "lucide",
+        "name": "rocket"
+      },
+      "colorId": "orange"
+    },
+    "Product/Launch": {
+      "icon": {
+        "kind": "lucide",
+        "name": "flag"
+      },
+      "colorId": "amber"
+    },
+    "Product/Design": {
+      "icon": {
+        "kind": "lucide",
+        "name": "palette"
+      },
+      "colorId": "plum"
+    },
+    "Field Notes": {
+      "icon": {
+        "kind": "lucide",
+        "name": "paw-print"
+      },
+      "colorId": "green"
+    },
+    "Writing": {
+      "icon": {
+        "kind": "lucide",
+        "name": "pencil-line"
+      },
+      "colorId": "teal"
+    },
+    "Reference": {
+      "icon": {
+        "kind": "lucide",
+        "name": "book-open"
+      },
+      "colorId": "slate"
+    },
+    "Archive": {
+      "icon": {
+        "kind": "lucide",
+        "name": "archive"
+      },
+      "colorId": "red"
+    }
   },
   "collapsedFolders": [],
   "noteListDateMode": "modified",
