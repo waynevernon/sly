@@ -2809,6 +2809,14 @@ fn validate_preview_path(path: &str) -> Result<PathBuf, String> {
         .canonicalize()
         .map_err(|e| format!("Cannot resolve file path: {}", e))?;
 
+    // Re-check the extension on the resolved path. Without this, a symlink
+    // named "note.md" pointing to "/etc/passwd" would pass the check above
+    // and allow reading an arbitrary file after canonicalization.
+    match canonical.extension().and_then(|e| e.to_str()) {
+        Some(ext) if ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown") => {}
+        _ => return Err("Only .md and .markdown files are allowed".to_string()),
+    }
+
     Ok(canonical)
 }
 
