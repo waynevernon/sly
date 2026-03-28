@@ -16,6 +16,12 @@ vi.mock("../../context/NotesContext", () => ({
   useNotes: vi.fn(),
 }));
 
+vi.mock("../../context/ThemeContext", () => ({
+  useTheme: vi.fn(() => ({
+    resolvedTheme: "light",
+  })),
+}));
+
 vi.mock("../notes/NoteList", () => ({
   NoteList: ({
     items,
@@ -79,7 +85,7 @@ function makeNotesHookValue(
         created: 2,
       },
     ],
-    folderIcons: {},
+    folderAppearances: {},
     noteSortMode: "modifiedDesc",
     noteListDateMode: "modified",
     noteListPreviewLines: 2,

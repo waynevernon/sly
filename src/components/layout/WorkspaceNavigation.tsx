@@ -17,7 +17,11 @@ import type { FolderDropOrderPlan } from "../../lib/folderTree";
 import { cn } from "../../lib/utils";
 import { NoteIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
-import { getFolderIconName } from "../../lib/folderIcons";
+import {
+  getFolderAppearance,
+  resolveFolderAppearanceIconColor,
+  resolveFolderAppearanceTextColor,
+} from "../../lib/folderIcons";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
 
@@ -76,8 +80,15 @@ export function WorkspaceNavigation({
   paneMode,
   onOpenSettings,
 }: WorkspaceNavigationProps) {
-  const { moveFolder, moveNote, moveSelectedNotes, folderIcons, setFolderManualOrder } = useNotes();
-  const { foldersPaneWidth, notesPaneWidth, setPaneWidths } = useTheme();
+  const {
+    moveFolder,
+    moveNote,
+    moveSelectedNotes,
+    folderAppearances,
+    setFolderManualOrder,
+  } = useNotes();
+  const { foldersPaneWidth, notesPaneWidth, resolvedTheme, setPaneWidths } =
+    useTheme();
 
   const [liveWidths, setLiveWidths] = useState({
     folders: foldersPaneWidth,
@@ -421,18 +432,45 @@ export function WorkspaceNavigation({
       >
         {dragLabel && (
           <div className="flex items-center gap-2 rounded-md border border-border/80 bg-bg-secondary/95 px-2.5 py-1.5 text-sm leading-none text-text shadow-lg backdrop-blur-sm">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-visible text-text/70">
-              {dragType === "folder" ? (
-                <FolderGlyph
-                  iconName={getFolderIconName(folderIcons, dragFolderPath)}
-                  className="w-4.25 h-4.25 shrink-0"
-                  strokeWidth={1.75}
-                />
-              ) : (
-                <NoteIcon className="w-4 h-4 stroke-[1.6] opacity-50 shrink-0" />
-              )}
-            </span>
-            <span className="block truncate">{dragLabel}</span>
+            {(() => {
+              const dragFolderAppearance = getFolderAppearance(
+                folderAppearances,
+                dragFolderPath,
+              );
+              const dragFolderIconColor = resolveFolderAppearanceIconColor(
+                dragFolderAppearance,
+                resolvedTheme,
+              );
+              const dragFolderTextColor = resolveFolderAppearanceTextColor(
+                dragFolderAppearance,
+                resolvedTheme,
+              );
+
+              return (
+                <>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-visible text-text/70">
+                    {dragType === "folder" ? (
+                      <FolderGlyph
+                        icon={dragFolderAppearance?.icon ?? null}
+                        className="w-4.25 h-4.25 shrink-0"
+                        strokeWidth={1.75}
+                        style={dragFolderIconColor ? { color: dragFolderIconColor } : undefined}
+                      />
+                    ) : (
+                      <NoteIcon className="w-4 h-4 stroke-[1.6] opacity-50 shrink-0" />
+                    )}
+                  </span>
+                  <span
+                    className="block truncate"
+                    style={dragType === "folder" && dragFolderTextColor
+                      ? { color: dragFolderTextColor }
+                      : undefined}
+                  >
+                    {dragLabel}
+                  </span>
+                </>
+              );
+            })()}
           </div>
         )}
       </DragOverlay>

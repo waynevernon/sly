@@ -28,6 +28,7 @@ vi.mock("../../context/NotesContext", () => ({
 vi.mock("../../context/ThemeContext", () => ({
   useTheme: vi.fn(() => ({
     confirmDeletions: true,
+    resolvedTheme: "light",
     setConfirmDeletions: vi.fn(),
   })),
 }));
@@ -48,7 +49,7 @@ function makeNotesHookValue(
     recentNotes: [],
     notesFolder: "/notes",
     settings: {},
-    folderIcons: {},
+    folderAppearances: {},
     folderSortMode: "nameAsc",
     folderManualOrder: {},
     showRecentNotes: true,
@@ -62,7 +63,7 @@ function makeNotesHookValue(
     deleteFolder: vi.fn(),
     renameFolder: vi.fn(),
     moveFolder: vi.fn(),
-    setFolderIcon: vi.fn(),
+    setFolderAppearance: vi.fn(),
     setCollapsedFolders: vi.fn(),
     ...overrides,
   } as never;

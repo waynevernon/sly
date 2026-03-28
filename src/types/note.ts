@@ -107,6 +107,23 @@ export type NoteSortMode =
   | "titleDesc";
 export type FolderSortMode = "manual" | "nameAsc" | "nameDesc";
 export type FolderManualOrder = Record<string, string[]>;
+export type FolderColorId =
+  | "slate"
+  | "blue"
+  | "teal"
+  | "green"
+  | "olive"
+  | "amber"
+  | "orange"
+  | "red"
+  | "plum";
+export type FolderIconSpec =
+  | { kind: "lucide"; name: string }
+  | { kind: "emoji"; shortcode: string };
+export interface FolderAppearance {
+  icon?: FolderIconSpec;
+  colorId?: FolderColorId;
+}
 export type NoteScope =
   | { type: "all" }
   | { type: "recent" }
@@ -149,7 +166,7 @@ export interface Settings {
   showRecentNotes?: boolean;
   defaultNoteName?: string;
   ollamaModel?: string;
-  folderIcons?: Record<string, string>;
+  folderIcons?: Record<string, FolderAppearance>;
   collapsedFolders?: string[];
   noteListDateMode?: NoteListDateMode;
   showNoteListFilename?: boolean;
@@ -168,7 +185,7 @@ export interface SettingsPatch {
   showRecentNotes?: boolean | null;
   defaultNoteName?: string | null;
   ollamaModel?: string | null;
-  folderIcons?: Record<string, string> | null;
+  folderIcons?: Record<string, FolderAppearance> | null;
   collapsedFolders?: string[] | null;
   noteListDateMode?: NoteListDateMode;
   showNoteListFilename?: boolean | null;

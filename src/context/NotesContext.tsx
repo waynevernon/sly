@@ -12,6 +12,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   DEFAULT_FOLDER_SORT_MODE,
   DEFAULT_NOTE_SORT_MODE,
+  type FolderAppearance,
   type FolderManualOrder,
   type FolderSortMode,
   type Note,
@@ -28,8 +29,8 @@ import type {
   SearchResult,
 } from "../services/notes";
 import {
-  sanitizeFolderIcons,
-  type FolderIconsMap,
+  sanitizeFolderAppearances,
+  type FolderAppearanceMap,
 } from "../lib/folderIcons";
 
 // Separate contexts to prevent unnecessary re-renders
@@ -45,7 +46,7 @@ interface NotesDataContextValue {
   showNoteListFolderPath: boolean;
   showNoteListPreview: boolean;
   settings: Settings;
-  folderIcons: FolderIconsMap;
+  folderAppearances: FolderAppearanceMap;
   noteSortMode: NoteSortMode;
   folderSortMode: FolderSortMode;
   folderManualOrder: FolderManualOrder;
@@ -94,7 +95,10 @@ interface NotesActionsContextValue {
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveSelectedNotes: (targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
-  setFolderIcon: (path: string, iconName: string | null) => Promise<void>;
+  setFolderAppearance: (
+    path: string,
+    appearance: FolderAppearance | null,
+  ) => Promise<void>;
   setCollapsedFolders: (paths: string[]) => Promise<void>;
   setNoteSortMode: (mode: NoteSortMode) => Promise<void>;
   setNoteListViewOptions: (options: {
@@ -296,13 +300,17 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   );
   nextSettings.folderManualOrder =
     Object.keys(folderManualOrder).length > 0 ? folderManualOrder : undefined;
+  const folderIcons = sanitizeFolderAppearances(nextSettings.folderIcons);
+  nextSettings.folderIcons =
+    Object.keys(folderIcons).length > 0 ? folderIcons : undefined;
   return nextSettings;
 }
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
-  const [folderIcons, setFolderIcons] = useState<FolderIconsMap>({});
+  const [folderAppearances, setFolderAppearances] =
+    useState<FolderAppearanceMap>({});
   const [selectedScope, setSelectedScope] = useState<NoteScope>({ type: "all" });
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
@@ -371,8 +379,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const applySettings = useCallback((nextSettings: Settings) => {
     const normalizedSettings = normalizeSettings(nextSettings);
     setSettings(normalizedSettings);
-    const nextFolderIcons = sanitizeFolderIcons(normalizedSettings.folderIcons);
-    setFolderIcons(nextFolderIcons);
+    const nextFolderAppearances = sanitizeFolderAppearances(
+      normalizedSettings.folderIcons,
+    );
+    setFolderAppearances(nextFolderAppearances);
     return normalizedSettings;
   }, []);
 
@@ -1463,15 +1473,23 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [persistSettings, refreshNotes]
   );
 
-  const setFolderIcon = useCallback(async (path: string, iconName: string | null) => {
+  const setFolderAppearance = useCallback(async (
+    path: string,
+    appearance: FolderAppearance | null,
+  ) => {
     if (!path) return;
 
     try {
       await persistSettings((currentSettings) => {
-        const nextFolderIcons = sanitizeFolderIcons(currentSettings.folderIcons);
+        const nextFolderIcons = sanitizeFolderAppearances(
+          currentSettings.folderIcons,
+        );
+        const normalizedAppearance = sanitizeFolderAppearances({
+          [path]: appearance,
+        })[path];
 
-        if (iconName) {
-          nextFolderIcons[path] = iconName;
+        if (normalizedAppearance) {
+          nextFolderIcons[path] = normalizedAppearance;
         } else {
           delete nextFolderIcons[path];
         }
@@ -1486,7 +1504,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update folder icon"
+        err instanceof Error ? err.message : "Failed to update folder style"
       );
       throw err;
     }
@@ -1824,7 +1842,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListFolderPath,
       showNoteListPreview,
       settings,
-      folderIcons,
+      folderAppearances,
       noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
       folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
       folderManualOrder: settings.folderManualOrder || {},
@@ -1853,7 +1871,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListFolderPath,
       showNoteListPreview,
       settings,
-      folderIcons,
+      folderAppearances,
       selectedScope,
       selectedNoteId,
       selectedNoteIds,
@@ -1901,7 +1919,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNote: moveNoteAction,
       moveSelectedNotes,
       moveFolder: moveFolderAction,
-      setFolderIcon,
+      setFolderAppearance,
       setCollapsedFolders,
       setNoteSortMode,
       setNoteListViewOptions,
@@ -1938,7 +1956,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveNoteAction,
       moveSelectedNotes,
       moveFolderAction,
-      setFolderIcon,
+      setFolderAppearance,
       setCollapsedFolders,
       setNoteSortMode,
       setNoteListViewOptions,

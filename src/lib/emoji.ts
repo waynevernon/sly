@@ -58,7 +58,13 @@ for (const [emoji, aliases] of Object.entries(rawEmojiCatalog)) {
   }
 }
 
-const emojiItems = Array.from(emojiItemsByShortcode.values());
+const emojiItems = Array.from(emojiItemsByShortcode.values()).sort((a, b) =>
+  a.shortcode.localeCompare(b.shortcode),
+);
+
+export function getEmojiCatalogItems(): readonly EmojiItem[] {
+  return emojiItems;
+}
 
 export function getEmojiItem(shortcode: string): EmojiItem | null {
   return emojiItemsByShortcode.get(normalizeSearchValue(shortcode)) ?? null;
@@ -94,12 +100,12 @@ function getSearchScore(item: EmojiItem, query: string): number | null {
 
 export function searchEmojiShortcodes(
   query: string,
-  limit = 10,
+  limit?: number,
 ): EmojiItem[] {
   const normalizedQuery = normalizeSearchValue(query);
   if (!normalizedQuery) return [];
 
-  return emojiItems
+  const matches = emojiItems
     .map((item) => ({
       item,
       score: getSearchScore(item, normalizedQuery),
@@ -115,6 +121,7 @@ export function searchEmojiShortcodes(
       }
       return a.item.shortcode.localeCompare(b.item.shortcode);
     })
-    .slice(0, limit)
     .map((entry) => entry.item);
+
+  return typeof limit === "number" ? matches.slice(0, limit) : matches;
 }

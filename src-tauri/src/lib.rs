@@ -4,7 +4,7 @@ use notify::{
     event::{CreateKind, ModifyKind, RemoveKind},
     Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -303,6 +303,43 @@ pub enum NoteListDateMode {
     Off,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum FolderColorId {
+    Slate,
+    Blue,
+    Teal,
+    Green,
+    Olive,
+    Amber,
+    Orange,
+    Red,
+    Plum,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum FolderIconSpec {
+    Lucide { name: String },
+    Emoji { shortcode: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderAppearance {
+    #[serde(default)]
+    pub icon: Option<FolderIconSpec>,
+    #[serde(default)]
+    pub color_id: Option<FolderColorId>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FolderAppearanceSetting {
+    Legacy(String),
+    Appearance(FolderAppearance),
+}
+
 // App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -326,8 +363,12 @@ pub struct Settings {
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
     pub ollama_model: Option<String>,
-    #[serde(rename = "folderIcons")]
-    pub folder_icons: Option<HashMap<String, String>>,
+    #[serde(
+        rename = "folderIcons",
+        default,
+        deserialize_with = "deserialize_folder_icons"
+    )]
+    pub folder_icons: Option<HashMap<String, FolderAppearance>>,
     #[serde(rename = "collapsedFolders")]
     pub collapsed_folders: Option<Vec<String>>,
     #[serde(rename = "noteListDateMode", default)]
@@ -367,7 +408,7 @@ pub struct SettingsPatch {
     #[serde(default)]
     pub ollama_model: Option<Option<String>>,
     #[serde(default)]
-    pub folder_icons: Option<Option<HashMap<String, String>>>,
+    pub folder_icons: Option<Option<HashMap<String, FolderAppearance>>>,
     #[serde(default)]
     pub collapsed_folders: Option<Option<Vec<String>>>,
     #[serde(default)]
@@ -1191,15 +1232,118 @@ fn save_app_config(app: &AppHandle, config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
+fn sanitize_folder_icon_spec(icon: FolderIconSpec) -> Option<FolderIconSpec> {
+    match icon {
+        FolderIconSpec::Lucide { name } => {
+            let normalized = name.trim();
+            if normalized.is_empty() {
+                None
+            } else {
+                Some(FolderIconSpec::Lucide {
+                    name: normalized.to_string(),
+                })
+            }
+        }
+        FolderIconSpec::Emoji { shortcode } => {
+            let normalized = shortcode.trim();
+            if normalized.is_empty() {
+                None
+            } else {
+                Some(FolderIconSpec::Emoji {
+                    shortcode: normalized.to_string(),
+                })
+            }
+        }
+    }
+}
+
+fn sanitize_folder_appearance(folder_appearance: FolderAppearance) -> Option<FolderAppearance> {
+    let icon = folder_appearance.icon.and_then(sanitize_folder_icon_spec);
+    let color_id = folder_appearance.color_id;
+
+    if icon.is_none() && color_id.is_none() {
+        return None;
+    }
+
+    Some(FolderAppearance { icon, color_id })
+}
+
+fn normalize_folder_appearance_setting(value: FolderAppearanceSetting) -> Option<FolderAppearance> {
+    match value {
+        FolderAppearanceSetting::Legacy(icon_name) => {
+            sanitize_folder_appearance(FolderAppearance {
+                icon: Some(FolderIconSpec::Lucide { name: icon_name }),
+                color_id: None,
+            })
+        }
+        FolderAppearanceSetting::Appearance(folder_appearance) => {
+            sanitize_folder_appearance(folder_appearance)
+        }
+    }
+}
+
+fn sanitize_folder_icons_map(
+    folder_icons: HashMap<String, FolderAppearance>,
+) -> HashMap<String, FolderAppearance> {
+    folder_icons
+        .into_iter()
+        .filter_map(|(path, folder_appearance)| {
+            let normalized_path = path.trim().to_string();
+            if normalized_path.is_empty() {
+                return None;
+            }
+
+            sanitize_folder_appearance(folder_appearance)
+                .map(|normalized_appearance| (normalized_path, normalized_appearance))
+        })
+        .collect()
+}
+
+fn deserialize_folder_icons<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, FolderAppearance>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = Option::<HashMap<String, FolderAppearanceSetting>>::deserialize(deserializer)?;
+
+    Ok(raw.and_then(|folder_icons| {
+        let normalized: HashMap<String, FolderAppearance> = folder_icons
+            .into_iter()
+            .filter_map(|(path, value)| {
+                let normalized_path = path.trim().to_string();
+                if normalized_path.is_empty() {
+                    return None;
+                }
+
+                normalize_folder_appearance_setting(value)
+                    .map(|folder_appearance| (normalized_path, folder_appearance))
+            })
+            .collect();
+
+        (!normalized.is_empty()).then_some(normalized)
+    }))
+}
+
+fn sanitize_settings(settings: &mut Settings) {
+    if let Some(folder_icons) = settings.folder_icons.take() {
+        let normalized_folder_icons = sanitize_folder_icons_map(folder_icons);
+        settings.folder_icons =
+            (!normalized_folder_icons.is_empty()).then_some(normalized_folder_icons);
+    }
+}
+
 // Load per-folder settings from disk
 fn load_settings(notes_folder: &str) -> Settings {
     let path = get_settings_path(notes_folder);
 
     if path.exists() {
-        std::fs::read_to_string(&path)
+        let mut settings = std::fs::read_to_string(&path)
             .ok()
             .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        sanitize_settings(&mut settings);
+        settings
     } else {
         Settings::default()
     }
@@ -1256,6 +1400,7 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(folder_manual_order) = patch.folder_manual_order {
         settings.folder_manual_order = folder_manual_order;
     }
+    sanitize_settings(settings);
 }
 
 fn metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<i64> {
@@ -1266,23 +1411,27 @@ fn metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<
 }
 
 fn rewrite_folder_icon_paths(
-    folder_icons: &mut HashMap<String, String>,
+    folder_icons: &mut HashMap<String, FolderAppearance>,
     old_path: &str,
     new_path: &str,
 ) {
     let old_prefix = format!("{}/", old_path);
     let new_prefix = format!("{}/", new_path);
 
-    let updates: Vec<(String, String, String)> = folder_icons
+    let updates: Vec<(String, String, FolderAppearance)> = folder_icons
         .iter()
-        .filter_map(|(path, icon_name)| {
+        .filter_map(|(path, folder_appearance)| {
             if path == old_path {
-                Some((path.clone(), new_path.to_string(), icon_name.clone()))
+                Some((
+                    path.clone(),
+                    new_path.to_string(),
+                    folder_appearance.clone(),
+                ))
             } else if path.starts_with(&old_prefix) {
                 Some((
                     path.clone(),
                     format!("{}{}", new_prefix, &path[old_prefix.len()..]),
-                    icon_name.clone(),
+                    folder_appearance.clone(),
                 ))
             } else {
                 None
@@ -1290,13 +1439,13 @@ fn rewrite_folder_icon_paths(
         })
         .collect();
 
-    for (old_key, new_key, icon_name) in updates {
+    for (old_key, new_key, folder_appearance) in updates {
         folder_icons.remove(&old_key);
-        folder_icons.insert(new_key, icon_name);
+        folder_icons.insert(new_key, folder_appearance);
     }
 }
 
-fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, String>, path: &str) {
+fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, FolderAppearance>, path: &str) {
     let prefix = format!("{}/", path);
     folder_icons.retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
 }
@@ -2644,9 +2793,12 @@ fn update_settings(new_settings: Settings, state: State<AppState>) -> Result<(),
             .ok_or("Notes folder not set")?
     };
 
+    let mut normalized_settings = new_settings;
+    sanitize_settings(&mut normalized_settings);
+
     {
         let mut settings = state.settings.write().expect("settings write lock");
-        *settings = new_settings;
+        *settings = normalized_settings;
     }
 
     let settings = state.settings.read().expect("settings read lock");
@@ -5292,6 +5444,115 @@ mod tests {
         assert!(!settings.show_note_list_preview);
         assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
+    }
+
+    #[test]
+    fn deserialize_folder_icons_accepts_legacy_strings() {
+        let settings: Settings = serde_json::from_str(
+            r#"{
+                "folderIcons": {
+                    "docs": "folder-open-dot"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            settings
+                .folder_icons
+                .as_ref()
+                .and_then(|folder_icons| folder_icons.get("docs")),
+            Some(&FolderAppearance {
+                icon: Some(FolderIconSpec::Lucide {
+                    name: "folder-open-dot".to_string(),
+                }),
+                color_id: None,
+            })
+        );
+    }
+
+    #[test]
+    fn rewrite_folder_icon_paths_preserves_color_and_emoji_entries() {
+        let mut folder_icons = HashMap::from([
+            (
+                "docs".to_string(),
+                FolderAppearance {
+                    icon: Some(FolderIconSpec::Lucide {
+                        name: "folder-open".to_string(),
+                    }),
+                    color_id: Some(FolderColorId::Olive),
+                },
+            ),
+            (
+                "docs/ideas".to_string(),
+                FolderAppearance {
+                    icon: Some(FolderIconSpec::Emoji {
+                        shortcode: "bulb".to_string(),
+                    }),
+                    color_id: Some(FolderColorId::Amber),
+                },
+            ),
+        ]);
+
+        rewrite_folder_icon_paths(&mut folder_icons, "docs", "work");
+
+        assert_eq!(
+            folder_icons.get("work"),
+            Some(&FolderAppearance {
+                icon: Some(FolderIconSpec::Lucide {
+                    name: "folder-open".to_string(),
+                }),
+                color_id: Some(FolderColorId::Olive),
+            })
+        );
+        assert_eq!(
+            folder_icons.get("work/ideas"),
+            Some(&FolderAppearance {
+                icon: Some(FolderIconSpec::Emoji {
+                    shortcode: "bulb".to_string(),
+                }),
+                color_id: Some(FolderColorId::Amber),
+            })
+        );
+    }
+
+    #[test]
+    fn remove_folder_icon_paths_removes_folder_and_descendants() {
+        let mut folder_icons = HashMap::from([
+            (
+                "docs".to_string(),
+                FolderAppearance {
+                    icon: Some(FolderIconSpec::Lucide {
+                        name: "folder".to_string(),
+                    }),
+                    color_id: None,
+                },
+            ),
+            (
+                "docs/ideas".to_string(),
+                FolderAppearance {
+                    icon: Some(FolderIconSpec::Emoji {
+                        shortcode: "book".to_string(),
+                    }),
+                    color_id: Some(FolderColorId::Blue),
+                },
+            ),
+            (
+                "journal".to_string(),
+                FolderAppearance {
+                    icon: Some(FolderIconSpec::Emoji {
+                        shortcode: "memo".to_string(),
+                    }),
+                    color_id: None,
+                },
+            ),
+        ]);
+
+        remove_folder_icon_paths(&mut folder_icons, "docs");
+
+        assert!(!folder_icons.contains_key("docs"));
+        assert!(!folder_icons.contains_key("docs/ideas"));
+        assert!(folder_icons.contains_key("journal"));
     }
 
     #[test]

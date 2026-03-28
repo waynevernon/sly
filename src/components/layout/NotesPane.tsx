@@ -11,6 +11,7 @@ import {
   History,
 } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
+import { useTheme } from "../../context/ThemeContext";
 import type {
   NoteListDateMode,
   NoteListPreviewLines,
@@ -34,7 +35,11 @@ import {
   XIcon,
 } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
-import { getFolderIconName } from "../../lib/folderIcons";
+import {
+  getFolderAppearance,
+  resolveFolderAppearanceIconColor,
+  resolveFolderAppearanceTextColor,
+} from "../../lib/folderIcons";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
 import type { NoteSortMode } from "../../types/note";
 
@@ -119,7 +124,7 @@ export function NotesPane() {
   const {
     notes,
     scopedNotes,
-    folderIcons,
+    folderAppearances,
     noteSortMode,
     noteListDateMode,
     noteListPreviewLines,
@@ -137,6 +142,7 @@ export function NotesPane() {
     setNoteSortMode,
     setNoteListViewOptions,
   } = useNotes();
+  const { resolvedTheme } = useTheme();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [inputValue, setInputValue] = useState(searchQuery);
@@ -178,7 +184,25 @@ export function NotesPane() {
     ? "Search Results"
     : getScopeLabel(selectedScope, selectedFolderPath);
   const noteCount = displayItems.length;
-  const selectedFolderIcon = getFolderIconName(folderIcons, selectedFolderPath);
+  const selectedFolderAppearance = getFolderAppearance(
+    folderAppearances,
+    selectedFolderPath,
+  );
+  const selectedFolderIcon = selectedFolderAppearance?.icon ?? null;
+  const selectedFolderIconStyle = useMemo(() => {
+    const color = resolveFolderAppearanceIconColor(
+      selectedFolderAppearance,
+      resolvedTheme,
+    );
+    return color ? { color } : undefined;
+  }, [resolvedTheme, selectedFolderAppearance]);
+  const selectedFolderTextStyle = useMemo(() => {
+    const color = resolveFolderAppearanceTextColor(
+      selectedFolderAppearance,
+      resolvedTheme,
+    );
+    return color ? { color } : undefined;
+  }, [resolvedTheme, selectedFolderAppearance]);
   const selectionCount = selectedNoteIds.length;
   const hasBatchSelection = selectionCount > 1;
 
@@ -259,13 +283,23 @@ export function NotesPane() {
               <History className="w-4.5 h-4.5 text-text-muted/80 shrink-0 stroke-[1.7]" />
             ) : (
               <FolderGlyph
-                iconName={selectedFolderIcon}
+                icon={selectedFolderIcon}
                 className="w-4.5 h-4.5 text-text-muted/80 shrink-0"
                 strokeWidth={1.7}
+                style={selectedFolderIconStyle}
               />
             )
           )}
-          <div className="font-medium text-base text-text truncate">
+          <div
+            className="font-medium text-base text-text truncate"
+            style={
+              !hasBatchSelection &&
+              !searchQuery.trim() &&
+              selectedScope.type === "folder"
+                ? selectedFolderTextStyle
+                : undefined
+            }
+          >
             {hasBatchSelection ? `${selectionCount} selected` : heading}
           </div>
           {!hasBatchSelection && (
