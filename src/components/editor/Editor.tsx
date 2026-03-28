@@ -1940,7 +1940,7 @@ export function Editor({
         data-tauri-drag-region
       >
         <div
-          className={`titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
           {hasExternalChanges ? (
             <Tooltip

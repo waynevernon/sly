@@ -46,8 +46,13 @@
   --ui-pane-header-height: 36px;
   --ui-pane-padding-start: 16px;
   --ui-pane-padding-end: 12px;
+  --ui-titlebar-native-control-center-y: calc(var(--ui-drag-region-height) / 2);
   --ui-titlebar-control-gap: 8px;
   --ui-titlebar-control-offset: 16px;
+  --ui-titlebar-control-offset-y: calc(
+    var(--ui-titlebar-native-control-center-y) -
+      (var(--ui-drag-region-height) / 2)
+  );
   --ui-titlebar-leading-offset: calc(
     var(--ui-titlebar-control-offset) +
       var(--ui-control-height-compact) +
@@ -192,6 +197,10 @@ body,
   --ui-titlebar-control-offset: 80px;
 }
 
+.platform-mac.platform-tauri-release {
+  --ui-titlebar-native-control-center-y: 22px;
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -322,6 +331,11 @@ body {
   align-items: center;
   padding-left: var(--ui-titlebar-control-offset);
   padding-right: var(--ui-pane-padding-end);
+}
+
+.ui-titlebar-control-cluster {
+  position: relative;
+  top: var(--ui-titlebar-control-offset-y);
 }
 
 .ui-titlebar-leading-offset {

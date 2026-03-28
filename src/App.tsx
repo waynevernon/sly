@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { NotesProvider, useNotes } from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
 import { IconButton, TooltipProvider, Toaster } from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
@@ -68,7 +69,7 @@ function TitlebarPaneSwitch({
 }) {
   return (
     <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
-      <div className="titlebar-no-drag flex items-center">
+      <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
         <IconButton
           onClick={onCyclePaneMode}
           title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
@@ -717,9 +718,14 @@ function App() {
 
   // Add platform class for OS-specific styling (e.g., keyboard shortcuts)
   useEffect(() => {
-    document.documentElement.classList.add(
-      isMac ? "platform-mac" : "platform-other",
-    );
+    const root = document.documentElement;
+    root.classList.add(isMac ? "platform-mac" : "platform-other");
+    if (isTauri()) {
+      root.classList.add("platform-tauri");
+      if (import.meta.env.PROD) {
+        root.classList.add("platform-tauri-release");
+      }
+    }
   }, []);
 
   // Check for app updates on startup (folder mode only)
