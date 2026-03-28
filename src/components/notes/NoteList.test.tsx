@@ -148,7 +148,7 @@ describe("NoteList", () => {
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
   });
 
-  it("can force the folder path to remain visible for disambiguation", async () => {
+  it("hides the folder path when the setting is off even if the view marks it as relevant", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
@@ -158,15 +158,9 @@ describe("NoteList", () => {
       }),
     );
 
-    render(
-      <NoteList
-        items={[baseItem]}
-        emptyMessage="Empty"
-        forceShowFolderPath
-      />,
-    );
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" showFolderPrefix />);
 
-    expect(screen.getByText("work/")).toBeInTheDocument();
+    expect(screen.queryByText("work/")).not.toBeInTheDocument();
   });
 
   it("renders only the preview text when folder path and date are off", async () => {

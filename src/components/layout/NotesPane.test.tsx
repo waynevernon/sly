@@ -353,7 +353,7 @@ describe("NotesPane", () => {
     expect(badge?.className).toMatch(/ui-count-badge--active/);
   });
 
-  it("forces folder prefixes for recursive folder-scoped notes", async () => {
+  it("keeps folder prefixes relevant for recursive folder-scoped notes", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({

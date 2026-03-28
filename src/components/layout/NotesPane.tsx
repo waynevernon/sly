@@ -614,7 +614,6 @@ export function NotesPane() {
             selectedScope.type !== "folder" ||
             showSubfolderNotesInCurrentView
           }
-          forceShowFolderPath={showSubfolderNotesInCurrentView}
         />
       </div>
     </div>
