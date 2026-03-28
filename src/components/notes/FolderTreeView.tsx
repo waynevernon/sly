@@ -22,7 +22,6 @@ import {
   applyFolderDropOrderPlan,
   buildFolderDropOrderPlan,
   buildFolderTree,
-  countNotesInFolder,
   projectFolderDrop,
   type FolderDropOrderPlan,
   type ProjectedFolderDrop,
@@ -246,7 +245,7 @@ function InlineFolderRow({
             style={textStyle}
           />
         </div>
-        {showNoteCounts && typeof noteCount === "number" && (
+        {showNoteCounts && typeof noteCount === "number" && noteCount > 0 && (
           <FolderRowTrailing count={noteCount} />
         )}
       </div>
@@ -303,7 +302,7 @@ const FolderItem = memo(function FolderItem({
 }: FolderItemProps) {
   const suppressCloseAutoFocusRef = useRef(false);
   const isCollapsed = collapsedFolders.has(folder.path);
-  const noteCount = countNotesInFolder(folder);
+  const noteCount = folder.notes.length;
   const folderAppearance = getFolderAppearance(folderAppearances, folder.path);
   const folderTextStyle = getFolderTextStyle(folderAppearance, resolvedTheme);
   const folderIconStyle = getFolderIconStyle(folderAppearance, resolvedTheme);
@@ -486,7 +485,9 @@ const FolderItem = memo(function FolderItem({
                 </span>
               </button>
             </div>
-            {showNoteCounts && <FolderRowTrailing count={noteCount} />}
+            {showNoteCounts && noteCount > 0 && (
+              <FolderRowTrailing count={noteCount} />
+            )}
           </div>
         </div>
         {showBottomDropLine && dropLineStyle && (

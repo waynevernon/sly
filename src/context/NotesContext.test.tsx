@@ -590,6 +590,87 @@ describe("NotesContext", () => {
     });
   });
 
+  it("refreshes the active recent scope after a note rename remap", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "alpha",
+        title: "Alpha note",
+        preview: "planning",
+        modified: 2,
+        created: 2,
+      },
+      {
+        id: "beta",
+        title: "Beta note",
+        preview: "shipping",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["alpha", "beta"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+    vi.mocked(notesService.saveNote).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "alpha-renamed",
+          title: "Alpha renamed",
+          preview: "planning",
+          modified: 3,
+          created: 2,
+        },
+        {
+          id: "beta",
+          title: "Beta note",
+          preview: "shipping",
+          modified: 1,
+          created: 1,
+        },
+      ]);
+
+      return {
+        id: "alpha-renamed",
+        title: "Alpha renamed",
+        content: "renamed",
+        path: "/notes/alpha-renamed.md",
+        modified: 3,
+      };
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+
+    await act(async () => {
+      await result.current.saveNote("renamed", "alpha");
+    });
+
+    await waitFor(() => {
+      expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+        "alpha-renamed",
+        "beta",
+      ]);
+    });
+  });
+
   it("prunes deleted notes from recent note ids", async () => {
     vi.mocked(notesService.getSettings).mockResolvedValueOnce({
       recentNoteIds: ["beta", "alpha"],
@@ -657,6 +738,57 @@ describe("NotesContext", () => {
 
     await waitFor(() => {
       expect(result.current.settings.recentNoteIds).toEqual([
+        "work/beta",
+        "alpha",
+      ]);
+    });
+  });
+
+  it("refreshes the active recent scope after a note move remap", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.moveNote).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "work/beta",
+          title: "Beta note",
+          preview: "shipping",
+          modified: 1,
+          created: 1,
+        },
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ]);
+      return "work/beta";
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+
+    await act(async () => {
+      await result.current.moveNote("beta", "work");
+    });
+
+    await waitFor(() => {
+      expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
         "work/beta",
         "alpha",
       ]);

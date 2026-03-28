@@ -167,6 +167,21 @@ function areNoteIdListsEqual(left: string[], right: string[]) {
   );
 }
 
+function haveSameNoteIdMembers(
+  left: string[] | null | undefined,
+  right: string[] | null | undefined,
+) {
+  const normalizedLeft = sanitizeRecentNoteIds(left) ?? [];
+  const normalizedRight = sanitizeRecentNoteIds(right) ?? [];
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  const rightSet = new Set(normalizedRight);
+  return normalizedLeft.every((id) => rightSet.has(id));
+}
+
 function getFolderPathFromScope(scope: NoteScope): string | null {
   return scope.type === "folder" ? scope.path : null;
 }
@@ -532,9 +547,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await notesService.patchSettings(patch);
       }
 
-      return applySettings(nextSettings);
+      const normalizedSettings = applySettings(nextSettings);
+
+      if (
+        selectedScopeRef.current.type === "recent" &&
+        !haveSameNoteIdMembers(
+          recentScopeNoteIds,
+          normalizedSettings.recentNoteIds,
+        )
+      ) {
+        refreshRecentScopeNoteIds(normalizedSettings.recentNoteIds);
+      }
+
+      return normalizedSettings;
     },
-    [applySettings],
+    [applySettings, recentScopeNoteIds, refreshRecentScopeNoteIds],
   );
 
   const persistFolderManualOrder = useCallback(

@@ -225,4 +225,60 @@ describe("FolderTreeView", () => {
     expect(screen.queryByText("1")).not.toBeInTheDocument();
     expect(screen.queryByText("2")).not.toBeInTheDocument();
   });
+
+  it("shows only direct folder note counts and hides zero-count folder badges", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const notesService = await import("../../services/notes");
+    const user = userEvent.setup();
+
+    vi.mocked(notesService.listFolders).mockResolvedValue([
+      "docs",
+      "docs/reference",
+      "empty",
+    ]);
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notes: [
+          {
+            id: "docs/alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+          {
+            id: "docs/reference/beta",
+            title: "Beta",
+            preview: "preview",
+            modified: 2,
+            created: 2,
+          },
+        ],
+      }),
+    );
+
+    render(<FolderTreeView dragDelta={null} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+      expect(screen.getByText("empty")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Expand folder/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("reference")).toBeInTheDocument();
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    const referenceRow = screen
+      .getByText("reference")
+      .closest('[data-folder-path="docs/reference"]');
+    const emptyRow = screen.getByText("empty").closest('[data-folder-path="empty"]');
+
+    expect(docsRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
+    expect(referenceRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
+    expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
+  });
 });

@@ -349,7 +349,7 @@ pub struct AppConfig {
 }
 
 // Per-folder settings (stored in .sly/settings.json within notes folder)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(rename = "gitEnabled")]
     pub git_enabled: Option<bool>,
@@ -392,6 +392,30 @@ pub struct Settings {
     pub folder_sort_mode: FolderSortMode,
     #[serde(rename = "folderManualOrder", default)]
     pub folder_manual_order: Option<HashMap<String, Vec<String>>>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            git_enabled: None,
+            pinned_note_ids: None,
+            recent_note_ids: None,
+            show_recent_notes: None,
+            show_note_counts: true,
+            default_note_name: None,
+            ollama_model: None,
+            folder_icons: None,
+            collapsed_folders: None,
+            note_list_date_mode: NoteListDateMode::default(),
+            show_note_list_filename: false,
+            show_note_list_folder_path: true,
+            show_note_list_preview: true,
+            note_list_preview_lines: default_note_list_preview_lines(),
+            note_sort_mode: NoteSortMode::default(),
+            folder_sort_mode: FolderSortMode::default(),
+            folder_manual_order: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -5442,6 +5466,32 @@ mod tests {
         assert!(!settings.show_note_list_preview);
         assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
+    }
+
+    #[test]
+    fn settings_default_matches_fresh_folder_defaults() {
+        let settings = Settings::default();
+
+        assert_eq!(settings.git_enabled, None);
+        assert_eq!(settings.pinned_note_ids, None);
+        assert_eq!(settings.recent_note_ids, None);
+        assert_eq!(settings.show_recent_notes, None);
+        assert!(settings.show_note_counts);
+        assert_eq!(settings.default_note_name, None);
+        assert_eq!(settings.ollama_model, None);
+        assert_eq!(settings.folder_icons, None);
+        assert_eq!(settings.collapsed_folders, None);
+        assert_eq!(settings.note_list_date_mode, NoteListDateMode::Modified);
+        assert!(!settings.show_note_list_filename);
+        assert!(settings.show_note_list_folder_path);
+        assert!(settings.show_note_list_preview);
+        assert_eq!(
+            settings.note_list_preview_lines,
+            default_note_list_preview_lines()
+        );
+        assert_eq!(settings.note_sort_mode, NoteSortMode::ModifiedDesc);
+        assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
+        assert_eq!(settings.folder_manual_order, None);
     }
 
     #[test]
