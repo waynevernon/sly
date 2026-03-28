@@ -192,6 +192,22 @@ function getFolderPathFromScope(scope: NoteScope): string | null {
   return scope.type === "folder" ? scope.path : null;
 }
 
+function isNoteInFolderScope(
+  noteId: string,
+  folderPath: string,
+  showNotesFromSubfolders = false,
+): boolean {
+  const parentPath = getParentFolderPath(noteId);
+  if (parentPath === folderPath) {
+    return true;
+  }
+
+  return Boolean(
+    showNotesFromSubfolders &&
+      parentPath?.startsWith(`${folderPath}/`),
+  );
+}
+
 function getScopedNotes(
   notes: NoteMetadata[],
   scope: NoteScope,
@@ -212,17 +228,9 @@ function getScopedNotes(
       .filter((note): note is NoteMetadata => note !== null);
   }
 
-  return notes.filter((note) => {
-    const parentPath = getParentFolderPath(note.id);
-    if (parentPath === scope.path) {
-      return true;
-    }
-
-    return Boolean(
-      showNotesFromSubfolders &&
-        parentPath?.startsWith(`${scope.path}/`),
-    );
-  });
+  return notes.filter((note) =>
+    isNoteInFolderScope(note.id, scope.path, showNotesFromSubfolders),
+  );
 }
 
 function prependRecentNoteId(
@@ -754,6 +762,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         scope.type === "recent"
           ? sanitizeRecentNoteIds(settingsRef.current.recentNoteIds)
           : settingsRef.current.recentNoteIds;
+      const includeSubfolders =
+        settingsRef.current.showNotesFromSubfolders ?? false;
 
       if (scope.type === "recent") {
         refreshRecentScopeNoteIds(scopedRecentNoteIds);
@@ -768,6 +778,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             notesRef.current,
             scope,
             scopedRecentNoteIds,
+            includeSubfolders,
           ).map((note) => note.id),
         );
         if (!visibleNoteIds.has(activeNoteId)) {
@@ -842,10 +853,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       });
       setHasExternalChanges(false);
       const parentFolder = getParentFolderPath(id);
+      const noteIsInCurrentScope =
+        selectedScopeRef.current.type !== "folder"
+          ? false
+          : isNoteInFolderScope(
+              id,
+              selectedScopeRef.current.path,
+              settingsRef.current.showNotesFromSubfolders ?? false,
+            );
       if (
         selectedScopeRef.current.type === "folder" &&
         !searchQueryRef.current.trim() &&
-        parentFolder !== selectedScopeRef.current.path
+        !noteIsInCurrentScope
       ) {
         setSelectedScope(
           parentFolder ? { type: "folder", path: parentFolder } : { type: "all" },
@@ -1450,14 +1469,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async (id: string, targetFolder: string) => {
       try {
         const newId = await notesService.moveNote(id, targetFolder);
+        const pinnedNoteIds = settingsRef.current.pinnedNoteIds || [];
         const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (recentNoteIds.includes(id)) {
+        if (pinnedNoteIds.includes(id) || recentNoteIds.includes(id)) {
+          const moveMap = new Map([[id, newId]] as const);
           await persistSettings((currentSettings) => ({
             ...currentSettings,
+            pinnedNoteIds: pinnedNoteIds.includes(id)
+              ? replaceNoteIds(currentSettings.pinnedNoteIds, moveMap)
+              : currentSettings.pinnedNoteIds,
             recentNoteIds: sanitizeRecentNoteIds(
               replaceNoteIds(
                 currentSettings.recentNoteIds,
-                new Map([[id, newId]]),
+                moveMap,
               ),
             ),
           }));
@@ -1517,10 +1541,20 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         const moveMap = new Map(
           moveResults.map((result) => [result.from, result.to] as const),
         );
+        const pinnedNoteIds = settingsRef.current.pinnedNoteIds || [];
         const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (recentNoteIds.some((noteId) => moveMap.has(noteId))) {
+        if (
+          pinnedNoteIds.some((noteId) => moveMap.has(noteId)) ||
+          recentNoteIds.some((noteId) => moveMap.has(noteId))
+        ) {
+          const movedPinnedNoteIds = pinnedNoteIds.some((noteId) =>
+            moveMap.has(noteId),
+          );
           await persistSettings((currentSettings) => ({
             ...currentSettings,
+            pinnedNoteIds: movedPinnedNoteIds
+              ? replaceNoteIds(currentSettings.pinnedNoteIds, moveMap)
+              : currentSettings.pinnedNoteIds,
             recentNoteIds: sanitizeRecentNoteIds(
               replaceNoteIds(currentSettings.recentNoteIds, moveMap),
             ),

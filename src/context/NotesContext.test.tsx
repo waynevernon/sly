@@ -308,6 +308,107 @@ describe("NotesContext", () => {
     ]);
   });
 
+  it("keeps the active descendant note selected when folder scope includes subfolders", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 3,
+        created: 3,
+      },
+      {
+        id: "docs/reference/beta",
+        title: "Beta",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+    ]);
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.setNoteListViewOptions({
+        showNotesFromSubfolders: true,
+      });
+      await result.current.selectNote("docs/reference/beta");
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.selectedScope).toEqual({
+      type: "folder",
+      path: "docs",
+    });
+    expect(result.current.selectedNoteId).toBe("docs/reference/beta");
+  });
+
+  it("does not snap folder scope to a child folder when selecting a descendant note", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 3,
+        created: 3,
+      },
+      {
+        id: "docs/reference/beta",
+        title: "Beta",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+    ]);
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.setNoteListViewOptions({
+        showNotesFromSubfolders: true,
+      });
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/reference/beta");
+    });
+
+    expect(result.current.selectedScope).toEqual({
+      type: "folder",
+      path: "docs",
+    });
+    expect(result.current.selectedNoteId).toBe("docs/reference/beta");
+  });
+
   it("tracks single and toggled note selections separately from the active note", async () => {
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
@@ -825,8 +926,9 @@ describe("NotesContext", () => {
     });
   });
 
-  it("remaps recent note ids when a note is moved", async () => {
+  it("remaps recent and pinned note ids when a note is moved", async () => {
     vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      pinnedNoteIds: ["beta"],
       recentNoteIds: ["beta", "alpha"],
     });
     vi.mocked(notesService.moveNote).mockImplementation(async () => {
@@ -864,6 +966,69 @@ describe("NotesContext", () => {
         "work/beta",
         "alpha",
       ]);
+      expect(result.current.settings.pinnedNoteIds).toEqual(["work/beta"]);
+    });
+  });
+
+  it("remaps recent and pinned note ids when multiple notes are moved", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      pinnedNoteIds: ["beta"],
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+    vi.mocked(notesService.moveNotes).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "work/beta",
+          title: "Beta note",
+          preview: "shipping",
+          modified: 1,
+          created: 1,
+        },
+        {
+          id: "work/alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ]);
+      return [
+        { from: "beta", to: "work/beta" },
+        { from: "alpha", to: "work/alpha" },
+      ];
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("beta");
+    });
+
+    act(() => {
+      result.current.toggleNoteSelection("alpha");
+    });
+
+    await act(async () => {
+      await result.current.moveSelectedNotes("work");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual([
+        "work/beta",
+        "work/alpha",
+      ]);
+      expect(result.current.settings.pinnedNoteIds).toEqual(["work/beta"]);
     });
   });
 
