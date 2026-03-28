@@ -33,7 +33,6 @@ vi.mock("../services/notes", () => ({
   moveNotes: vi.fn(),
   moveFolder: vi.fn(),
   getSettings: vi.fn(),
-  updateSettings: vi.fn(),
   patchSettings: vi.fn(),
   getAppearanceSettings: vi.fn(),
   updateAppearanceSettings: vi.fn(),
@@ -75,7 +74,7 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.getSettings).mockResolvedValue({});
-    vi.mocked(notesService.updateSettings).mockResolvedValue();
+    vi.mocked(notesService.patchSettings).mockResolvedValue();
     vi.mocked(notesService.startFileWatcher).mockResolvedValue();
     vi.mocked(notesService.searchNotes).mockResolvedValue([]);
   });
@@ -178,13 +177,11 @@ describe("NotesContext", () => {
       await result.current.setFolderManualOrder("", ["docs", "docs", "", "journal"]);
     });
 
-    expect(notesService.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderManualOrder: {
-          "": ["docs", "journal"],
-        },
-      }),
-    );
+    expect(notesService.patchSettings).toHaveBeenCalledWith({
+      folderManualOrder: {
+        "": ["docs", "journal"],
+      },
+    });
     expect(result.current.folderManualOrder).toEqual({
       "": ["docs", "journal"],
     });
@@ -207,11 +204,9 @@ describe("NotesContext", () => {
       await result.current.setFolderManualOrder("", []);
     });
 
-    expect(notesService.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folderManualOrder: undefined,
-      }),
-    );
+    expect(notesService.patchSettings).toHaveBeenCalledWith({
+      folderManualOrder: null,
+    });
     expect(result.current.folderManualOrder).toEqual({});
   });
 
@@ -237,15 +232,12 @@ describe("NotesContext", () => {
       });
     });
 
-    expect(notesService.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        noteListDateMode: "off",
-        noteListPreviewLines: 2,
-        showNoteListPreview: false,
-        showNoteListFilename: true,
-        showNoteListFolderPath: false,
-      }),
-    );
+    expect(notesService.patchSettings).toHaveBeenLastCalledWith({
+      noteListDateMode: "off",
+      showNoteListPreview: false,
+      showNoteListFilename: true,
+      showNoteListFolderPath: false,
+    });
     expect(result.current.noteListDateMode).toBe("off");
     expect(result.current.noteListPreviewLines).toBe(0);
     expect(result.current.showNoteListFilename).toBe(true);
@@ -423,6 +415,9 @@ describe("NotesContext", () => {
         "epsilon",
       ]);
     });
+    expect(notesService.patchSettings).toHaveBeenLastCalledWith({
+      recentNoteIds: ["alpha", "beta", "gamma", "delta", "epsilon"],
+    });
 
     await act(async () => {
       await result.current.selectNote("gamma");
@@ -436,6 +431,9 @@ describe("NotesContext", () => {
         "delta",
         "epsilon",
       ]);
+    });
+    expect(notesService.patchSettings).toHaveBeenLastCalledWith({
+      recentNoteIds: ["gamma", "alpha", "beta", "delta", "epsilon"],
     });
   });
 
@@ -535,14 +533,14 @@ describe("NotesContext", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    vi.mocked(notesService.updateSettings).mockClear();
+    vi.mocked(notesService.patchSettings).mockClear();
 
     await act(async () => {
       await result.current.selectNote("alpha");
     });
 
     expect(result.current.settings.recentNoteIds).toBeUndefined();
-    expect(notesService.updateSettings).not.toHaveBeenCalled();
+    expect(notesService.patchSettings).not.toHaveBeenCalled();
   });
 
   it("remaps recent note ids when a note is renamed on save", async () => {
@@ -574,7 +572,7 @@ describe("NotesContext", () => {
       await result.current.selectNote("alpha");
     });
 
-    vi.mocked(notesService.updateSettings).mockClear();
+    vi.mocked(notesService.patchSettings).mockClear();
 
     await act(async () => {
       await result.current.saveNote("renamed", "alpha");
@@ -756,6 +754,9 @@ describe("NotesContext", () => {
       await result.current.setShowRecentNotes(false);
     });
 
+    expect(notesService.patchSettings).toHaveBeenCalledWith({
+      showRecentNotes: false,
+    });
     expect(result.current.showRecentNotes).toBe(false);
     expect(result.current.selectedScope).toEqual({ type: "all" });
   });

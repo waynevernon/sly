@@ -1364,6 +1364,12 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(pinned_note_ids) = patch.pinned_note_ids {
         settings.pinned_note_ids = pinned_note_ids;
     }
+    if let Some(recent_note_ids) = patch.recent_note_ids {
+        settings.recent_note_ids = recent_note_ids;
+    }
+    if let Some(show_recent_notes) = patch.show_recent_notes {
+        settings.show_recent_notes = show_recent_notes;
+    }
     if let Some(default_note_name) = patch.default_note_name {
         settings.default_note_name = default_note_name;
     }
@@ -2780,30 +2786,6 @@ fn update_appearance_settings(
     };
 
     save_app_config(&app, &updated_config).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-fn update_settings(new_settings: Settings, state: State<AppState>) -> Result<(), String> {
-    let folder = {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        app_config
-            .notes_folder
-            .clone()
-            .ok_or("Notes folder not set")?
-    };
-
-    let mut normalized_settings = new_settings;
-    sanitize_settings(&mut normalized_settings);
-
-    {
-        let mut settings = state.settings.write().expect("settings write lock");
-        *settings = normalized_settings;
-    }
-
-    let settings = state.settings.read().expect("settings read lock");
-    save_settings(&folder, &settings).map_err(|e| e.to_string())?;
-
     Ok(())
 }
 
@@ -5086,7 +5068,6 @@ pub fn run() {
             get_settings,
             get_appearance_settings,
             update_appearance_settings,
-            update_settings,
             patch_settings,
             update_git_enabled,
             preview_note_name,
@@ -5424,6 +5405,8 @@ mod tests {
         apply_settings_patch(
             &mut settings,
             SettingsPatch {
+                recent_note_ids: Some(Some(vec!["beta".to_string(), "alpha".to_string()])),
+                show_recent_notes: Some(Some(false)),
                 default_note_name: Some(Some("Daily".to_string())),
                 ollama_model: Some(None),
                 note_list_date_mode: Some(NoteListDateMode::Off),
@@ -5438,6 +5421,11 @@ mod tests {
         assert_eq!(settings.default_note_name.as_deref(), Some("Daily"));
         assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.git_enabled, Some(true));
+        assert_eq!(
+            settings.recent_note_ids,
+            Some(vec!["beta".to_string(), "alpha".to_string()])
+        );
+        assert_eq!(settings.show_recent_notes, Some(false));
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Off);
         assert!(settings.show_note_list_filename);
         assert!(!settings.show_note_list_folder_path);

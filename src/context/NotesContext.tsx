@@ -22,6 +22,7 @@ import {
   type NoteScope,
   type NoteSortMode,
   type Settings,
+  type SettingsPatch,
 } from "../types/note";
 import * as notesService from "../services/notes";
 import type {
@@ -306,6 +307,108 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   return nextSettings;
 }
 
+function areSettingValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.length !== right.length) return false;
+
+    return left.every((item, index) => areSettingValuesEqual(item, right[index]));
+  }
+
+  if (
+    left &&
+    right &&
+    typeof left === "object" &&
+    typeof right === "object"
+  ) {
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const leftKeys = Object.keys(leftRecord);
+    const rightKeys = Object.keys(rightRecord);
+
+    if (leftKeys.length !== rightKeys.length) return false;
+
+    return leftKeys.every(
+      (key) =>
+        Object.prototype.hasOwnProperty.call(rightRecord, key) &&
+        areSettingValuesEqual(leftRecord[key], rightRecord[key]),
+    );
+  }
+
+  return false;
+}
+
+function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
+  const patch: SettingsPatch = {};
+  const patchRecord = patch as Record<string, unknown>;
+
+  const assignNullableField = (
+    key: keyof SettingsPatch,
+    currentValue: unknown,
+    nextValue: unknown,
+  ) => {
+    if (areSettingValuesEqual(currentValue, nextValue)) return;
+    patchRecord[key] = nextValue === undefined ? null : nextValue;
+  };
+
+  const assignField = (
+    key: keyof SettingsPatch,
+    currentValue: unknown,
+    nextValue: unknown,
+  ) => {
+    if (areSettingValuesEqual(currentValue, nextValue)) return;
+    patchRecord[key] = nextValue;
+  };
+
+  assignNullableField("pinnedNoteIds", current.pinnedNoteIds, next.pinnedNoteIds);
+  assignNullableField("recentNoteIds", current.recentNoteIds, next.recentNoteIds);
+  assignField("showRecentNotes", current.showRecentNotes, next.showRecentNotes);
+  assignNullableField("defaultNoteName", current.defaultNoteName, next.defaultNoteName);
+  assignNullableField("ollamaModel", current.ollamaModel, next.ollamaModel);
+  assignNullableField("folderIcons", current.folderIcons, next.folderIcons);
+  assignNullableField(
+    "collapsedFolders",
+    current.collapsedFolders,
+    next.collapsedFolders,
+  );
+  assignField("noteListDateMode", current.noteListDateMode, next.noteListDateMode);
+  assignField(
+    "showNoteListFilename",
+    current.showNoteListFilename,
+    next.showNoteListFilename,
+  );
+  assignField(
+    "showNoteListFolderPath",
+    current.showNoteListFolderPath,
+    next.showNoteListFolderPath,
+  );
+  assignField(
+    "showNoteListPreview",
+    current.showNoteListPreview,
+    next.showNoteListPreview,
+  );
+  assignField(
+    "noteListPreviewLines",
+    current.noteListPreviewLines,
+    next.noteListPreviewLines,
+  );
+  assignField("noteSortMode", current.noteSortMode, next.noteSortMode);
+  assignField("folderSortMode", current.folderSortMode, next.folderSortMode);
+  assignNullableField(
+    "folderManualOrder",
+    current.folderManualOrder,
+    next.folderManualOrder,
+  );
+
+  return patch;
+}
+
+function isSettingsPatchEmpty(patch: SettingsPatch): boolean {
+  return Object.keys(patch).length === 0;
+}
+
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
@@ -416,8 +519,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const persistSettings = useCallback(
     async (updater: (currentSettings: Settings) => Settings) => {
-      const nextSettings = normalizeSettings(updater(settingsRef.current));
-      await notesService.updateSettings(nextSettings);
+      const currentSettings = settingsRef.current;
+      const nextSettings = normalizeSettings(updater(currentSettings));
+      const patch = buildSettingsPatch(currentSettings, nextSettings);
+
+      if (!isSettingsPatchEmpty(patch)) {
+        await notesService.patchSettings(patch);
+      }
+
       return applySettings(nextSettings);
     },
     [applySettings],
