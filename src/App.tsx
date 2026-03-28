@@ -156,6 +156,17 @@ function AppContent() {
   const [aiProvider, setAiProvider] = useState<AiProvider>("claude");
   const editorRef = useRef<TiptapEditor | null>(null);
 
+  // Refs for volatile state consumed by the keydown handler so the effect
+  // doesn't need to re-register on every note selection or filter change.
+  const focusModeRef = useRef(focusMode);
+  focusModeRef.current = focusMode;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const selectedNoteIdKbRef = useRef(selectedNoteId);
+  selectedNoteIdKbRef.current = selectedNoteId;
+  const selectedNoteIdsKbRef = useRef(selectedNoteIds);
+  selectedNoteIdsKbRef.current = selectedNoteIds;
+
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
   useEffect(() => {
@@ -191,10 +202,10 @@ function AppContent() {
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
       // Don't enter focus mode without a selected note
-      if (!prev && !selectedNoteId) return prev;
+      if (!prev && !selectedNoteIdKbRef.current) return prev;
       return !prev;
     });
-  }, [selectedNoteId]);
+  }, []); // stable — reads selectedNoteId via ref
 
   const [settingsInitialTab, setSettingsInitialTab] = useState<
     SettingsTab | undefined
@@ -347,6 +358,8 @@ function AppContent() {
   const displayItems = useMemo(() => {
     return searchQuery.trim() ? searchResults : scopedNotes;
   }, [scopedNotes, searchQuery, searchResults]);
+  const displayItemsRef = useRef(displayItems);
+  displayItemsRef.current = displayItems;
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -395,7 +408,7 @@ function AppContent() {
       }
 
       // Block all other shortcuts when in settings view
-      if (view === "settings") {
+      if (viewRef.current === "settings") {
         return;
       }
 
@@ -418,7 +431,7 @@ function AppContent() {
       }
 
       // Escape exits focus mode when not in editor
-      if (e.key === "Escape" && focusMode && !isInEditor) {
+      if (e.key === "Escape" && focusModeRef.current && !isInEditor) {
         e.preventDefault();
         toggleFocusMode();
         return;
@@ -443,7 +456,7 @@ function AppContent() {
         e.key.toLowerCase() === "f"
       ) {
         e.preventDefault();
-        if (focusMode) {
+        if (focusModeRef.current) {
           setFocusMode(false);
         }
         if (paneModeRef.current < 2) {
@@ -483,7 +496,7 @@ function AppContent() {
 
       // Delete current note (note list focused, or editor on empty note)
       if (
-        (selectedNoteId || selectedNoteIds.length > 0) &&
+        (selectedNoteIdKbRef.current || selectedNoteIdsKbRef.current.length > 0) &&
         !isInInput &&
         (e.key === "Delete" ||
           (e.key === "Backspace" && (e.metaKey || e.ctrlKey))) &&
@@ -493,9 +506,9 @@ function AppContent() {
         window.dispatchEvent(
           new CustomEvent("request-delete-note", {
             detail:
-              selectedNoteIds.length > 1
-                ? selectedNoteIds
-                : selectedNoteId ?? selectedNoteIds[0],
+              selectedNoteIdsKbRef.current.length > 1
+                ? selectedNoteIdsKbRef.current
+                : selectedNoteIdKbRef.current ?? selectedNoteIdsKbRef.current[0],
           }),
         );
         return;
@@ -507,10 +520,10 @@ function AppContent() {
         e.key.toLowerCase() === "d" &&
         !isInEditor &&
         !isInInput &&
-        selectedNoteId
+        selectedNoteIdKbRef.current
       ) {
         e.preventDefault();
-        duplicateNote(selectedNoteId);
+        duplicateNote(selectedNoteIdKbRef.current);
         return;
       }
 
@@ -525,23 +538,23 @@ function AppContent() {
       // Skip if folder tree view is handling its own navigation
       const isInFolderTree = !!(e.target as HTMLElement).closest("[data-folder-tree]");
       if (
-        displayItems.length > 0 &&
+        displayItemsRef.current.length > 0 &&
         (e.key === "ArrowDown" || e.key === "ArrowUp") &&
         ((!isInEditor && !isInInput) || isEditorEmpty) &&
         paneModeRef.current >= 2 &&
-        !focusMode &&
+        !focusModeRef.current &&
         !isInFolderTree &&
         isInNoteList
       ) {
         e.preventDefault();
-        const currentIndex = displayItems.findIndex(
-          (n) => n.id === selectedNoteId,
+        const currentIndex = displayItemsRef.current.findIndex(
+          (n) => n.id === selectedNoteIdKbRef.current,
         );
 
         // Selected note is no longer in the visible list (e.g. after a filter
         // change) — snap to the first item rather than doing arithmetic on -1.
         if (currentIndex === -1) {
-          selectNote(displayItems[0].id);
+          selectNote(displayItemsRef.current[0].id);
           window.dispatchEvent(new CustomEvent("focus-note-list"));
           return;
         }
@@ -550,23 +563,23 @@ function AppContent() {
 
         if (e.key === "ArrowDown") {
           newIndex =
-            currentIndex < displayItems.length - 1 ? currentIndex + 1 : 0;
+            currentIndex < displayItemsRef.current.length - 1 ? currentIndex + 1 : 0;
         } else {
           newIndex =
-            currentIndex > 0 ? currentIndex - 1 : displayItems.length - 1;
+            currentIndex > 0 ? currentIndex - 1 : displayItemsRef.current.length - 1;
         }
 
         if (e.shiftKey) {
-          selectNoteRange(displayItems[newIndex].id);
+          selectNoteRange(displayItemsRef.current[newIndex].id);
         } else {
-          selectNote(displayItems[newIndex].id);
+          selectNote(displayItemsRef.current[newIndex].id);
         }
         window.dispatchEvent(new CustomEvent("focus-note-list"));
         return;
       }
 
       // Enter to focus editor
-      if (e.key === "Enter" && selectedNoteId && !isInEditor && !isInInput) {
+      if (e.key === "Enter" && selectedNoteIdKbRef.current && !isInEditor && !isInInput) {
         e.preventDefault();
         const editor = document.querySelector(".ProseMirror") as HTMLElement;
         if (editor) {
@@ -579,13 +592,13 @@ function AppContent() {
       if (e.key === "Escape" && isInEditor) {
         e.preventDefault();
         (target as HTMLElement).blur();
-        if (!focusMode && paneModeRef.current >= 2) {
+        if (!focusModeRef.current && paneModeRef.current >= 2) {
           window.dispatchEvent(new CustomEvent("focus-note-list"));
         }
         return;
       }
 
-      if (e.key === "Escape" && isInNoteList && selectedNoteIds.length > 1) {
+      if (e.key === "Escape" && isInNoteList && selectedNoteIdsKbRef.current.length > 1) {
         e.preventDefault();
         clearNoteSelection();
         return;
@@ -616,11 +629,7 @@ function AppContent() {
     createNote,
     cyclePaneMode,
     duplicateNote,
-    displayItems,
-    paneMode,
     reloadCurrentNote,
-    selectedNoteId,
-    selectedNoteIds,
     selectNote,
     selectNoteRange,
     clearNoteSelection,
@@ -628,8 +637,6 @@ function AppContent() {
     setPaneMode,
     openSettings,
     toggleFocusMode,
-    focusMode,
-    view,
     setInterfaceZoom,
   ]);
 

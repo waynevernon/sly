@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant};
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
@@ -840,6 +840,11 @@ fn generate_preview(content: &str) -> String {
     preview
 }
 
+static IMG_RE: OnceLock<regex::Regex> = OnceLock::new();
+static LINK_RE: OnceLock<regex::Regex> = OnceLock::new();
+static LIST_RE: OnceLock<regex::Regex> = OnceLock::new();
+static ANSI_RE: OnceLock<regex::Regex> = OnceLock::new();
+
 // Strip common markdown formatting from text
 fn strip_markdown(text: &str) -> String {
     let mut result = text.to_string();
@@ -909,11 +914,11 @@ fn strip_markdown(text: &str) -> String {
     }
 
     // Remove images ![alt](url) - must come before links
-    let img_re = regex::Regex::new(r"!\[([^\]]*)\]\([^)]+\)").unwrap();
+    let img_re = IMG_RE.get_or_init(|| regex::Regex::new(r"!\[([^\]]*)\]\([^)]+\)").unwrap());
     result = img_re.replace_all(&result, "$1").to_string();
 
     // Remove links [text](url)
-    let link_re = regex::Regex::new(r"\[([^\]]+)\]\([^)]+\)").unwrap();
+    let link_re = LINK_RE.get_or_init(|| regex::Regex::new(r"\[([^\]]+)\]\([^)]+\)").unwrap());
     result = link_re.replace_all(&result, "$1").to_string();
 
     // Remove italic (*text* or _text_) - simple approach after bold is removed
@@ -961,7 +966,7 @@ fn strip_markdown(text: &str) -> String {
         .replace("- [X] ", "");
 
     // Remove list markers at start (-, *, +, 1.)
-    let list_re = regex::Regex::new(r"^(\s*[-+*]|\s*\d+\.)\s+").unwrap();
+    let list_re = LIST_RE.get_or_init(|| regex::Regex::new(r"^(\s*[-+*]|\s*\d+\.)\s+").unwrap());
     result = list_re.replace(&result, "").to_string();
 
     result.trim().to_string()
@@ -4096,7 +4101,7 @@ async fn execute_ai_cli(
             .unwrap_or(false);
 
         // Strip ANSI escape sequences from output (e.g. Ollama progress spinners)
-        let ansi_re = regex::Regex::new(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\].*?\x07").unwrap();
+        let ansi_re = ANSI_RE.get_or_init(|| regex::Regex::new(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\].*?\x07").unwrap());
         let stdout_clean = ansi_re.replace_all(&stdout_str, "").to_string();
         let stderr_clean = ansi_re.replace_all(&stderr_str, "").trim().to_string();
 
