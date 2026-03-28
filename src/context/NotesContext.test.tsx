@@ -439,6 +439,93 @@ describe("NotesContext", () => {
     });
   });
 
+  it("keeps recent scope order stable while persisting viewed-note recency", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual(["alpha", "beta"]);
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+  });
+
+  it("refreshes recent scope ordering after leaving and re-entering the scope", async () => {
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["beta", "alpha"],
+    });
+    vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
+      id,
+      title: id,
+      content: "",
+      path: `/notes/${id}.md`,
+      modified: 1,
+    }));
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual(["alpha", "beta"]);
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+
+    act(() => {
+      result.current.selectFolder(null);
+      result.current.selectRecentNotes();
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+  });
+
   it("does not update recent notes when opening a note fails", async () => {
     vi.mocked(notesService.readNote).mockRejectedValue(new Error("boom"));
 

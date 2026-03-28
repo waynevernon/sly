@@ -309,6 +309,9 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
+  const [recentScopeNoteIds, setRecentScopeNoteIds] = useState<
+    string[] | undefined
+  >(undefined);
   const [folderAppearances, setFolderAppearances] =
     useState<FolderAppearanceMap>({});
   const [selectedScope, setSelectedScope] = useState<NoteScope>({ type: "all" });
@@ -386,10 +389,30 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return normalizedSettings;
   }, []);
 
+  const refreshRecentScopeNoteIds = useCallback(
+    (nextRecentNoteIds: string[] | null | undefined) => {
+      const normalizedRecentNoteIds = sanitizeRecentNoteIds(nextRecentNoteIds);
+
+      setRecentScopeNoteIds((currentRecentNoteIds) => {
+        const currentIds = currentRecentNoteIds ?? [];
+        const nextIds = normalizedRecentNoteIds ?? [];
+
+        if (areNoteIdListsEqual(currentIds, nextIds)) {
+          return currentRecentNoteIds;
+        }
+
+        return normalizedRecentNoteIds;
+      });
+    },
+    [],
+  );
+
   const refreshSettings = useCallback(async () => {
     const nextSettings = await notesService.getSettings();
-    return applySettings(nextSettings);
-  }, [applySettings]);
+    const normalizedSettings = applySettings(nextSettings);
+    refreshRecentScopeNoteIds(normalizedSettings.recentNoteIds);
+    return normalizedSettings;
+  }, [applySettings, refreshRecentScopeNoteIds]);
 
   const persistSettings = useCallback(
     async (updater: (currentSettings: Settings) => Settings) => {
@@ -429,12 +452,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       return searchResultsRef.current.map((result) => result.id);
     }
 
+    const visibleRecentNoteIds =
+      selectedScopeRef.current.type === "recent"
+        ? recentScopeNoteIds
+        : settingsRef.current.recentNoteIds;
+
     return getScopedNotes(
       notesRef.current,
       selectedScopeRef.current,
-      settingsRef.current.recentNoteIds,
+      visibleRecentNoteIds,
     ).map((note) => note.id);
-  }, []);
+  }, [recentScopeNoteIds]);
 
   const setSelectionState = useCallback(
     (
@@ -584,6 +612,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const selectScope = useCallback(
     (scope: NoteScope) => {
+      const scopedRecentNoteIds =
+        scope.type === "recent"
+          ? sanitizeRecentNoteIds(settingsRef.current.recentNoteIds)
+          : settingsRef.current.recentNoteIds;
+
+      if (scope.type === "recent") {
+        refreshRecentScopeNoteIds(scopedRecentNoteIds);
+      }
+
       setSelectedScope(scope);
 
       const activeNoteId = selectedNoteIdRef.current;
@@ -592,7 +629,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           getScopedNotes(
             notesRef.current,
             scope,
-            settingsRef.current.recentNoteIds,
+            scopedRecentNoteIds,
           ).map((note) => note.id),
         );
         if (!visibleNoteIds.has(activeNoteId)) {
@@ -608,7 +645,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [setSelectionState],
+    [refreshRecentScopeNoteIds, setSelectionState],
   );
 
   const selectFolder = useCallback(
@@ -1768,8 +1805,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   );
 
   const scopedNotes = useMemo(
-    () => getScopedNotes(notes, selectedScope, settings.recentNoteIds),
-    [notes, selectedScope, settings.recentNoteIds],
+    () =>
+      getScopedNotes(
+        notes,
+        selectedScope,
+        selectedScope.type === "recent"
+          ? recentScopeNoteIds
+          : settings.recentNoteIds,
+      ),
+    [notes, recentScopeNoteIds, selectedScope, settings.recentNoteIds],
   );
 
   useEffect(() => {
