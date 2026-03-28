@@ -6,7 +6,6 @@ import type {
 
 export type FolderAppearanceInput =
   | FolderAppearance
-  | string
   | null
   | undefined;
 
@@ -114,18 +113,6 @@ function sanitizeFolderIconSpec(value: unknown): FolderIconSpec | null {
 export function sanitizeFolderAppearance(
   folderAppearance: FolderAppearanceInput,
 ): FolderAppearance | null {
-  if (typeof folderAppearance === "string") {
-    const iconName = folderAppearance.trim();
-    return iconName
-      ? {
-          icon: {
-            kind: "lucide",
-            name: iconName,
-          },
-        }
-      : null;
-  }
-
   if (!folderAppearance || typeof folderAppearance !== "object") {
     return null;
   }

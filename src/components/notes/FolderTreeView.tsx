@@ -79,16 +79,6 @@ type FolderIconPickerTarget =
 
 const TREE_INDENT_WIDTH = 12;
 
-function loadLegacyCollapsedFolders(): Set<string> | null {
-  try {
-    const saved = localStorage.getItem("sly:collapsedFolders");
-    if (!saved) return null;
-    return new Set(JSON.parse(saved));
-  } catch {
-    return null;
-  }
-}
-
 function sanitizeFolderName(name: string): string {
   return name.replace(/[\/\\:*?"<>|]/g, "-").trim();
 }
@@ -674,11 +664,7 @@ export function FolderTreeView({
       return;
     }
 
-    const legacyCollapsedFolders = loadLegacyCollapsedFolders();
-    const initialCollapsedFolders = legacyCollapsedFolders
-      ? allFolderPaths.filter((path) => legacyCollapsedFolders.has(path))
-      : allFolderPaths;
-
+    const initialCollapsedFolders = allFolderPaths;
     setCollapsedFoldersState(new Set(initialCollapsedFolders));
     setHasInitializedCollapseState(true);
     void persistCollapsedFolders(initialCollapsedFolders);

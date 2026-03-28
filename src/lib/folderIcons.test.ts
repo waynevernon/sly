@@ -6,15 +6,19 @@ import {
 } from "./folderIcons";
 
 describe("folderIcons helpers", () => {
-  it("normalizes legacy lucide strings and emoji appearances", () => {
+  it("normalizes structured lucide and emoji appearances", () => {
     expect(
       sanitizeFolderAppearances({
-        docs: "folder-open-dot",
+        docs: {
+          icon: { kind: "lucide", name: "folder-open-dot" },
+        },
         journal: {
           icon: { kind: "emoji", shortcode: "book" },
           colorId: "blue",
         },
-        empty: "   ",
+        empty: {
+          icon: { kind: "lucide", name: "   " },
+        },
       }),
     ).toEqual({
       docs: {

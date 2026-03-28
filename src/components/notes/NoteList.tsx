@@ -211,7 +211,6 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onClearSelection,
   onFocusList,
   showFolderPrefix = true,
-  forceShowFolderPath = false,
   noteListDateMode,
   noteListPreviewLines,
   showNoteListFilename,

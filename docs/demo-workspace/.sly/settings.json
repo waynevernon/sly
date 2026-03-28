@@ -12,6 +12,7 @@
     "Writing/On the trail at blue hour"
   ],
   "showRecentNotes": true,
+  "showNoteCounts": true,
   "defaultNoteName": "Untitled",
   "ollamaModel": null,
   "folderIcons": {

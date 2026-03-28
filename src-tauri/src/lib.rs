@@ -346,13 +346,6 @@ pub struct FolderAppearance {
     pub color_id: Option<FolderColorId>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-enum FolderAppearanceSetting {
-    Legacy(String),
-    Appearance(FolderAppearance),
-}
-
 // App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -378,11 +371,7 @@ pub struct Settings {
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
     pub ollama_model: Option<String>,
-    #[serde(
-        rename = "folderIcons",
-        default,
-        deserialize_with = "deserialize_folder_icons"
-    )]
+    #[serde(rename = "folderIcons", default)]
     pub folder_icons: Option<HashMap<String, FolderAppearance>>,
     #[serde(rename = "collapsedFolders")]
     pub collapsed_folders: Option<Vec<String>>,
@@ -1304,20 +1293,6 @@ fn sanitize_folder_appearance(folder_appearance: FolderAppearance) -> Option<Fol
     Some(FolderAppearance { icon, color_id })
 }
 
-fn normalize_folder_appearance_setting(value: FolderAppearanceSetting) -> Option<FolderAppearance> {
-    match value {
-        FolderAppearanceSetting::Legacy(icon_name) => {
-            sanitize_folder_appearance(FolderAppearance {
-                icon: Some(FolderIconSpec::Lucide { name: icon_name }),
-                color_id: None,
-            })
-        }
-        FolderAppearanceSetting::Appearance(folder_appearance) => {
-            sanitize_folder_appearance(folder_appearance)
-        }
-    }
-}
-
 fn sanitize_folder_icons_map(
     folder_icons: HashMap<String, FolderAppearance>,
 ) -> HashMap<String, FolderAppearance> {
@@ -1333,32 +1308,6 @@ fn sanitize_folder_icons_map(
                 .map(|normalized_appearance| (normalized_path, normalized_appearance))
         })
         .collect()
-}
-
-fn deserialize_folder_icons<'de, D>(
-    deserializer: D,
-) -> Result<Option<HashMap<String, FolderAppearance>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let raw = Option::<HashMap<String, FolderAppearanceSetting>>::deserialize(deserializer)?;
-
-    Ok(raw.and_then(|folder_icons| {
-        let normalized: HashMap<String, FolderAppearance> = folder_icons
-            .into_iter()
-            .filter_map(|(path, value)| {
-                let normalized_path = path.trim().to_string();
-                if normalized_path.is_empty() {
-                    return None;
-                }
-
-                normalize_folder_appearance_setting(value)
-                    .map(|folder_appearance| (normalized_path, folder_appearance))
-            })
-            .collect();
-
-        (!normalized.is_empty()).then_some(normalized)
-    }))
 }
 
 fn sanitize_settings(settings: &mut Settings) {
@@ -1607,19 +1556,11 @@ fn cleanup_debounce_map(map: &Mutex<HashMap<PathBuf, Instant>>) {
     map.retain(|_, last| now.duration_since(*last) < Duration::from_secs(5));
 }
 
-// Normalize notes folder path from plain paths and legacy file:// URIs.
+// Normalize notes folder path input from the UI/config.
 fn normalize_notes_folder_path(path: &str) -> Result<PathBuf, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
         return Err("Notes folder path is empty".to_string());
-    }
-
-    if trimmed.starts_with("file://") {
-        let parsed = url::Url::parse(trimmed)
-            .map_err(|e| format!("Invalid file URL for notes folder: {}", e))?;
-        return parsed
-            .to_file_path()
-            .map_err(|_| "Invalid file URL for notes folder".to_string());
     }
 
     Ok(PathBuf::from(trimmed))
@@ -4883,7 +4824,7 @@ pub fn run() {
             let mut app_config = load_app_config(app.handle());
             let mut app_config_dirty = false;
 
-            // Normalize legacy/invalid saved paths (e.g. file:// URI from older builds)
+            // Normalize saved paths from config and clear empty values.
             if let Some(saved_path) = app_config.notes_folder.clone() {
                 match normalize_notes_folder_path(&saved_path) {
                     Ok(normalized) if normalized.is_dir() => {
@@ -5381,36 +5322,12 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_folder_icons_accepts_legacy_strings() {
-        let settings: Settings = serde_json::from_str(
-            r#"{
-                "folderIcons": {
-                    "docs": "folder-open-dot"
-                }
-            }"#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            settings
-                .folder_icons
-                .as_ref()
-                .and_then(|folder_icons| folder_icons.get("docs")),
-            Some(&FolderAppearance {
-                icon: Some(FolderIconSpec::Lucide {
-                    name: "folder-open-dot".to_string(),
-                }),
-                color_id: None,
-            })
-        );
-    }
-
-    #[test]
     fn deserialize_demo_workspace_settings_file() {
         let content =
             std::fs::read_to_string("../docs/demo-workspace/.sly/settings.json").unwrap();
         let settings: Settings = serde_json::from_str(&content).unwrap();
 
+        assert!(settings.show_note_counts);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
         assert_eq!(settings.pinned_note_ids.as_ref().map(Vec::len), Some(2));
         assert_eq!(settings.recent_note_ids.as_ref().map(Vec::len), Some(5));
