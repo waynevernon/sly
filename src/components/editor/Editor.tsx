@@ -435,8 +435,12 @@ export interface PreviewModeData {
 interface EditorProps {
   paneMode?: PaneMode;
   focusMode?: boolean;
+  printMode?: boolean;
   previewMode?: PreviewModeData;
   onEditorReady?: (editor: TiptapEditor | null) => void;
+  onRegisterFlushPendingSave?: (
+    flushPendingSave: (() => Promise<void>) | null,
+  ) => void;
   onSaveToFolder?: () => void;
   saveToFolderDisabled?: boolean;
 }
@@ -444,7 +448,9 @@ interface EditorProps {
 export function Editor({
   paneMode = 2,
   focusMode,
+  printMode = false,
   onEditorReady,
+  onRegisterFlushPendingSave,
   previewMode,
   onSaveToFolder,
   saveToFolderDisabled,
@@ -505,6 +511,7 @@ export function Editor({
 
   // Source mode state
   const [sourceMode, setSourceMode] = useState(false);
+  const effectiveSourceMode = printMode ? false : sourceMode;
   const [sourceContent, setSourceContent] = useState("");
   const sourceTimeoutRef = useRef<number | null>(null);
   const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -703,6 +710,13 @@ export function Editor({
       await saveImmediately(loadedNoteIdRef.current, markdown);
     }
   }, [saveImmediately, getMarkdown]);
+
+  useEffect(() => {
+    onRegisterFlushPendingSave?.(flushPendingSave);
+    return () => {
+      onRegisterFlushPendingSave?.(null);
+    };
+  }, [flushPendingSave, onRegisterFlushPendingSave]);
 
   // Schedule a debounced save (markdown computed only when timer fires)
   const scheduleSave = useCallback(() => {
@@ -1782,16 +1796,15 @@ export function Editor({
 
   // Download handlers
   const handleDownloadPdf = useCallback(async () => {
-    if (!editor || !currentNote) return;
+    if (!currentNote) return;
     try {
-      await downloadPdf(editor, currentNote.title);
-      // Note: window.print() opens the print dialog but doesn't wait for user action
-      // No success toast needed - the print dialog provides its own feedback
+      await flushPendingSave();
+      await downloadPdf(currentNote.path);
     } catch (error) {
       console.error("Failed to open print dialog:", error);
       toast.error("Failed to open print dialog");
     }
-  }, [editor, currentNote]);
+  }, [currentNote, flushPendingSave]);
 
   const handleDownloadMarkdown = useCallback(async () => {
     if (!editor || !currentNote) return;
@@ -1810,7 +1823,7 @@ export function Editor({
   // Toggle source mode
   const toggleSourceMode = useCallback(() => {
     if (!editor) return;
-    if (!sourceMode) {
+    if (!effectiveSourceMode) {
       // Entering source mode: get markdown from editor
       const md = getMarkdown(editor);
       setSourceContent(md);
@@ -1830,7 +1843,7 @@ export function Editor({
       }
       setSourceMode(false);
     }
-  }, [editor, sourceMode, sourceContent, getMarkdown]);
+  }, [editor, effectiveSourceMode, sourceContent, getMarkdown]);
 
   // Listen for toggle-source-mode custom event (from App.tsx shortcut / command palette)
   useEffect(() => {
@@ -1869,8 +1882,12 @@ export function Editor({
     if (previewMode) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
-          <div className="ui-pane-drag-region" data-tauri-drag-region></div>
-          <div className="ui-pane-header" />
+          {!printMode && (
+            <>
+              <div className="ui-pane-drag-region" data-tauri-drag-region></div>
+              <div className="ui-pane-header" />
+            </>
+          )}
           <div className="flex-1 flex items-center justify-center">
             <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
           </div>
@@ -1930,15 +1947,22 @@ export function Editor({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-bg overflow-hidden">
-      {/* Drag region with action buttons */}
-      <div
-        className={cn(
-          "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
-          !navigationVisible && "ui-titlebar-leading-offset",
-        )}
-        data-tauri-drag-region
-      >
+    <div
+      className={cn(
+        "flex-1 flex flex-col bg-bg overflow-hidden",
+        printMode && "print-note-editor overflow-visible",
+      )}
+    >
+      {!printMode && (
+        <>
+          {/* Drag region with action buttons */}
+          <div
+            className={cn(
+              "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
+              !navigationVisible && "ui-titlebar-leading-offset",
+            )}
+            data-tauri-drag-region
+          >
         <div
           className={`ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         >
@@ -2016,13 +2040,13 @@ export function Editor({
           {currentNote && (
             <Tooltip
               content={
-                sourceMode
+                effectiveSourceMode
                   ? `View Formatted (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
                   : `View Markdown Source (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
               }
             >
               <IconButton onClick={toggleSourceMode}>
-                {sourceMode ? (
+                {effectiveSourceMode ? (
                   <MarkdownOffIcon className="w-4.75 h-4.75 stroke-[1.4]" />
                 ) : (
                   <MarkdownIcon className="w-4.75 h-4.75 stroke-[1.4]" />
@@ -2111,33 +2135,40 @@ export function Editor({
             </Tooltip>
           )}
         </div>
-      </div>
+          </div>
 
-      {/* Header with format bar – border aligns with FoldersPane / NotesPane */}
-      <div className={`ui-pane-header px-0 border-border/80 ${focusMode ? "border-transparent" : ""} ${hasTransitioned ? `transition-[border-color] duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}>
-        <div
-          className={`flex-1 ${focusMode || sourceMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
-        >
-          <FormatBar
-            editor={editor}
-            onAddLink={handleAddLink}
-            onAddBlockMath={handleAddBlockMath}
-            onAddImage={handleAddImage}
-          />
-        </div>
-      </div>
+          {/* Header with format bar – border aligns with FoldersPane / NotesPane */}
+          <div className={`ui-pane-header px-0 border-border/80 ${focusMode ? "border-transparent" : ""} ${hasTransitioned ? `transition-[border-color] duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}>
+            <div
+              className={`flex-1 ${focusMode || effectiveSourceMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
+            >
+              <FormatBar
+                editor={editor}
+                onAddLink={handleAddLink}
+                onAddBlockMath={handleAddBlockMath}
+                onAddImage={handleAddImage}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Editor content area with resize handles overlay */}
-      <div className="flex-1 relative overflow-hidden">
-        {!focusMode && !sourceMode && (
+      <div className={cn("flex-1 relative overflow-hidden", printMode && "overflow-visible")}>
+        {!focusMode && !effectiveSourceMode && !printMode && (
           <EditorWidthHandles containerRef={scrollContainerRef} />
         )}
         <div
           ref={scrollContainerRef}
-          className="ui-scrollbar-overlay absolute inset-0 overflow-y-auto overflow-x-hidden"
+          className={cn(
+            "ui-scrollbar-overlay",
+            printMode
+              ? "print-note-scroll overflow-visible"
+              : "absolute inset-0 overflow-y-auto overflow-x-hidden",
+          )}
           dir={textDirection}
         >
-          {sourceMode ? (
+          {effectiveSourceMode ? (
             /* Markdown source textarea */
             <div className="h-full">
               <textarea
@@ -2161,7 +2192,7 @@ export function Editor({
             </div>
           ) : (
             <>
-              {searchOpen && (
+              {!printMode && searchOpen && (
                 <div className="sticky top-2 z-10 animate-in fade-in slide-in-from-top-4 duration-[180ms] pointer-events-none pr-2 flex justify-end">
                   <div className="pointer-events-auto">
                     <SearchToolbar

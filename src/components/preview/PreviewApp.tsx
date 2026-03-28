@@ -4,18 +4,25 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { Editor, type PreviewModeData } from "../editor/Editor";
 import * as filesService from "../../services/files";
+import { cn } from "../../lib/utils";
 
 interface PreviewAppProps {
   filePath: string;
+  mode?: "preview" | "print";
 }
 
-export function PreviewApp({ filePath }: PreviewAppProps) {
+export function PreviewApp({
+  filePath,
+  mode = "preview",
+}: PreviewAppProps) {
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [modified, setModified] = useState(0);
   const [hasExternalChanges, setHasExternalChanges] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
+  const hasTriggeredPrintRef = useRef(false);
   const recentlySavedRef = useRef(false);
 
   // Load file on mount
@@ -161,6 +168,38 @@ export function PreviewApp({ filePath }: PreviewAppProps) {
     }
   }, [filePath]);
 
+  useEffect(() => {
+    if (mode !== "print" || content === null || !editorReady) {
+      return;
+    }
+
+    if (hasTriggeredPrintRef.current) {
+      return;
+    }
+    hasTriggeredPrintRef.current = true;
+
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [content, editorReady, mode]);
+
+  useEffect(() => {
+    if (mode !== "print") {
+      return;
+    }
+
+    const handleAfterPrint = () => {
+      void getCurrentWindow().close().catch((error) => {
+        console.error("Failed to close print window:", error);
+      });
+    };
+
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => window.removeEventListener("afterprint", handleAfterPrint);
+  }, [mode]);
+
   const previewData: PreviewModeData = {
     content,
     title,
@@ -173,12 +212,21 @@ export function PreviewApp({ filePath }: PreviewAppProps) {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-bg text-text">
+    <div
+      className={cn(
+        "h-screen flex flex-col bg-bg text-text",
+        mode === "print" && "print-note-shell min-h-screen h-auto",
+      )}
+    >
       <Editor
-        focusMode={focusMode}
+        focusMode={mode === "print" ? true : focusMode}
         previewMode={previewData}
-        onSaveToFolder={handleSaveToFolder}
-        saveToFolderDisabled={isSaving}
+        printMode={mode === "print"}
+        onEditorReady={(editor) => {
+          setEditorReady(editor !== null);
+        }}
+        onSaveToFolder={mode === "preview" ? handleSaveToFolder : undefined}
+        saveToFolderDisabled={mode === "preview" ? isSaving : undefined}
       />
     </div>
   );

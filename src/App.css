@@ -1484,165 +1484,106 @@ table.not-prose th {
 
 /* Print styles for clean PDF export */
 @media print {
-  /* Disable all transitions to prevent color flashing after print */
-  *,
-  *::before,
-  *::after {
+  html.window-mode-print *,
+  html.window-mode-print *::before,
+  html.window-mode-print *::after {
     transition: none !important;
     animation: none !important;
-  }
-
-  /* Force white background and black text for printing - only for visible content */
-  body,
-  #root,
-  .prose,
-  .prose *,
-  .ProseMirror,
-  .ProseMirror * {
-    background: white !important;
-    color: black !important;
     box-shadow: none !important;
   }
 
-  /* Remove all height/overflow constraints to allow multi-page printing */
-  html,
-  body,
-  #root,
-  #root > div,
-  #root > div > div,
-  .flex-1,
-  .flex-1 > div {
+  html.window-mode-print,
+  html.window-mode-print body,
+  html.window-mode-print #root,
+  html.window-mode-print .print-note-shell,
+  html.window-mode-print .print-note-editor,
+  html.window-mode-print .print-note-scroll,
+  html.window-mode-print .ProseMirror,
+  html.window-mode-print .ProseMirror * {
+    background: white !important;
+    color: black !important;
+  }
+
+  html.window-mode-print,
+  html.window-mode-print body,
+  html.window-mode-print #root,
+  html.window-mode-print .print-note-shell,
+  html.window-mode-print .print-note-editor,
+  html.window-mode-print .print-note-scroll {
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     max-height: none !important;
-    border: none !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    outline: none !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Hide sidebar - target the first flex child that contains Sidebar */
-  #root > div > div:first-child {
-    display: none !important;
-  }
-
-  /* Hide all UI elements - only show editor content */
-  [data-tauri-drag-region],
-  button,
-  .dropdown,
-  .tooltip,
-  .toast,
-  .modal,
-  .dialog,
-  [role="dialog"],
-  [data-radix-portal],
-  nav,
-  header,
-  footer {
-    display: none !important;
-  }
-
-  /* Hide the toolbar div with drag region */
-  [data-tauri-drag-region] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    position: absolute !important;
-    pointer-events: none !important;
-    overflow: hidden !important;
-  }
-
-  /* Hide format bar by targeting its wrapper */
-  .flex-1 > div:has(> div[class*="border-b"]) {
-    display: none !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  /* Make editor container expand for printing */
-  .flex-1 {
-    overflow: visible !important;
-    height: auto !important;
-  }
-
-  /* Make editor full width for printing */
-  .ProseMirror {
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
-    height: auto !important;
-  }
-
-  /* Add padding to prose content for proper margins */
-  .prose {
-    max-width: 100% !important;
+  html.window-mode-print .ProseMirror {
+    max-width: none !important;
     padding: 0.75in 1in !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  html.window-mode-print .prose {
+    max-width: none !important;
+    margin: 0 auto !important;
   }
 
   /* Ensure page breaks work well */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
+  html.window-mode-print h1,
+  html.window-mode-print h2,
+  html.window-mode-print h3,
+  html.window-mode-print h4,
+  html.window-mode-print h5,
+  html.window-mode-print h6 {
     page-break-after: avoid;
     break-after: avoid;
   }
 
-  p,
-  blockquote,
-  pre,
-  ul,
-  ol,
-  table {
+  html.window-mode-print p,
+  html.window-mode-print blockquote,
+  html.window-mode-print pre,
+  html.window-mode-print ul,
+  html.window-mode-print ol,
+  html.window-mode-print table {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
   /* Preserve code block background for printing */
-  .code-block-wrapper pre {
+  html.window-mode-print .code-block-wrapper pre {
     background: #f5f5f5 !important;
     color: black !important;
   }
 
   /* Hide language selector in print */
-  .code-block-language-selector,
-  .code-block-mermaid-btn {
+  html.window-mode-print .code-block-language-selector,
+  html.window-mode-print .code-block-mermaid-btn {
     display: none !important;
   }
 
   /* Mermaid diagrams: avoid page breaks */
-  .mermaid-diagram svg {
+  html.window-mode-print .mermaid-diagram svg {
     max-width: 100% !important;
     break-inside: avoid;
   }
 
   /* Ensure links are underlined and show URL */
-  a {
+  html.window-mode-print a {
     text-decoration: underline !important;
     color: black !important;
   }
 
   /* Hide link tooltips when printing */
-  a::after {
+  html.window-mode-print a::after {
     display: none !important;
   }
 
   /* Render wikilinks as regular text when printing */
-  .prose span[data-wikilink],
-  .prose span[data-wikilink]:hover {
+  html.window-mode-print .prose span[data-wikilink],
+  html.window-mode-print .prose span[data-wikilink]:hover {
     border-bottom: none !important;
     cursor: default !important;
     color: black !important;
@@ -1650,42 +1591,42 @@ table.not-prose th {
   }
 
   /* Make code blocks readable */
-  code,
-  pre {
+  html.window-mode-print code,
+  html.window-mode-print pre {
     background: #f5f5f5 !important;
     border: none !important;
     color: black !important;
   }
 
   /* Table borders for printing - subtle styling with outer border */
-  table {
+  html.window-mode-print table {
     border: 1px solid #d0d0d0 !important;
     border-collapse: collapse !important;
   }
 
-  th,
-  td {
+  html.window-mode-print th,
+  html.window-mode-print td {
     border: none !important;
     border-bottom: 1px solid #e5e5e5 !important;
   }
 
-  th {
+  html.window-mode-print th {
     background: #fafafa !important;
     border-bottom: 1px solid #d0d0d0 !important;
   }
 
   /* Remove border from last row */
-  tr:last-child td {
+  html.window-mode-print tr:last-child td {
     border-bottom: none !important;
   }
 
   /* Remove task list checkboxes for printing (show as bullet list) */
-  ul[data-type="taskList"] input[type="checkbox"] {
+  html.window-mode-print ul[data-type="taskList"] input[type="checkbox"] {
     display: none !important;
   }
 
   /* Ensure images fit on page */
-  img {
+  html.window-mode-print img {
     max-width: 100% !important;
     page-break-inside: avoid;
     break-inside: avoid;

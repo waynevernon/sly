@@ -53,17 +53,22 @@ const PreviewApp = lazy(() =>
   loadPreviewApp().then((module) => ({ default: module.PreviewApp })),
 );
 
-// Detect preview mode from URL search params
+type WindowMode = "folder" | "preview" | "print";
+
+// Detect preview/print mode from URL search params
 function getWindowMode(): {
-  isPreview: boolean;
-  previewFile: string | null;
+  mode: WindowMode;
+  filePath: string | null;
 } {
   const params = new URLSearchParams(window.location.search);
-  const mode = params.get("mode");
+  const rawMode = params.get("mode");
   const file = params.get("file");
+  const mode: WindowMode =
+    rawMode === "preview" || rawMode === "print" ? rawMode : "folder";
+
   return {
-    isPreview: mode === "preview" && !!file,
-    previewFile: file,
+    mode: mode !== "folder" && file ? mode : "folder",
+    filePath: file,
   };
 }
 
@@ -154,6 +159,9 @@ function AppContent() {
   const [aiEditing, setAiEditing] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [aiProvider, setAiProvider] = useState<AiProvider>("claude");
+  const [flushPendingSave, setFlushPendingSave] = useState<
+    (() => Promise<void>) | null
+  >(null);
   const editorRef = useRef<TiptapEditor | null>(null);
 
   // Refs for volatile state consumed by the keydown handler so the effect
@@ -683,6 +691,7 @@ function AppContent() {
             <Editor
               paneMode={paneMode}
               focusMode={focusMode}
+              onRegisterFlushPendingSave={setFlushPendingSave}
               onEditorReady={(editor) => {
                 editorRef.current = editor;
               }}
@@ -703,6 +712,7 @@ function AppContent() {
           focusMode={focusMode}
           onToggleFocusMode={toggleFocusMode}
           editorRef={editorRef}
+          flushPendingSave={flushPendingSave}
         />
       </Suspense>
       <Suspense fallback={null}>
@@ -775,7 +785,9 @@ async function showUpdateToast(): Promise<"update" | "no-update" | "error"> {
 export { showUpdateToast };
 
 function App() {
-  const { isPreview, previewFile } = useMemo(getWindowMode, []);
+  const { mode, filePath } = useMemo(getWindowMode, []);
+  const isPreviewMode = mode === "preview";
+  const isPrintMode = mode === "print";
 
   // Cmd/Ctrl+W — close window (works in both preview and folder mode)
   useEffect(() => {
@@ -799,23 +811,32 @@ function App() {
         root.classList.add("platform-tauri-release");
       }
     }
-  }, []);
+    root.classList.toggle("window-mode-preview", isPreviewMode);
+    root.classList.toggle("window-mode-print", isPrintMode);
+
+    return () => {
+      root.classList.remove("window-mode-preview", "window-mode-print");
+    };
+  }, [isPreviewMode, isPrintMode]);
 
   // Check for app updates on startup (folder mode only)
   useEffect(() => {
-    if (isPreview) return;
+    if (mode !== "folder") return;
     const timer = setTimeout(() => showUpdateToast(), 3000);
     return () => clearTimeout(timer);
-  }, [isPreview]);
+  }, [mode]);
 
-  // Preview mode: lightweight editor without sidebar, search, git
-  if (isPreview && previewFile) {
+  // Preview/print modes: lightweight editor without sidebar, search, git
+  if ((isPreviewMode || isPrintMode) && filePath) {
     return (
       <ThemeProvider>
         <Toaster />
         <TooltipProvider>
           <Suspense fallback={<PreviewFallback />}>
-            <PreviewApp filePath={decodeURIComponent(previewFile)} />
+            <PreviewApp
+              filePath={decodeURIComponent(filePath)}
+              mode={isPrintMode ? "print" : "preview"}
+            />
           </Suspense>
         </TooltipProvider>
       </ThemeProvider>

@@ -4565,6 +4565,51 @@ fn create_preview_window(app: &AppHandle, file_path: &str) -> Result<(), String>
     Ok(())
 }
 
+fn create_print_window(app: &AppHandle, file_path: &str) -> Result<(), String> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    file_path.hash(&mut hasher);
+    let label = format!("print-{:x}", hasher.finish());
+
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.close();
+    }
+
+    let filename = PathBuf::from(file_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Print".to_string());
+
+    let encoded_path = urlencoding::encode(file_path);
+    let url = format!("index.html?mode=print&file={}", encoded_path);
+
+    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
+        .title(format!("{} — Print — Sly", filename))
+        .inner_size(900.0, 700.0)
+        .min_inner_size(480.0, 360.0)
+        .resizable(true)
+        .decorations(true);
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+
+    let window = builder
+        .build()
+        .map_err(|e| format!("Failed to create print window: {}", e))?;
+
+    let win = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let _ = win.set_focus();
+    });
+
+    Ok(())
+}
+
 #[tauri::command]
 fn open_file_preview(app: AppHandle, path: String) -> Result<(), String> {
     let file_path = PathBuf::from(&path);
@@ -4576,6 +4621,16 @@ fn open_file_preview(app: AppHandle, path: String) -> Result<(), String> {
         create_preview_window(&app, &path)?;
     }
     Ok(())
+}
+
+#[tauri::command]
+fn open_print_preview(app: AppHandle, path: String) -> Result<(), String> {
+    let file_path = PathBuf::from(&path);
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", path));
+    }
+
+    create_print_window(&app, &path)
 }
 
 // Handle CLI arguments: open .md files in preview mode.
@@ -5038,6 +5093,7 @@ pub fn run() {
             save_file_direct,
             import_file_to_folder,
             open_file_preview,
+            open_print_preview,
             install_cli,
             uninstall_cli,
             get_cli_status,

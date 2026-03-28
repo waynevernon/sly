@@ -76,6 +76,7 @@ interface CommandPaletteProps {
   focusMode?: boolean;
   onToggleFocusMode?: () => void;
   editorRef?: React.RefObject<Editor | null>;
+  flushPendingSave?: (() => Promise<void>) | null;
 }
 
 export function CommandPalette({
@@ -86,6 +87,7 @@ export function CommandPalette({
   focusMode,
   onToggleFocusMode,
   editorRef,
+  flushPendingSave,
 }: CommandPaletteProps) {
   const {
     notes,
@@ -359,13 +361,12 @@ export function CommandPalette({
           icon: <DownloadIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
-              if (!editorRef?.current || !currentNote) {
-                toast.error("Editor not available");
+              if (!currentNote) {
+                toast.error("No note selected");
                 return;
               }
-              await downloadPdf(editorRef.current, currentNote.title);
-              // Note: window.print() opens the print dialog but doesn't wait for user action
-              // No success toast needed - the print dialog provides its own feedback
+              await flushPendingSave?.();
+              await downloadPdf(currentNote.path);
               onClose();
             } catch (error) {
               console.error("Failed to open print dialog:", error);
@@ -536,7 +537,10 @@ export function CommandPalette({
   }, [
     createNote,
     currentNote,
+    confirmDeletions,
     deleteNote,
+    editorRef,
+    flushPendingSave,
     onClose,
     onOpenSettings,
     onOpenAiModal,

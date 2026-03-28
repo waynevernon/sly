@@ -103,8 +103,16 @@ vi.mock("./components/ai/AiEditModal", () => ({
 }));
 
 vi.mock("./components/preview/PreviewApp", () => ({
-  PreviewApp: ({ filePath }: { filePath: string }) => (
-    <div>preview-app:{filePath}</div>
+  PreviewApp: ({
+    filePath,
+    mode,
+  }: {
+    filePath: string;
+    mode?: "preview" | "print";
+  }) => (
+    <div>
+      preview-app:{mode ?? "preview"}:{filePath}
+    </div>
   ),
 }));
 
@@ -141,7 +149,24 @@ describe("App", () => {
     render(<App />);
 
     expect(
-      await screen.findByText("preview-app:/tmp/preview-note.md"),
+      await screen.findByText("preview-app:preview:/tmp/preview-note.md"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText("editor")).not.toBeInTheDocument();
+    expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
+  });
+
+  it("renders print mode without folder mode shell", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?mode=print&file=%2Ftmp%2Fprint-note.md",
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("preview-app:print:/tmp/print-note.md"),
     ).toBeInTheDocument();
     expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();

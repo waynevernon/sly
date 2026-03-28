@@ -1,24 +1,15 @@
-import type { Editor } from "@tiptap/react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 
 /**
- * Triggers the native print dialog for the editor content.
+ * Opens a dedicated print window for the current note.
  * Users can save as PDF or print to a physical printer.
- * Uses the browser's native print functionality which produces high-quality PDFs.
  *
- * @param editor - The TipTap editor instance
- * @param _noteTitle - The note title (currently unused, but kept for API consistency)
+ * @param notePath - Absolute path to the note on disk
  */
-export async function downloadPdf(
-  editor: Editor,
-  _noteTitle: string
-): Promise<void> {
-  if (!editor) throw new Error("Editor not available");
-
-  // Trigger native print dialog
-  // The user can choose "Save as PDF" in the print dialog
-  window.print();
+export async function downloadPdf(notePath: string): Promise<void> {
+  if (!notePath) throw new Error("Note path not available");
+  await invoke("open_print_preview", { path: notePath });
 }
 
 /**
