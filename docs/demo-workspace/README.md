@@ -6,7 +6,7 @@ It includes:
 
 - a realistic folder structure
 - sample notes with believable previews
-- `.sly/settings.json` so folder icons, folder colors, pinned notes, recent notes, and manual ordering match the intended demo state
+- `.sly/settings.json` so folder icons, folder colors, pinned notes, and recent notes match the intended demo state
 
 ## Recommended Notes For Screenshots
 

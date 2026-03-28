@@ -285,12 +285,26 @@ pub enum NoteSortMode {
     TitleDesc,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum FolderSortMode {
     #[default]
     NameAsc,
     NameDesc,
+}
+
+impl<'de> Deserialize<'de> for FolderSortMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Option::<String>::deserialize(deserializer)?;
+
+        Ok(match value.as_deref() {
+            Some("nameDesc") => Self::NameDesc,
+            _ => Self::NameAsc,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -5389,6 +5403,18 @@ mod tests {
                 color_id: None,
             })
         );
+    }
+
+    #[test]
+    fn deserialize_demo_workspace_settings_file() {
+        let content =
+            std::fs::read_to_string("../docs/demo-workspace/.sly/settings.json").unwrap();
+        let settings: Settings = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
+        assert_eq!(settings.pinned_note_ids.as_ref().map(Vec::len), Some(2));
+        assert_eq!(settings.recent_note_ids.as_ref().map(Vec::len), Some(5));
+        assert_eq!(settings.folder_icons.as_ref().map(HashMap::len), Some(8));
     }
 
     #[test]

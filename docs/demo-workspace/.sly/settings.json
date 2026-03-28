@@ -79,19 +79,5 @@
   "showNoteListPreview": true,
   "noteListPreviewLines": 2,
   "noteSortMode": "modifiedDesc",
-  "folderSortMode": "manual",
-  "folderManualOrder": {
-    "": [
-      "Inbox",
-      "Product",
-      "Field Notes",
-      "Writing",
-      "Reference",
-      "Archive"
-    ],
-    "Product": [
-      "Product/Launch",
-      "Product/Design"
-    ]
-  }
+  "folderSortMode": "nameAsc"
 }
