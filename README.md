@@ -19,7 +19,7 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 - Rich markdown editing with source mode, wikilinks, slash commands, Mermaid, KaTeX, tables, and syntax-highlighted code blocks
 - Editor-first workspace with 1, 2, and 3 pane layouts
 - Keyboard-friendly workflows with a command palette and extensive shortcuts
-- Fast note and folder organization with icons, sorting, drag-and-drop, manual ordering, and inline naming
+- Fast note and folder organization with sorting, recursive subfolder views, note counts, drag-and-drop, inline naming, and customizable folder icons with colors or emoji
 - Appearance controls for theme presets, separate UI/note/code fonts, typography tuning, page width, text direction, and interface zoom
 - Optional Git workflows for repository setup, status, commits, remotes, and push flows
 - Optional AI editing through Claude Code, OpenAI Codex, OpenCode, and Ollama
@@ -30,8 +30,8 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 ## Platform Status
 
 - macOS is the primary day-to-day development and validation target.
-- Windows and Linux release artifacts are produced, but they are currently untested before 1.0.
-- If you run Sly on Windows or Linux, treat those builds as early support until they have been manually validated.
+- Windows and Linux release artifacts are produced, but they are not yet manually validated for every release.
+- If you run Sly on Windows or Linux, treat those builds as early support until release validation is more consistent.
 
 ## Installation
 
@@ -43,13 +43,13 @@ Download the latest release from the [Releases](https://github.com/waynevernon/s
 
 Download the latest `.exe` installer from the [Releases](https://github.com/waynevernon/sly/releases) page and run it. WebView2 will be downloaded automatically if needed.
 
-Windows builds are currently untested.
+Windows builds are not yet manually validated for every release.
 
 ### Linux
 
 Download the latest `.AppImage` or `.deb` from the [Releases](https://github.com/waynevernon/sly/releases) page.
 
-Linux builds are currently untested.
+Linux builds are not yet manually validated for every release.
 
 ## Keyboard Shortcuts
 
