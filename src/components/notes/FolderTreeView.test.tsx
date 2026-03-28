@@ -396,6 +396,50 @@ describe("FolderTreeView", () => {
     expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
   });
 
+  it("uses active and inactive badge emphasis for selected and unselected counts", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notes: [
+          {
+            id: "alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+        ],
+        recentNotes: [
+          {
+            id: "alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+        ],
+        selectedScope: { type: "recent" },
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
+    });
+
+    const recentButton = screen.getByRole("button", { name: /Recent Notes/i });
+    const allNotesButton = screen.getByRole("button", { name: /All Notes/i });
+    const recentBadge = recentButton.querySelector(".ui-count-badge");
+    const allNotesBadge = allNotesButton.querySelector(".ui-count-badge");
+
+    expect(recentBadge?.className).toMatch(/ui-count-badge--active/);
+    expect(recentBadge?.className).toMatch(/ui-count-badge--plain/);
+    expect(allNotesBadge?.className).toMatch(/ui-count-badge--inactive/);
+    expect(allNotesBadge?.className).toMatch(/ui-count-badge--plain/);
+  });
+
   it("keeps the dragged folder dimmed while a move is pending", async () => {
     const notesContext = await import("../../context/NotesContext");
 

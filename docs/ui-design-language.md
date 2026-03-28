@@ -138,7 +138,8 @@ Permanent layout should stay flat and restrained. Elevated surfaces are for tran
 
 - Count badges use the shared compact badge treatment, not ad hoc pills.
 - Use `radius-sm` geometry for note counts and similar metadata chips.
-- Keep note-count badges quiet: muted fill, muted text, compact height, and no accent color unless the count itself represents alert-level state.
+- Default note counts to a quiet plain treatment: muted text, compact height, and no accent color unless the count itself represents alert-level state.
+- Preserve a filled compact badge treatment as an available shared variant for cases where a surfaced chip reads better than plain metadata.
 - In list and tree rows, right-justify count badges in a consistent trailing column so nested items still share one visual edge.
 
 ### Menus

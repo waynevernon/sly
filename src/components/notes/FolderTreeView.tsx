@@ -39,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Checkbox,
+  CountBadge,
   InlineNameEditor,
   destructiveMenuItemClassName,
   menuItemClassName,
@@ -125,16 +126,6 @@ function getFolderIconStyle(
   return color ? { color } : undefined;
 }
 
-function FolderCountBadge({
-  count,
-  className = "",
-}: {
-  count: number;
-  className?: string;
-}) {
-  return <span className={`ui-count-badge ${className}`.trim()}>{count}</span>;
-}
-
 function FolderRowTrailing({
   count,
   isActive = false,
@@ -148,7 +139,11 @@ function FolderRowTrailing({
     <div className="ml-auto flex items-center gap-1.5 pl-2 shrink-0">
       {children}
       <div className="ui-count-badge-column">
-        <FolderCountBadge count={count} className={isActive ? "opacity-80" : "opacity-60"} />
+        <CountBadge
+          count={count}
+          layout="column"
+          emphasis={isActive ? "active" : "inactive"}
+        />
       </div>
     </div>
   );

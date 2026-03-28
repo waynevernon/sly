@@ -14,6 +14,7 @@ export {
 } from "./Tooltip";
 export { Button } from "./Button";
 export { Checkbox } from "./Checkbox";
+export { CountBadge, type CountBadgeProps } from "./CountBadge";
 export { Input } from "./Input";
 export { InlineNameEditor } from "./InlineNameEditor";
 export { Select } from "./Select";

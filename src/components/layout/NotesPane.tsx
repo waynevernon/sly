@@ -20,6 +20,7 @@ import type {
 import type { NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import {
+  CountBadge,
   IconButton,
   Input,
   menuItemClassName,
@@ -304,9 +305,12 @@ export function NotesPane() {
             {hasBatchSelection ? `${selectionCount} selected` : heading}
           </div>
           {!hasBatchSelection && showNoteCounts && (
-            <div className="ui-count-badge ui-count-badge-inline mt-0.5 pt-px shrink-0 opacity-80">
-              {noteCount}
-            </div>
+            <CountBadge
+              count={noteCount}
+              layout="inline"
+              emphasis="active"
+              className="mt-0.5 pt-px shrink-0"
+            />
           )}
         </div>
         <div className="ui-pane-header-actions">

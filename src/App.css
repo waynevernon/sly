@@ -366,18 +366,43 @@ body {
 .ui-count-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  width: var(--ui-count-badge-width);
   height: var(--ui-count-badge-height);
   padding: 0;
   border-radius: var(--ui-radius-sm);
-  background: transparent;
   font-size: 0.75rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
   text-align: right;
+}
+
+.ui-count-badge--column-layout {
+  justify-content: flex-end;
+  width: var(--ui-count-badge-width);
+}
+
+.ui-count-badge--inline {
+  justify-content: flex-end;
+  width: auto;
+  min-width: 0;
+}
+
+.ui-count-badge--plain {
+  background: transparent;
   color: var(--color-text-muted);
+}
+
+.ui-count-badge--filled {
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+}
+
+.ui-count-badge--active {
+  opacity: 0.8;
+}
+
+.ui-count-badge--inactive {
+  opacity: 0.6;
 }
 
 .ui-count-badge-column {
@@ -385,11 +410,6 @@ body {
   justify-content: flex-end;
   min-width: var(--ui-count-badge-column-width);
   flex-shrink: 0;
-}
-
-.ui-count-badge-inline {
-  width: auto;
-  min-width: 0;
 }
 
 .folder-tree-drop-line {

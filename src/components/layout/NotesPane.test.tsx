@@ -335,4 +335,18 @@ describe("NotesPane", () => {
 
     expect(screen.queryByText("3")).not.toBeInTheDocument();
   });
+
+  it("renders the header note count with the inline plain active badge treatment", async () => {
+    const { container } = render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    const badge = container.querySelector(".ui-count-badge");
+    expect(badge).toHaveTextContent("1");
+    expect(badge?.className).toMatch(/ui-count-badge--inline/);
+    expect(badge?.className).toMatch(/ui-count-badge--plain/);
+    expect(badge?.className).toMatch(/ui-count-badge--active/);
+  });
 });
