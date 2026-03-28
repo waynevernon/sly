@@ -4712,6 +4712,11 @@ fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn should_hide_window_on_close(window_label: &str) -> bool {
+    window_label == "main"
+}
+
 fn open_external_url(url: &'static str) {
     tauri::async_runtime::spawn(async move {
         let _ = open_url_safe(url.to_string()).await;
@@ -4885,17 +4890,29 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Handle drag-and-drop of .md files onto any window
-            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
-                let app = window.app_handle();
-                for path in paths {
-                    if is_markdown_extension(path)
-                        && path.is_file()
-                        && !try_select_in_notes_folder(app, path)
-                    {
-                        let _ = create_preview_window(app, &path.to_string_lossy());
+            match event {
+                #[cfg(target_os = "macos")]
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if should_hide_window_on_close(window.label()) {
+                        api.prevent_close();
+                        let _ = window.hide();
                     }
                 }
+
+                // Handle drag-and-drop of .md files onto any window
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    let app = window.app_handle();
+                    for path in paths {
+                        if is_markdown_extension(path)
+                            && path.is_file()
+                            && !try_select_in_notes_folder(app, path)
+                        {
+                            let _ = create_preview_window(app, &path.to_string_lossy());
+                        }
+                    }
+                }
+
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -4963,18 +4980,31 @@ pub fn run() {
     // RunEvent::Opened is macOS-only in Tauri v2
     app.run(|_app_handle, _event| {
         #[cfg(target_os = "macos")]
-        if let tauri::RunEvent::Opened { urls } = _event {
-            for url in urls {
-                if let Ok(path) = url.to_file_path() {
-                    if is_markdown_extension(&path)
-                        && path.is_file()
-                        && !try_select_in_notes_folder(_app_handle, &path)
-                    {
-                        let _ = create_preview_window(_app_handle, &path.to_string_lossy());
+        match _event {
+            tauri::RunEvent::Opened { urls } => {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        if is_markdown_extension(&path)
+                            && path.is_file()
+                            && !try_select_in_notes_folder(_app_handle, &path)
+                        {
+                            let _ = create_preview_window(_app_handle, &path.to_string_lossy());
+                        }
                     }
                 }
             }
-        }
+
+            tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } => {
+                if !has_visible_windows {
+                    focus_main_window(_app_handle);
+                }
+            }
+
+            _ => {}
+        };
     });
 }
 
@@ -5002,6 +5032,13 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn hides_only_main_window_on_close() {
+        assert!(should_hide_window_on_close("main"));
+        assert!(!should_hide_window_on_close("preview-123"));
     }
 
     #[test]
