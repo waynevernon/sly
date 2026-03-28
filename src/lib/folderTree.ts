@@ -1,6 +1,5 @@
 import {
   DEFAULT_FOLDER_SORT_MODE,
-  type FolderManualOrder,
   type FolderNode,
   type FolderSortMode,
   type NoteMetadata,
@@ -11,72 +10,33 @@ export interface FolderTreeData {
   folders: FolderNode[];
 }
 
-export interface VisibleFolderRow {
-  path: string;
-  depth: number;
-  parentPath: string;
-  visibleIndex: number;
-}
+export function rewriteFolderPathList(
+  paths: string[],
+  oldPath: string,
+  newPath: string,
+): string[] {
+  const oldPrefix = `${oldPath}/`;
+  const newPrefix = `${newPath}/`;
+  const seen = new Set<string>();
+  const nextPaths: string[] = [];
 
-export interface ProjectedFolderDrop {
-  parentPath: string;
-  insertIndex: number;
-  depth: number;
-  lineAnchor: "before" | "after";
-  beforePath?: string;
-  afterPath?: string;
-}
+  for (const path of paths) {
+    const nextPath =
+      path === oldPath
+        ? newPath
+        : path.startsWith(oldPrefix)
+          ? `${newPrefix}${path.slice(oldPrefix.length)}`
+          : path;
 
-export interface FolderDropOrderPlan {
-  activePath: string;
-  sourceParentPath: string;
-  targetParentPath: string;
-  targetOrder: string[];
-  sourceOrder?: string[];
-  newPath: string;
-  movedAcrossParents: boolean;
-  isNoOp: boolean;
-}
+    if (seen.has(nextPath)) {
+      continue;
+    }
 
-function isSameOrDescendantPath(path: string, ancestorPath: string): boolean {
-  return path === ancestorPath || path.startsWith(`${ancestorPath}/`);
-}
-
-function getFolderLeaf(path: string): string {
-  return path.split("/").pop() || path;
-}
-
-function getFolderParentPath(path: string): string {
-  const lastSlash = path.lastIndexOf("/");
-  return lastSlash >= 0 ? path.substring(0, lastSlash) : "";
-}
-
-function buildFolderChildrenMap(tree: FolderTreeData): Map<string, string[]> {
-  const childrenByParent = new Map<string, string[]>();
-
-  function visitChildren(parentPath: string, folders: FolderNode[]) {
-    childrenByParent.set(
-      parentPath,
-      folders.map((folder) => folder.path),
-    );
-
-    folders.forEach((folder) => visitChildren(folder.path, folder.children));
+    seen.add(nextPath);
+    nextPaths.push(nextPath);
   }
 
-  visitChildren("", tree.folders);
-
-  return childrenByParent;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function arraysEqual(left: string[], right: string[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
+  return nextPaths;
 }
 
 export function buildFolderTree(
@@ -84,7 +44,6 @@ export function buildFolderTree(
   _pinnedIds: Set<string>,
   knownFolders?: string[],
   folderSortMode: FolderSortMode = DEFAULT_FOLDER_SORT_MODE,
-  folderManualOrder: FolderManualOrder = {},
 ): FolderTreeData {
   const rootNotes: NoteMetadata[] = [];
   const folderMap = new Map<string, FolderNode>();
@@ -130,22 +89,7 @@ export function buildFolderTree(
   function compareFolders(
     left: FolderNode,
     right: FolderNode,
-    parentPath: string,
   ): number {
-    if (folderSortMode === "manual") {
-      const positions = new Map(
-        (folderManualOrder[parentPath] || []).map((path, index) => [path, index]),
-      );
-      const leftPosition = positions.get(left.path);
-      const rightPosition = positions.get(right.path);
-
-      if (leftPosition !== undefined && rightPosition !== undefined) {
-        return leftPosition - rightPosition;
-      }
-      if (leftPosition !== undefined) return -1;
-      if (rightPosition !== undefined) return 1;
-    }
-
     const comparison = left.name.localeCompare(right.name);
     if (comparison !== 0) {
       return folderSortMode === "nameDesc" ? -comparison : comparison;
@@ -154,250 +98,17 @@ export function buildFolderTree(
   }
 
   function sortNode(node: FolderNode) {
-    node.children.sort((a, b) => compareFolders(a, b, node.path));
+    node.children.sort(compareFolders);
     node.children.forEach(sortNode);
   }
 
   const topLevelFolders = Array.from(folderMap.values()).filter(
     (f) => !f.path.includes("/"),
   );
-  topLevelFolders.sort((a, b) => compareFolders(a, b, ""));
+  topLevelFolders.sort(compareFolders);
   topLevelFolders.forEach(sortNode);
 
   return { rootNotes, folders: topLevelFolders };
-}
-
-export function flattenVisibleFolders(
-  tree: FolderTreeData,
-  collapsedFolders: Set<string>,
-): VisibleFolderRow[] {
-  const rows: VisibleFolderRow[] = [];
-
-  function walkFolder(folder: FolderNode, depth: number, parentPath: string) {
-    rows.push({
-      path: folder.path,
-      depth,
-      parentPath,
-      visibleIndex: rows.length,
-    });
-
-    if (collapsedFolders.has(folder.path)) {
-      return;
-    }
-
-    folder.children.forEach((child) => walkFolder(child, depth + 1, folder.path));
-  }
-
-  tree.folders.forEach((folder) => walkFolder(folder, 0, ""));
-
-  return rows;
-}
-
-export function projectFolderDrop({
-  tree,
-  collapsedFolders,
-  activePath,
-  overPath,
-  placement,
-  horizontalOffset,
-  indentationWidth = 12,
-}: {
-  tree: FolderTreeData;
-  collapsedFolders: Set<string>;
-  activePath: string;
-  overPath: string;
-  placement: "before" | "after";
-  horizontalOffset: number;
-  indentationWidth?: number;
-}): ProjectedFolderDrop | null {
-  const rows = flattenVisibleFolders(tree, collapsedFolders);
-  const activeRow = rows.find((row) => row.path === activePath);
-  if (!activeRow) {
-    return null;
-  }
-
-  const remainingRows = rows.filter(
-    (row) => !isSameOrDescendantPath(row.path, activePath),
-  );
-  const overIndex = remainingRows.findIndex((row) => row.path === overPath);
-  if (overIndex === -1) {
-    return null;
-  }
-
-  const insertionIndex = overIndex + (placement === "after" ? 1 : 0);
-  const previousRow = remainingRows[insertionIndex - 1];
-  const nextRow = remainingRows[insertionIndex];
-  const rawDepth =
-    activeRow.depth + Math.round(horizontalOffset / indentationWidth);
-  const maxDepth = previousRow ? previousRow.depth + 1 : 0;
-  const minDepth = nextRow ? Math.min(nextRow.depth, maxDepth) : 0;
-  const depth = clamp(rawDepth, minDepth, maxDepth);
-
-  let parentPath = "";
-  const nestedUnderPrevious = Boolean(previousRow && depth > previousRow.depth);
-
-  if (depth > 0) {
-    if (!previousRow) {
-      return null;
-    }
-
-    if (nestedUnderPrevious) {
-      parentPath = previousRow.path;
-    } else if (depth === previousRow.depth) {
-      parentPath = previousRow.parentPath;
-    } else {
-      const ancestorRow = [...remainingRows.slice(0, insertionIndex)]
-        .reverse()
-        .find((row) => row.depth === depth - 1);
-
-      if (!ancestorRow) {
-        return null;
-      }
-
-      parentPath = ancestorRow.path;
-    }
-  }
-
-  const childrenByParent = buildFolderChildrenMap(tree);
-  const targetChildren = (childrenByParent.get(parentPath) ?? []).filter(
-    (path) => path !== activePath,
-  );
-
-  let insertIndex = targetChildren.length;
-  if (nestedUnderPrevious) {
-    insertIndex = 0;
-  } else if (nextRow?.parentPath === parentPath) {
-    const nextSiblingIndex = targetChildren.indexOf(nextRow.path);
-    insertIndex = nextSiblingIndex === -1 ? targetChildren.length : nextSiblingIndex;
-  } else if (previousRow?.parentPath === parentPath) {
-    const previousSiblingIndex = targetChildren.indexOf(previousRow.path);
-    insertIndex =
-      previousSiblingIndex === -1
-        ? targetChildren.length
-        : previousSiblingIndex + 1;
-  } else if (targetChildren.length === 0) {
-    insertIndex = 0;
-  }
-
-  return {
-    parentPath,
-    insertIndex,
-    depth,
-    lineAnchor: nextRow ? "before" : "after",
-    beforePath: previousRow?.path,
-    afterPath: nextRow?.path,
-  };
-}
-
-export function buildFolderDropOrderPlan(
-  tree: FolderTreeData,
-  activePath: string,
-  projection: ProjectedFolderDrop,
-): FolderDropOrderPlan | null {
-  const sourceParentPath = getFolderParentPath(activePath);
-  const targetParentPath = projection.parentPath;
-  const childrenByParent = buildFolderChildrenMap(tree);
-  const activeName = getFolderLeaf(activePath);
-  const movedAcrossParents = sourceParentPath !== targetParentPath;
-  const currentSourceChildren = childrenByParent.get(sourceParentPath) ?? [];
-  const nextPath = movedAcrossParents
-    ? targetParentPath
-      ? `${targetParentPath}/${activeName}`
-      : activeName
-    : activePath;
-
-  const targetChildren = (
-    childrenByParent.get(targetParentPath) ?? []
-  ).filter((path) => path !== activePath && path !== nextPath);
-  const insertIndex = clamp(
-    projection.insertIndex,
-    0,
-    targetChildren.length,
-  );
-  const nextTargetOrder = [...targetChildren];
-  nextTargetOrder.splice(insertIndex, 0, nextPath);
-
-  if (!movedAcrossParents) {
-    return {
-      activePath,
-      sourceParentPath,
-      targetParentPath,
-      targetOrder: nextTargetOrder,
-      newPath: activePath,
-      movedAcrossParents: false,
-      isNoOp: arraysEqual(currentSourceChildren, nextTargetOrder),
-    };
-  }
-
-  const nextSourceOrder = currentSourceChildren.filter((path) => path !== activePath);
-
-  return {
-    activePath,
-    sourceParentPath,
-    targetParentPath,
-    targetOrder: nextTargetOrder,
-    sourceOrder: nextSourceOrder,
-    newPath: nextPath,
-    movedAcrossParents: true,
-    isNoOp: false,
-  };
-}
-
-function cloneFolderNode(folder: FolderNode): FolderNode {
-  return {
-    ...folder,
-    notes: [...folder.notes],
-    children: folder.children.map(cloneFolderNode),
-  };
-}
-
-export function applyFolderDropOrderPlan(
-  tree: FolderTreeData,
-  plan: FolderDropOrderPlan,
-): FolderTreeData {
-  const rootFolders = tree.folders.map(cloneFolderNode);
-  const rootNode: FolderNode = {
-    name: "",
-    path: "",
-    notes: [],
-    children: rootFolders,
-  };
-  const folderMap = new Map<string, FolderNode>([["", rootNode]]);
-
-  function indexFolders(folder: FolderNode) {
-    folderMap.set(folder.path, folder);
-    folder.children.forEach(indexFolders);
-  }
-
-  rootFolders.forEach(indexFolders);
-
-  const sourceParent = folderMap.get(plan.sourceParentPath);
-  const activeNode = folderMap.get(plan.activePath);
-  const targetParent = folderMap.get(plan.targetParentPath);
-
-  if (!sourceParent || !activeNode || !targetParent) {
-    return tree;
-  }
-
-  sourceParent.children = sourceParent.children.filter(
-    (folder) => folder.path !== plan.activePath,
-  );
-
-  const insertPath = plan.movedAcrossParents ? plan.newPath : plan.activePath;
-  const insertIndex = Math.max(
-    0,
-    plan.targetOrder.findIndex((path) => path === insertPath),
-  );
-
-  targetParent.children = targetParent.children.filter(
-    (folder) => folder.path !== plan.activePath,
-  );
-  targetParent.children.splice(insertIndex, 0, activeNode);
-
-  return {
-    rootNotes: [...tree.rootNotes],
-    folders: rootNode.children,
-  };
 }
 
 export type TreeItem =

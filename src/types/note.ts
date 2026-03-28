@@ -105,8 +105,7 @@ export type NoteSortMode =
   | "createdAsc"
   | "titleAsc"
   | "titleDesc";
-export type FolderSortMode = "manual" | "nameAsc" | "nameDesc";
-export type FolderManualOrder = Record<string, string[]>;
+export type FolderSortMode = "nameAsc" | "nameDesc";
 export type FolderColorId =
   | "slate"
   | "blue"
@@ -176,7 +175,6 @@ export interface Settings {
   noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
-  folderManualOrder?: FolderManualOrder;
 }
 
 export interface SettingsPatch {
@@ -196,7 +194,6 @@ export interface SettingsPatch {
   noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
   folderSortMode?: FolderSortMode;
-  folderManualOrder?: FolderManualOrder | null;
 }
 
 export interface FolderNode {

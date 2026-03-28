@@ -288,7 +288,6 @@ pub enum NoteSortMode {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum FolderSortMode {
-    Manual,
     #[default]
     NameAsc,
     NameDesc,
@@ -390,8 +389,6 @@ pub struct Settings {
     pub note_sort_mode: NoteSortMode,
     #[serde(rename = "folderSortMode", default)]
     pub folder_sort_mode: FolderSortMode,
-    #[serde(rename = "folderManualOrder", default)]
-    pub folder_manual_order: Option<HashMap<String, Vec<String>>>,
 }
 
 impl Default for Settings {
@@ -413,7 +410,6 @@ impl Default for Settings {
             note_list_preview_lines: default_note_list_preview_lines(),
             note_sort_mode: NoteSortMode::default(),
             folder_sort_mode: FolderSortMode::default(),
-            folder_manual_order: None,
         }
     }
 }
@@ -453,8 +449,6 @@ pub struct SettingsPatch {
     pub note_sort_mode: Option<NoteSortMode>,
     #[serde(default)]
     pub folder_sort_mode: Option<FolderSortMode>,
-    #[serde(default)]
-    pub folder_manual_order: Option<Option<HashMap<String, Vec<String>>>>,
 }
 
 // Search result
@@ -1434,9 +1428,6 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(folder_sort_mode) = patch.folder_sort_mode {
         settings.folder_sort_mode = folder_sort_mode;
     }
-    if let Some(folder_manual_order) = patch.folder_manual_order {
-        settings.folder_manual_order = folder_manual_order;
-    }
     sanitize_settings(settings);
 }
 
@@ -1517,79 +1508,26 @@ fn rewrite_collapsed_folder_paths(
     sanitize_collapsed_folder_paths(collapsed_folders);
 }
 
-fn get_parent_folder_path(path: &str) -> String {
-    path.rsplit_once('/')
-        .map(|(parent, _)| parent.to_string())
-        .unwrap_or_default()
-}
-
-fn sanitize_folder_manual_order(folder_manual_order: &mut HashMap<String, Vec<String>>) {
-    for siblings in folder_manual_order.values_mut() {
-        let mut seen = HashSet::new();
-        siblings.retain(|path| seen.insert(path.clone()));
-    }
-    folder_manual_order.retain(|_, siblings| !siblings.is_empty());
-}
-
-fn append_folder_manual_order(
-    folder_manual_order: &mut HashMap<String, Vec<String>>,
-    parent_path: &str,
-    folder_path: &str,
-) {
-    let siblings = folder_manual_order
-        .entry(parent_path.to_string())
-        .or_default();
-    siblings.retain(|path| path != folder_path);
-    siblings.push(folder_path.to_string());
-}
-
-fn remove_folder_manual_order_paths(
-    folder_manual_order: &mut HashMap<String, Vec<String>>,
-    path: &str,
-) {
-    let prefix = format!("{}/", path);
-    folder_manual_order.retain(|parent_path, siblings| {
-        siblings.retain(|folder_path| folder_path != path && !folder_path.starts_with(&prefix));
-        parent_path != path && !parent_path.starts_with(&prefix)
-    });
-    sanitize_folder_manual_order(folder_manual_order);
-}
-
-fn rewrite_folder_manual_order_paths(
-    folder_manual_order: &mut HashMap<String, Vec<String>>,
-    old_path: &str,
-    new_path: &str,
-) {
+fn rewrite_note_id_prefixes(note_ids: &mut [String], old_path: &str, new_path: &str) -> bool {
     let old_prefix = format!("{}/", old_path);
     let new_prefix = format!("{}/", new_path);
-    let existing = std::mem::take(folder_manual_order);
+    let mut changed = false;
 
-    for (parent_path, siblings) in existing {
-        let next_parent_path = if parent_path == old_path {
-            new_path.to_string()
-        } else if parent_path.starts_with(&old_prefix) {
-            format!("{}{}", new_prefix, &parent_path[old_prefix.len()..])
-        } else {
-            parent_path
-        };
-
-        let next_siblings = siblings
-            .into_iter()
-            .map(|folder_path| {
-                if folder_path == old_path {
-                    new_path.to_string()
-                } else if folder_path.starts_with(&old_prefix) {
-                    format!("{}{}", new_prefix, &folder_path[old_prefix.len()..])
-                } else {
-                    folder_path
-                }
-            })
-            .collect();
-
-        folder_manual_order.insert(next_parent_path, next_siblings);
+    for note_id in note_ids.iter_mut() {
+        if note_id.starts_with(&old_prefix) {
+            *note_id = format!("{}{}", new_prefix, &note_id[old_prefix.len()..]);
+            changed = true;
+        }
     }
 
-    sanitize_folder_manual_order(folder_manual_order);
+    changed
+}
+
+fn remove_note_ids_with_prefix(note_ids: &mut Vec<String>, path: &str) -> bool {
+    let prefix = format!("{}/", path);
+    let original_len = note_ids.len();
+    note_ids.retain(|note_id| !note_id.starts_with(&prefix));
+    note_ids.len() != original_len
 }
 
 fn note_sort_value_cmp(left: i64, right: i64, descending: bool) -> Ordering {
@@ -2283,20 +2221,6 @@ async fn create_folder(path: String, state: State<'_, AppState>) -> Result<(), S
         .await
         .map_err(|e| e.to_string())?;
 
-    {
-        let mut settings = state.settings.write().expect("settings write lock");
-        let folder_manual_order = settings
-            .folder_manual_order
-            .get_or_insert_with(HashMap::new);
-        let parent_path = get_parent_folder_path(&path);
-        append_folder_manual_order(folder_manual_order, &parent_path, &path);
-        sanitize_folder_manual_order(folder_manual_order);
-        if folder_manual_order.is_empty() {
-            settings.folder_manual_order = None;
-        }
-        let _ = save_settings(&folder, &settings);
-    }
-
     Ok(())
 }
 
@@ -2345,22 +2269,49 @@ async fn delete_folder(path: String, state: State<'_, AppState>) -> Result<(), S
 
     {
         let mut settings = state.settings.write().expect("settings write lock");
-        if let Some(ref mut folder_icons) = settings.folder_icons {
-            remove_folder_icon_paths(folder_icons, &path);
-            if folder_icons.is_empty() {
-                settings.folder_icons = None;
+        let mut settings_changed = false;
+        let mut clear_pinned = false;
+        if let Some(ref mut pinned_note_ids) = settings.pinned_note_ids {
+            if remove_note_ids_with_prefix(pinned_note_ids, &path) {
+                settings_changed = true;
             }
+            clear_pinned = pinned_note_ids.is_empty();
         }
-        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
-            remove_folder_manual_order_paths(folder_manual_order, &path);
-            if folder_manual_order.is_empty() {
-                settings.folder_manual_order = None;
+        if clear_pinned {
+            settings.pinned_note_ids = None;
+        }
+        let mut clear_recent = false;
+        if let Some(ref mut recent_note_ids) = settings.recent_note_ids {
+            if remove_note_ids_with_prefix(recent_note_ids, &path) {
+                settings_changed = true;
             }
+            clear_recent = recent_note_ids.is_empty();
+        }
+        if clear_recent {
+            settings.recent_note_ids = None;
+        }
+        let mut clear_folder_icons = false;
+        if let Some(ref mut folder_icons) = settings.folder_icons {
+            let previous_len = folder_icons.len();
+            remove_folder_icon_paths(folder_icons, &path);
+            if folder_icons.len() != previous_len {
+                settings_changed = true;
+            }
+            clear_folder_icons = folder_icons.is_empty();
+        }
+        if clear_folder_icons {
+            settings.folder_icons = None;
         }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
+            let previous_len = collapsed_folders.len();
             remove_collapsed_folder_paths(collapsed_folders, &path);
+            if collapsed_folders.len() != previous_len {
+                settings_changed = true;
+            }
         }
-        let _ = save_settings(&folder, &settings);
+        if settings_changed {
+            let _ = save_settings(&folder, &settings);
+        }
     }
 
     fs::remove_dir_all(&target)
@@ -2434,22 +2385,13 @@ async fn rename_folder(
     {
         let mut settings = state.settings.write().expect("settings write lock");
         if let Some(ref mut pinned) = settings.pinned_note_ids {
-            for id in pinned.iter_mut() {
-                if id.starts_with(&old_prefix) {
-                    *id = format!("{}{}", new_prefix, &id[old_prefix.len()..]);
-                } else if *id == old_path {
-                    *id = new_path.clone();
-                }
-            }
+            rewrite_note_id_prefixes(pinned, &old_path, &new_path);
+        }
+        if let Some(ref mut recent_note_ids) = settings.recent_note_ids {
+            rewrite_note_id_prefixes(recent_note_ids, &old_path, &new_path);
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &old_path, &new_path);
-        }
-        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
-            rewrite_folder_manual_order_paths(folder_manual_order, &old_path, &new_path);
-            if folder_manual_order.is_empty() {
-                settings.folder_manual_order = None;
-            }
         }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
             rewrite_collapsed_folder_paths(collapsed_folders, &old_path, &new_path);
@@ -2729,29 +2671,13 @@ async fn move_folder(
     {
         let mut settings = state.settings.write().expect("settings write lock");
         if let Some(ref mut pinned) = settings.pinned_note_ids {
-            for pin_id in pinned.iter_mut() {
-                if pin_id.starts_with(&old_prefix) {
-                    *pin_id = format!("{}{}", new_prefix, &pin_id[old_prefix.len()..]);
-                }
-            }
+            rewrite_note_id_prefixes(pinned, &path, &new_path);
+        }
+        if let Some(ref mut recent_note_ids) = settings.recent_note_ids {
+            rewrite_note_id_prefixes(recent_note_ids, &path, &new_path);
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &path, &new_path);
-        }
-        if let Some(ref mut folder_manual_order) = settings.folder_manual_order {
-            rewrite_folder_manual_order_paths(folder_manual_order, &path, &new_path);
-            let old_parent = get_parent_folder_path(&path);
-            let new_parent = target_parent.clone();
-            if old_parent != new_parent {
-                if let Some(old_siblings) = folder_manual_order.get_mut(&old_parent) {
-                    old_siblings.retain(|folder_path| folder_path != &new_path);
-                }
-                append_folder_manual_order(folder_manual_order, &new_parent, &new_path);
-            }
-            sanitize_folder_manual_order(folder_manual_order);
-            if folder_manual_order.is_empty() {
-                settings.folder_manual_order = None;
-            }
         }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
             rewrite_collapsed_folder_paths(collapsed_folders, &path, &new_path);
@@ -5186,18 +5112,6 @@ mod tests {
         }
     }
 
-    fn order_map(entries: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
-        entries
-            .iter()
-            .map(|(parent, children)| {
-                (
-                    (*parent).to_string(),
-                    children.iter().map(|child| (*child).to_string()).collect(),
-                )
-            })
-            .collect()
-    }
-
     #[cfg(target_os = "macos")]
     #[test]
     fn hides_only_main_window_on_close() {
@@ -5299,64 +5213,24 @@ mod tests {
     }
 
     #[test]
-    fn folder_manual_order_rewrites_nested_paths() {
-        let mut folder_manual_order = order_map(&[
-            ("", &["docs", "journal"]),
-            ("docs", &["docs/rust", "docs/typescript"]),
-        ]);
+    fn rewrite_note_id_prefixes_updates_recent_and_pinned_note_ids() {
+        let mut note_ids = vec![
+            "source/moved/one".to_string(),
+            "source/moved/nested/two".to_string(),
+            "other/three".to_string(),
+        ];
 
-        rewrite_folder_manual_order_paths(&mut folder_manual_order, "docs", "work");
+        let changed = rewrite_note_id_prefixes(&mut note_ids, "source/moved", "target/moved");
 
+        assert!(changed);
         assert_eq!(
-            folder_manual_order.get("").cloned().unwrap_or_default(),
-            vec!["work".to_string(), "journal".to_string()]
+            note_ids,
+            vec![
+                "target/moved/one".to_string(),
+                "target/moved/nested/two".to_string(),
+                "other/three".to_string(),
+            ]
         );
-        assert_eq!(
-            folder_manual_order.get("work").cloned().unwrap_or_default(),
-            vec!["work/rust".to_string(), "work/typescript".to_string()]
-        );
-        assert!(!folder_manual_order.contains_key("docs"));
-    }
-
-    #[test]
-    fn folder_manual_order_removes_deleted_paths_and_descendants() {
-        let mut folder_manual_order = order_map(&[
-            ("", &["docs", "journal"]),
-            ("docs", &["docs/rust", "docs/typescript"]),
-        ]);
-
-        remove_folder_manual_order_paths(&mut folder_manual_order, "docs");
-
-        assert_eq!(
-            folder_manual_order.get("").cloned().unwrap_or_default(),
-            vec!["journal".to_string()]
-        );
-        assert!(!folder_manual_order.contains_key("docs"));
-    }
-
-    #[test]
-    fn folder_manual_order_move_appends_to_new_parent() {
-        let mut folder_manual_order = order_map(&[
-            ("", &["docs", "archive"]),
-            ("docs", &["docs/rust"]),
-            ("archive", &["archive/old"]),
-        ]);
-
-        rewrite_folder_manual_order_paths(&mut folder_manual_order, "docs/rust", "archive/rust");
-        if let Some(old_siblings) = folder_manual_order.get_mut("docs") {
-            old_siblings.retain(|folder_path| folder_path != "archive/rust");
-        }
-        append_folder_manual_order(&mut folder_manual_order, "archive", "archive/rust");
-        sanitize_folder_manual_order(&mut folder_manual_order);
-
-        assert_eq!(
-            folder_manual_order
-                .get("archive")
-                .cloned()
-                .unwrap_or_default(),
-            vec!["archive/old".to_string(), "archive/rust".to_string()]
-        );
-        assert!(!folder_manual_order.contains_key("docs"));
     }
 
     #[test]
@@ -5431,7 +5305,6 @@ mod tests {
             note_list_preview_lines: 2,
             note_sort_mode: NoteSortMode::TitleAsc,
             folder_sort_mode: FolderSortMode::NameDesc,
-            folder_manual_order: None,
         };
 
         apply_settings_patch(
@@ -5491,7 +5364,6 @@ mod tests {
         );
         assert_eq!(settings.note_sort_mode, NoteSortMode::ModifiedDesc);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
-        assert_eq!(settings.folder_manual_order, None);
     }
 
     #[test]

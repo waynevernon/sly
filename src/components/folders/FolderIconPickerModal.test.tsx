@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmojiCatalogItems, searchEmojiShortcodes } from "../../lib/emoji";
 import { TooltipProvider } from "../ui";
@@ -33,10 +33,9 @@ describe("FolderIconPickerModal", () => {
       </TooltipProvider>,
     );
 
-    await user.type(
-      screen.getByPlaceholderText("Search Lucide icons..."),
-      "folder-open-dot",
-    );
+    fireEvent.change(screen.getByPlaceholderText("Search Lucide icons..."), {
+      target: { value: "folder-open-dot" },
+    });
     await user.keyboard("{Enter}");
 
     expect(onApply).not.toHaveBeenCalled();
@@ -67,11 +66,17 @@ describe("FolderIconPickerModal", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
-    const input = screen.getByPlaceholderText("Search emoji names or aliases...");
-    await user.type(input, "book");
+    fireEvent.change(
+      screen.getByPlaceholderText("Search emoji names or aliases..."),
+      {
+        target: { value: "book" },
+      },
+    );
 
     await user.click(screen.getByRole("button", { name: "Icons" }));
-    expect(screen.getByDisplayValue("book")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("book")).toBeInTheDocument();
+    });
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
     await user.keyboard("{Enter}");

@@ -11,27 +11,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { listen } from "@tauri-apps/api/event";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { FilePlusCorner, History } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  applyFolderDropOrderPlan,
-  buildFolderDropOrderPlan,
-  buildFolderTree,
-  projectFolderDrop,
-  type FolderDropOrderPlan,
-  type ProjectedFolderDrop,
-} from "../../lib/folderTree";
+import { buildFolderTree } from "../../lib/folderTree";
 import type {
   FolderAppearance,
   FolderNode,
 } from "../../types/note";
-import * as notesService from "../../services/notes";
-import type { FileChangeEventPayload } from "../../services/notes";
 import {
   areFolderAppearancesEqual,
   getFolderAppearance,
@@ -86,14 +76,7 @@ type FolderIconPickerTarget =
   | { kind: "inline-create" }
   | { kind: "inline-rename"; path: string };
 
-interface FolderTreeViewProps {
-  dragDelta: { x: number; y: number } | null;
-  onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
-  pendingManualFolderDropPlan?: FolderDropOrderPlan | null;
-}
-
 const TREE_INDENT_WIDTH = 12;
-const DROP_LINE_BASE_OFFSET = 28;
 
 function loadLegacyCollapsedFolders(): Set<string> | null {
   try {
@@ -126,12 +109,6 @@ function getRenamedFolderPath(path: string, newName: string): string {
     : sanitizedName;
 }
 
-function getDropLineStyle(depth: number): CSSProperties {
-  return {
-    left: `${depth * TREE_INDENT_WIDTH + DROP_LINE_BASE_OFFSET}px`,
-  };
-}
-
 function getFolderTextStyle(
   folderAppearance: FolderAppearance | null | undefined,
   resolvedTheme: "light" | "dark",
@@ -148,22 +125,30 @@ function getFolderIconStyle(
   return color ? { color } : undefined;
 }
 
-function FolderCountBadge({ count }: { count: number }) {
-  return <span className="ui-count-badge">{count}</span>;
+function FolderCountBadge({
+  count,
+  className = "",
+}: {
+  count: number;
+  className?: string;
+}) {
+  return <span className={`ui-count-badge ${className}`.trim()}>{count}</span>;
 }
 
 function FolderRowTrailing({
   count,
+  isActive = false,
   children,
 }: {
   count: number;
+  isActive?: boolean;
   children?: ReactNode;
 }) {
   return (
     <div className="ml-auto flex items-center gap-1.5 pl-2 shrink-0">
       {children}
       <div className="ui-count-badge-column">
-        <FolderCountBadge count={count} />
+        <FolderCountBadge count={count} className={isActive ? "opacity-80" : "opacity-60"} />
       </div>
     </div>
   );
@@ -246,7 +231,7 @@ function InlineFolderRow({
           />
         </div>
         {showNoteCounts && typeof noteCount === "number" && noteCount > 0 && (
-          <FolderRowTrailing count={noteCount} />
+          <FolderRowTrailing count={noteCount} isActive={isSelected} />
         )}
       </div>
     </div>
@@ -256,13 +241,12 @@ function InlineFolderRow({
 interface FolderItemProps {
   folder: FolderNode;
   depth: number;
-  isManualSorting: boolean;
+  pendingFolderPath: string | null;
   folderAppearances: FolderAppearanceMap;
   showNoteCounts: boolean;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
-  projectedDrop: ProjectedFolderDrop | null;
   resolvedTheme: "light" | "dark";
   onToggleCollapse: (path: string) => void;
   onSelectFolder: (path: string) => void;
@@ -280,13 +264,12 @@ interface FolderItemProps {
 const FolderItem = memo(function FolderItem({
   folder,
   depth,
-  isManualSorting,
+  pendingFolderPath,
   folderAppearances,
   showNoteCounts,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
-  projectedDrop,
   resolvedTheme,
   onToggleCollapse,
   onSelectFolder,
@@ -306,7 +289,7 @@ const FolderItem = memo(function FolderItem({
   const folderAppearance = getFolderAppearance(folderAppearances, folder.path);
   const folderTextStyle = getFolderTextStyle(folderAppearance, resolvedTheme);
   const folderIconStyle = getFolderIconStyle(folderAppearance, resolvedTheme);
-  const parentPath = getFolderParentPath(folder.path);
+  const isPendingMove = pendingFolderPath === folder.path;
   const isRenaming =
     inlineEditState?.mode === "rename" && inlineEditState.path === folder.path;
   const isCreatingChild =
@@ -315,8 +298,7 @@ const FolderItem = memo(function FolderItem({
   const { active } = useDndContext();
   const activeDragType = active?.data.current?.type;
   const isContainerDropActive =
-    activeDragType === "note" ||
-    (activeDragType === "folder" && active?.data.current?.manualSort !== true);
+    activeDragType === "note" || activeDragType === "folder";
 
   const {
     attributes: dragAttributes,
@@ -328,8 +310,6 @@ const FolderItem = memo(function FolderItem({
     data: {
       type: "folder",
       path: folder.path,
-      parentPath,
-      manualSort: isManualSorting,
     },
   });
 
@@ -348,12 +328,6 @@ const FolderItem = memo(function FolderItem({
         ? "bg-bg-muted"
         : "hover:bg-bg-muted/80"
   }`;
-  const showTopDropLine = projectedDrop?.afterPath === folder.path;
-  const showBottomDropLine =
-    !projectedDrop?.afterPath && projectedDrop?.beforePath === folder.path;
-  const dropLineStyle = projectedDrop
-    ? getDropLineStyle(projectedDrop.depth)
-    : undefined;
   const hasNestedFolders = folder.children.length > 0 || isCreatingChild;
 
   const children = !isCollapsed && (isCreatingChild || folder.children.length > 0) && (
@@ -376,13 +350,12 @@ const FolderItem = memo(function FolderItem({
           key={child.path}
           folder={child}
           depth={depth + 1}
-          isManualSorting={isManualSorting}
+          pendingFolderPath={pendingFolderPath}
           folderAppearances={folderAppearances}
           showNoteCounts={showNoteCounts}
           selectedFolderPath={selectedFolderPath}
           collapsedFolders={collapsedFolders}
           inlineEditState={inlineEditState}
-          projectedDrop={projectedDrop}
           resolvedTheme={resolvedTheme}
           onToggleCollapse={onToggleCollapse}
           onSelectFolder={onSelectFolder}
@@ -424,17 +397,8 @@ const FolderItem = memo(function FolderItem({
     </>
   ) : (
     <>
-      <div className={`relative ${isDragging ? "opacity-40" : ""}`}>
-        {showTopDropLine && dropLineStyle && (
-          <div
-            className="folder-tree-drop-line folder-tree-drop-line-top"
-            style={dropLineStyle}
-          />
-        )}
-        <div
-          ref={setDropRef}
-          className={rowClassName}
-        >
+      <div className={`relative ${isDragging || isPendingMove ? "opacity-40" : ""}`}>
+        <div ref={setDropRef} className={rowClassName}>
           <div className="flex items-center gap-1.5 pr-2 py-2" style={{ paddingLeft: `${depth * TREE_INDENT_WIDTH}px` }}>
             <div className="min-w-0 flex flex-1 items-center gap-1.5">
               {hasNestedFolders ? (
@@ -486,16 +450,13 @@ const FolderItem = memo(function FolderItem({
               </button>
             </div>
             {showNoteCounts && noteCount > 0 && (
-              <FolderRowTrailing count={noteCount} />
+              <FolderRowTrailing
+                count={noteCount}
+                isActive={selectedFolderPath === folder.path}
+              />
             )}
           </div>
         </div>
-        {showBottomDropLine && dropLineStyle && (
-          <div
-            className="folder-tree-drop-line folder-tree-drop-line-bottom"
-            style={dropLineStyle}
-          />
-        )}
       </div>
       {children}
     </>
@@ -584,24 +545,27 @@ const FolderItem = memo(function FolderItem({
 });
 
 export function FolderTreeView({
-  dragDelta,
-  onManualFolderDropPlanChange,
-  pendingManualFolderDropPlan = null,
-}: FolderTreeViewProps) {
+  pendingFolderPath = null,
+}: {
+  pendingFolderPath?: string | null;
+} = {}) {
   const {
     notes,
     recentNotes,
+    knownFolders,
+    hasLoadedFolders,
     notesFolder,
     settings,
     folderAppearances,
     folderSortMode,
-    folderManualOrder,
+    folderRevealRequest,
     showRecentNotes,
     showNoteCounts,
     selectedScope,
     selectedFolderPath,
     selectFolder,
     selectRecentNotes,
+    createNote,
     createNoteInFolder,
     createFolder,
     deleteFolder,
@@ -612,10 +576,8 @@ export function FolderTreeView({
   } = useNotes();
 
   const [collapsedFolders, setCollapsedFoldersState] = useState<Set<string>>(
-    new Set(),
+    () => new Set(),
   );
-  const [knownFolders, setKnownFolders] = useState<string[]>([]);
-  const [hasLoadedKnownFolders, setHasLoadedKnownFolders] = useState(false);
   const [hasInitializedCollapseState, setHasInitializedCollapseState] =
     useState(false);
   const [inlineEditState, setInlineEditState] =
@@ -628,10 +590,9 @@ export function FolderTreeView({
   const [dontAskAgain, setDontAskAgain] = useState(false);
   const dontAskAgainId = useId();
   const treeRef = useRef<HTMLDivElement>(null);
+  const suppressRootMenuCloseAutoFocusRef = useRef(false);
   const collapsedFoldersRef = useRef<Set<string>>(new Set());
   collapsedFoldersRef.current = collapsedFolders;
-  const folderLoadRequestIdRef = useRef(0);
-  const folderReloadTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const preloadPicker = () => {
@@ -647,82 +608,6 @@ export function FolderTreeView({
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
-  const loadKnownFolders = useCallback(async () => {
-    if (!notesFolder) {
-      folderLoadRequestIdRef.current += 1;
-      setKnownFolders([]);
-      setHasLoadedKnownFolders(true);
-      return;
-    }
-
-    const requestId = ++folderLoadRequestIdRef.current;
-    setHasLoadedKnownFolders(false);
-
-    try {
-      const folders = await notesService.listFolders();
-      if (requestId !== folderLoadRequestIdRef.current) return;
-      setKnownFolders(folders);
-      setHasLoadedKnownFolders(true);
-    } catch {
-      if (requestId !== folderLoadRequestIdRef.current) return;
-      setKnownFolders([]);
-      setHasLoadedKnownFolders(true);
-    }
-  }, [notesFolder]);
-
-  const scheduleKnownFoldersReload = useCallback(
-    (delay = 120) => {
-      if (folderReloadTimeoutRef.current) {
-        clearTimeout(folderReloadTimeoutRef.current);
-      }
-
-      folderReloadTimeoutRef.current = window.setTimeout(() => {
-        folderReloadTimeoutRef.current = null;
-        void loadKnownFolders();
-      }, delay);
-    },
-    [loadKnownFolders],
-  );
-
-  useEffect(() => {
-    scheduleKnownFoldersReload(0);
-  }, [notes, notesFolder, scheduleKnownFoldersReload]);
-
-  useEffect(() => {
-    let isCancelled = false;
-    let unlisten: (() => void) | undefined;
-
-    listen<FileChangeEventPayload>("file-change", (event) => {
-      if (isCancelled || !event.payload.folder_structure_changed) {
-        return;
-      }
-
-      scheduleKnownFoldersReload();
-    }).then((fn) => {
-      if (isCancelled) {
-        fn();
-      } else {
-        unlisten = fn;
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [scheduleKnownFoldersReload]);
-
-  useEffect(() => {
-    return () => {
-      if (folderReloadTimeoutRef.current) {
-        clearTimeout(folderReloadTimeoutRef.current);
-        folderReloadTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
   const tree = useMemo(
     () =>
       buildFolderTree(
@@ -730,9 +615,8 @@ export function FolderTreeView({
         new Set<string>(),
         knownFolders,
         folderSortMode,
-        folderManualOrder,
       ),
-    [folderManualOrder, folderSortMode, knownFolders, notes],
+    [folderSortMode, knownFolders, notes],
   );
   const allFolderPaths = useMemo(() => {
     const paths = new Set(knownFolders);
@@ -747,7 +631,7 @@ export function FolderTreeView({
   }, [knownFolders, tree]);
 
   useEffect(() => {
-    if (!hasLoadedKnownFolders || !selectedFolderPath) {
+    if (!hasLoadedFolders || !selectedFolderPath) {
       return;
     }
 
@@ -766,7 +650,7 @@ export function FolderTreeView({
     }
 
     selectFolder(null);
-  }, [hasLoadedKnownFolders, knownFolders, selectFolder, selectedFolderPath]);
+  }, [hasLoadedFolders, knownFolders, selectFolder, selectedFolderPath]);
 
   useEffect(() => {
     setCollapsedFoldersState(new Set());
@@ -774,7 +658,7 @@ export function FolderTreeView({
   }, [notesFolder]);
 
   useEffect(() => {
-    if (hasInitializedCollapseState || !hasLoadedKnownFolders) {
+    if (hasInitializedCollapseState || !hasLoadedFolders) {
       return;
     }
 
@@ -795,7 +679,7 @@ export function FolderTreeView({
   }, [
     allFolderPaths,
     hasInitializedCollapseState,
-    hasLoadedKnownFolders,
+    hasLoadedFolders,
     persistCollapsedFolders,
     settings.collapsedFolders,
   ]);
@@ -808,69 +692,10 @@ export function FolderTreeView({
     setCollapsedFoldersState(new Set(settings.collapsedFolders));
   }, [hasInitializedCollapseState, settings.collapsedFolders]);
 
-  const visibleCollapsedFolders = useMemo(() => {
-    if (!pendingManualFolderDropPlan?.targetParentPath) {
-      return collapsedFolders;
-    }
-
-    const next = new Set(collapsedFolders);
-    next.delete(pendingManualFolderDropPlan.targetParentPath);
-    return next;
-  }, [collapsedFolders, pendingManualFolderDropPlan]);
-  const displayTree = useMemo(
-    () =>
-      pendingManualFolderDropPlan
-        ? applyFolderDropOrderPlan(tree, pendingManualFolderDropPlan)
-        : tree,
-    [pendingManualFolderDropPlan, tree],
-  );
-  const { active, over } = useDndContext();
+  const { active } = useDndContext();
   const activeDragType = active?.data.current?.type;
   const isContainerDropActive =
-    activeDragType === "note" ||
-    (activeDragType === "folder" && active?.data.current?.manualSort !== true);
-  const activeManualFolderPath =
-    folderSortMode === "manual" &&
-    activeDragType === "folder" &&
-    active?.data.current?.manualSort === true
-      ? (active.data.current?.path as string)
-      : null;
-  const projectedDrop = useMemo(() => {
-    if (!activeManualFolderPath || !dragDelta) {
-      return null;
-    }
-
-    if (over?.data.current?.type !== "folder-drop-target") {
-      return null;
-    }
-
-    const overPath = over.data.current?.path;
-    const initialRect = active?.rect.current.initial;
-    if (!overPath || !initialRect) {
-      return null;
-    }
-
-    const currentCenterY = initialRect.top + dragDelta.y + initialRect.height / 2;
-    const placement =
-      currentCenterY < over.rect.top + over.rect.height / 2 ? "before" : "after";
-
-    return projectFolderDrop({
-      tree,
-      collapsedFolders,
-      activePath: activeManualFolderPath,
-      overPath,
-      placement,
-      horizontalOffset: dragDelta.x,
-      indentationWidth: TREE_INDENT_WIDTH,
-    });
-  }, [active, activeManualFolderPath, collapsedFolders, dragDelta, over, tree]);
-  const manualFolderDropPlan = useMemo(() => {
-    if (!activeManualFolderPath || !projectedDrop) {
-      return null;
-    }
-
-    return buildFolderDropOrderPlan(tree, activeManualFolderPath, projectedDrop);
-  }, [activeManualFolderPath, projectedDrop, tree]);
+    activeDragType === "note" || activeDragType === "folder";
 
   const focusTree = useCallback(() => {
     requestAnimationFrame(() => {
@@ -917,16 +742,12 @@ export function FolderTreeView({
   }, [folderAppearances]);
 
   useEffect(() => {
-    const handleExpand = (event: Event) => {
-      const folderPath = (event as CustomEvent<string>).detail;
-      if (folderPath) {
-        expandFolder(folderPath);
-      }
-    };
+    if (!folderRevealRequest) {
+      return;
+    }
 
-    window.addEventListener("expand-folder", handleExpand);
-    return () => window.removeEventListener("expand-folder", handleExpand);
-  }, [expandFolder]);
+    expandFolder(folderRevealRequest.path);
+  }, [expandFolder, folderRevealRequest]);
 
   useEffect(() => {
     const handleCreateFolder = () => {
@@ -938,11 +759,10 @@ export function FolderTreeView({
       window.removeEventListener("create-new-folder", handleCreateFolder);
   }, [selectedFolderPath, startCreateFolder]);
 
-  useEffect(() => {
-    if (selectedFolderPath) {
-      expandFolder(selectedFolderPath);
-    }
-  }, [expandFolder, selectedFolderPath]);
+  const handleSelectFolder = useCallback((path: string) => {
+    expandFolder(path);
+    selectFolder(path);
+  }, [expandFolder, selectFolder]);
 
   const handleToggleCollapse = useCallback((path: string) => {
     commitCollapsedFolders((prev) => {
@@ -1035,7 +855,6 @@ export function FolderTreeView({
         }
 
         await setFolderAppearance(oldPath, folderAppearance);
-        selectFolder(oldPath);
         setInlineEditState(null);
         setIconPickerTarget(null);
         focusTree();
@@ -1051,8 +870,6 @@ export function FolderTreeView({
           toast.error("Folder renamed, but failed to save style");
         }
       }
-      expandFolder(newPath);
-      selectFolder(newPath);
       setInlineEditState(null);
       setIconPickerTarget(null);
       focusTree();
@@ -1062,14 +879,12 @@ export function FolderTreeView({
       throw error;
     }
   }, [
-    expandFolder,
     focusTree,
     handleCancelInlineEdit,
     folderAppearances,
     inlineEditState,
     renameFolder,
     setFolderAppearance,
-    selectFolder,
   ]);
 
   const pickerValue = useMemo<FolderAppearance | null>(() => {
@@ -1154,10 +969,6 @@ export function FolderTreeView({
     }
   }, [deleteFolder, folderToDelete, dontAskAgain, setConfirmDeletions]);
 
-  useEffect(() => {
-    onManualFolderDropPlanChange?.(manualFolderDropPlan);
-  }, [manualFolderDropPlan, onManualFolderDropPlanChange]);
-
   const { setNodeRef: setRootDropRef, isOver: isOverRoot } = useDroppable({
     id: "drop-folder:root",
     data: { type: "folder-drop-target", path: "" },
@@ -1190,36 +1001,80 @@ export function FolderTreeView({
                 Recent Notes
               </span>
             </span>
-            {showNoteCounts && <FolderRowTrailing count={recentNotes.length} />}
+            {showNoteCounts && (
+              <FolderRowTrailing
+                count={recentNotes.length}
+                isActive={selectedScope.type === "recent"}
+              />
+            )}
           </button>
         )}
-        <div
-          ref={setRootDropRef}
-          className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
-            isOverRoot && isContainerDropActive
-              ? "bg-accent/12 ring-1 ring-accent/60"
-              : selectedScope.type === "all"
-                ? "bg-bg-muted"
-                : "hover:bg-bg-muted/80"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => selectFolder(null)}
-            className="w-full flex items-center gap-3 pl-3 pr-2 py-2 text-left"
-          >
-            <span className="flex items-center gap-2 min-w-0 flex-1">
-              <FolderGlyph
-                className="w-4.25 h-4.25 text-text-muted/80 shrink-0"
-                strokeWidth={1.7}
-              />
-              <span className="text-sm font-medium text-text truncate">
-                All Notes
-              </span>
-            </span>
-            {showNoteCounts && <FolderRowTrailing count={notes.length} />}
-          </button>
-        </div>
+        <ContextMenu.Root>
+          <ContextMenu.Trigger asChild>
+            <div
+              ref={setRootDropRef}
+              className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
+                isOverRoot && isContainerDropActive
+                  ? "bg-accent/12 ring-1 ring-accent/60"
+                  : selectedScope.type === "all"
+                    ? "bg-bg-muted"
+                    : "hover:bg-bg-muted/80"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => selectFolder(null)}
+                className="w-full flex items-center gap-3 pl-3 pr-2 py-2 text-left"
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <FolderGlyph
+                    className="w-4.25 h-4.25 text-text-muted/80 shrink-0"
+                    strokeWidth={1.7}
+                  />
+                  <span className="text-sm font-medium text-text truncate">
+                    All Notes
+                  </span>
+                </span>
+                {showNoteCounts && (
+                  <FolderRowTrailing
+                    count={notes.length}
+                    isActive={selectedScope.type === "all"}
+                  />
+                )}
+              </button>
+            </div>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content
+              className={`${menuSurfaceClassName} min-w-44 z-50`}
+              onCloseAutoFocus={(event) => {
+                if (!suppressRootMenuCloseAutoFocusRef.current) return;
+                suppressRootMenuCloseAutoFocusRef.current = false;
+                event.preventDefault();
+              }}
+            >
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => {
+                  void createNote();
+                }}
+              >
+                <FilePlusCorner className="w-4 h-4 stroke-[1.6]" />
+                New Note
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => {
+                  suppressRootMenuCloseAutoFocusRef.current = true;
+                  startCreateFolder("");
+                }}
+              >
+                <FolderPlusIcon className="w-4 h-4 stroke-[1.6]" />
+                New Subfolder
+              </ContextMenu.Item>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
 
         <div className="flex flex-col gap-0.5">
           {isCreatingRoot && (
@@ -1239,21 +1094,20 @@ export function FolderTreeView({
             />
           )}
 
-          {displayTree.folders.map((folder) => (
-            <FolderItem
-              key={folder.path}
-              folder={folder}
-              depth={0}
-              isManualSorting={folderSortMode === "manual"}
-              folderAppearances={folderAppearances}
-              showNoteCounts={showNoteCounts}
+          {tree.folders.map((folder) => (
+              <FolderItem
+                key={folder.path}
+                folder={folder}
+                depth={0}
+                pendingFolderPath={pendingFolderPath}
+                folderAppearances={folderAppearances}
+                showNoteCounts={showNoteCounts}
               selectedFolderPath={selectedFolderPath}
-              collapsedFolders={visibleCollapsedFolders}
+              collapsedFolders={collapsedFolders}
               inlineEditState={inlineEditState}
-              projectedDrop={projectedDrop}
               resolvedTheme={resolvedTheme}
               onToggleCollapse={handleToggleCollapse}
-              onSelectFolder={selectFolder}
+              onSelectFolder={handleSelectFolder}
               onCreateNoteHere={createNoteInFolder}
               onStartCreateFolder={startCreateFolder}
               onCreateFolder={handleCreateFolder}

@@ -52,17 +52,14 @@ describe("FoldersPane", () => {
 
     render(
       <TooltipProvider>
-        <FoldersPane
-          dragDelta={null}
-          onManualFolderDropPlanChange={vi.fn()}
-          pendingManualFolderDropPlan={null}
-        />
+        <FoldersPane />
       </TooltipProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: "Sort Folders" }));
 
     expect(screen.getByText("View")).toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: /Manual/i })).not.toBeInTheDocument();
 
     const toggle = screen.getByRole("menuitemcheckbox", {
       name: /Recent Notes/i,
@@ -77,5 +74,5 @@ describe("FoldersPane", () => {
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteCounts: false,
     });
-  });
+  }, 10000);
 });

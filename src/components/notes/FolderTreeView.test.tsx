@@ -1,11 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FolderTreeView } from "./FolderTreeView";
-
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
-}));
 
 vi.mock("@dnd-kit/core", () => ({
   useDndContext: vi.fn(() => ({ active: null, over: null })),
@@ -33,10 +30,6 @@ vi.mock("../../context/ThemeContext", () => ({
   })),
 }));
 
-vi.mock("../../services/notes", () => ({
-  listFolders: vi.fn(async () => []),
-}));
-
 type NotesHookValue = ReturnType<
   typeof import("../../context/NotesContext").useNotes
 >;
@@ -47,18 +40,22 @@ function makeNotesHookValue(
   return {
     notes: [],
     recentNotes: [],
+    knownFolders: [],
+    hasLoadedFolders: true,
     notesFolder: "/notes",
     settings: {},
     folderAppearances: {},
     folderSortMode: "nameAsc",
-    folderManualOrder: {},
+    folderRevealRequest: null,
     showRecentNotes: true,
     showNoteCounts: true,
     selectedScope: { type: "all" },
     selectedFolderPath: null,
     selectFolder: vi.fn(),
     selectRecentNotes: vi.fn(),
+    revealFolder: vi.fn(),
     setShowRecentNotes: vi.fn(),
+    createNote: vi.fn(),
     createNoteInFolder: vi.fn(),
     createFolder: vi.fn(),
     deleteFolder: vi.fn(),
@@ -103,7 +100,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    render(<FolderTreeView dragDelta={null} />);
+    render(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
@@ -132,7 +129,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    const { rerender } = render(<FolderTreeView dragDelta={null} />);
+    const { rerender } = render(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
@@ -148,7 +145,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    rerender(<FolderTreeView dragDelta={null} />);
+    rerender(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
@@ -171,7 +168,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    render(<FolderTreeView dragDelta={null} />);
+    render(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
@@ -216,7 +213,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    render(<FolderTreeView dragDelta={null} />);
+    render(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
@@ -226,19 +223,136 @@ describe("FolderTreeView", () => {
     expect(screen.queryByText("2")).not.toBeInTheDocument();
   });
 
-  it("shows only direct folder note counts and hides zero-count folder badges", async () => {
-    const notesContext = await import("../../context/NotesContext");
-    const notesService = await import("../../services/notes");
+  it("opens root folder creation from the All Notes context menu", async () => {
     const user = userEvent.setup();
 
-    vi.mocked(notesService.listFolders).mockResolvedValue([
-      "docs",
-      "docs/reference",
-      "empty",
-    ]);
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /All Notes/i }));
+
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: /New Subfolder/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Folder name")).toBeInTheDocument();
+    });
+  });
+
+  it("creates a root note from the All Notes context menu", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+    const createNote = vi.fn();
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
+        createNote,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /All Notes/i }));
+
+    await user.click(screen.getByRole("menuitem", { name: /^New Note$/i }));
+
+    expect(createNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not briefly expand a collapsed folder while renaming it", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockImplementation(() => {
+      const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
+        "docs",
+      );
+      const [knownFolders, setKnownFolders] = useState(["docs", "docs/reference"]);
+      const [settings, setSettings] = useState({
+        collapsedFolders: ["docs"],
+      });
+
+      const renameFolder = vi.fn().mockImplementation(async () => {
+        setKnownFolders(["archive", "archive/reference"]);
+        setSettings({ collapsedFolders: ["archive"] });
+        setSelectedFolderPath("archive");
+      });
+
+      return makeNotesHookValue({
+        settings,
+        knownFolders,
+        selectedScope: selectedFolderPath
+          ? { type: "folder", path: selectedFolderPath }
+          : { type: "all" },
+        selectedFolderPath,
+        selectFolder: setSelectedFolderPath,
+        renameFolder,
+      });
+    });
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Expand folder/i }),
+      ).toBeInTheDocument();
+    });
+
+    const expandedChildSeen: boolean[] = [];
+    const observer = new MutationObserver(() => {
+      if (screen.queryByText("reference")) {
+        expandedChildSeen.push(true);
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    expect(docsRow).not.toBeNull();
+
+    fireEvent.contextMenu(docsRow!);
+    await user.click(screen.getByRole("menuitem", { name: /Rename/i }));
+
+    const input = screen.getByDisplayValue("docs");
+    await user.clear(input);
+    await user.type(input, "archive{enter}");
+
+    await waitFor(() => {
+      expect(screen.getByText("archive")).toBeInTheDocument();
+    });
+
+    observer.disconnect();
+
+    expect(expandedChildSeen).toHaveLength(0);
+    expect(screen.queryByText("reference")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Expand folder/i })).toBeInTheDocument();
+  });
+
+  it("shows only direct folder note counts and hides zero-count folder badges", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: [
+          "docs",
+          "docs/reference",
+          "empty",
+        ],
         notes: [
           {
             id: "docs/alpha",
@@ -258,7 +372,7 @@ describe("FolderTreeView", () => {
       }),
     );
 
-    render(<FolderTreeView dragDelta={null} />);
+    render(<FolderTreeView />);
 
     await waitFor(() => {
       expect(screen.getByText("docs")).toBeInTheDocument();
@@ -280,5 +394,24 @@ describe("FolderTreeView", () => {
     expect(docsRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
     expect(referenceRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
     expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
+  });
+
+  it("keeps the dragged folder dimmed while a move is pending", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs"],
+      }),
+    );
+
+    render(<FolderTreeView pendingFolderPath="docs" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    expect(docsRow?.firstElementChild).toHaveClass("opacity-40");
   });
 });

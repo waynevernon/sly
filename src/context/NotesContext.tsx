@@ -13,7 +13,6 @@ import {
   DEFAULT_FOLDER_SORT_MODE,
   DEFAULT_NOTE_SORT_MODE,
   type FolderAppearance,
-  type FolderManualOrder,
   type FolderSortMode,
   type Note,
   type NoteListDateMode,
@@ -33,6 +32,12 @@ import {
   sanitizeFolderAppearances,
   type FolderAppearanceMap,
 } from "../lib/folderIcons";
+import { rewriteFolderPathList } from "../lib/folderTree";
+
+interface FolderRevealRequest {
+  path: string;
+  version: number;
+}
 
 // Separate contexts to prevent unnecessary re-renders
 // Data context: changes frequently, only subscribed by components that need the data
@@ -40,6 +45,8 @@ interface NotesDataContextValue {
   notes: NoteMetadata[];
   scopedNotes: NoteMetadata[];
   recentNotes: NoteMetadata[];
+  knownFolders: string[];
+  hasLoadedFolders: boolean;
   showRecentNotes: boolean;
   showNoteCounts: boolean;
   noteListDateMode: NoteListDateMode;
@@ -51,7 +58,6 @@ interface NotesDataContextValue {
   folderAppearances: FolderAppearanceMap;
   noteSortMode: NoteSortMode;
   folderSortMode: FolderSortMode;
-  folderManualOrder: FolderManualOrder;
   selectedScope: NoteScope;
   selectedNoteId: string | null;
   selectedNoteIds: string[];
@@ -65,6 +71,7 @@ interface NotesDataContextValue {
   isSearching: boolean;
   hasExternalChanges: boolean;
   reloadVersion: number;
+  folderRevealRequest: FolderRevealRequest | null;
 }
 
 // Actions context: stable references, rarely causes re-renders
@@ -94,6 +101,7 @@ interface NotesActionsContextValue {
   createFolder: (parentPath: string, name: string) => Promise<void>;
   deleteFolder: (path: string) => Promise<void>;
   renameFolder: (oldPath: string, newName: string) => Promise<void>;
+  revealFolder: (path: string | null) => void;
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveSelectedNotes: (targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
@@ -112,10 +120,6 @@ interface NotesActionsContextValue {
     showNoteListPreview?: boolean;
   }) => Promise<void>;
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
-  setFolderManualOrder: (
-    parentPath: string,
-    orderedPaths: string[],
-  ) => Promise<void>;
   setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
 }
 
@@ -224,61 +228,12 @@ function replaceNoteIds(
   );
 }
 
-function replaceNoteIdsByPrefix(
-  noteIds: string[] | null | undefined,
-  oldPrefix: string,
-  newPrefix: string,
-): string[] {
-  return normalizeNoteIds(
-    (noteIds ?? []).map((noteId) =>
-      noteId.startsWith(oldPrefix)
-        ? `${newPrefix}${noteId.substring(oldPrefix.length)}`
-        : noteId,
-    ),
-  );
-}
-
 function removeNoteIds(
   noteIds: string[] | null | undefined,
   idsToRemove: Set<string>,
 ): string[] {
   return normalizeNoteIds(
     (noteIds ?? []).filter((noteId) => !idsToRemove.has(noteId)),
-  );
-}
-
-function removeNoteIdsByPrefix(
-  noteIds: string[] | null | undefined,
-  prefix: string,
-): string[] {
-  return normalizeNoteIds(
-    (noteIds ?? []).filter((noteId) => !noteId.startsWith(prefix)),
-  );
-}
-
-function sanitizeFolderManualOrder(
-  folderManualOrder: FolderManualOrder | null | undefined,
-): FolderManualOrder {
-  if (!folderManualOrder) return {};
-
-  return Object.fromEntries(
-    Object.entries(folderManualOrder)
-      .filter(([parentPath, orderedPaths]) => {
-        if (parentPath !== "" && parentPath.trim().length === 0) return false;
-        return Array.isArray(orderedPaths);
-      })
-      .map(([parentPath, orderedPaths]) => {
-        const uniquePaths = Array.from(
-          new Set(
-            orderedPaths.filter(
-              (path): path is string =>
-                typeof path === "string" && path.trim().length > 0,
-            ),
-          ),
-        );
-        return [parentPath, uniquePaths];
-      })
-      .filter(([, orderedPaths]) => orderedPaths.length > 0),
   );
 }
 
@@ -314,11 +269,6 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   nextSettings.collapsedFolders = sanitizeCollapsedFolders(
     nextSettings.collapsedFolders,
   );
-  const folderManualOrder = sanitizeFolderManualOrder(
-    nextSettings.folderManualOrder,
-  );
-  nextSettings.folderManualOrder =
-    Object.keys(folderManualOrder).length > 0 ? folderManualOrder : undefined;
   const folderIcons = sanitizeFolderAppearances(nextSettings.folderIcons);
   nextSettings.folderIcons =
     Object.keys(folderIcons).length > 0 ? folderIcons : undefined;
@@ -415,11 +365,6 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   );
   assignField("noteSortMode", current.noteSortMode, next.noteSortMode);
   assignField("folderSortMode", current.folderSortMode, next.folderSortMode);
-  assignNullableField(
-    "folderManualOrder",
-    current.folderManualOrder,
-    next.folderManualOrder,
-  );
 
   return patch;
 }
@@ -430,6 +375,8 @@ function isSettingsPatchEmpty(patch: SettingsPatch): boolean {
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
+  const [knownFolders, setKnownFolders] = useState<string[]>([]);
+  const [hasLoadedFolders, setHasLoadedFolders] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
   const [recentScopeNoteIds, setRecentScopeNoteIds] = useState<
     string[] | undefined
@@ -449,6 +396,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [hasExternalChanges, setHasExternalChanges] = useState(false);
   // Increments when user manually refreshes, so Editor knows to reload content
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [folderRevealRequest, setFolderRevealRequest] =
+    useState<FolderRevealRequest | null>(null);
 
   // Track recently saved note IDs to ignore file-change events from our own saves
   const recentlySavedRef = useRef<Set<string>>(new Set());
@@ -479,6 +428,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
   const windowRefreshTimeoutRef = useRef<number | null>(null);
+  const folderLoadRequestIdRef = useRef(0);
+  const folderRevealVersionRef = useRef(0);
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
   const showRecentNotes = settings.showRecentNotes ?? true;
   const showNoteCounts = settings.showNoteCounts ?? true;
@@ -502,8 +453,52 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder]);
 
+  const refreshKnownFolders = useCallback(async (
+    targetNotesFolder: string | null = notesFolder,
+  ) => {
+    if (!targetNotesFolder) {
+      folderLoadRequestIdRef.current += 1;
+      setKnownFolders([]);
+      setHasLoadedFolders(true);
+      return;
+    }
+
+    const requestId = ++folderLoadRequestIdRef.current;
+    setHasLoadedFolders(false);
+
+    try {
+      const folders = await notesService.listFolders();
+      if (requestId !== folderLoadRequestIdRef.current) {
+        return;
+      }
+      setKnownFolders(folders);
+    } catch {
+      if (requestId !== folderLoadRequestIdRef.current) {
+        return;
+      }
+      setKnownFolders([]);
+    } finally {
+      if (requestId === folderLoadRequestIdRef.current) {
+        setHasLoadedFolders(true);
+      }
+    }
+  }, [notesFolder]);
+
+  const revealFolder = useCallback((path: string | null) => {
+    if (!path) {
+      return;
+    }
+
+    folderRevealVersionRef.current += 1;
+    setFolderRevealRequest({
+      path,
+      version: folderRevealVersionRef.current,
+    });
+  }, []);
+
   const applySettings = useCallback((nextSettings: Settings) => {
     const normalizedSettings = normalizeSettings(nextSettings);
+    settingsRef.current = normalizedSettings;
     setSettings(normalizedSettings);
     const nextFolderAppearances = sanitizeFolderAppearances(
       normalizedSettings.folderIcons,
@@ -562,30 +557,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       return normalizedSettings;
     },
     [applySettings, recentScopeNoteIds, refreshRecentScopeNoteIds],
-  );
-
-  const persistFolderManualOrder = useCallback(
-    async (parentPath: string, orderedPaths: string[]) => {
-      await persistSettings((currentSettings) => {
-        const folderManualOrder = sanitizeFolderManualOrder(
-          currentSettings.folderManualOrder,
-        );
-        if (orderedPaths.length > 0) {
-          folderManualOrder[parentPath] = orderedPaths;
-        } else {
-          delete folderManualOrder[parentPath];
-        }
-
-        return {
-          ...currentSettings,
-          folderManualOrder:
-            Object.keys(folderManualOrder).length > 0
-              ? folderManualOrder
-              : undefined,
-        };
-      });
-    },
-    [persistSettings],
   );
 
   const getVisibleNoteIds = useCallback(() => {
@@ -714,13 +685,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [persistSettings],
   );
 
-  const setFolderManualOrder = useCallback(
-    async (parentPath: string, orderedPaths: string[]) => {
-      await persistFolderManualOrder(parentPath, orderedPaths);
-    },
-    [persistFolderManualOrder],
-  );
-
   const setShowRecentNotes = useCallback(
     async (showRecentNotes: boolean) => {
       await persistSettings((currentSettings) => ({
@@ -785,21 +749,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           setCurrentNote(null);
         }
       }
-
-      if (scope.type === "folder") {
-        window.dispatchEvent(
-          new CustomEvent("expand-folder", { detail: scope.path }),
-        );
-      }
     },
     [refreshRecentScopeNoteIds, setSelectionState],
   );
 
   const selectFolder = useCallback(
     (path: string | null) => {
+      if (path) {
+        revealFolder(path);
+      }
       selectScope(path ? { type: "folder", path } : { type: "all" });
     },
-    [selectScope],
+    [revealFolder, selectScope],
   );
 
   const selectRecentNotes = useCallback(() => {
@@ -864,12 +825,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
       // Expand parent folders so the note is visible in the tree
-      if (parentFolder) {
-        window.dispatchEvent(
-          new CustomEvent("expand-folder", {
-            detail: parentFolder,
-          }),
-        );
+      if (parentFolder && selectedScopeRef.current.type !== "recent") {
+        revealFolder(parentFolder);
       }
       const note = await notesService.readNote(id);
       if (requestId !== selectRequestIdRef.current) return;
@@ -879,7 +836,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       if (requestId !== selectRequestIdRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to load note");
     }
-  }, [getVisibleNoteIds, recordRecentNoteView, setSelectionState]);
+  }, [getVisibleNoteIds, recordRecentNoteView, revealFolder, setSelectionState]);
 
   const toggleNoteSelection = useCallback(
     (id: string) => {
@@ -1267,6 +1224,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setSelectedNoteId(note.id);
         setSelectionState([note.id], { anchorId: note.id, rangeEndId: note.id });
         setSelectedScope({ type: "folder", path: folderPath });
+        revealFolder(folderPath);
         setSearchQuery("");
         setSearchResults([]);
         void recordRecentNoteView(note.id);
@@ -1279,7 +1237,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [recordRecentNoteView, refreshNotes, setSelectionState]
+    [recordRecentNoteView, refreshNotes, revealFolder, setSelectionState]
   );
 
   const createFolderAction = useCallback(
@@ -1287,15 +1245,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       try {
         const fullPath = parentPath ? `${parentPath}/${name}` : name;
         await notesService.createFolder(fullPath);
-        await refreshSettings();
+        setKnownFolders((currentFolders) =>
+          currentFolders.includes(fullPath)
+            ? currentFolders
+            : [...currentFolders, fullPath],
+        );
+        setHasLoadedFolders(true);
         await refreshNotes();
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to create folder"
         );
+        throw err;
       }
     },
-    [refreshNotes, refreshSettings]
+    [refreshNotes]
   );
 
   const deleteFolderAction = useCallback(
@@ -1303,15 +1267,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       try {
         await notesService.deleteFolder(path);
         const folderPrefix = `${path}/`;
-        const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (recentNoteIds.some((noteId) => noteId.startsWith(folderPrefix))) {
-          await persistSettings((currentSettings) => ({
-            ...currentSettings,
-            recentNoteIds: sanitizeRecentNoteIds(
-              removeNoteIdsByPrefix(currentSettings.recentNoteIds, folderPrefix),
-            ),
-          }));
-        }
+        await refreshSettings();
+        setKnownFolders((currentFolders) =>
+          currentFolders.filter(
+            (folderPath) =>
+              folderPath !== path && !folderPath.startsWith(folderPrefix),
+          ),
+        );
+        setHasLoadedFolders(true);
         // If the selected note was inside the deleted folder, clear selection
         setSelectedNoteId((prevId) => {
           if (prevId && prevId.startsWith(folderPrefix)) {
@@ -1347,19 +1310,94 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           return prevScope;
         });
         await refreshNotes();
+        await refreshActiveSearchResults();
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to delete folder"
         );
       }
     },
-    [persistSettings, refreshNotes]
+    [refreshActiveSearchResults, refreshNotes, refreshSettings]
+  );
+
+  const remapLocalStateForFolderPathChange = useCallback(
+    (oldPath: string, newPath: string) => {
+      const oldPrefix = `${oldPath}/`;
+      const newPrefix = `${newPath}/`;
+
+      setSelectedNoteId((prevId) => {
+        if (prevId && prevId.startsWith(oldPrefix)) {
+          const newId = `${newPrefix}${prevId.substring(oldPrefix.length)}`;
+          notesService.readNote(newId).then((note) => {
+            setCurrentNote(note);
+          }).catch((err) => {
+            setError(err instanceof Error ? err.message : "Failed to read moved note");
+          });
+          return newId;
+        }
+        return prevId;
+      });
+      setSelectedNoteIds((prevIds) =>
+        prevIds.map((id) =>
+          id.startsWith(oldPrefix)
+            ? `${newPrefix}${id.substring(oldPrefix.length)}`
+            : id,
+        ),
+      );
+      if (
+        selectionAnchorIdRef.current &&
+        selectionAnchorIdRef.current.startsWith(oldPrefix)
+      ) {
+        selectionAnchorIdRef.current =
+          `${newPrefix}${selectionAnchorIdRef.current.substring(oldPrefix.length)}`;
+      }
+      if (
+        selectionRangeEndIdRef.current &&
+        selectionRangeEndIdRef.current.startsWith(oldPrefix)
+      ) {
+        selectionRangeEndIdRef.current =
+          `${newPrefix}${selectionRangeEndIdRef.current.substring(oldPrefix.length)}`;
+      }
+      setKnownFolders((currentFolders) =>
+        rewriteFolderPathList(currentFolders, oldPath, newPath),
+      );
+      setFolderRevealRequest((currentRequest) => {
+        if (!currentRequest) {
+          return currentRequest;
+        }
+
+        const nextPath = rewriteFolderPathList(
+          [currentRequest.path],
+          oldPath,
+          newPath,
+        )[0];
+
+        return nextPath === currentRequest.path
+          ? currentRequest
+          : { ...currentRequest, path: nextPath };
+      });
+      setSelectedScope((prevScope) => {
+        if (prevScope.type !== "folder") return prevScope;
+        if (prevScope.path === oldPath) {
+          return { type: "folder", path: newPath };
+        }
+        if (prevScope.path.startsWith(oldPrefix)) {
+          return {
+            type: "folder",
+            path: `${newPrefix}${prevScope.path.substring(oldPrefix.length)}`,
+          };
+        }
+        return prevScope;
+      });
+    },
+    [],
   );
 
   const renameFolderAction = useCallback(
     async (oldPath: string, newName: string) => {
       try {
         await notesService.renameFolder(oldPath, newName);
+        await refreshSettings();
 
         // Compute new folder path
         const lastSlash = oldPath.lastIndexOf("/");
@@ -1367,77 +1405,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           lastSlash >= 0
             ? `${oldPath.substring(0, lastSlash)}/${newName}`
             : newName;
-        const oldPrefix = oldPath + "/";
-        const newPrefix = newPath + "/";
-        const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (recentNoteIds.some((noteId) => noteId.startsWith(oldPrefix))) {
-          await persistSettings((currentSettings) => ({
-            ...currentSettings,
-            recentNoteIds: sanitizeRecentNoteIds(
-              replaceNoteIdsByPrefix(
-                currentSettings.recentNoteIds,
-                oldPrefix,
-                newPrefix,
-              ),
-            ),
-          }));
-        }
-
-        // Update selectedNoteId if it was inside the renamed folder
-        setSelectedNoteId((prevId) => {
-          if (prevId && prevId.startsWith(oldPrefix)) {
-            const newId = newPrefix + prevId.substring(oldPrefix.length);
-            notesService.readNote(newId).then((note) => {
-              setCurrentNote(note);
-            }).catch((err) => {
-              setError(err instanceof Error ? err.message : "Failed to read renamed note");
-            });
-            return newId;
-          }
-          return prevId;
-        });
-        setSelectedNoteIds((prevIds) =>
-          prevIds.map((id) =>
-            id.startsWith(oldPrefix)
-              ? newPrefix + id.substring(oldPrefix.length)
-              : id,
-          ),
-        );
-        if (
-          selectionAnchorIdRef.current &&
-          selectionAnchorIdRef.current.startsWith(oldPrefix)
-        ) {
-          selectionAnchorIdRef.current =
-            newPrefix + selectionAnchorIdRef.current.substring(oldPrefix.length);
-        }
-        if (
-          selectionRangeEndIdRef.current &&
-          selectionRangeEndIdRef.current.startsWith(oldPrefix)
-        ) {
-          selectionRangeEndIdRef.current =
-            newPrefix + selectionRangeEndIdRef.current.substring(oldPrefix.length);
-        }
-        setSelectedScope((prevScope) => {
-          if (prevScope.type !== "folder") return prevScope;
-          if (prevScope.path === oldPath) {
-            return { type: "folder", path: newPath };
-          }
-          if (prevScope.path.startsWith(oldPrefix)) {
-            return {
-              type: "folder",
-              path: `${newPrefix}${prevScope.path.substring(oldPrefix.length)}`,
-            };
-          }
-          return prevScope;
-        });
+        remapLocalStateForFolderPathChange(oldPath, newPath);
+        setHasLoadedFolders(true);
         await refreshNotes();
+        await refreshActiveSearchResults();
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to rename folder"
         );
+        throw err;
       }
     },
-    [persistSettings, refreshNotes]
+    [refreshActiveSearchResults, refreshNotes, refreshSettings, remapLocalStateForFolderPathChange]
   );
 
   const moveNoteAction = useCallback(
@@ -1578,6 +1557,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async (path: string, targetParent: string) => {
       try {
         await notesService.moveFolder(path, targetParent);
+        await refreshSettings();
 
         // Compute new folder path
         const folderName = path.includes("/")
@@ -1586,75 +1566,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         const newPath = targetParent
           ? `${targetParent}/${folderName}`
           : folderName;
-        const oldPrefix = path + "/";
-        const newPrefix = newPath + "/";
-        const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (recentNoteIds.some((noteId) => noteId.startsWith(oldPrefix))) {
-          await persistSettings((currentSettings) => ({
-            ...currentSettings,
-            recentNoteIds: sanitizeRecentNoteIds(
-              replaceNoteIdsByPrefix(
-                currentSettings.recentNoteIds,
-                oldPrefix,
-                newPrefix,
-              ),
-            ),
-          }));
-        }
-
-        // Update selectedNoteId if it was inside the moved folder
-        setSelectedNoteId((prevId) => {
-          if (prevId && prevId.startsWith(oldPrefix)) {
-            const newId = newPrefix + prevId.substring(oldPrefix.length);
-            notesService.readNote(newId).then((note) => {
-              setCurrentNote(note);
-            }).catch((err) => {
-              setError(err instanceof Error ? err.message : "Failed to read moved note");
-            });
-            return newId;
-          }
-          return prevId;
-        });
-        setSelectedNoteIds((prevIds) =>
-          prevIds.map((id) =>
-            id.startsWith(oldPrefix)
-              ? newPrefix + id.substring(oldPrefix.length)
-              : id,
-          ),
-        );
-        if (
-          selectionAnchorIdRef.current &&
-          selectionAnchorIdRef.current.startsWith(oldPrefix)
-        ) {
-          selectionAnchorIdRef.current =
-            newPrefix + selectionAnchorIdRef.current.substring(oldPrefix.length);
-        }
-        if (
-          selectionRangeEndIdRef.current &&
-          selectionRangeEndIdRef.current.startsWith(oldPrefix)
-        ) {
-          selectionRangeEndIdRef.current =
-            newPrefix + selectionRangeEndIdRef.current.substring(oldPrefix.length);
-        }
-        setSelectedScope((prevScope) => {
-          if (prevScope.type !== "folder") return prevScope;
-          if (prevScope.path === path) {
-            return { type: "folder", path: newPath };
-          }
-          if (prevScope.path.startsWith(oldPrefix)) {
-            return {
-              type: "folder",
-              path: `${newPrefix}${prevScope.path.substring(oldPrefix.length)}`,
-            };
-          }
-          return prevScope;
-        });
+        remapLocalStateForFolderPathChange(path, newPath);
+        setHasLoadedFolders(true);
         await refreshNotes();
+        await refreshActiveSearchResults();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move folder");
+        throw err;
       }
     },
-    [persistSettings, refreshNotes]
+    [refreshActiveSearchResults, refreshNotes, refreshSettings, remapLocalStateForFolderPathChange]
   );
 
   const setFolderAppearance = useCallback(async (
@@ -1698,6 +1619,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     try {
       await notesService.setNotesFolder(path);
       setNotesFolderState(path);
+      setKnownFolders([]);
+      setHasLoadedFolders(false);
       applySettings({});
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
@@ -1705,19 +1628,22 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setCurrentNote(null);
       // Start file watcher after setting folder
       await notesService.startFileWatcher();
+      await refreshKnownFolders(path);
       await refreshSettings();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to set notes folder"
       );
     }
-  }, [applySettings, refreshSettings, setSelectionState]);
+  }, [applySettings, refreshKnownFolders, refreshSettings, setSelectionState]);
 
   // Update local state only (backend already initialized the folder).
   // Used when the CLI sets the notes folder and emits an event.
   const syncNotesFolder = useCallback(async (path: string) => {
     try {
       setNotesFolderState(path);
+      setKnownFolders([]);
+      setHasLoadedFolders(false);
       applySettings({});
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
@@ -1725,6 +1651,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setCurrentNote(null);
       const notesList = await notesService.listNotes();
       setNotes(notesList);
+      await refreshKnownFolders(path);
       await notesService.startFileWatcher();
       await refreshSettings();
     } catch (err) {
@@ -1732,7 +1659,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         err instanceof Error ? err.message : "Failed to sync notes folder"
       );
     }
-  }, [applySettings, refreshSettings, setSelectionState]);
+  }, [applySettings, refreshKnownFolders, refreshSettings, setSelectionState]);
 
   const search = useCallback(async (query: string) => {
     const requestId = ++searchRequestIdRef.current;
@@ -1830,12 +1757,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         const folder = await notesService.getNotesFolder();
         setNotesFolderState(folder);
         if (folder) {
-          const notesList = await notesService.listNotes();
+          const [notesList, folders] = await Promise.all([
+            notesService.listNotes(),
+            notesService.listFolders(),
+          ]);
           setNotes(notesList);
+          setKnownFolders(folders);
+          setHasLoadedFolders(true);
           await refreshSettings();
           // Start file watcher
           await notesService.startFileWatcher();
         } else {
+          setKnownFolders([]);
+          setHasLoadedFolders(true);
           applySettings({});
         }
       } catch (err) {
@@ -1873,6 +1807,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           setHasExternalChanges(true);
         }
       }
+
+      if (event.payload.folder_structure_changed) {
+        void refreshKnownFolders();
+      }
     }).then((fn) => {
       if (isCancelled) {
         // Effect was cleaned up before listener registered, clean up immediately
@@ -1888,7 +1826,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         unlisten();
       }
     };
-  }, [refreshNotes]);
+  }, [refreshKnownFolders, refreshNotes]);
 
   useEffect(() => {
     const scheduleRefresh = () => {
@@ -2026,6 +1964,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       notes,
       scopedNotes,
       recentNotes,
+      knownFolders,
+      hasLoadedFolders,
       showRecentNotes,
       showNoteCounts,
       noteListDateMode,
@@ -2037,7 +1977,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       folderAppearances,
       noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
       folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
-      folderManualOrder: settings.folderManualOrder || {},
       selectedScope,
       selectedNoteId,
       selectedNoteIds,
@@ -2051,11 +1990,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       isSearching,
       hasExternalChanges,
       reloadVersion,
+      folderRevealRequest,
     }),
     [
       notes,
       scopedNotes,
       recentNotes,
+      knownFolders,
+      hasLoadedFolders,
       showRecentNotes,
       showNoteCounts,
       noteListDateMode,
@@ -2078,6 +2020,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       isSearching,
       hasExternalChanges,
       reloadVersion,
+      folderRevealRequest,
     ]
   );
 
@@ -2109,6 +2052,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createFolder: createFolderAction,
       deleteFolder: deleteFolderAction,
       renameFolder: renameFolderAction,
+      revealFolder,
       moveNote: moveNoteAction,
       moveSelectedNotes,
       moveFolder: moveFolderAction,
@@ -2117,7 +2061,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setNoteListViewOptions,
       setFolderSortMode,
-      setFolderManualOrder,
       setShowRecentNotes,
     }),
     [
@@ -2146,6 +2089,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createFolderAction,
       deleteFolderAction,
       renameFolderAction,
+      revealFolder,
       moveNoteAction,
       moveSelectedNotes,
       moveFolderAction,
@@ -2154,7 +2098,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setNoteListViewOptions,
       setFolderSortMode,
-      setFolderManualOrder,
       setShowRecentNotes,
     ]
   );

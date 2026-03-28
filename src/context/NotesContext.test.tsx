@@ -73,6 +73,7 @@ describe("NotesContext", () => {
         created: 1,
       },
     ]);
+    vi.mocked(notesService.listFolders).mockResolvedValue([]);
     vi.mocked(notesService.getSettings).mockResolvedValue({});
     vi.mocked(notesService.patchSettings).mockResolvedValue();
     vi.mocked(notesService.startFileWatcher).mockResolvedValue();
@@ -166,33 +167,31 @@ describe("NotesContext", () => {
     expect(result.current.searchResults.map((note) => note.id)).not.toContain("alpha");
   });
 
-  it("persists sanitized manual folder order", async () => {
+  it("rethrows create folder failures so the tree does not continue on a fake success path", async () => {
+    vi.mocked(notesService.createFolder).mockRejectedValueOnce(new Error("exists"));
+
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    let thrown: unknown;
     await act(async () => {
-      await result.current.setFolderManualOrder("", ["docs", "docs", "", "journal"]);
+      try {
+        await result.current.createFolder("", "docs");
+      } catch (error) {
+        thrown = error;
+      }
     });
 
-    expect(notesService.patchSettings).toHaveBeenCalledWith({
-      folderManualOrder: {
-        "": ["docs", "journal"],
-      },
-    });
-    expect(result.current.folderManualOrder).toEqual({
-      "": ["docs", "journal"],
-    });
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe("exists");
+    expect(result.current.error).toBe("exists");
   });
 
-  it("removes manual folder order entries when cleared", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
-      folderManualOrder: {
-        "": ["docs"],
-      },
-    });
+  it("rethrows rename folder failures so the tree does not continue on a fake success path", async () => {
+    vi.mocked(notesService.renameFolder).mockRejectedValueOnce(new Error("collision"));
 
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 
@@ -200,14 +199,18 @@ describe("NotesContext", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    let thrown: unknown;
     await act(async () => {
-      await result.current.setFolderManualOrder("", []);
+      try {
+        await result.current.renameFolder("docs", "archive");
+      } catch (error) {
+        thrown = error;
+      }
     });
 
-    expect(notesService.patchSettings).toHaveBeenCalledWith({
-      folderManualOrder: null,
-    });
-    expect(result.current.folderManualOrder).toEqual({});
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe("collision");
+    expect(result.current.error).toBe("collision");
   });
 
   it("persists note list view settings together with normalized defaults", async () => {
@@ -528,6 +531,70 @@ describe("NotesContext", () => {
     ]);
   });
 
+  it("does not expand the folder tree when opening a note from recent scope", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha note",
+        preview: "planning",
+        modified: 2,
+        created: 2,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      recentNoteIds: ["docs/alpha"],
+    });
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "docs/alpha",
+      title: "Alpha note",
+      content: "",
+      path: "/notes/docs/alpha.md",
+      modified: 2,
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectRecentNotes();
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/alpha");
+    });
+
+    expect(result.current.folderRevealRequest).toBeNull();
+  });
+
+  it("publishes a new folder reveal request each time a folder is explicitly selected", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.folderRevealRequest).toEqual({
+      path: "docs",
+      version: 1,
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.folderRevealRequest).toEqual({
+      path: "docs",
+      version: 2,
+    });
+  });
+
   it("does not update recent notes when opening a note fails", async () => {
     vi.mocked(notesService.readNote).mockRejectedValue(new Error("boom"));
 
@@ -795,7 +862,84 @@ describe("NotesContext", () => {
     });
   });
 
-  it("remaps recent note ids when a folder is renamed", async () => {
+  it("refreshes folder settings and remaps selection when a folder is moved", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+    ]);
+    vi.mocked(notesService.getSettings)
+      .mockResolvedValueOnce({
+        recentNoteIds: ["docs/alpha"],
+        folderIcons: {
+          docs: { colorId: "blue" },
+        },
+        collapsedFolders: ["docs"],
+      })
+      .mockResolvedValueOnce({
+        recentNoteIds: ["archive/docs/alpha"],
+        folderIcons: {
+          "archive/docs": { colorId: "blue" },
+        },
+        collapsedFolders: ["archive/docs"],
+      });
+    vi.mocked(notesService.moveFolder).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "archive/docs/alpha",
+          title: "Alpha",
+          preview: "",
+          modified: 2,
+          created: 2,
+        },
+      ]);
+    });
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "archive/docs/alpha",
+      title: "Alpha",
+      content: "",
+      path: "/notes/archive/docs/alpha.md",
+      modified: 2,
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/alpha");
+    });
+
+    await act(async () => {
+      await result.current.moveFolder("docs", "archive");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual(["archive/docs/alpha"]);
+    });
+    expect(notesService.moveFolder).toHaveBeenCalledWith("docs", "archive");
+    expect(result.current.settings.folderIcons).toEqual({
+      "archive/docs": { colorId: "blue" },
+    });
+    expect(result.current.settings.collapsedFolders).toEqual(["archive/docs"]);
+    expect(result.current.selectedScope).toEqual({
+      type: "folder",
+      path: "archive/docs",
+    });
+    expect(result.current.selectedNoteId).toBe("archive/docs/alpha");
+  });
+
+  it("refreshes folder settings and remaps selection when a folder is renamed", async () => {
     vi.mocked(notesService.listNotes).mockResolvedValue([
       {
         id: "docs/alpha",
@@ -812,9 +956,21 @@ describe("NotesContext", () => {
         created: 1,
       },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
-      recentNoteIds: ["docs/alpha", "docs/beta"],
-    });
+    vi.mocked(notesService.getSettings)
+      .mockResolvedValueOnce({
+        recentNoteIds: ["docs/alpha", "docs/beta"],
+        folderIcons: {
+          docs: { colorId: "blue" },
+        },
+        collapsedFolders: ["docs"],
+      })
+      .mockResolvedValueOnce({
+        recentNoteIds: ["archive/alpha", "archive/beta"],
+        folderIcons: {
+          archive: { colorId: "blue" },
+        },
+        collapsedFolders: ["archive"],
+      });
     vi.mocked(notesService.renameFolder).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -833,11 +989,26 @@ describe("NotesContext", () => {
         },
       ]);
     });
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "archive/alpha",
+      title: "Alpha",
+      content: "",
+      path: "/notes/archive/alpha.md",
+      modified: 2,
+    });
 
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/alpha");
     });
 
     await act(async () => {
@@ -850,6 +1021,97 @@ describe("NotesContext", () => {
         "archive/beta",
       ]);
     });
+    expect(result.current.settings.folderIcons).toEqual({
+      archive: { colorId: "blue" },
+    });
+    expect(result.current.settings.collapsedFolders).toEqual(["archive"]);
+    expect(result.current.selectedScope).toEqual({
+      type: "folder",
+      path: "archive",
+    });
+    expect(result.current.selectedNoteId).toBe("archive/alpha");
+  });
+
+  it("refreshes folder settings and clears selection when a folder is deleted", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+      {
+        id: "journal/beta",
+        title: "Beta",
+        preview: "",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+    vi.mocked(notesService.getSettings)
+      .mockResolvedValueOnce({
+        recentNoteIds: ["docs/alpha", "journal/beta"],
+        folderIcons: {
+          docs: { colorId: "blue" },
+          journal: { colorId: "red" },
+        },
+        collapsedFolders: ["docs", "journal"],
+      })
+      .mockResolvedValueOnce({
+        recentNoteIds: ["journal/beta"],
+        folderIcons: {
+          journal: { colorId: "red" },
+        },
+        collapsedFolders: ["journal"],
+      });
+    vi.mocked(notesService.deleteFolder).mockImplementation(async () => {
+      vi.mocked(notesService.listNotes).mockResolvedValue([
+        {
+          id: "journal/beta",
+          title: "Beta",
+          preview: "",
+          modified: 1,
+          created: 1,
+        },
+      ]);
+    });
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "docs/alpha",
+      title: "Alpha",
+      content: "",
+      path: "/notes/docs/alpha.md",
+      modified: 2,
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/alpha");
+    });
+
+    await act(async () => {
+      await result.current.deleteFolder("docs");
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.recentNoteIds).toEqual(["journal/beta"]);
+    });
+    expect(notesService.deleteFolder).toHaveBeenCalledWith("docs");
+    expect(result.current.settings.folderIcons).toEqual({
+      journal: { colorId: "red" },
+    });
+    expect(result.current.settings.collapsedFolders).toEqual(["journal"]);
+    expect(result.current.selectedScope).toEqual({ type: "all" });
+    expect(result.current.selectedNoteId).toBeNull();
   });
 
   it("shows recent scope in stored recent order instead of note sort order", async () => {

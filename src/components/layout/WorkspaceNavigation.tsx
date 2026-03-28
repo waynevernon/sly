@@ -7,13 +7,11 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
-import type { FolderDropOrderPlan } from "../../lib/folderTree";
 import { workspaceCollisionDetection } from "../../lib/dragCollision";
 import { cn } from "../../lib/utils";
 import { NoteIcon } from "../icons";
@@ -85,8 +83,8 @@ export function WorkspaceNavigation({
     moveFolder,
     moveNote,
     moveSelectedNotes,
+    revealFolder,
     folderAppearances,
-    setFolderManualOrder,
   } = useNotes();
   const { foldersPaneWidth, notesPaneWidth, resolvedTheme, setPaneWidths } =
     useTheme();
@@ -154,11 +152,7 @@ export function WorkspaceNavigation({
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [dragType, setDragType] = useState<"folder" | "note" | null>(null);
   const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
-  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null);
-  const [manualFolderDropPlan, setManualFolderDropPlan] =
-    useState<FolderDropOrderPlan | null>(null);
-  const [pendingManualFolderDropPlan, setPendingManualFolderDropPlan] =
-    useState<FolderDropOrderPlan | null>(null);
+  const [pendingFolderPath, setPendingFolderPath] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -168,14 +162,9 @@ export function WorkspaceNavigation({
     setDragLabel(null);
     setDragType(null);
     setDragFolderPath(null);
-    setDragDelta(null);
-    setManualFolderDropPlan(null);
   }, []);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    setDragDelta({ x: 0, y: 0 });
-    setManualFolderDropPlan(null);
-
     const data = event.active.data.current;
     if (data?.type === "note") {
       const noteIds = Array.isArray(data.ids)
@@ -242,20 +231,15 @@ export function WorkspaceNavigation({
     [],
   );
 
-  const handleDragMove = useCallback((event: DragMoveEvent) => {
-    setDragDelta({ x: event.delta.x, y: event.delta.y });
-  }, []);
-
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     const activeData = active.data.current;
     const overData = over?.data.current;
-    const nextManualFolderDropPlan = manualFolderDropPlan;
-    clearDragState();
     if (!activeData) return;
 
     try {
       if (activeData.type === "note") {
+        clearDragState();
         if (!overData) return;
 
         const targetFolder = (overData.path as string) || "";
@@ -278,53 +262,13 @@ export function WorkspaceNavigation({
           await moveNote(noteId, targetFolder);
         }
         if (targetFolder) {
-          window.dispatchEvent(
-            new CustomEvent("expand-folder", { detail: targetFolder }),
-          );
+          revealFolder(targetFolder);
         }
-        return;
-      }
-
-      if (activeData.type === "folder" && activeData.manualSort === true) {
-        const folderPath = activeData.path as string;
-        if (
-          !nextManualFolderDropPlan ||
-          nextManualFolderDropPlan.activePath !== folderPath ||
-          nextManualFolderDropPlan.isNoOp
-        ) {
-          return;
-        }
-
-        setPendingManualFolderDropPlan(nextManualFolderDropPlan);
-
-        if (nextManualFolderDropPlan.movedAcrossParents) {
-          await moveFolder(folderPath, nextManualFolderDropPlan.targetParentPath);
-          await setFolderManualOrder(
-            nextManualFolderDropPlan.sourceParentPath,
-            nextManualFolderDropPlan.sourceOrder ?? [],
-          );
-        }
-
-        await setFolderManualOrder(
-          nextManualFolderDropPlan.targetParentPath,
-          nextManualFolderDropPlan.targetOrder,
-        );
-
-        if (
-          nextManualFolderDropPlan.movedAcrossParents &&
-          nextManualFolderDropPlan.targetParentPath
-        ) {
-          window.dispatchEvent(
-            new CustomEvent("expand-folder", {
-              detail: nextManualFolderDropPlan.targetParentPath,
-            }),
-          );
-        }
-        setPendingManualFolderDropPlan(null);
         return;
       }
 
       if (activeData.type === "folder") {
+        clearDragState();
         if (!overData) return;
 
         const targetFolder = (overData.path as string) || "";
@@ -341,25 +285,27 @@ export function WorkspaceNavigation({
           return;
         }
 
-        await moveFolder(folderPath, targetFolder);
-        if (targetFolder) {
-          window.dispatchEvent(
-            new CustomEvent("expand-folder", { detail: targetFolder }),
+        setPendingFolderPath(folderPath);
+        try {
+          await moveFolder(folderPath, targetFolder);
+          if (targetFolder) {
+            revealFolder(targetFolder);
+          }
+        } finally {
+          setPendingFolderPath((currentPath) =>
+            currentPath === folderPath ? null : currentPath,
           );
         }
       }
     } catch (error) {
       console.error("Failed to move item:", error);
-      setPendingManualFolderDropPlan(null);
     }
   }, [
     clearDragState,
-    manualFolderDropPlan,
     moveFolder,
     moveNote,
     moveSelectedNotes,
-    setPendingManualFolderDropPlan,
-    setFolderManualOrder,
+    revealFolder,
   ]);
 
   const foldersVisible = paneMode === 3;
@@ -370,7 +316,6 @@ export function WorkspaceNavigation({
       collisionDetection={workspaceCollisionDetection}
       sensors={sensors}
       onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onDragCancel={clearDragState}
     >
@@ -387,9 +332,7 @@ export function WorkspaceNavigation({
         >
           <FoldersPane
             onOpenSettings={onOpenSettings}
-            dragDelta={dragDelta}
-            onManualFolderDropPlanChange={setManualFolderDropPlan}
-            pendingManualFolderDropPlan={pendingManualFolderDropPlan}
+            pendingFolderPath={pendingFolderPath}
           />
         </div>
 

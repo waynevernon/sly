@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ, GripVertical } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
@@ -13,47 +13,32 @@ import {
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
-import type { FolderDropOrderPlan } from "../../lib/folderTree";
 
-const folderSortItems: SortMenuItem<FolderSortMode>[] = [
-  {
-    key: "manual",
-    label: "Manual",
-    isActive: (value) => value === "manual",
-    getNextValue: (value) => (value === "manual" ? value : "manual"),
-    renderIcon: () => <GripVertical className="w-4 h-4 stroke-[1.6]" />,
+const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
+  key: "name",
+  label: "Name",
+  isActive: (value) => value === "nameAsc" || value === "nameDesc",
+  getNextValue: (value) =>
+    value === "nameAsc"
+      ? "nameDesc"
+      : value === "nameDesc"
+        ? "nameAsc"
+        : "nameAsc",
+  renderIcon: (value, isActive) => {
+    const isDescending = value === "nameDesc";
+    const Icon = isActive && isDescending ? ArrowUpAZ : ArrowDownAZ;
+    return <Icon className="w-4 h-4 stroke-[1.6]" />;
   },
-  {
-    key: "name",
-    label: "Name",
-    isActive: (value) => value === "nameAsc" || value === "nameDesc",
-    getNextValue: (value) =>
-      value === "nameAsc"
-        ? "nameDesc"
-        : value === "nameDesc"
-          ? "nameAsc"
-          : "nameAsc",
-    renderIcon: (value, isActive) => {
-      const isDescending = value === "nameDesc";
-      const Icon =
-        isActive && isDescending ? ArrowUpAZ : ArrowDownAZ;
-      return <Icon className="w-4 h-4 stroke-[1.6]" />;
-    },
-  },
-];
+}];
 
 interface FoldersPaneProps {
   onOpenSettings?: () => void;
-  dragDelta: { x: number; y: number } | null;
-  onManualFolderDropPlanChange?: (plan: FolderDropOrderPlan | null) => void;
-  pendingManualFolderDropPlan?: FolderDropOrderPlan | null;
+  pendingFolderPath?: string | null;
 }
 
 export function FoldersPane({
   onOpenSettings,
-  dragDelta,
-  onManualFolderDropPlanChange,
-  pendingManualFolderDropPlan,
+  pendingFolderPath = null,
 }: FoldersPaneProps) {
   const {
     folderSortMode,
@@ -131,11 +116,7 @@ export function FoldersPane({
         ref={scrollContainerRef}
         className="ui-scrollbar-overlay flex-1 overflow-y-auto py-2.5"
       >
-        <FolderTreeView
-          dragDelta={dragDelta}
-          onManualFolderDropPlanChange={onManualFolderDropPlanChange}
-          pendingManualFolderDropPlan={pendingManualFolderDropPlan}
-        />
+        <FolderTreeView pendingFolderPath={pendingFolderPath} />
       </div>
 
       <Footer onOpenSettings={onOpenSettings} />
