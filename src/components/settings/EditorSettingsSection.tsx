@@ -43,6 +43,10 @@ const boldWeightOptions = [
   { value: 800, label: "Extra Bold" },
 ];
 
+const MIN_CUSTOM_EDITOR_WIDTH_PX = 480;
+const MAX_CUSTOM_EDITOR_WIDTH_PX = 3840;
+const CUSTOM_EDITOR_WIDTH_STEP_PX = 10;
+
 function fontChoiceEquals(a: FontChoice, b: FontChoice) {
   return a.kind === b.kind && a.value === b.value;
 }
@@ -430,22 +434,36 @@ export function AppearanceSettingsSection() {
               <label className="text-sm text-text font-medium">
                 Custom Width
               </label>
-              <div className="relative w-40 flex items-center gap-2">
-                <Input
-                  type="number"
-                  min="480"
-                  max="3840"
-                  step="10"
-                  value={customEditorWidthPx}
-                  onChange={(e) => {
-                    const parsed = parseInt(e.target.value, 10);
-                    if (Number.isFinite(parsed)) {
-                      setCustomEditorWidthPx(parsed);
-                    }
-                  }}
-                  className="w-full text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <span className="text-sm text-text-muted">px</span>
+              <div className="flex items-center gap-1 w-40">
+                <IconButton
+                  variant="outline"
+                  size="md"
+                  onClick={() =>
+                    setCustomEditorWidthPx(
+                      customEditorWidthPx - CUSTOM_EDITOR_WIDTH_STEP_PX,
+                    )
+                  }
+                  disabled={customEditorWidthPx <= MIN_CUSTOM_EDITOR_WIDTH_PX}
+                  title="Decrease custom width"
+                >
+                  <MinusIcon className="w-4 h-4" />
+                </IconButton>
+                <span className="text-sm font-medium tabular-nums flex-1 text-center">
+                  {customEditorWidthPx}
+                </span>
+                <IconButton
+                  variant="outline"
+                  size="md"
+                  onClick={() =>
+                    setCustomEditorWidthPx(
+                      customEditorWidthPx + CUSTOM_EDITOR_WIDTH_STEP_PX,
+                    )
+                  }
+                  disabled={customEditorWidthPx >= MAX_CUSTOM_EDITOR_WIDTH_PX}
+                  title="Increase custom width"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </IconButton>
               </div>
             </div>
           )}
