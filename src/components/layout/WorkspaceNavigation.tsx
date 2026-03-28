@@ -14,6 +14,7 @@ import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import type { FolderDropOrderPlan } from "../../lib/folderTree";
+import { workspaceCollisionDetection } from "../../lib/dragCollision";
 import { cn } from "../../lib/utils";
 import { NoteIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
@@ -366,6 +367,7 @@ export function WorkspaceNavigation({
 
   return (
     <DndContext
+      collisionDetection={workspaceCollisionDetection}
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
