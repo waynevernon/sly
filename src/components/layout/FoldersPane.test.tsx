@@ -26,7 +26,9 @@ function makeNotesHookValue(
   return {
     folderSortMode: "nameAsc",
     showRecentNotes: true,
+    showNoteCounts: true,
     setFolderSortMode: vi.fn(),
+    setNoteListViewOptions: vi.fn(),
     setShowRecentNotes: vi.fn(),
     ...overrides,
   } as never;
@@ -38,13 +40,14 @@ describe("FoldersPane", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("shows the recent notes toggle in a virtual folders section", async () => {
+  it("shows the recent notes and note count toggles in the folders view menu", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
     const setShowRecentNotes = vi.fn();
+    const setNoteListViewOptions = vi.fn();
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
-      makeNotesHookValue({ setShowRecentNotes }),
+      makeNotesHookValue({ setShowRecentNotes, setNoteListViewOptions }),
     );
 
     render(
@@ -67,7 +70,12 @@ describe("FoldersPane", () => {
     expect(toggle).toHaveAttribute("data-state", "checked");
 
     await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: "Sort Folders" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /Note Count/i }));
 
     expect(setShowRecentNotes).toHaveBeenCalledWith(false);
+    expect(setNoteListViewOptions).toHaveBeenCalledWith({
+      showNoteCounts: false,
+    });
   });
 });

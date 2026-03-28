@@ -219,6 +219,7 @@ describe("NotesContext", () => {
 
     expect(result.current.noteListDateMode).toBe("modified");
     expect(result.current.noteListPreviewLines).toBe(2);
+    expect(result.current.showNoteCounts).toBe(true);
     expect(result.current.showNoteListFilename).toBe(false);
     expect(result.current.showNoteListFolderPath).toBe(true);
     expect(result.current.showNoteListPreview).toBe(true);
@@ -227,6 +228,7 @@ describe("NotesContext", () => {
       await result.current.setNoteListViewOptions({
         noteListDateMode: "off",
         noteListPreviewLines: 0,
+        showNoteCounts: false,
         showNoteListFilename: true,
         showNoteListFolderPath: false,
       });
@@ -235,11 +237,13 @@ describe("NotesContext", () => {
     expect(notesService.patchSettings).toHaveBeenLastCalledWith({
       noteListDateMode: "off",
       showNoteListPreview: false,
+      showNoteCounts: false,
       showNoteListFilename: true,
       showNoteListFolderPath: false,
     });
     expect(result.current.noteListDateMode).toBe("off");
     expect(result.current.noteListPreviewLines).toBe(0);
+    expect(result.current.showNoteCounts).toBe(false);
     expect(result.current.showNoteListFilename).toBe(true);
     expect(result.current.showNoteListFolderPath).toBe(false);
     expect(result.current.showNoteListPreview).toBe(false);

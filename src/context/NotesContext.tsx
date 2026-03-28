@@ -41,6 +41,7 @@ interface NotesDataContextValue {
   scopedNotes: NoteMetadata[];
   recentNotes: NoteMetadata[];
   showRecentNotes: boolean;
+  showNoteCounts: boolean;
   noteListDateMode: NoteListDateMode;
   noteListPreviewLines: 0 | NoteListPreviewLines;
   showNoteListFilename: boolean;
@@ -105,6 +106,7 @@ interface NotesActionsContextValue {
   setNoteListViewOptions: (options: {
     noteListDateMode?: NoteListDateMode;
     noteListPreviewLines?: 0 | NoteListPreviewLines;
+    showNoteCounts?: boolean;
     showNoteListFilename?: boolean;
     showNoteListFolderPath?: boolean;
     showNoteListPreview?: boolean;
@@ -288,6 +290,7 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
   nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
   nextSettings.showRecentNotes ??= true;
+  nextSettings.showNoteCounts ??= true;
   nextSettings.noteListDateMode ??= "modified";
   nextSettings.showNoteListFilename ??= false;
   nextSettings.showNoteListFolderPath ??= true;
@@ -365,6 +368,7 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   assignNullableField("pinnedNoteIds", current.pinnedNoteIds, next.pinnedNoteIds);
   assignNullableField("recentNoteIds", current.recentNoteIds, next.recentNoteIds);
   assignField("showRecentNotes", current.showRecentNotes, next.showRecentNotes);
+  assignField("showNoteCounts", current.showNoteCounts, next.showNoteCounts);
   assignNullableField("defaultNoteName", current.defaultNoteName, next.defaultNoteName);
   assignNullableField("ollamaModel", current.ollamaModel, next.ollamaModel);
   assignNullableField("folderIcons", current.folderIcons, next.folderIcons);
@@ -462,6 +466,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const windowRefreshTimeoutRef = useRef<number | null>(null);
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
   const showRecentNotes = settings.showRecentNotes ?? true;
+  const showNoteCounts = settings.showNoteCounts ?? true;
   const noteListDateMode = settings.noteListDateMode ?? "modified";
   const noteListPreviewLines =
     settings.showNoteListPreview === false
@@ -621,12 +626,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async ({
       noteListDateMode,
       noteListPreviewLines,
+      showNoteCounts,
       showNoteListFilename,
       showNoteListFolderPath,
       showNoteListPreview,
     }: {
       noteListDateMode?: NoteListDateMode;
       noteListPreviewLines?: 0 | NoteListPreviewLines;
+      showNoteCounts?: boolean;
       showNoteListFilename?: boolean;
       showNoteListFolderPath?: boolean;
       showNoteListPreview?: boolean;
@@ -636,6 +643,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
         if (noteListDateMode !== undefined) {
           nextSettings.noteListDateMode = noteListDateMode;
+        }
+
+        if (showNoteCounts !== undefined) {
+          nextSettings.showNoteCounts = showNoteCounts;
         }
 
         if (noteListPreviewLines !== undefined) {
@@ -1989,6 +2000,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       scopedNotes,
       recentNotes,
       showRecentNotes,
+      showNoteCounts,
       noteListDateMode,
       noteListPreviewLines,
       showNoteListFilename,
@@ -2018,6 +2030,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       scopedNotes,
       recentNotes,
       showRecentNotes,
+      showNoteCounts,
       noteListDateMode,
       noteListPreviewLines,
       showNoteListFilename,

@@ -176,6 +176,7 @@ interface InlineFolderRowProps {
   appearance?: FolderAppearance | null;
   placeholder: string;
   noteCount?: number;
+  showNoteCounts?: boolean;
   isSelected?: boolean;
   collapseState?: "expanded" | "collapsed";
   resolvedTheme: "light" | "dark";
@@ -190,6 +191,7 @@ function InlineFolderRow({
   appearance = null,
   placeholder,
   noteCount,
+  showNoteCounts = true,
   isSelected = false,
   collapseState,
   resolvedTheme,
@@ -244,7 +246,7 @@ function InlineFolderRow({
             style={textStyle}
           />
         </div>
-        {typeof noteCount === "number" && (
+        {showNoteCounts && typeof noteCount === "number" && (
           <FolderRowTrailing count={noteCount} />
         )}
       </div>
@@ -257,6 +259,7 @@ interface FolderItemProps {
   depth: number;
   isManualSorting: boolean;
   folderAppearances: FolderAppearanceMap;
+  showNoteCounts: boolean;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
@@ -280,6 +283,7 @@ const FolderItem = memo(function FolderItem({
   depth,
   isManualSorting,
   folderAppearances,
+  showNoteCounts,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
@@ -360,6 +364,7 @@ const FolderItem = memo(function FolderItem({
           depth={depth + 1}
           appearance={inlineEditState?.mode === "create" ? inlineEditState.appearance : null}
           placeholder="Folder name"
+          showNoteCounts={showNoteCounts}
           resolvedTheme={resolvedTheme}
           onSubmit={onCreateFolder}
           onCancel={onCancelInlineEdit}
@@ -374,6 +379,7 @@ const FolderItem = memo(function FolderItem({
           depth={depth + 1}
           isManualSorting={isManualSorting}
           folderAppearances={folderAppearances}
+          showNoteCounts={showNoteCounts}
           selectedFolderPath={selectedFolderPath}
           collapsedFolders={collapsedFolders}
           inlineEditState={inlineEditState}
@@ -403,6 +409,7 @@ const FolderItem = memo(function FolderItem({
         appearance={inlineEditState?.mode === "rename" ? inlineEditState.appearance : null}
         placeholder="Folder name"
         noteCount={noteCount}
+        showNoteCounts={showNoteCounts}
         isSelected={selectedFolderPath === folder.path}
         collapseState={
           hasNestedFolders ? (isCollapsed ? "collapsed" : "expanded") : undefined
@@ -479,7 +486,7 @@ const FolderItem = memo(function FolderItem({
                 </span>
               </button>
             </div>
-            <FolderRowTrailing count={noteCount} />
+            {showNoteCounts && <FolderRowTrailing count={noteCount} />}
           </div>
         </div>
         {showBottomDropLine && dropLineStyle && (
@@ -589,6 +596,7 @@ export function FolderTreeView({
     folderSortMode,
     folderManualOrder,
     showRecentNotes,
+    showNoteCounts,
     selectedScope,
     selectedFolderPath,
     selectFolder,
@@ -1181,7 +1189,7 @@ export function FolderTreeView({
                 Recent Notes
               </span>
             </span>
-            <FolderRowTrailing count={recentNotes.length} />
+            {showNoteCounts && <FolderRowTrailing count={recentNotes.length} />}
           </button>
         )}
         <div
@@ -1208,7 +1216,7 @@ export function FolderTreeView({
                 All Notes
               </span>
             </span>
-            <FolderRowTrailing count={notes.length} />
+            {showNoteCounts && <FolderRowTrailing count={notes.length} />}
           </button>
         </div>
 
@@ -1222,6 +1230,7 @@ export function FolderTreeView({
                   : null
               }
               placeholder="Folder name"
+              showNoteCounts={showNoteCounts}
               resolvedTheme={resolvedTheme}
               onSubmit={handleCreateFolder}
               onCancel={handleCancelInlineEdit}
@@ -1236,6 +1245,7 @@ export function FolderTreeView({
               depth={0}
               isManualSorting={folderSortMode === "manual"}
               folderAppearances={folderAppearances}
+              showNoteCounts={showNoteCounts}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={visibleCollapsedFolders}
               inlineEditState={inlineEditState}

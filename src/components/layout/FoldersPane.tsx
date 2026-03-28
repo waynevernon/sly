@@ -58,7 +58,9 @@ export function FoldersPane({
   const {
     folderSortMode,
     showRecentNotes,
+    showNoteCounts,
     setFolderSortMode,
+    setNoteListViewOptions,
     setShowRecentNotes,
   } = useNotes();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +97,22 @@ export function FoldersPane({
                 </DropdownMenu.ItemIndicator>
               </span>
               <span>Recent Notes</span>
+            </DropdownMenu.CheckboxItem>
+            <DropdownMenu.CheckboxItem
+              checked={showNoteCounts}
+              className={menuItemClassName}
+              onCheckedChange={(checked) => {
+                void setNoteListViewOptions({
+                  showNoteCounts: checked === true,
+                });
+              }}
+            >
+              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                <DropdownMenu.ItemIndicator>
+                  <span className="text-xs leading-none">✓</span>
+                </DropdownMenu.ItemIndicator>
+              </span>
+              <span>Note Count</span>
             </DropdownMenu.CheckboxItem>
           </SortMenuButton>
           <IconButton

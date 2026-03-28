@@ -89,6 +89,7 @@ function makeNotesHookValue(
     noteSortMode: "modifiedDesc",
     noteListDateMode: "modified",
     noteListPreviewLines: 2,
+    showNoteCounts: true,
     showNoteListFilename: false,
     showNoteListFolderPath: true,
     showNoteListPreview: true,
@@ -293,5 +294,45 @@ describe("NotesPane", () => {
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteListFilename: true,
     });
+  });
+
+  it("hides the header note count when the setting is disabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        scopedNotes: [
+          {
+            id: "alpha",
+            title: "Alpha note",
+            preview: "planning",
+            modified: 2,
+            created: 2,
+          },
+          {
+            id: "beta",
+            title: "Beta note",
+            preview: "shipping",
+            modified: 1,
+            created: 1,
+          },
+          {
+            id: "gamma",
+            title: "Gamma note",
+            preview: "drafting",
+            modified: 3,
+            created: 3,
+          },
+        ],
+        showNoteCounts: false,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.queryByText("3")).not.toBeInTheDocument();
   });
 });

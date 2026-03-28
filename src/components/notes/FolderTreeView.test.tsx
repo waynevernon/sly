@@ -53,6 +53,7 @@ function makeNotesHookValue(
     folderSortMode: "nameAsc",
     folderManualOrder: {},
     showRecentNotes: true,
+    showNoteCounts: true,
     selectedScope: { type: "all" },
     selectedFolderPath: null,
     selectFolder: vi.fn(),
@@ -179,5 +180,49 @@ describe("FolderTreeView", () => {
     expect(
       screen.queryByRole("button", { name: /Recent Notes/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("hides folder note counts when the setting is disabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notes: [
+          {
+            id: "alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+        ],
+        recentNotes: [
+          {
+            id: "beta",
+            title: "Beta",
+            preview: "preview",
+            modified: 2,
+            created: 2,
+          },
+          {
+            id: "gamma",
+            title: "Gamma",
+            preview: "preview",
+            modified: 3,
+            created: 3,
+          },
+        ],
+        showNoteCounts: false,
+      }),
+    );
+
+    render(<FolderTreeView dragDelta={null} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+    expect(screen.queryByText("2")).not.toBeInTheDocument();
   });
 });

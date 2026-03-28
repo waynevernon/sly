@@ -359,6 +359,8 @@ pub struct Settings {
     pub recent_note_ids: Option<Vec<String>>,
     #[serde(rename = "showRecentNotes")]
     pub show_recent_notes: Option<bool>,
+    #[serde(rename = "showNoteCounts", default = "default_true")]
+    pub show_note_counts: bool,
     #[serde(rename = "defaultNoteName")]
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
@@ -403,6 +405,8 @@ pub struct SettingsPatch {
     pub recent_note_ids: Option<Option<Vec<String>>>,
     #[serde(default)]
     pub show_recent_notes: Option<Option<bool>>,
+    #[serde(default)]
+    pub show_note_counts: Option<Option<bool>>,
     #[serde(default)]
     pub default_note_name: Option<Option<String>>,
     #[serde(default)]
@@ -1369,6 +1373,9 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     }
     if let Some(show_recent_notes) = patch.show_recent_notes {
         settings.show_recent_notes = show_recent_notes;
+    }
+    if let Some(show_note_counts) = patch.show_note_counts {
+        settings.show_note_counts = show_note_counts.unwrap_or(true);
     }
     if let Some(default_note_name) = patch.default_note_name {
         settings.default_note_name = default_note_name;
@@ -5388,6 +5395,7 @@ mod tests {
             pinned_note_ids: Some(vec!["alpha".to_string()]),
             recent_note_ids: Some(vec!["alpha".to_string()]),
             show_recent_notes: Some(true),
+            show_note_counts: true,
             default_note_name: Some("Untitled".to_string()),
             ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
@@ -5407,6 +5415,7 @@ mod tests {
             SettingsPatch {
                 recent_note_ids: Some(Some(vec!["beta".to_string(), "alpha".to_string()])),
                 show_recent_notes: Some(Some(false)),
+                show_note_counts: Some(Some(false)),
                 default_note_name: Some(Some("Daily".to_string())),
                 ollama_model: Some(None),
                 note_list_date_mode: Some(NoteListDateMode::Off),
@@ -5426,6 +5435,7 @@ mod tests {
             Some(vec!["beta".to_string(), "alpha".to_string()])
         );
         assert_eq!(settings.show_recent_notes, Some(false));
+        assert!(!settings.show_note_counts);
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Off);
         assert!(settings.show_note_list_filename);
         assert!(!settings.show_note_list_folder_path);
