@@ -446,6 +446,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   selectedScopeRef.current = selectedScope;
   const selectionAnchorIdRef = useRef<string | null>(null);
   const selectionRangeEndIdRef = useRef<string | null>(null);
+  // Per-note save sequence counter to discard out-of-order save completions.
+  const saveSequenceRef = useRef<Map<string, number>>(new Map());
   // Monotonic counter to ignore stale async note selection responses.
   const selectRequestIdRef = useRef(0);
   // Monotonic counter to ignore stale async search responses
@@ -1014,11 +1016,22 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       if (!savingNoteId) return;
       let updatedId: string | null = null;
 
+      // Stamp this save so we can discard completions from older concurrent saves
+      const seq = (saveSequenceRef.current.get(savingNoteId) ?? 0) + 1;
+      saveSequenceRef.current.set(savingNoteId, seq);
+
       try {
         // Mark this note as recently saved to ignore file-change events from our own save
         recentlySavedRef.current.add(savingNoteId);
 
         const updated = await notesService.saveNote(savingNoteId, content);
+
+        // A newer save was started for this note while we were awaiting — discard
+        if (saveSequenceRef.current.get(savingNoteId) !== seq) {
+          recentlySavedRef.current.delete(savingNoteId);
+          return;
+        }
+
         updatedId = updated.id;
 
         // If the note was renamed (ID changed), also mark the new ID

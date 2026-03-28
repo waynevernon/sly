@@ -537,6 +537,15 @@ function AppContent() {
         const currentIndex = displayItems.findIndex(
           (n) => n.id === selectedNoteId,
         );
+
+        // Selected note is no longer in the visible list (e.g. after a filter
+        // change) — snap to the first item rather than doing arithmetic on -1.
+        if (currentIndex === -1) {
+          selectNote(displayItems[0].id);
+          window.dispatchEvent(new CustomEvent("focus-note-list"));
+          return;
+        }
+
         let newIndex: number;
 
         if (e.key === "ArrowDown") {

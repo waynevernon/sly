@@ -1753,7 +1753,13 @@ async fn read_note(id: String, state: State<'_, AppState>) -> Result<Note, Strin
 
     let content = fs::read_to_string(&file_path)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::InvalidData {
+                "File is not valid UTF-8. Sly only supports UTF-8 encoded notes.".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
 
     let modified = metadata
@@ -2811,7 +2817,13 @@ async fn read_file_direct(path: String) -> Result<FileContent, String> {
 
     let content = fs::read_to_string(&canonical)
         .await
-        .map_err(|_| "Failed to read file".to_string())?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::InvalidData {
+                "File is not valid UTF-8. Sly only supports UTF-8 encoded files.".to_string()
+            } else {
+                "Failed to read file".to_string()
+            }
+        })?;
     let metadata = fs::metadata(&canonical)
         .await
         .map_err(|_| "Failed to read metadata".to_string())?;
