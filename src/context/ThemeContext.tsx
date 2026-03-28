@@ -377,7 +377,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       editorWidth: DEFAULT_APPEARANCE_SETTINGS.editorWidth,
       customEditorWidthPx: undefined,
       interfaceZoom: DEFAULT_APPEARANCE_SETTINGS.interfaceZoom,
-      paneMode: DEFAULT_APPEARANCE_SETTINGS.paneMode,
     }));
   }, [updateAppearance]);
 

@@ -17,11 +17,10 @@ import type {
   EditorWidth,
   FontChoice,
   FontPresetId,
-  PaneMode,
   TextDirection,
   ThemeMode,
 } from "../../types/note";
-import { ColumnsIcon, EyeIcon, MinusIcon, PlusIcon } from "../icons";
+import { EyeIcon, MinusIcon, PlusIcon } from "../icons";
 
 const textDirectionOptions: { value: TextDirection; label: string }[] = [
   { value: "auto", label: "Auto" },
@@ -35,12 +34,6 @@ const editorWidthOptions: { value: EditorWidth; label: string }[] = [
   { value: "wide", label: "Wide" },
   { value: "full", label: "Full" },
   { value: "custom", label: "Custom" },
-];
-
-const paneModeOptions: { value: PaneMode; label: string }[] = [
-  { value: 1, label: "1 Pane" },
-  { value: 2, label: "2 Panes" },
-  { value: 3, label: "3 Panes" },
 ];
 
 const boldWeightOptions = [
@@ -142,8 +135,6 @@ export function AppearanceSettingsSection() {
     setTextDirection,
     editorWidth,
     setEditorWidth,
-    paneMode,
-    setPaneMode,
     interfaceZoom,
     setInterfaceZoom,
     customEditorWidthPx,
@@ -165,7 +156,6 @@ export function AppearanceSettingsSection() {
       DEFAULT_APPEARANCE_SETTINGS.noteTypography.lineHeight ||
     textDirection !== DEFAULT_APPEARANCE_SETTINGS.textDirection ||
     editorWidth !== DEFAULT_APPEARANCE_SETTINGS.editorWidth ||
-    paneMode !== DEFAULT_APPEARANCE_SETTINGS.paneMode ||
     Math.round(interfaceZoom * 100) !== 100;
 
   const previewTheme = previewMode === "resolved" ? resolvedTheme : previewMode;
@@ -418,26 +408,6 @@ export function AppearanceSettingsSection() {
                 </option>
               ))}
             </Select>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-text font-medium">
-              Workspace Layout
-            </label>
-            <div className="ui-settings-toggle-group">
-              {paneModeOptions.map((option) => (
-                <Button
-                  key={option.value}
-                  onClick={() => setPaneMode(option.value)}
-                  variant={paneMode === option.value ? "primary" : "ghost"}
-                  size="xs"
-                  className="gap-1.5 min-w-19"
-                >
-                  <ColumnsIcon className="w-4 h-4 stroke-[1.6]" />
-                  {option.label}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div className="flex items-center justify-between">

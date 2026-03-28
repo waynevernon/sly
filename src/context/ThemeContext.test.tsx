@@ -82,4 +82,28 @@ describe("ThemeContext", () => {
 
     expect(lastUpdate?.interfaceZoom).toBe(1.5);
   });
+
+  it("keeps pane mode unchanged when resetting typography and layout settings", async () => {
+    const { result } = renderHook(() => useTheme(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.paneMode).toBe(3);
+    });
+
+    act(() => {
+      result.current.setPaneMode(1);
+      result.current.resetTypographyAndLayoutSettings();
+    });
+
+    await waitFor(() => {
+      expect(notesService.updateAppearanceSettings).toHaveBeenCalled();
+    });
+
+    expect(result.current.paneMode).toBe(1);
+
+    const updateCalls = vi.mocked(notesService.updateAppearanceSettings).mock.calls;
+    const lastUpdate = updateCalls[updateCalls.length - 1]?.[0];
+
+    expect(lastUpdate?.paneMode).toBe(1);
+  });
 });
