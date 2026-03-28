@@ -90,6 +90,7 @@ function makeNotesHookValue(
     noteListDateMode: "modified",
     noteListPreviewLines: 2,
     showNoteCounts: true,
+    showNotesFromSubfolders: false,
     showNoteListFilename: false,
     showNoteListFolderPath: true,
     showNoteListPreview: true,
@@ -281,18 +282,20 @@ describe("NotesPane", () => {
     expect(screen.getByText("Modified")).toBeInTheDocument();
     expect(screen.getByText("2 Lines")).toBeInTheDocument();
     expect(screen.getByRole("menu").textContent).toMatch(
-      /Text Preview.*2 Lines.*Date.*Modified.*Folder Path.*Filename/s,
+      /Notes From Subfolders.*Text Preview.*2 Lines.*Date.*Modified.*Folder Path.*Filename/s,
     );
 
-    await user.click(screen.getByRole("menuitemcheckbox", { name: /Folder Path/ }));
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
+    );
     await user.click(sortButton);
-    await user.click(screen.getByRole("menuitemcheckbox", { name: /Filename/ }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /Folder Path/ }));
 
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
-      showNoteListFolderPath: false,
+      showNotesFromSubfolders: true,
     });
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
-      showNoteListFilename: true,
+      showNoteListFolderPath: false,
     });
   });
 
@@ -348,5 +351,55 @@ describe("NotesPane", () => {
     expect(badge?.className).toMatch(/ui-count-badge--inline/);
     expect(badge?.className).toMatch(/ui-count-badge--plain/);
     expect(badge?.className).toMatch(/ui-count-badge--active/);
+  });
+
+  it("forces folder prefixes for recursive folder-scoped notes", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        scopedNotes: [
+          {
+            id: "docs/reference/alpha",
+            title: "Alpha note",
+            preview: "planning",
+            modified: 2,
+            created: 2,
+          },
+        ],
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
+        showNotesFromSubfolders: true,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("show-folder-prefix")).toHaveTextContent("true");
+  });
+
+  it("shows the recursive folder empty state when enabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        scopedNotes: [],
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
+        showNotesFromSubfolders: true,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("empty-message")).toHaveTextContent(
+      "No notes in this folder or its subfolders",
+    );
   });
 });

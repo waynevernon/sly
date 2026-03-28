@@ -17,7 +17,7 @@ import { FilePlusCorner, History } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
-import { buildFolderTree } from "../../lib/folderTree";
+import { buildFolderTree, countNotesInFolder } from "../../lib/folderTree";
 import type {
   FolderAppearance,
   FolderNode,
@@ -239,6 +239,8 @@ interface FolderItemProps {
   pendingFolderPath: string | null;
   folderAppearances: FolderAppearanceMap;
   showNoteCounts: boolean;
+  noteCount: number;
+  getNoteCount: (folder: FolderNode) => number;
   selectedFolderPath: string | null;
   collapsedFolders: Set<string>;
   inlineEditState: InlineFolderEditState | null;
@@ -262,6 +264,8 @@ const FolderItem = memo(function FolderItem({
   pendingFolderPath,
   folderAppearances,
   showNoteCounts,
+  noteCount,
+  getNoteCount,
   selectedFolderPath,
   collapsedFolders,
   inlineEditState,
@@ -280,7 +284,6 @@ const FolderItem = memo(function FolderItem({
 }: FolderItemProps) {
   const suppressCloseAutoFocusRef = useRef(false);
   const isCollapsed = collapsedFolders.has(folder.path);
-  const noteCount = folder.notes.length;
   const folderAppearance = getFolderAppearance(folderAppearances, folder.path);
   const folderTextStyle = getFolderTextStyle(folderAppearance, resolvedTheme);
   const folderIconStyle = getFolderIconStyle(folderAppearance, resolvedTheme);
@@ -348,6 +351,8 @@ const FolderItem = memo(function FolderItem({
           pendingFolderPath={pendingFolderPath}
           folderAppearances={folderAppearances}
           showNoteCounts={showNoteCounts}
+          noteCount={getNoteCount(child)}
+          getNoteCount={getNoteCount}
           selectedFolderPath={selectedFolderPath}
           collapsedFolders={collapsedFolders}
           inlineEditState={inlineEditState}
@@ -506,7 +511,7 @@ const FolderItem = memo(function FolderItem({
             onSelect={() => onOpenIconPicker({ kind: "existing", path: folder.path })}
           >
             <SwatchIcon className="w-4 h-4 stroke-[1.6]" />
-            Customize Folder
+            Change Icon and Color
           </ContextMenu.Item>
           {folder.path.includes("/") && (
             <>
@@ -556,6 +561,7 @@ export function FolderTreeView({
     folderRevealRequest,
     showRecentNotes,
     showNoteCounts,
+    showNotesFromSubfolders,
     selectedScope,
     selectedFolderPath,
     selectFolder,
@@ -624,6 +630,11 @@ export function FolderTreeView({
     tree.folders.forEach(visit);
     return [...paths];
   }, [knownFolders, tree]);
+  const noteCountForFolder = useCallback(
+    (folder: FolderNode) =>
+      showNotesFromSubfolders ? countNotesInFolder(folder) : folder.notes.length,
+    [showNotesFromSubfolders],
+  );
 
   useEffect(() => {
     if (!hasLoadedFolders || !selectedFolderPath) {
@@ -1090,13 +1101,15 @@ export function FolderTreeView({
           )}
 
           {tree.folders.map((folder) => (
-              <FolderItem
-                key={folder.path}
-                folder={folder}
-                depth={0}
-                pendingFolderPath={pendingFolderPath}
-                folderAppearances={folderAppearances}
-                showNoteCounts={showNoteCounts}
+            <FolderItem
+              key={folder.path}
+              folder={folder}
+              depth={0}
+              pendingFolderPath={pendingFolderPath}
+              folderAppearances={folderAppearances}
+              showNoteCounts={showNoteCounts}
+              noteCount={noteCountForFolder(folder)}
+              getNoteCount={noteCountForFolder}
               selectedFolderPath={selectedFolderPath}
               collapsedFolders={collapsedFolders}
               inlineEditState={inlineEditState}

@@ -44,6 +44,7 @@ interface NoteListProps {
   items: NoteListItem[];
   emptyMessage: string;
   showFolderPrefix?: boolean;
+  forceShowFolderPath?: boolean;
 }
 
 function formatDate(timestamp: number): string {
@@ -105,6 +106,7 @@ interface NoteItemProps {
     },
   ) => void;
   showFolderPrefix?: boolean;
+  forceShowFolderPath?: boolean;
   noteListDateMode: "modified" | "created" | "off";
   noteListPreviewLines: 0 | 1 | 2 | 3;
   showNoteListFilename: boolean;
@@ -121,6 +123,7 @@ const NoteItem = memo(function NoteItem({
   isPinned,
   onSelect,
   showFolderPrefix = true,
+  forceShowFolderPath = false,
   noteListDateMode,
   noteListPreviewLines,
   showNoteListFilename,
@@ -135,7 +138,9 @@ const NoteItem = memo(function NoteItem({
   }, [selectionState]);
 
   const folder =
-    showFolderPrefix && showNoteListFolderPath && id.includes("/")
+    showFolderPrefix &&
+    (showNoteListFolderPath || forceShowFolderPath) &&
+    id.includes("/")
       ? id.substring(0, id.lastIndexOf("/"))
       : null;
   const filename = showNoteListFilename ? getNoteFilename(id) : "";
@@ -211,6 +216,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onClearSelection,
   onFocusList,
   showFolderPrefix = true,
+  forceShowFolderPath = false,
   noteListDateMode,
   noteListPreviewLines,
   showNoteListFilename,
@@ -277,6 +283,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             isPinned={isPinned}
             onSelect={onSelect}
             showFolderPrefix={showFolderPrefix}
+            forceShowFolderPath={forceShowFolderPath}
             noteListDateMode={noteListDateMode}
             noteListPreviewLines={noteListPreviewLines}
             showNoteListFilename={showNoteListFilename}
@@ -362,6 +369,7 @@ export function NoteList({
   items,
   emptyMessage,
   showFolderPrefix = true,
+  forceShowFolderPath = false,
 }: NoteListProps) {
   const {
     selectedNoteId,
@@ -565,6 +573,7 @@ export function NoteList({
               onClearSelection={clearNoteSelection}
               onFocusList={focusList}
               showFolderPrefix={showFolderPrefix}
+              forceShowFolderPath={forceShowFolderPath}
               noteListDateMode={noteListDateMode}
               noteListPreviewLines={noteListPreviewLines}
               showNoteListFilename={showNoteListFilename}

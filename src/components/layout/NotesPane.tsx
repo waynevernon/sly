@@ -130,6 +130,7 @@ export function NotesPane() {
     noteListDateMode,
     noteListPreviewLines,
     showNoteCounts,
+    showNotesFromSubfolders,
     showNoteListFilename,
     showNoteListFolderPath,
     selectedScope,
@@ -186,6 +187,8 @@ export function NotesPane() {
     ? "Search Results"
     : getScopeLabel(selectedScope, selectedFolderPath);
   const noteCount = displayItems.length;
+  const showSubfolderNotesInCurrentView =
+    selectedScope.type === "folder" && showNotesFromSubfolders;
   const selectedFolderAppearance = getFolderAppearance(
     folderAppearances,
     selectedFolderPath,
@@ -351,6 +354,23 @@ export function NotesPane() {
                   <DropdownMenu.Label className={menuLabelClassName}>
                     View
                   </DropdownMenu.Label>
+                  <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  <DropdownMenu.CheckboxItem
+                    checked={showNotesFromSubfolders}
+                    className={menuItemClassName}
+                    onCheckedChange={(checked) => {
+                      void setNoteListViewOptions({
+                        showNotesFromSubfolders: checked === true,
+                      });
+                    }}
+                  >
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                      <DropdownMenu.ItemIndicator>
+                        <span className="text-xs leading-none">✓</span>
+                      </DropdownMenu.ItemIndicator>
+                    </span>
+                    <span>Notes From Subfolders</span>
+                  </DropdownMenu.CheckboxItem>
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
                   <DropdownMenu.Sub>
                     <DropdownMenu.SubTrigger className={menuItemClassName}>
@@ -584,12 +604,17 @@ export function NotesPane() {
               : selectedScope.type === "recent"
                 ? "No recent notes yet"
                 : selectedFolderPath
-                ? "No notes in this folder"
+                ? showSubfolderNotesInCurrentView
+                  ? "No notes in this folder or its subfolders"
+                  : "No notes in this folder"
                 : "No notes yet"
           }
           showFolderPrefix={
-            searchQuery.trim().length > 0 || selectedScope.type !== "folder"
+            searchQuery.trim().length > 0 ||
+            selectedScope.type !== "folder" ||
+            showSubfolderNotesInCurrentView
           }
+          forceShowFolderPath={showSubfolderNotesInCurrentView}
         />
       </div>
     </div>

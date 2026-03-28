@@ -223,6 +223,7 @@ describe("NotesContext", () => {
     expect(result.current.noteListDateMode).toBe("modified");
     expect(result.current.noteListPreviewLines).toBe(2);
     expect(result.current.showNoteCounts).toBe(true);
+    expect(result.current.showNotesFromSubfolders).toBe(false);
     expect(result.current.showNoteListFilename).toBe(false);
     expect(result.current.showNoteListFolderPath).toBe(true);
     expect(result.current.showNoteListPreview).toBe(true);
@@ -232,6 +233,7 @@ describe("NotesContext", () => {
         noteListDateMode: "off",
         noteListPreviewLines: 0,
         showNoteCounts: false,
+        showNotesFromSubfolders: true,
         showNoteListFilename: true,
         showNoteListFolderPath: false,
       });
@@ -241,15 +243,69 @@ describe("NotesContext", () => {
       noteListDateMode: "off",
       showNoteListPreview: false,
       showNoteCounts: false,
+      showNotesFromSubfolders: true,
       showNoteListFilename: true,
       showNoteListFolderPath: false,
     });
     expect(result.current.noteListDateMode).toBe("off");
     expect(result.current.noteListPreviewLines).toBe(0);
     expect(result.current.showNoteCounts).toBe(false);
+    expect(result.current.showNotesFromSubfolders).toBe(true);
     expect(result.current.showNoteListFilename).toBe(true);
     expect(result.current.showNoteListFolderPath).toBe(false);
     expect(result.current.showNoteListPreview).toBe(false);
+  });
+
+  it("keeps folder scope direct-only unless notes from subfolders is enabled", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 3,
+        created: 3,
+      },
+      {
+        id: "docs/reference/beta",
+        title: "Beta",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+      {
+        id: "docs/reference/api/gamma",
+        title: "Gamma",
+        preview: "",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/alpha",
+    ]);
+
+    await act(async () => {
+      await result.current.setNoteListViewOptions({
+        showNotesFromSubfolders: true,
+      });
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/alpha",
+      "docs/reference/beta",
+      "docs/reference/api/gamma",
+    ]);
   });
 
   it("tracks single and toggled note selections separately from the active note", async () => {

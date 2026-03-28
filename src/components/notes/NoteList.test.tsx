@@ -148,6 +148,27 @@ describe("NoteList", () => {
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
   });
 
+  it("can force the folder path to remain visible for disambiguation", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        noteListDateMode: "off",
+        showNoteListFolderPath: false,
+        noteListPreviewLines: 0,
+      }),
+    );
+
+    render(
+      <NoteList
+        items={[baseItem]}
+        emptyMessage="Empty"
+        forceShowFolderPath
+      />,
+    );
+
+    expect(screen.getByText("work/")).toBeInTheDocument();
+  });
+
   it("renders only the preview text when folder path and date are off", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(

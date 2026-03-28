@@ -49,6 +49,7 @@ interface NotesDataContextValue {
   hasLoadedFolders: boolean;
   showRecentNotes: boolean;
   showNoteCounts: boolean;
+  showNotesFromSubfolders: boolean;
   noteListDateMode: NoteListDateMode;
   noteListPreviewLines: 0 | NoteListPreviewLines;
   showNoteListFilename: boolean;
@@ -115,6 +116,7 @@ interface NotesActionsContextValue {
     noteListDateMode?: NoteListDateMode;
     noteListPreviewLines?: 0 | NoteListPreviewLines;
     showNoteCounts?: boolean;
+    showNotesFromSubfolders?: boolean;
     showNoteListFilename?: boolean;
     showNoteListFolderPath?: boolean;
     showNoteListPreview?: boolean;
@@ -194,6 +196,7 @@ function getScopedNotes(
   notes: NoteMetadata[],
   scope: NoteScope,
   recentNoteIds: string[] | null | undefined,
+  showNotesFromSubfolders = false,
 ): NoteMetadata[] {
   if (scope.type === "all") {
     return notes;
@@ -209,7 +212,17 @@ function getScopedNotes(
       .filter((note): note is NoteMetadata => note !== null);
   }
 
-  return notes.filter((note) => getParentFolderPath(note.id) === scope.path);
+  return notes.filter((note) => {
+    const parentPath = getParentFolderPath(note.id);
+    if (parentPath === scope.path) {
+      return true;
+    }
+
+    return Boolean(
+      showNotesFromSubfolders &&
+        parentPath?.startsWith(`${scope.path}/`),
+    );
+  });
 }
 
 function prependRecentNoteId(
@@ -261,6 +274,7 @@ function normalizeSettings(settings: Settings | null | undefined): Settings {
   nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
   nextSettings.showRecentNotes ??= true;
   nextSettings.showNoteCounts ??= true;
+  nextSettings.showNotesFromSubfolders ??= false;
   nextSettings.noteListDateMode ??= "modified";
   nextSettings.showNoteListFilename ??= false;
   nextSettings.showNoteListFolderPath ??= true;
@@ -334,6 +348,11 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   assignNullableField("recentNoteIds", current.recentNoteIds, next.recentNoteIds);
   assignField("showRecentNotes", current.showRecentNotes, next.showRecentNotes);
   assignField("showNoteCounts", current.showNoteCounts, next.showNoteCounts);
+  assignField(
+    "showNotesFromSubfolders",
+    current.showNotesFromSubfolders,
+    next.showNotesFromSubfolders,
+  );
   assignNullableField("defaultNoteName", current.defaultNoteName, next.defaultNoteName);
   assignNullableField("ollamaModel", current.ollamaModel, next.ollamaModel);
   assignNullableField("folderIcons", current.folderIcons, next.folderIcons);
@@ -433,6 +452,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
   const showRecentNotes = settings.showRecentNotes ?? true;
   const showNoteCounts = settings.showNoteCounts ?? true;
+  const showNotesFromSubfolders = settings.showNotesFromSubfolders ?? false;
   const noteListDateMode = settings.noteListDateMode ?? "modified";
   const noteListPreviewLines =
     settings.showNoteListPreview === false
@@ -573,6 +593,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       notesRef.current,
       selectedScopeRef.current,
       visibleRecentNoteIds,
+      settingsRef.current.showNotesFromSubfolders ?? false,
     ).map((note) => note.id);
   }, [recentScopeNoteIds]);
 
@@ -625,6 +646,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       noteListDateMode,
       noteListPreviewLines,
       showNoteCounts,
+      showNotesFromSubfolders,
       showNoteListFilename,
       showNoteListFolderPath,
       showNoteListPreview,
@@ -632,6 +654,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       noteListDateMode?: NoteListDateMode;
       noteListPreviewLines?: 0 | NoteListPreviewLines;
       showNoteCounts?: boolean;
+      showNotesFromSubfolders?: boolean;
       showNoteListFilename?: boolean;
       showNoteListFolderPath?: boolean;
       showNoteListPreview?: boolean;
@@ -645,6 +668,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
         if (showNoteCounts !== undefined) {
           nextSettings.showNoteCounts = showNoteCounts;
+        }
+
+        if (showNotesFromSubfolders !== undefined) {
+          nextSettings.showNotesFromSubfolders = showNotesFromSubfolders;
         }
 
         if (noteListPreviewLines !== undefined) {
@@ -1897,8 +1924,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         selectedScope.type === "recent"
           ? recentScopeNoteIds
           : settings.recentNoteIds,
+        showNotesFromSubfolders,
       ),
-    [notes, recentScopeNoteIds, selectedScope, settings.recentNoteIds],
+    [
+      notes,
+      recentScopeNoteIds,
+      selectedScope,
+      settings.recentNoteIds,
+      showNotesFromSubfolders,
+    ],
   );
 
   useEffect(() => {
@@ -1968,6 +2002,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       hasLoadedFolders,
       showRecentNotes,
       showNoteCounts,
+      showNotesFromSubfolders,
       noteListDateMode,
       noteListPreviewLines,
       showNoteListFilename,
@@ -2000,6 +2035,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       hasLoadedFolders,
       showRecentNotes,
       showNoteCounts,
+      showNotesFromSubfolders,
       noteListDateMode,
       noteListPreviewLines,
       showNoteListFilename,

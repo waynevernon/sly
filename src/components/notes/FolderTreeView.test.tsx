@@ -49,6 +49,7 @@ function makeNotesHookValue(
     folderRevealRequest: null,
     showRecentNotes: true,
     showNoteCounts: true,
+    showNotesFromSubfolders: false,
     selectedScope: { type: "all" },
     selectedFolderPath: null,
     selectFolder: vi.fn(),
@@ -392,6 +393,61 @@ describe("FolderTreeView", () => {
     const emptyRow = screen.getByText("empty").closest('[data-folder-path="empty"]');
 
     expect(docsRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
+    expect(referenceRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
+    expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
+  });
+
+  it("shows recursive folder note counts when enabled and still hides zero-count badges", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: [
+          "docs",
+          "docs/reference",
+          "empty",
+        ],
+        notes: [
+          {
+            id: "docs/alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+          {
+            id: "docs/reference/beta",
+            title: "Beta",
+            preview: "preview",
+            modified: 2,
+            created: 2,
+          },
+        ],
+        showNotesFromSubfolders: true,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+      expect(screen.getByText("empty")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Expand folder/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("reference")).toBeInTheDocument();
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    const referenceRow = screen
+      .getByText("reference")
+      .closest('[data-folder-path="docs/reference"]');
+    const emptyRow = screen.getByText("empty").closest('[data-folder-path="empty"]');
+
+    expect(docsRow?.querySelector(".ui-count-badge")).toHaveTextContent("2");
     expect(referenceRow?.querySelector(".ui-count-badge")).toHaveTextContent("1");
     expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
   });

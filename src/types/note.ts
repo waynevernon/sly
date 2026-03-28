@@ -164,6 +164,7 @@ export interface Settings {
   recentNoteIds?: string[];
   showRecentNotes?: boolean;
   showNoteCounts?: boolean;
+  showNotesFromSubfolders?: boolean;
   defaultNoteName?: string;
   ollamaModel?: string;
   folderIcons?: Record<string, FolderAppearance>;
@@ -183,6 +184,7 @@ export interface SettingsPatch {
   recentNoteIds?: string[] | null;
   showRecentNotes?: boolean | null;
   showNoteCounts?: boolean | null;
+  showNotesFromSubfolders?: boolean | null;
   defaultNoteName?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
