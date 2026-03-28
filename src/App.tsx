@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  lazy,
+  Suspense,
+} from "react";
 import { PanelLeft } from "lucide-react";
 import { toast } from "sonner";
 import { NotesProvider, useNotes } from "./context/NotesContext";
@@ -11,7 +19,6 @@ import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
-import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { SettingsPage } from "./components/settings";
 import type { PaneMode } from "./types/note";
 import type { SettingsTab } from "./components/settings/SettingsPage";
@@ -22,9 +29,7 @@ import {
   OpenCodeIcon,
   OllamaIcon,
 } from "./components/icons";
-import { AiEditModal } from "./components/ai/AiEditModal";
 import { AiResponseToast } from "./components/ai/AiResponseToast";
-import { PreviewApp } from "./components/preview/PreviewApp";
 import {
   check as checkForUpdate,
 } from "@tauri-apps/plugin-updater";
@@ -33,6 +38,20 @@ import * as aiService from "./services/ai";
 import type { AiProvider } from "./services/ai";
 import { isMac, mod } from "./lib/platform";
 import { UpdateToast } from "./components/updater/UpdateToast";
+
+const loadCommandPalette = () => import("./components/command-palette/CommandPalette");
+const loadAiEditModal = () => import("./components/ai/AiEditModal");
+const loadPreviewApp = () => import("./components/preview/PreviewApp");
+
+const CommandPalette = lazy(() =>
+  loadCommandPalette().then((module) => ({ default: module.CommandPalette })),
+);
+const AiEditModal = lazy(() =>
+  loadAiEditModal().then((module) => ({ default: module.AiEditModal })),
+);
+const PreviewApp = lazy(() =>
+  loadPreviewApp().then((module) => ({ default: module.PreviewApp })),
+);
 
 // Detect preview mode from URL search params
 function getWindowMode(): {
@@ -58,6 +77,21 @@ function formatPaneModeLabel(mode: PaneMode): string {
 
 function getNextPaneMode(mode: PaneMode): PaneMode {
   return mode === 1 ? 3 : ((mode - 1) as PaneMode);
+}
+
+function FullScreenFallback({ label }: { label: string }) {
+  return (
+    <div className="h-screen flex items-center justify-center bg-bg-secondary">
+      <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
+        <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function PreviewFallback() {
+  return <FullScreenFallback label="Opening preview..." />;
 }
 
 function TitlebarPaneSwitch({
@@ -138,6 +172,21 @@ function AppContent() {
       unlisten?.();
     };
   }, [syncNotesFolder]);
+
+  useEffect(() => {
+    const preloadSurfaces = () => {
+      void loadCommandPalette();
+      void loadAiEditModal();
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(preloadSurfaces);
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(preloadSurfaces, 300);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, []);
 
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
@@ -604,7 +653,11 @@ function AppContent() {
           />
         )}
         {view === "settings" ? (
-          <SettingsPage key={settingsKey} onBack={closeSettings} initialTab={settingsInitialTab} />
+          <SettingsPage
+            key={settingsKey}
+            onBack={closeSettings}
+            initialTab={settingsInitialTab}
+          />
         ) : (
           <>
             <WorkspaceNavigation
@@ -622,25 +675,29 @@ function AppContent() {
         )}
       </div>
 
-      <CommandPalette
-        open={paletteOpen}
-        onClose={handleClosePalette}
-        onOpenSettings={openSettings}
-        onOpenAiModal={(provider) => {
-          setAiProvider(provider);
-          setAiModalOpen(true);
-        }}
-        focusMode={focusMode}
-        onToggleFocusMode={toggleFocusMode}
-        editorRef={editorRef}
-      />
-      <AiEditModal
-        open={aiModalOpen}
-        provider={aiProvider}
-        onBack={handleBackToPalette}
-        onExecute={handleAiEdit}
-        isExecuting={aiEditing}
-      />
+      <Suspense fallback={null}>
+        <CommandPalette
+          open={paletteOpen}
+          onClose={handleClosePalette}
+          onOpenSettings={openSettings}
+          onOpenAiModal={(provider) => {
+            setAiProvider(provider);
+            setAiModalOpen(true);
+          }}
+          focusMode={focusMode}
+          onToggleFocusMode={toggleFocusMode}
+          editorRef={editorRef}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <AiEditModal
+          open={aiModalOpen}
+          provider={aiProvider}
+          onBack={handleBackToPalette}
+          onExecute={handleAiEdit}
+          isExecuting={aiEditing}
+        />
+      </Suspense>
 
       {/* AI Editing Overlay */}
       {aiEditing && (
@@ -741,7 +798,9 @@ function App() {
       <ThemeProvider>
         <Toaster />
         <TooltipProvider>
-          <PreviewApp filePath={decodeURIComponent(previewFile)} />
+          <Suspense fallback={<PreviewFallback />}>
+            <PreviewApp filePath={decodeURIComponent(previewFile)} />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     );
