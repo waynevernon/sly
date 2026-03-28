@@ -1,5 +1,6 @@
 import { Component, useMemo } from "react";
 import type { ReactNode } from "react";
+import DOMPurify from "dompurify";
 import { renderMermaidSVG } from "beautiful-mermaid";
 
 class MermaidErrorBoundary extends Component<
@@ -32,14 +33,15 @@ export function MermaidRenderer({ code }: MermaidRendererProps) {
   const { svg, error } = useMemo(() => {
     if (!code.trim()) return { svg: null, error: null };
     try {
+      const raw = renderMermaidSVG(code.trim(), {
+        bg: "var(--color-bg)",
+        fg: "var(--color-text)",
+        muted: "var(--color-text-muted)",
+        border: "var(--color-border-solid)",
+        transparent: true,
+      });
       return {
-        svg: renderMermaidSVG(code.trim(), {
-          bg: "var(--color-bg)",
-          fg: "var(--color-text)",
-          muted: "var(--color-text-muted)",
-          border: "var(--color-border-solid)",
-          transparent: true,
-        }),
+        svg: DOMPurify.sanitize(raw, { USE_PROFILES: { svg: true, svgFilters: true } }),
         error: null,
       };
     } catch (err) {
