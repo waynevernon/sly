@@ -11,6 +11,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { FolderAppearance, FolderColorId } from "../../types/note";
 import {
   getEmojiCatalogItems,
+  getEmojiItem,
   searchEmojiShortcodes,
 } from "../../lib/emoji";
 import {
@@ -167,6 +168,9 @@ export function FolderIconPickerModal({
     draftAppearance?.icon?.kind === "emoji"
       ? draftAppearance.icon.shortcode
       : null;
+  const selectedEmojiId = selectedEmojiShortcode
+    ? getEmojiItem(selectedEmojiShortcode)?.id ?? null
+    : null;
   const scrollAreaHeightClass =
     "max-h-[clamp(11rem,calc(100vh-21rem),22rem)]";
 
@@ -538,30 +542,29 @@ export function FolderIconPickerModal({
                               gridTemplateColumns: `repeat(${lanes}, minmax(0, 1fr))`,
                             }}
                           >
-                            {rowItems.map((item, columnIndex) => {
-                              const index = startIndex + columnIndex;
-                              const isSelected =
-                                item.shortcode === selectedEmojiShortcode;
-                              const isActive = index === activeIndex;
+                              {rowItems.map((item, columnIndex) => {
+                                const index = startIndex + columnIndex;
+                                const isSelected = item.id === selectedEmojiId;
+                                const isActive = index === activeIndex;
 
-                              return (
-                                <button
-                                  key={item.shortcode}
-                                  type="button"
-                                  title={`:${item.shortcode}:`}
-                                  aria-label={`:${item.shortcode}:`}
-                                  aria-selected={isSelected}
-                                  onMouseEnter={() => setActiveIndex(index)}
-                                  onFocus={() => setActiveIndex(index)}
-                                  onClick={() => handleSelectEmoji(item.shortcode)}
-                                  className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
-                                    isSelected
-                                      ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
-                                      : isActive
-                                        ? "border-text-muted/45 bg-bg shadow-sm"
-                                        : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
-                                  }`}
-                                >
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    title={`:${item.shortcode}:`}
+                                    aria-label={`:${item.shortcode}:`}
+                                    aria-selected={isSelected}
+                                    onMouseEnter={() => setActiveIndex(index)}
+                                    onFocus={() => setActiveIndex(index)}
+                                    onClick={() => handleSelectEmoji(item.shortcode)}
+                                    className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
+                                      isSelected
+                                        ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
+                                        : isActive
+                                          ? "border-text-muted/45 bg-bg shadow-sm"
+                                          : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
+                                    }`}
+                                  >
                                   {isSelected && (
                                     <span className="absolute right-1.5 top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-accent text-text-inverse">
                                       <CheckIcon className="h-2.75 w-2.75 stroke-[2.4]" />

@@ -20,24 +20,51 @@ export const EmojiSuggestionList = forwardRef<
     ref={ref}
     items={items}
     command={command}
-    itemKey={(item) => item.shortcode}
+    itemKey={(item) => item.id}
     width="w-80"
     emptyText="No matching emoji"
-    renderItem={(item) => (
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="shrink-0 text-xl leading-none">{item.emoji}</div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm leading-snug font-medium truncate">
-            :{item.shortcode}:
-          </span>
-          {item.keywords.length > 0 && (
-            <span className="text-xs text-text-muted truncate mt-0.5">
-              {item.keywords.slice(0, 4).join(" · ")}
+    renderItem={(item) => {
+      const metadata = [];
+
+      if (item.shortcode !== item.primaryShortcode) {
+        metadata.push(item.primaryShortcode);
+      }
+
+      if (
+        item.matchedAlias &&
+        item.matchedAlias !== item.shortcode &&
+        item.matchedAlias !== item.primaryShortcode
+      ) {
+        metadata.push(item.matchedAlias);
+      }
+
+      for (const keyword of item.keywords) {
+        if (
+          keyword === item.shortcode ||
+          keyword === item.primaryShortcode ||
+          keyword === item.matchedAlias
+        ) {
+          continue;
+        }
+        metadata.push(keyword);
+      }
+
+      return (
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="shrink-0 text-xl leading-none">{item.emoji}</div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm leading-snug font-medium truncate">
+              :{item.shortcode}:
             </span>
-          )}
+            {metadata.length > 0 && (
+              <span className="text-xs text-text-muted truncate mt-0.5">
+                {metadata.slice(0, 4).join(" · ")}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-    )}
+      );
+    }}
   />
 ));
 EmojiSuggestionList.displayName = "EmojiSuggestionList";

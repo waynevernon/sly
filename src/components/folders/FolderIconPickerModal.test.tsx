@@ -50,7 +50,7 @@ describe("FolderIconPickerModal", () => {
   it("persists the query across source switches and applies emoji styles", async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    const [firstResult] = searchEmojiShortcodes("book", 1);
+    const [firstResult] = searchEmojiShortcodes("open-book", 1);
     expect(firstResult).toBeTruthy();
 
     render(
@@ -69,13 +69,13 @@ describe("FolderIconPickerModal", () => {
     fireEvent.change(
       screen.getByPlaceholderText("Search emoji names or aliases..."),
       {
-        target: { value: "book" },
+        target: { value: "open-book" },
       },
     );
 
     await user.click(screen.getByRole("button", { name: "Icons" }));
     await waitFor(() => {
-      expect(screen.getByDisplayValue("book")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("open-book")).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
@@ -86,6 +86,37 @@ describe("FolderIconPickerModal", () => {
     expect(onApply).toHaveBeenCalledWith({
       icon: { kind: "emoji", shortcode: firstResult.shortcode },
       colorId: "blue",
+    });
+  });
+
+  it("uses the deduped emoji search results in the picker", async () => {
+    const user = userEvent.setup();
+    const bookResults = searchEmojiShortcodes("book");
+
+    render(
+      <TooltipProvider>
+        <FolderIconPickerModal
+          open
+          value={null}
+          title="Customize Folder"
+          onOpenChange={vi.fn()}
+          onApply={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Emoji" }));
+    fireEvent.change(
+      screen.getByPlaceholderText("Search emoji names or aliases..."),
+      {
+        target: { value: "book" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(`${bookResults.length.toLocaleString()} emoji`),
+      ).toBeInTheDocument();
     });
   });
 
