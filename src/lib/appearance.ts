@@ -22,18 +22,18 @@ export interface ThemePreset {
 }
 
 export const DEFAULT_NOTE_TYPOGRAPHY: NoteTypographySettings = {
-  baseFontSize: 15,
+  baseFontSize: 16,
   boldWeight: 600,
-  lineHeight: 1.6,
+  lineHeight: 1.5,
 };
 
 export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   mode: "system",
   lightPresetId: "nord-light",
   darkPresetId: "nord",
-  uiFont: { kind: "preset", value: "system-sans" },
-  noteFont: { kind: "preset", value: "system-sans" },
-  codeFont: { kind: "preset", value: "system-mono" },
+  uiFont: { kind: "preset", value: "inter" },
+  noteFont: { kind: "preset", value: "atkinson-hyperlegible-next" },
+  codeFont: { kind: "preset", value: "jetbrains-mono" },
   noteTypography: DEFAULT_NOTE_TYPOGRAPHY,
   textDirection: "auto",
   editorWidth: "normal",
@@ -45,42 +45,77 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
 };
 
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {
+  inter: {
+    id: "inter",
+    label: "Inter",
+    stack:
+      '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+  "atkinson-hyperlegible-next": {
+    id: "atkinson-hyperlegible-next",
+    label: "Atkinson Hyperlegible Next",
+    stack:
+      '"Atkinson Hyperlegible Next", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+  "jetbrains-mono": {
+    id: "jetbrains-mono",
+    label: "JetBrains Mono",
+    stack:
+      '"JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
+  },
   "system-sans": {
     id: "system-sans",
-    label: "Sans",
+    label: "System Sans",
     stack:
       'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
   "system-serif": {
     id: "system-serif",
-    label: "Serif",
+    label: "System Serif",
     stack: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
   },
   "system-mono": {
     id: "system-mono",
-    label: "Mono",
+    label: "System Mono",
     stack:
       'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace',
   },
 };
 
 export const UI_FONT_PRESET_IDS: FontPresetId[] = [
+  "inter",
+  "atkinson-hyperlegible-next",
+  "jetbrains-mono",
   "system-sans",
   "system-serif",
   "system-mono",
 ];
 
 export const NOTE_FONT_PRESET_IDS: FontPresetId[] = [
+  "atkinson-hyperlegible-next",
+  "inter",
+  "jetbrains-mono",
   "system-sans",
   "system-serif",
   "system-mono",
 ];
 
 export const CODE_FONT_PRESET_IDS: FontPresetId[] = [
+  "jetbrains-mono",
+  "inter",
+  "atkinson-hyperlegible-next",
   "system-sans",
   "system-serif",
   "system-mono",
 ];
+
+export function getFontPresetOptionLabel(
+  presetId: FontPresetId,
+  defaultPresetId: FontPresetId,
+): string {
+  const label = FONT_PRESETS[presetId].label;
+  return presetId === defaultPresetId ? `${label} (Default)` : label;
+}
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   "github-light-default": {

@@ -60,6 +60,9 @@ export type ThemePresetId =
   | "monokai";
 
 export type FontPresetId =
+  | "inter"
+  | "atkinson-hyperlegible-next"
+  | "jetbrains-mono"
   | "system-sans"
   | "system-serif"
   | "system-mono";

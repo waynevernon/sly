@@ -4,6 +4,61 @@
 /* Use class-based dark mode instead of media query */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src:
+    url("/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNextVariable.ttf")
+      format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src:
+    url("/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNextVariable-Italic.ttf")
+      format("truetype");
+  font-weight: 200 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src:
+    url("/fonts/jetbrains-mono/JetBrainsMonoVariable.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src:
+    url("/fonts/jetbrains-mono/JetBrainsMonoVariable-Italic.woff2")
+      format("woff2");
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* Theme color tokens - Light mode (default) */
 :root {
   --color-bg: #ffffff;
@@ -68,11 +123,11 @@
 
   /* Editor font settings - simplified (overridden by ThemeContext) */
   --editor-font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+    "Atkinson Hyperlegible Next", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --editor-base-font-size: 16px;
-  --editor-bold-weight: 700;
-  --editor-line-height: 1.6;
+  --editor-bold-weight: 600;
+  --editor-line-height: 1.5;
   --editor-paragraph-spacing: 1em;
 
   /* Computed header sizes (set by ThemeContext based on base size) */
@@ -140,14 +195,14 @@
 /* Register theme colors with Tailwind */
 @theme {
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --font-serif:
     ui-serif, Georgia, Cambria, "Times New Roman", Times, serif,
     "Apple Color Emoji";
   --font-mono:
-    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, "Courier New",
-    monospace;
+    "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco,
+    "Courier New", monospace;
 
   /* Custom font sizes */
   --text-2xs: 0.75rem; /* 12px */

@@ -136,7 +136,7 @@ fn default_true() -> bool {
 }
 
 fn default_note_base_font_size() -> f32 {
-    15.0
+    16.0
 }
 
 fn default_note_bold_weight() -> i32 {
@@ -144,13 +144,13 @@ fn default_note_bold_weight() -> i32 {
 }
 
 fn default_note_line_height() -> f32 {
-    1.6
+    1.5
 }
 
 const NOTE_PREVIEW_MAX_CHARS: usize = 180;
 const NOTE_PREVIEW_ELLIPSIS: &str = "...";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FontChoice {
     #[serde(default = "default_font_choice_kind")]
@@ -170,20 +170,20 @@ impl FontChoice {
 
 impl Default for FontChoice {
     fn default() -> Self {
-        Self::preset("system-sans")
+        Self::preset("inter")
     }
 }
 
 fn default_ui_font() -> FontChoice {
-    FontChoice::preset("system-sans")
+    FontChoice::preset("inter")
 }
 
 fn default_note_font() -> FontChoice {
-    FontChoice::preset("system-sans")
+    FontChoice::preset("atkinson-hyperlegible-next")
 }
 
 fn default_code_font() -> FontChoice {
-    FontChoice::preset("system-mono")
+    FontChoice::preset("jetbrains-mono")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1265,6 +1265,45 @@ fn save_app_config(app: &AppHandle, config: &AppConfig) -> Result<()> {
     let content = serde_json::to_string_pretty(config)?;
     std::fs::write(path, content)?;
     Ok(())
+}
+
+fn font_choice_is_preset(choice: &FontChoice, preset: &str) -> bool {
+    choice.kind == "preset" && choice.value == preset
+}
+
+fn float_matches(value: f32, expected: f32) -> bool {
+    (value - expected).abs() < 0.0001
+}
+
+fn migrate_appearance_defaults(appearance: &mut AppearanceSettings) -> bool {
+    let mut changed = false;
+
+    if font_choice_is_preset(&appearance.ui_font, "system-sans") {
+        appearance.ui_font = default_ui_font();
+        changed = true;
+    }
+
+    if font_choice_is_preset(&appearance.note_font, "system-sans") {
+        appearance.note_font = default_note_font();
+        changed = true;
+    }
+
+    if font_choice_is_preset(&appearance.code_font, "system-mono") {
+        appearance.code_font = default_code_font();
+        changed = true;
+    }
+
+    if float_matches(appearance.note_typography.base_font_size, 15.0) {
+        appearance.note_typography.base_font_size = default_note_base_font_size();
+        changed = true;
+    }
+
+    if float_matches(appearance.note_typography.line_height, 1.6) {
+        appearance.note_typography.line_height = default_note_line_height();
+        changed = true;
+    }
+
+    changed
 }
 
 fn sanitize_folder_icon_spec(icon: FolderIconSpec) -> Option<FolderIconSpec> {
@@ -5017,6 +5056,10 @@ pub fn run() {
                 }
             }
 
+            if migrate_appearance_defaults(&mut app_config.appearance) {
+                app_config_dirty = true;
+            }
+
             // Load per-folder settings if notes folder is set
             let settings = if let Some(ref folder) = app_config.notes_folder {
                 load_settings(folder)
@@ -5236,6 +5279,30 @@ mod tests {
         }
     }
 
+    fn old_default_appearance() -> AppearanceSettings {
+        AppearanceSettings {
+            mode: default_theme_mode(),
+            light_preset_id: default_light_preset_id(),
+            dark_preset_id: default_dark_preset_id(),
+            ui_font: FontChoice::preset("system-sans"),
+            note_font: FontChoice::preset("system-sans"),
+            code_font: FontChoice::preset("system-mono"),
+            note_typography: NoteTypographySettings {
+                base_font_size: 15.0,
+                bold_weight: default_note_bold_weight(),
+                line_height: 1.6,
+            },
+            text_direction: TextDirection::default(),
+            editor_width: default_editor_width(),
+            custom_editor_width_px: None,
+            interface_zoom: default_interface_zoom(),
+            pane_mode: default_pane_mode(),
+            custom_light_colors: None,
+            custom_dark_colors: None,
+            confirm_deletions: default_true(),
+        }
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn hides_only_main_window_on_close() {
@@ -5247,6 +5314,56 @@ mod tests {
     fn resolve_created_timestamp_falls_back_to_modified() {
         assert_eq!(resolve_created_timestamp(None, 42), 42);
         assert_eq!(resolve_created_timestamp(Some(7), 42), 7);
+    }
+
+    #[test]
+    fn migrate_appearance_defaults_updates_only_old_default_fields() {
+        let mut appearance = old_default_appearance();
+
+        assert!(migrate_appearance_defaults(&mut appearance));
+        assert_eq!(appearance.ui_font, FontChoice::preset("inter"));
+        assert_eq!(
+            appearance.note_font,
+            FontChoice::preset("atkinson-hyperlegible-next")
+        );
+        assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
+        assert!(float_matches(appearance.note_typography.base_font_size, 16.0));
+        assert!(float_matches(appearance.note_typography.line_height, 1.5));
+    }
+
+    #[test]
+    fn migrate_appearance_defaults_preserves_customized_fields() {
+        let mut appearance = old_default_appearance();
+        appearance.ui_font = FontChoice::preset("system-serif");
+        appearance.note_font = FontChoice {
+            kind: "custom".to_string(),
+            value: "\"Literata\", serif".to_string(),
+        };
+        appearance.code_font = FontChoice::preset("jetbrains-mono");
+        appearance.note_typography.base_font_size = 18.0;
+        appearance.note_typography.line_height = 1.8;
+
+        assert!(!migrate_appearance_defaults(&mut appearance));
+        assert_eq!(appearance.ui_font, FontChoice::preset("system-serif"));
+        assert_eq!(appearance.note_font.kind, "custom");
+        assert_eq!(appearance.note_font.value, "\"Literata\", serif");
+        assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
+        assert!(float_matches(appearance.note_typography.base_font_size, 18.0));
+        assert!(float_matches(appearance.note_typography.line_height, 1.8));
+    }
+
+    #[test]
+    fn migrate_appearance_defaults_handles_partial_migration() {
+        let mut appearance = old_default_appearance();
+        appearance.note_font = FontChoice::preset("system-serif");
+        appearance.note_typography.base_font_size = 18.0;
+
+        assert!(migrate_appearance_defaults(&mut appearance));
+        assert_eq!(appearance.ui_font, FontChoice::preset("inter"));
+        assert_eq!(appearance.note_font, FontChoice::preset("system-serif"));
+        assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
+        assert!(float_matches(appearance.note_typography.base_font_size, 18.0));
+        assert!(float_matches(appearance.note_typography.line_height, 1.5));
     }
 
     #[test]

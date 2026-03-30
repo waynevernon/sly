@@ -136,9 +136,9 @@ function normalizeAppearanceSettings(
       next.darkPresetId && isThemePresetId(next.darkPresetId)
         ? next.darkPresetId
         : defaultAppearance.darkPresetId,
-    uiFont: normalizeFontChoice(next.uiFont, "system-sans"),
-    noteFont: normalizeFontChoice(next.noteFont, "system-sans"),
-    codeFont: normalizeFontChoice(next.codeFont, "system-mono"),
+    uiFont: normalizeFontChoice(next.uiFont, "inter"),
+    noteFont: normalizeFontChoice(next.noteFont, "atkinson-hyperlegible-next"),
+    codeFont: normalizeFontChoice(next.codeFont, "jetbrains-mono"),
     noteTypography: {
       baseFontSize:
         typeof next.noteTypography?.baseFontSize === "number"
@@ -190,9 +190,12 @@ function applyAppearanceCSSVariables(
   resolvedTheme: "light" | "dark",
 ) {
   const root = document.documentElement;
-  const noteFontFamily = resolveFontFamily(appearance.noteFont, "system-sans");
-  const codeFontFamily = resolveFontFamily(appearance.codeFont, "system-mono");
-  const uiFontFamily = resolveFontFamily(appearance.uiFont, "system-sans");
+  const noteFontFamily = resolveFontFamily(
+    appearance.noteFont,
+    "atkinson-hyperlegible-next",
+  );
+  const codeFontFamily = resolveFontFamily(appearance.codeFont, "jetbrains-mono");
+  const uiFontFamily = resolveFontFamily(appearance.uiFont, "inter");
   const baseSize = appearance.noteTypography.baseFontSize;
   const boldWeight = appearance.noteTypography.boldWeight;
   const lineHeight = appearance.noteTypography.lineHeight;

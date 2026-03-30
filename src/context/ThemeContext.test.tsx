@@ -19,10 +19,10 @@ describe("ThemeContext", () => {
       mode: "system",
       lightPresetId: "nord-light",
       darkPresetId: "nord",
-      uiFont: { kind: "preset", value: "system-sans" },
-      noteFont: { kind: "preset", value: "system-sans" },
-      codeFont: { kind: "preset", value: "system-mono" },
-      noteTypography: { baseFontSize: 15, boldWeight: 600, lineHeight: 1.6 },
+      uiFont: { kind: "preset", value: "inter" },
+      noteFont: { kind: "preset", value: "atkinson-hyperlegible-next" },
+      codeFont: { kind: "preset", value: "jetbrains-mono" },
+      noteTypography: { baseFontSize: 16, boldWeight: 600, lineHeight: 1.5 },
       textDirection: "auto",
       editorWidth: "normal",
       interfaceZoom: 1,
@@ -39,9 +39,9 @@ describe("ThemeContext", () => {
       mode: "invalid" as never,
       lightPresetId: "invalid" as never,
       darkPresetId: "invalid" as never,
-      uiFont: { kind: "custom", value: "" },
-      noteFont: { kind: "custom", value: "" },
-      codeFont: { kind: "custom", value: "" },
+      uiFont: { kind: "preset", value: "" } as never,
+      noteFont: { kind: "preset", value: "" } as never,
+      codeFont: { kind: "preset", value: "" } as never,
       noteTypography: { baseFontSize: 15, boldWeight: 600, lineHeight: 1.6 },
       textDirection: "invalid" as never,
       editorWidth: "invalid" as never,
@@ -56,6 +56,15 @@ describe("ThemeContext", () => {
       expect(result.current.theme).toBe("system");
     });
 
+    expect(result.current.uiFont).toEqual({ kind: "preset", value: "inter" });
+    expect(result.current.noteFont).toEqual({
+      kind: "preset",
+      value: "atkinson-hyperlegible-next",
+    });
+    expect(result.current.codeFont).toEqual({
+      kind: "preset",
+      value: "jetbrains-mono",
+    });
     expect(result.current.editorWidth).toBe("normal");
     expect(result.current.interfaceZoom).toBe(1.5);
     expect(result.current.paneMode).toBe(3);

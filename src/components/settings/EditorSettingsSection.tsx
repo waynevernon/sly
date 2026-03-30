@@ -4,7 +4,7 @@ import {
   CODE_FONT_PRESET_IDS,
   DEFAULT_APPEARANCE_SETTINGS,
   DARK_THEME_PRESETS,
-  FONT_PRESETS,
+  getFontPresetOptionLabel,
   LIGHT_THEME_PRESETS,
   NOTE_FONT_PRESET_IDS,
   resolveFontFamily,
@@ -55,6 +55,7 @@ interface FontChoiceControlProps {
   label: string;
   value: FontChoice;
   presetIds: FontPresetId[];
+  defaultPresetId: FontPresetId;
   customPlaceholder: string;
   onChange: (value: FontChoice) => void;
 }
@@ -63,6 +64,7 @@ function FontChoiceControl({
   label,
   value,
   presetIds,
+  defaultPresetId,
   customPlaceholder,
   onChange,
 }: FontChoiceControlProps) {
@@ -89,7 +91,7 @@ function FontChoiceControl({
         >
           {presetIds.map((presetId) => (
             <option key={presetId} value={presetId}>
-              {FONT_PRESETS[presetId].label}
+              {getFontPresetOptionLabel(presetId, defaultPresetId)}
             </option>
           ))}
           <option value="custom">Custom</option>
@@ -166,9 +168,12 @@ export function AppearanceSettingsSection() {
 
   const previewVariables = useMemo(() => {
     const themeTokens = resolveThemeTokens(appearanceSettings, previewTheme);
-    const noteFontFamily = resolveFontFamily(noteFont, "system-sans");
-    const codeFontFamily = resolveFontFamily(codeFont, "system-mono");
-    const uiFontFamily = resolveFontFamily(uiFont, "system-sans");
+    const noteFontFamily = resolveFontFamily(
+      noteFont,
+      "atkinson-hyperlegible-next",
+    );
+    const codeFontFamily = resolveFontFamily(codeFont, "jetbrains-mono");
+    const uiFontFamily = resolveFontFamily(uiFont, "inter");
 
     return {
       ...themeColorsToCSSVariables(themeTokens),
@@ -284,6 +289,7 @@ export function AppearanceSettingsSection() {
             label="UI Font"
             value={uiFont}
             presetIds={UI_FONT_PRESET_IDS}
+            defaultPresetId="inter"
             customPlaceholder={`system-ui, sans-serif`}
             onChange={setUiFont}
           />
@@ -292,6 +298,7 @@ export function AppearanceSettingsSection() {
             label="Note Font"
             value={noteFont}
             presetIds={NOTE_FONT_PRESET_IDS}
+            defaultPresetId="atkinson-hyperlegible-next"
             customPlaceholder={`ui-serif, serif`}
             onChange={setNoteFont}
           />
@@ -300,6 +307,7 @@ export function AppearanceSettingsSection() {
             label="Code Font"
             value={codeFont}
             presetIds={CODE_FONT_PRESET_IDS}
+            defaultPresetId="jetbrains-mono"
             customPlaceholder={`ui-monospace, monospace`}
             onChange={setCodeFont}
           />
