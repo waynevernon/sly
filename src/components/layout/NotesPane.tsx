@@ -105,6 +105,11 @@ function getScopeLabel(scope: NoteScope, path: string | null): string {
   return parts[parts.length - 1];
 }
 
+function getSortMenuTitle(scope: NoteScope): string {
+  if (scope.type === "recent") return "Recent Notes View";
+  return "Sort This Folder";
+}
+
 function getDateModeLabel(mode: NoteListDateMode): string {
   switch (mode) {
     case "created":
@@ -186,6 +191,8 @@ export function NotesPane() {
   const heading = searchQuery.trim()
     ? "Search Results"
     : getScopeLabel(selectedScope, selectedFolderPath);
+  const sortMenuTitle = getSortMenuTitle(selectedScope);
+  const showSortItems = selectedScope.type !== "recent";
   const noteCount = displayItems.length;
   const showSubfolderNotesInCurrentView =
     selectedScope.type === "folder" && showNotesFromSubfolders;
@@ -343,35 +350,40 @@ export function NotesPane() {
             <>
               {!searchQuery.trim() && (
                 <SortMenuButton
-                  title="Sort Notes"
+                  title="Note List Options"
+                  menuTitle={sortMenuTitle}
                   value={noteSortMode}
-                  items={noteSortItems}
+                  items={showSortItems ? noteSortItems : []}
                   onChange={(nextMode) => {
                     void setNoteSortMode(nextMode);
                   }}
                 >
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
                   <DropdownMenu.Label className={menuLabelClassName}>
-                    View
+                    View Options
                   </DropdownMenu.Label>
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
-                  <DropdownMenu.CheckboxItem
-                    checked={showNotesFromSubfolders}
-                    className={menuItemClassName}
-                    onCheckedChange={(checked) => {
-                      void setNoteListViewOptions({
-                        showNotesFromSubfolders: checked === true,
-                      });
-                    }}
-                  >
-                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                      <DropdownMenu.ItemIndicator>
-                        <span className="text-xs leading-none">✓</span>
-                      </DropdownMenu.ItemIndicator>
-                    </span>
-                    <span>Notes From Subfolders</span>
-                  </DropdownMenu.CheckboxItem>
-                  <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  {selectedScope.type === "folder" && (
+                    <>
+                      <DropdownMenu.CheckboxItem
+                        checked={showNotesFromSubfolders}
+                        className={menuItemClassName}
+                        onCheckedChange={(checked) => {
+                          void setNoteListViewOptions({
+                            showNotesFromSubfolders: checked === true,
+                          });
+                        }}
+                      >
+                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                          <DropdownMenu.ItemIndicator>
+                            <span className="text-xs leading-none">✓</span>
+                          </DropdownMenu.ItemIndicator>
+                        </span>
+                        <span>Notes From Subfolders</span>
+                      </DropdownMenu.CheckboxItem>
+                      <DropdownMenu.Separator className={menuSeparatorClassName} />
+                    </>
+                  )}
                   <DropdownMenu.Sub>
                     <DropdownMenu.SubTrigger className={menuItemClassName}>
                       <span className="inline-flex h-4 w-4 shrink-0" />

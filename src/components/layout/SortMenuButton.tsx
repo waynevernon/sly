@@ -23,6 +23,7 @@ export interface SortMenuItem<T extends string> {
 
 interface SortMenuButtonProps<T extends string> {
   title: string;
+  menuTitle?: string;
   value: T;
   items: SortMenuItem<T>[];
   onChange: (value: T) => void;
@@ -31,6 +32,7 @@ interface SortMenuButtonProps<T extends string> {
 
 export function SortMenuButton<T extends string>({
   title,
+  menuTitle,
   value,
   items,
   onChange,
@@ -89,7 +91,7 @@ export function SortMenuButton<T extends string>({
           className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
           <DropdownMenu.Label className={menuLabelClassName}>
-            {title}
+            {menuTitle ?? title}
           </DropdownMenu.Label>
           <DropdownMenu.Separator className={menuSeparatorClassName} />
           <div className="flex flex-col gap-0.5">

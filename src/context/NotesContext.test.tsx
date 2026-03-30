@@ -1356,6 +1356,150 @@ describe("NotesContext", () => {
     ]);
   });
 
+  it("uses a folder-specific sort override for folder scope", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/zulu",
+        title: "Zulu",
+        preview: "z",
+        modified: 9,
+        created: 9,
+      },
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "a",
+        modified: 1,
+        created: 1,
+      },
+      {
+        id: "docs/mike",
+        title: "Mike",
+        preview: "m",
+        modified: 5,
+        created: 5,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      noteSortMode: "modifiedDesc",
+      pinnedNoteIds: ["docs/mike"],
+      folderNoteSortModes: {
+        docs: "titleAsc",
+      },
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.noteSortMode).toBe("titleAsc");
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/mike",
+      "docs/alpha",
+      "docs/zulu",
+    ]);
+  });
+
+  it("falls back to the workspace note sort when a folder has no override", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/zulu",
+        title: "Zulu",
+        preview: "z",
+        modified: 9,
+        created: 9,
+      },
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "a",
+        modified: 1,
+        created: 1,
+      },
+      {
+        id: "docs/mike",
+        title: "Mike",
+        preview: "m",
+        modified: 5,
+        created: 5,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+      noteSortMode: "createdAsc",
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    expect(result.current.noteSortMode).toBe("createdAsc");
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/alpha",
+      "docs/mike",
+      "docs/zulu",
+    ]);
+  });
+
+  it("stores folder sort changes as folder overrides instead of changing the workspace default", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/zulu",
+        title: "Zulu",
+        preview: "z",
+        modified: 9,
+        created: 9,
+      },
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "a",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectFolder("docs");
+    });
+
+    await act(async () => {
+      await result.current.setNoteSortMode("titleDesc");
+    });
+
+    expect(notesService.patchSettings).toHaveBeenCalledWith({
+      folderNoteSortModes: {
+        docs: "titleDesc",
+      },
+    });
+    expect(result.current.settings.noteSortMode).toBe("modifiedDesc");
+    expect(result.current.settings.folderNoteSortModes).toEqual({
+      docs: "titleDesc",
+    });
+    expect(result.current.noteSortMode).toBe("titleDesc");
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/zulu",
+      "docs/alpha",
+    ]);
+  });
+
   it("defaults showRecentNotes on and can hide the recent scope", async () => {
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 

@@ -175,6 +175,7 @@ export interface Settings {
   showNoteListPreview?: boolean;
   noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
+  folderNoteSortModes?: Record<string, NoteSortMode>;
   folderSortMode?: FolderSortMode;
 }
 
@@ -195,6 +196,7 @@ export interface SettingsPatch {
   showNoteListPreview?: boolean | null;
   noteListPreviewLines?: NoteListPreviewLines;
   noteSortMode?: NoteSortMode;
+  folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode?: FolderSortMode;
 }
 

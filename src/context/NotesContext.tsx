@@ -139,13 +139,21 @@ function getParentPath(path: string): string | null {
 }
 
 const RECENT_NOTES_LIMIT = 5;
+const VALID_NOTE_SORT_MODES: ReadonlySet<NoteSortMode> = new Set([
+  "modifiedDesc",
+  "modifiedAsc",
+  "createdDesc",
+  "createdAsc",
+  "titleAsc",
+  "titleDesc",
+]);
 
 function normalizeNoteIds(
-  noteIds: Array<string | null | undefined>,
+  noteIds: Array<string | null | undefined> | null | undefined,
 ): string[] {
   return Array.from(
     new Set(
-      noteIds.filter(
+      (noteIds ?? []).filter(
         (id): id is string => typeof id === "string" && id.trim().length > 0,
       ),
     ),
@@ -164,6 +172,29 @@ function sanitizeRecentNoteIds(
     RECENT_NOTES_LIMIT,
   );
   return normalizedIds.length > 0 ? normalizedIds : undefined;
+}
+
+function sanitizeFolderNoteSortModes(
+  folderNoteSortModes: Record<string, NoteSortMode> | null | undefined,
+): Record<string, NoteSortMode> | undefined {
+  if (!folderNoteSortModes) {
+    return undefined;
+  }
+
+  const normalizedEntries = Object.entries(folderNoteSortModes).flatMap(
+    ([path, noteSortMode]) => {
+      const normalizedPath = path.trim();
+      if (!normalizedPath || !VALID_NOTE_SORT_MODES.has(noteSortMode)) {
+        return [];
+      }
+
+      return [[normalizedPath, noteSortMode] as const];
+    },
+  );
+
+  return normalizedEntries.length > 0
+    ? Object.fromEntries(normalizedEntries)
+    : undefined;
 }
 
 function areNoteIdListsEqual(left: string[], right: string[]) {
@@ -208,14 +239,96 @@ function isNoteInFolderScope(
   );
 }
 
+function noteSortValueCompare(
+  left: number,
+  right: number,
+  descending: boolean,
+): number {
+  return descending ? right - left : left - right;
+}
+
+function compareNoteMetadata(
+  left: NoteMetadata,
+  right: NoteMetadata,
+  noteSortMode: NoteSortMode,
+): number {
+  const ordering = (() => {
+    switch (noteSortMode) {
+      case "modifiedDesc":
+        return noteSortValueCompare(left.modified, right.modified, true);
+      case "modifiedAsc":
+        return noteSortValueCompare(left.modified, right.modified, false);
+      case "createdDesc":
+        return noteSortValueCompare(left.created, right.created, true);
+      case "createdAsc":
+        return noteSortValueCompare(left.created, right.created, false);
+      case "titleAsc": {
+        const lowerTitleOrder = left.title
+          .toLocaleLowerCase()
+          .localeCompare(right.title.toLocaleLowerCase());
+        return lowerTitleOrder || left.title.localeCompare(right.title);
+      }
+      case "titleDesc": {
+        const lowerTitleOrder = right.title
+          .toLocaleLowerCase()
+          .localeCompare(left.title.toLocaleLowerCase());
+        return lowerTitleOrder || right.title.localeCompare(left.title);
+      }
+    }
+  })();
+
+  return (
+    ordering ||
+    right.modified - left.modified ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function sortNoteMetadataList(
+  notes: NoteMetadata[],
+  pinnedNoteIds: string[] | null | undefined,
+  noteSortMode: NoteSortMode,
+): NoteMetadata[] {
+  const pinnedIdSet = new Set(normalizeNoteIds(pinnedNoteIds));
+
+  return [...notes].sort((left, right) => {
+    const leftPinned = pinnedIdSet.has(left.id);
+    const rightPinned = pinnedIdSet.has(right.id);
+
+    if (leftPinned !== rightPinned) {
+      return leftPinned ? -1 : 1;
+    }
+
+    return compareNoteMetadata(left, right, noteSortMode);
+  });
+}
+
+function getEffectiveNoteSortMode(
+  scope: NoteScope,
+  settings: Settings,
+): NoteSortMode {
+  const workspaceNoteSortMode = settings.noteSortMode ?? DEFAULT_NOTE_SORT_MODE;
+
+  if (scope.type !== "folder") {
+    return workspaceNoteSortMode;
+  }
+
+  return (
+    settings.folderNoteSortModes?.[scope.path] ??
+    workspaceNoteSortMode
+  );
+}
+
 function getScopedNotes(
   notes: NoteMetadata[],
   scope: NoteScope,
   recentNoteIds: string[] | null | undefined,
   showNotesFromSubfolders = false,
+  pinnedNoteIds?: string[] | null,
+  noteSortMode: NoteSortMode = DEFAULT_NOTE_SORT_MODE,
 ): NoteMetadata[] {
   if (scope.type === "all") {
-    return notes;
+    return sortNoteMetadataList(notes, pinnedNoteIds, noteSortMode);
   }
 
   if (scope.type === "recent") {
@@ -228,8 +341,12 @@ function getScopedNotes(
       .filter((note): note is NoteMetadata => note !== null);
   }
 
-  return notes.filter((note) =>
-    isNoteInFolderScope(note.id, scope.path, showNotesFromSubfolders),
+  return sortNoteMetadataList(
+    notes.filter((note) =>
+      isNoteInFolderScope(note.id, scope.path, showNotesFromSubfolders),
+    ),
+    pinnedNoteIds,
+    noteSortMode,
   );
 }
 
@@ -278,6 +395,9 @@ function sanitizeCollapsedFolders(
 function normalizeSettings(settings: Settings | null | undefined): Settings {
   const nextSettings = settings ? { ...settings } : {};
   nextSettings.noteSortMode ??= DEFAULT_NOTE_SORT_MODE;
+  nextSettings.folderNoteSortModes = sanitizeFolderNoteSortModes(
+    nextSettings.folderNoteSortModes,
+  );
   nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
   nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
   nextSettings.showRecentNotes ??= true;
@@ -364,6 +484,11 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   assignNullableField("defaultNoteName", current.defaultNoteName, next.defaultNoteName);
   assignNullableField("ollamaModel", current.ollamaModel, next.ollamaModel);
   assignNullableField("folderIcons", current.folderIcons, next.folderIcons);
+  assignNullableField(
+    "folderNoteSortModes",
+    current.folderNoteSortModes,
+    next.folderNoteSortModes,
+  );
   assignNullableField(
     "collapsedFolders",
     current.collapsedFolders,
@@ -463,6 +588,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const showRecentNotes = settings.showRecentNotes ?? true;
   const showNoteCounts = settings.showNoteCounts ?? true;
   const showNotesFromSubfolders = settings.showNotesFromSubfolders ?? false;
+  const effectiveNoteSortMode = getEffectiveNoteSortMode(selectedScope, settings);
   const noteListDateMode = settings.noteListDateMode ?? "modified";
   const noteListPreviewLines =
     settings.showNoteListPreview === false
@@ -599,11 +725,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         ? recentScopeNoteIds
         : settingsRef.current.recentNoteIds;
 
+    const visibleNoteSortMode = getEffectiveNoteSortMode(
+      selectedScopeRef.current,
+      settingsRef.current,
+    );
+
     return getScopedNotes(
       notesRef.current,
       selectedScopeRef.current,
       visibleRecentNoteIds,
       settingsRef.current.showNotesFromSubfolders ?? false,
+      settingsRef.current.pinnedNoteIds,
+      visibleNoteSortMode,
     ).map((note) => note.id);
   }, [recentScopeNoteIds]);
 
@@ -642,6 +775,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const setNoteSortMode = useCallback(
     async (mode: NoteSortMode) => {
+      if (selectedScopeRef.current.type === "folder") {
+        const selectedPath = selectedScopeRef.current.path;
+        await persistSettings((currentSettings) => ({
+          ...currentSettings,
+          folderNoteSortModes: {
+            ...(currentSettings.folderNoteSortModes ?? {}),
+            [selectedPath]: mode,
+          },
+        }));
+        return;
+      }
+
       await persistSettings((currentSettings) => ({
         ...currentSettings,
         noteSortMode: mode,
@@ -766,6 +911,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           : settingsRef.current.recentNoteIds;
       const includeSubfolders =
         settingsRef.current.showNotesFromSubfolders ?? false;
+      const noteSortMode = getEffectiveNoteSortMode(scope, settingsRef.current);
 
       if (scope.type === "recent") {
         refreshRecentScopeNoteIds(scopedRecentNoteIds);
@@ -781,6 +927,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             scope,
             scopedRecentNoteIds,
             includeSubfolders,
+            settingsRef.current.pinnedNoteIds,
+            noteSortMode,
           ).map((note) => note.id),
         );
         if (!visibleNoteIds.has(activeNoteId)) {
@@ -1959,7 +2107,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [notesFolder, refreshNotes]);
 
   const recentNotes = useMemo(
-    () => getScopedNotes(notes, { type: "recent" }, settings.recentNoteIds),
+    () =>
+      getScopedNotes(
+        notes,
+        { type: "recent" },
+        settings.recentNoteIds,
+      ),
     [notes, settings.recentNoteIds],
   );
 
@@ -1972,11 +2125,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           ? recentScopeNoteIds
           : settings.recentNoteIds,
         showNotesFromSubfolders,
+        settings.pinnedNoteIds,
+        effectiveNoteSortMode,
       ),
     [
       notes,
+      effectiveNoteSortMode,
       recentScopeNoteIds,
       selectedScope,
+      settings.pinnedNoteIds,
       settings.recentNoteIds,
       showNotesFromSubfolders,
     ],
@@ -2057,7 +2214,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListPreview,
       settings,
       folderAppearances,
-      noteSortMode: settings.noteSortMode || DEFAULT_NOTE_SORT_MODE,
+      noteSortMode: effectiveNoteSortMode,
       folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
       selectedScope,
       selectedNoteId,
@@ -2090,6 +2247,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListPreview,
       settings,
       folderAppearances,
+      effectiveNoteSortMode,
       selectedScope,
       selectedNoteId,
       selectedNoteIds,

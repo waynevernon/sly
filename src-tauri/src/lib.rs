@@ -390,6 +390,8 @@ pub struct Settings {
     pub note_list_preview_lines: u8,
     #[serde(rename = "noteSortMode", default)]
     pub note_sort_mode: NoteSortMode,
+    #[serde(rename = "folderNoteSortModes", default)]
+    pub folder_note_sort_modes: Option<HashMap<String, NoteSortMode>>,
     #[serde(rename = "folderSortMode", default)]
     pub folder_sort_mode: FolderSortMode,
 }
@@ -412,6 +414,7 @@ impl Default for Settings {
             show_note_list_preview: true,
             note_list_preview_lines: default_note_list_preview_lines(),
             note_sort_mode: NoteSortMode::default(),
+            folder_note_sort_modes: None,
             folder_sort_mode: FolderSortMode::default(),
         }
     }
@@ -450,6 +453,8 @@ pub struct SettingsPatch {
     pub note_list_preview_lines: Option<u8>,
     #[serde(default)]
     pub note_sort_mode: Option<NoteSortMode>,
+    #[serde(default)]
+    pub folder_note_sort_modes: Option<Option<HashMap<String, NoteSortMode>>>,
     #[serde(default)]
     pub folder_sort_mode: Option<FolderSortMode>,
 }
@@ -1315,11 +1320,34 @@ fn sanitize_folder_icons_map(
         .collect()
 }
 
+fn sanitize_folder_note_sort_modes_map(
+    folder_note_sort_modes: HashMap<String, NoteSortMode>,
+) -> HashMap<String, NoteSortMode> {
+    folder_note_sort_modes
+        .into_iter()
+        .filter_map(|(path, note_sort_mode)| {
+            let normalized_path = path.trim().to_string();
+            if normalized_path.is_empty() {
+                None
+            } else {
+                Some((normalized_path, note_sort_mode))
+            }
+        })
+        .collect()
+}
+
 fn sanitize_settings(settings: &mut Settings) {
     if let Some(folder_icons) = settings.folder_icons.take() {
         let normalized_folder_icons = sanitize_folder_icons_map(folder_icons);
         settings.folder_icons =
             (!normalized_folder_icons.is_empty()).then_some(normalized_folder_icons);
+    }
+    if let Some(folder_note_sort_modes) = settings.folder_note_sort_modes.take() {
+        let normalized_folder_note_sort_modes =
+            sanitize_folder_note_sort_modes_map(folder_note_sort_modes);
+        settings.folder_note_sort_modes =
+            (!normalized_folder_note_sort_modes.is_empty())
+                .then_some(normalized_folder_note_sort_modes);
     }
 }
 
@@ -1393,6 +1421,9 @@ fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
     if let Some(note_sort_mode) = patch.note_sort_mode {
         settings.note_sort_mode = note_sort_mode;
     }
+    if let Some(folder_note_sort_modes) = patch.folder_note_sort_modes {
+        settings.folder_note_sort_modes = folder_note_sort_modes;
+    }
     if let Some(folder_sort_mode) = patch.folder_sort_mode {
         settings.folder_sort_mode = folder_sort_mode;
     }
@@ -1444,6 +1475,46 @@ fn rewrite_folder_icon_paths(
 fn remove_folder_icon_paths(folder_icons: &mut HashMap<String, FolderAppearance>, path: &str) {
     let prefix = format!("{}/", path);
     folder_icons.retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
+}
+
+fn rewrite_folder_note_sort_mode_paths(
+    folder_note_sort_modes: &mut HashMap<String, NoteSortMode>,
+    old_path: &str,
+    new_path: &str,
+) {
+    let old_prefix = format!("{}/", old_path);
+    let new_prefix = format!("{}/", new_path);
+
+    let updates: Vec<(String, String, NoteSortMode)> = folder_note_sort_modes
+        .iter()
+        .filter_map(|(path, note_sort_mode)| {
+            if path == old_path {
+                Some((path.clone(), new_path.to_string(), *note_sort_mode))
+            } else if path.starts_with(&old_prefix) {
+                Some((
+                    path.clone(),
+                    format!("{}{}", new_prefix, &path[old_prefix.len()..]),
+                    *note_sort_mode,
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (old_key, new_key, note_sort_mode) in updates {
+        folder_note_sort_modes.remove(&old_key);
+        folder_note_sort_modes.insert(new_key, note_sort_mode);
+    }
+}
+
+fn remove_folder_note_sort_mode_paths(
+    folder_note_sort_modes: &mut HashMap<String, NoteSortMode>,
+    path: &str,
+) {
+    let prefix = format!("{}/", path);
+    folder_note_sort_modes
+        .retain(|folder_path, _| folder_path != path && !folder_path.starts_with(&prefix));
 }
 
 fn sanitize_collapsed_folder_paths(collapsed_folders: &mut Vec<String>) {
@@ -2268,6 +2339,18 @@ async fn delete_folder(path: String, state: State<'_, AppState>) -> Result<(), S
         if clear_folder_icons {
             settings.folder_icons = None;
         }
+        let mut clear_folder_note_sort_modes = false;
+        if let Some(ref mut folder_note_sort_modes) = settings.folder_note_sort_modes {
+            let previous_len = folder_note_sort_modes.len();
+            remove_folder_note_sort_mode_paths(folder_note_sort_modes, &path);
+            if folder_note_sort_modes.len() != previous_len {
+                settings_changed = true;
+            }
+            clear_folder_note_sort_modes = folder_note_sort_modes.is_empty();
+        }
+        if clear_folder_note_sort_modes {
+            settings.folder_note_sort_modes = None;
+        }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
             let previous_len = collapsed_folders.len();
             remove_collapsed_folder_paths(collapsed_folders, &path);
@@ -2357,6 +2440,9 @@ async fn rename_folder(
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &old_path, &new_path);
+        }
+        if let Some(ref mut folder_note_sort_modes) = settings.folder_note_sort_modes {
+            rewrite_folder_note_sort_mode_paths(folder_note_sort_modes, &old_path, &new_path);
         }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
             rewrite_collapsed_folder_paths(collapsed_folders, &old_path, &new_path);
@@ -2643,6 +2729,9 @@ async fn move_folder(
         }
         if let Some(ref mut folder_icons) = settings.folder_icons {
             rewrite_folder_icon_paths(folder_icons, &path, &new_path);
+        }
+        if let Some(ref mut folder_note_sort_modes) = settings.folder_note_sort_modes {
+            rewrite_folder_note_sort_mode_paths(folder_note_sort_modes, &path, &new_path);
         }
         if let Some(ref mut collapsed_folders) = settings.collapsed_folders {
             rewrite_collapsed_folder_paths(collapsed_folders, &path, &new_path);
@@ -5339,6 +5428,10 @@ mod tests {
             show_note_list_preview: true,
             note_list_preview_lines: 2,
             note_sort_mode: NoteSortMode::TitleAsc,
+            folder_note_sort_modes: Some(HashMap::from([(
+                "journal".to_string(),
+                NoteSortMode::CreatedAsc,
+            )])),
             folder_sort_mode: FolderSortMode::NameDesc,
         };
 
@@ -5355,6 +5448,10 @@ mod tests {
                 show_note_list_folder_path: Some(Some(false)),
                 show_note_list_preview: Some(Some(false)),
                 note_list_preview_lines: Some(3),
+                folder_note_sort_modes: Some(Some(HashMap::from([(
+                    "daily".to_string(),
+                    NoteSortMode::TitleDesc,
+                )]))),
                 ..SettingsPatch::default()
             },
         );
@@ -5374,6 +5471,13 @@ mod tests {
         assert!(!settings.show_note_list_preview);
         assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
+        assert_eq!(
+            settings.folder_note_sort_modes,
+            Some(HashMap::from([(
+                "daily".to_string(),
+                NoteSortMode::TitleDesc,
+            )]))
+        );
     }
 
     #[test]
@@ -5398,6 +5502,7 @@ mod tests {
             default_note_list_preview_lines()
         );
         assert_eq!(settings.note_sort_mode, NoteSortMode::ModifiedDesc);
+        assert_eq!(settings.folder_note_sort_modes, None);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
     }
 
@@ -5496,6 +5601,48 @@ mod tests {
         assert!(!folder_icons.contains_key("docs"));
         assert!(!folder_icons.contains_key("docs/ideas"));
         assert!(folder_icons.contains_key("journal"));
+    }
+
+    #[test]
+    fn rewrite_folder_note_sort_mode_paths_updates_nested_paths() {
+        let mut folder_note_sort_modes = HashMap::from([
+            ("docs".to_string(), NoteSortMode::TitleAsc),
+            ("docs/ideas".to_string(), NoteSortMode::CreatedDesc),
+            ("journal".to_string(), NoteSortMode::ModifiedAsc),
+        ]);
+
+        rewrite_folder_note_sort_mode_paths(&mut folder_note_sort_modes, "docs", "work");
+
+        assert_eq!(
+            folder_note_sort_modes.get("work"),
+            Some(&NoteSortMode::TitleAsc)
+        );
+        assert_eq!(
+            folder_note_sort_modes.get("work/ideas"),
+            Some(&NoteSortMode::CreatedDesc)
+        );
+        assert_eq!(
+            folder_note_sort_modes.get("journal"),
+            Some(&NoteSortMode::ModifiedAsc)
+        );
+    }
+
+    #[test]
+    fn remove_folder_note_sort_mode_paths_removes_folder_and_descendants() {
+        let mut folder_note_sort_modes = HashMap::from([
+            ("docs".to_string(), NoteSortMode::TitleAsc),
+            ("docs/ideas".to_string(), NoteSortMode::CreatedDesc),
+            ("journal".to_string(), NoteSortMode::ModifiedAsc),
+        ]);
+
+        remove_folder_note_sort_mode_paths(&mut folder_note_sort_modes, "docs");
+
+        assert!(!folder_note_sort_modes.contains_key("docs"));
+        assert!(!folder_note_sort_modes.contains_key("docs/ideas"));
+        assert_eq!(
+            folder_note_sort_modes.get("journal"),
+            Some(&NoteSortMode::ModifiedAsc)
+        );
     }
 
     #[test]

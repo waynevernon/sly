@@ -258,6 +258,8 @@ describe("NotesPane", () => {
     const setNoteListViewOptions = vi.fn();
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
         setNoteListViewOptions,
       }),
     );
@@ -268,10 +270,11 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
-    const sortButton = screen.getByRole("button", { name: "Sort Notes" });
+    const sortButton = screen.getByRole("button", { name: "Note List Options" });
 
     await user.click(sortButton);
-    expect(screen.getByText("View")).toBeInTheDocument();
+    expect(screen.getByText("Sort This Folder")).toBeInTheDocument();
+    expect(screen.getByText("View Options")).toBeInTheDocument();
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
     expect(screen.getByText("2 Lines")).toBeInTheDocument();
@@ -291,6 +294,53 @@ describe("NotesPane", () => {
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteListFolderPath: false,
     });
+  });
+
+  it("uses folder-scoped wording for the root notes view", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Note List Options" }),
+    );
+
+    expect(screen.getByText("Sort This Folder")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows recent-note view options without folder or sort controls", async () => {
+    const user = userEvent.setup();
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "recent" },
+        selectedFolderPath: null,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Note List Options" }),
+    );
+
+    expect(screen.getByText("Recent Notes View")).toBeInTheDocument();
+    expect(screen.getByText("View Options")).toBeInTheDocument();
+    expect(screen.queryByText("Last Modified")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the header note count when the setting is disabled", async () => {
