@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as notesService from "../services/notes";
+import type { Settings } from "../types/note";
 import { NotesProvider, useNotes } from "./NotesContext";
 
 type SearchResult = {
@@ -54,6 +55,22 @@ function Wrapper({ children }: PropsWithChildren) {
   return <NotesProvider>{children}</NotesProvider>;
 }
 
+function createSettings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    schemaVersion: 1,
+    showNoteCounts: true,
+    showNotesFromSubfolders: false,
+    noteListDateMode: "modified",
+    showNoteListFilename: false,
+    showNoteListFolderPath: true,
+    showNoteListPreview: true,
+    noteListPreviewLines: 2,
+    noteSortMode: "modifiedDesc",
+    folderSortMode: "nameAsc",
+    ...overrides,
+  };
+}
+
 describe("NotesContext", () => {
   beforeEach(() => {
     vi.mocked(notesService.getNotesFolder).mockResolvedValue("/notes");
@@ -74,7 +91,7 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.listFolders).mockResolvedValue([]);
-    vi.mocked(notesService.getSettings).mockResolvedValue({});
+    vi.mocked(notesService.getSettings).mockResolvedValue(createSettings());
     vi.mocked(notesService.patchSettings).mockResolvedValue();
     vi.mocked(notesService.startFileWatcher).mockResolvedValue();
     vi.mocked(notesService.searchNotes).mockResolvedValue([]);
@@ -549,9 +566,9 @@ describe("NotesContext", () => {
       { id: "epsilon", title: "Epsilon", preview: "", modified: 2, created: 2 },
       { id: "zeta", title: "Zeta", preview: "", modified: 1, created: 1 },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "gamma", "delta", "epsilon", "zeta"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -602,9 +619,9 @@ describe("NotesContext", () => {
   });
 
   it("keeps recent scope order stable while persisting viewed-note recency", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -643,9 +660,9 @@ describe("NotesContext", () => {
   });
 
   it("refreshes recent scope ordering after leaving and re-entering the scope", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -698,9 +715,9 @@ describe("NotesContext", () => {
         created: 2,
       },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["docs/alpha"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockResolvedValue({
       id: "docs/alpha",
       title: "Alpha note",
@@ -772,9 +789,9 @@ describe("NotesContext", () => {
   });
 
   it("remaps recent note ids when a note is renamed on save", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["alpha", "beta"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -831,9 +848,9 @@ describe("NotesContext", () => {
         created: 1,
       },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["alpha", "beta"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -896,9 +913,9 @@ describe("NotesContext", () => {
   });
 
   it("prunes deleted notes from recent note ids", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.deleteNote).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -927,10 +944,10 @@ describe("NotesContext", () => {
   });
 
   it("remaps recent and pinned note ids when a note is moved", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       pinnedNoteIds: ["beta"],
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.moveNote).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -971,10 +988,10 @@ describe("NotesContext", () => {
   });
 
   it("remaps recent and pinned note ids when multiple notes are moved", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       pinnedNoteIds: ["beta"],
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.readNote).mockImplementation(async (id) => ({
       id,
       title: id,
@@ -1033,9 +1050,9 @@ describe("NotesContext", () => {
   });
 
   it("refreshes the active recent scope after a note move remap", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
     vi.mocked(notesService.moveNote).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -1094,20 +1111,20 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.getSettings)
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["docs/alpha"],
         folderIcons: {
           docs: { colorId: "blue" },
         },
         collapsedFolders: ["docs"],
-      })
-      .mockResolvedValueOnce({
+      }))
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["archive/docs/alpha"],
         folderIcons: {
           "archive/docs": { colorId: "blue" },
         },
         collapsedFolders: ["archive/docs"],
-      });
+      }));
     vi.mocked(notesService.moveFolder).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -1178,20 +1195,20 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.getSettings)
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["docs/alpha", "docs/beta"],
         folderIcons: {
           docs: { colorId: "blue" },
         },
         collapsedFolders: ["docs"],
-      })
-      .mockResolvedValueOnce({
+      }))
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["archive/alpha", "archive/beta"],
         folderIcons: {
           archive: { colorId: "blue" },
         },
         collapsedFolders: ["archive"],
-      });
+      }));
     vi.mocked(notesService.renameFolder).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -1271,21 +1288,21 @@ describe("NotesContext", () => {
       },
     ]);
     vi.mocked(notesService.getSettings)
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["docs/alpha", "journal/beta"],
         folderIcons: {
           docs: { colorId: "blue" },
           journal: { colorId: "red" },
         },
         collapsedFolders: ["docs", "journal"],
-      })
-      .mockResolvedValueOnce({
+      }))
+      .mockResolvedValueOnce(createSettings({
         recentNoteIds: ["journal/beta"],
         folderIcons: {
           journal: { colorId: "red" },
         },
         collapsedFolders: ["journal"],
-      });
+      }));
     vi.mocked(notesService.deleteFolder).mockImplementation(async () => {
       vi.mocked(notesService.listNotes).mockResolvedValue([
         {
@@ -1336,9 +1353,9 @@ describe("NotesContext", () => {
   });
 
   it("shows recent scope in stored recent order instead of note sort order", async () => {
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       recentNoteIds: ["beta", "alpha"],
-    });
+    }));
 
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 
@@ -1380,13 +1397,13 @@ describe("NotesContext", () => {
         created: 5,
       },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       noteSortMode: "modifiedDesc",
       pinnedNoteIds: ["docs/mike"],
       folderNoteSortModes: {
         docs: "titleAsc",
       },
-    });
+    }));
 
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 
@@ -1430,9 +1447,9 @@ describe("NotesContext", () => {
         created: 5,
       },
     ]);
-    vi.mocked(notesService.getSettings).mockResolvedValueOnce({
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
       noteSortMode: "createdAsc",
-    });
+    }));
 
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 

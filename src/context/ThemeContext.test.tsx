@@ -34,41 +34,36 @@ describe("ThemeContext", () => {
     vi.mocked(notesService.updateAppearanceSettings).mockResolvedValue();
   });
 
-  it("normalizes invalid persisted values", async () => {
+  it("uses canonical persisted values from the backend", async () => {
     vi.mocked(notesService.getAppearanceSettings).mockResolvedValueOnce({
-      mode: "invalid" as never,
-      lightPresetId: "invalid" as never,
-      darkPresetId: "invalid" as never,
-      uiFont: { kind: "preset", value: "" } as never,
-      noteFont: { kind: "preset", value: "" } as never,
-      codeFont: { kind: "preset", value: "" } as never,
-      noteTypography: { baseFontSize: 15, boldWeight: 600, lineHeight: 1.6 },
-      textDirection: "invalid" as never,
-      editorWidth: "invalid" as never,
-      interfaceZoom: 4,
-      paneMode: 9 as never,
-      confirmDeletions: undefined,
+      mode: "dark",
+      lightPresetId: "nord-light",
+      darkPresetId: "nord",
+      uiFont: { kind: "preset", value: "inter" },
+      noteFont: { kind: "preset", value: "atkinson-hyperlegible-next" },
+      codeFont: { kind: "preset", value: "jetbrains-mono" },
+      noteTypography: { baseFontSize: 16, boldWeight: 600, lineHeight: 1.5 },
+      textDirection: "auto",
+      editorWidth: "wide",
+      interfaceZoom: 1.25,
+      paneMode: 2,
+      foldersPaneWidth: 260,
+      notesPaneWidth: 320,
+      confirmDeletions: false,
     });
 
     const { result } = renderHook(() => useTheme(), { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(result.current.theme).toBe("system");
+      expect(result.current.theme).toBe("dark");
     });
 
-    expect(result.current.uiFont).toEqual({ kind: "preset", value: "inter" });
-    expect(result.current.noteFont).toEqual({
-      kind: "preset",
-      value: "atkinson-hyperlegible-next",
-    });
-    expect(result.current.codeFont).toEqual({
-      kind: "preset",
-      value: "jetbrains-mono",
-    });
-    expect(result.current.editorWidth).toBe("normal");
-    expect(result.current.interfaceZoom).toBe(1.5);
-    expect(result.current.paneMode).toBe(3);
-    expect(result.current.confirmDeletions).toBe(true);
+    expect(result.current.editorWidth).toBe("wide");
+    expect(result.current.interfaceZoom).toBe(1.25);
+    expect(result.current.paneMode).toBe(2);
+    expect(result.current.foldersPaneWidth).toBe(260);
+    expect(result.current.notesPaneWidth).toBe(320);
+    expect(result.current.confirmDeletions).toBe(false);
   });
 
   it("clamps interface zoom before persisting", async () => {

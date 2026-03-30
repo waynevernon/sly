@@ -1269,7 +1269,7 @@ export function resolveThemeTokens(
       ? appearance.customLightColors
       : appearance.customDarkColors;
 
-  return mergeThemeColors(preset.tokens, overrides);
+  return mergeThemeColors(preset.tokens, overrides ?? undefined);
 }
 
 export function themeColorsToCSSVariables(

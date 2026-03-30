@@ -4,7 +4,7 @@ use notify::{
     event::{CreateKind, ModifyKind, RemoveKind},
     Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -25,6 +25,10 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
 mod git;
+mod persistence;
+
+use persistence::app_config::{load_app_config, save_app_config};
+use persistence::workspace_settings::{apply_settings_patch, load_settings, save_settings};
 
 const MENU_SETTINGS_ID: &str = "app-settings";
 const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
@@ -117,6 +121,14 @@ fn default_dark_preset_id() -> String {
 
 fn default_note_list_preview_lines() -> u8 {
     2
+}
+
+fn default_folders_pane_width() -> u32 {
+    240
+}
+
+fn default_notes_pane_width() -> u32 {
+    304
 }
 
 fn default_editor_width() -> String {
@@ -243,6 +255,10 @@ pub struct AppearanceSettings {
     pub interface_zoom: f32,
     #[serde(default = "default_pane_mode")]
     pub pane_mode: i32,
+    #[serde(default = "default_folders_pane_width")]
+    pub folders_pane_width: u32,
+    #[serde(default = "default_notes_pane_width")]
+    pub notes_pane_width: u32,
     #[serde(default)]
     pub custom_light_colors: Option<ThemeColors>,
     #[serde(default)]
@@ -266,6 +282,8 @@ impl Default for AppearanceSettings {
             custom_editor_width_px: None,
             interface_zoom: default_interface_zoom(),
             pane_mode: default_pane_mode(),
+            folders_pane_width: default_folders_pane_width(),
+            notes_pane_width: default_notes_pane_width(),
             custom_light_colors: None,
             custom_dark_colors: None,
             confirm_deletions: true,
@@ -285,26 +303,12 @@ pub enum NoteSortMode {
     TitleDesc,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum FolderSortMode {
     #[default]
     NameAsc,
     NameDesc,
-}
-
-impl<'de> Deserialize<'de> for FolderSortMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = Option::<String>::deserialize(deserializer)?;
-
-        Ok(match value.as_deref() {
-            Some("nameDesc") => Self::NameDesc,
-            _ => Self::NameAsc,
-        })
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -347,16 +351,33 @@ pub struct FolderAppearance {
 }
 
 // App config (stored in app data directory)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(rename = "schemaVersion", default = "persistence::app_config::current_app_config_schema_version")]
+    pub schema_version: u32,
     pub notes_folder: Option<String>,
     #[serde(default)]
     pub appearance: AppearanceSettings,
 }
 
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            schema_version: persistence::app_config::current_app_config_schema_version(),
+            notes_folder: None,
+            appearance: AppearanceSettings::default(),
+        }
+    }
+}
+
 // Per-folder settings (stored in .sly/settings.json within notes folder)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(
+        rename = "schemaVersion",
+        default = "persistence::workspace_settings::current_settings_schema_version"
+    )]
+    pub schema_version: u32,
     #[serde(rename = "gitEnabled")]
     pub git_enabled: Option<bool>,
     #[serde(rename = "pinnedNoteIds")]
@@ -367,6 +388,8 @@ pub struct Settings {
     pub show_recent_notes: Option<bool>,
     #[serde(rename = "showNoteCounts", default = "default_true")]
     pub show_note_counts: bool,
+    #[serde(rename = "showNotesFromSubfolders", default)]
+    pub show_notes_from_subfolders: bool,
     #[serde(rename = "defaultNoteName")]
     pub default_note_name: Option<String>,
     #[serde(rename = "ollamaModel")]
@@ -399,11 +422,13 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            schema_version: persistence::workspace_settings::current_settings_schema_version(),
             git_enabled: None,
             pinned_note_ids: None,
             recent_note_ids: None,
             show_recent_notes: None,
             show_note_counts: true,
+            show_notes_from_subfolders: false,
             default_note_name: None,
             ollama_model: None,
             folder_icons: None,
@@ -433,6 +458,8 @@ pub struct SettingsPatch {
     pub show_recent_notes: Option<Option<bool>>,
     #[serde(default)]
     pub show_note_counts: Option<Option<bool>>,
+    #[serde(default)]
+    pub show_notes_from_subfolders: Option<Option<bool>>,
     #[serde(default)]
     pub default_note_name: Option<Option<String>>,
     #[serde(default)]
@@ -1221,252 +1248,11 @@ fn apply_note_move_results_to_cache(
     }
 }
 
-// Get app config file path (in app data directory)
-fn get_app_config_path(app: &AppHandle) -> Result<PathBuf> {
-    let app_data = app.path().app_data_dir()?;
-    std::fs::create_dir_all(&app_data)?;
-    Ok(app_data.join("config.json"))
-}
-
-// Get per-folder settings file path (in .sly/ within notes folder)
-fn get_settings_path(notes_folder: &str) -> PathBuf {
-    let sly_dir = PathBuf::from(notes_folder).join(".sly");
-    std::fs::create_dir_all(&sly_dir).ok();
-    sly_dir.join("settings.json")
-}
-
 // Get search index path
 fn get_search_index_path(app: &AppHandle) -> Result<PathBuf> {
     let app_data = app.path().app_data_dir()?;
     std::fs::create_dir_all(&app_data)?;
     Ok(app_data.join("search_index"))
-}
-
-// Load app config from disk (notes folder path)
-fn load_app_config(app: &AppHandle) -> AppConfig {
-    let path = match get_app_config_path(app) {
-        Ok(p) => p,
-        Err(_) => return AppConfig::default(),
-    };
-
-    if path.exists() {
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
-    } else {
-        AppConfig::default()
-    }
-}
-
-// Save app config to disk
-fn save_app_config(app: &AppHandle, config: &AppConfig) -> Result<()> {
-    let path = get_app_config_path(app)?;
-    let content = serde_json::to_string_pretty(config)?;
-    std::fs::write(path, content)?;
-    Ok(())
-}
-
-fn font_choice_is_preset(choice: &FontChoice, preset: &str) -> bool {
-    choice.kind == "preset" && choice.value == preset
-}
-
-fn float_matches(value: f32, expected: f32) -> bool {
-    (value - expected).abs() < 0.0001
-}
-
-fn migrate_appearance_defaults(appearance: &mut AppearanceSettings) -> bool {
-    let mut changed = false;
-
-    if font_choice_is_preset(&appearance.ui_font, "system-sans") {
-        appearance.ui_font = default_ui_font();
-        changed = true;
-    }
-
-    if font_choice_is_preset(&appearance.note_font, "system-sans") {
-        appearance.note_font = default_note_font();
-        changed = true;
-    }
-
-    if font_choice_is_preset(&appearance.code_font, "system-mono") {
-        appearance.code_font = default_code_font();
-        changed = true;
-    }
-
-    if float_matches(appearance.note_typography.base_font_size, 15.0) {
-        appearance.note_typography.base_font_size = default_note_base_font_size();
-        changed = true;
-    }
-
-    if float_matches(appearance.note_typography.line_height, 1.6) {
-        appearance.note_typography.line_height = default_note_line_height();
-        changed = true;
-    }
-
-    changed
-}
-
-fn sanitize_folder_icon_spec(icon: FolderIconSpec) -> Option<FolderIconSpec> {
-    match icon {
-        FolderIconSpec::Lucide { name } => {
-            let normalized = name.trim();
-            if normalized.is_empty() {
-                None
-            } else {
-                Some(FolderIconSpec::Lucide {
-                    name: normalized.to_string(),
-                })
-            }
-        }
-        FolderIconSpec::Emoji { shortcode } => {
-            let normalized = shortcode.trim();
-            if normalized.is_empty() {
-                None
-            } else {
-                Some(FolderIconSpec::Emoji {
-                    shortcode: normalized.to_string(),
-                })
-            }
-        }
-    }
-}
-
-fn sanitize_folder_appearance(folder_appearance: FolderAppearance) -> Option<FolderAppearance> {
-    let icon = folder_appearance.icon.and_then(sanitize_folder_icon_spec);
-    let color_id = folder_appearance.color_id;
-
-    if icon.is_none() && color_id.is_none() {
-        return None;
-    }
-
-    Some(FolderAppearance { icon, color_id })
-}
-
-fn sanitize_folder_icons_map(
-    folder_icons: HashMap<String, FolderAppearance>,
-) -> HashMap<String, FolderAppearance> {
-    folder_icons
-        .into_iter()
-        .filter_map(|(path, folder_appearance)| {
-            let normalized_path = path.trim().to_string();
-            if normalized_path.is_empty() {
-                return None;
-            }
-
-            sanitize_folder_appearance(folder_appearance)
-                .map(|normalized_appearance| (normalized_path, normalized_appearance))
-        })
-        .collect()
-}
-
-fn sanitize_folder_note_sort_modes_map(
-    folder_note_sort_modes: HashMap<String, NoteSortMode>,
-) -> HashMap<String, NoteSortMode> {
-    folder_note_sort_modes
-        .into_iter()
-        .filter_map(|(path, note_sort_mode)| {
-            let normalized_path = path.trim().to_string();
-            if normalized_path.is_empty() {
-                None
-            } else {
-                Some((normalized_path, note_sort_mode))
-            }
-        })
-        .collect()
-}
-
-fn sanitize_settings(settings: &mut Settings) {
-    if let Some(folder_icons) = settings.folder_icons.take() {
-        let normalized_folder_icons = sanitize_folder_icons_map(folder_icons);
-        settings.folder_icons =
-            (!normalized_folder_icons.is_empty()).then_some(normalized_folder_icons);
-    }
-    if let Some(folder_note_sort_modes) = settings.folder_note_sort_modes.take() {
-        let normalized_folder_note_sort_modes =
-            sanitize_folder_note_sort_modes_map(folder_note_sort_modes);
-        settings.folder_note_sort_modes =
-            (!normalized_folder_note_sort_modes.is_empty())
-                .then_some(normalized_folder_note_sort_modes);
-    }
-}
-
-// Load per-folder settings from disk
-fn load_settings(notes_folder: &str) -> Settings {
-    let path = get_settings_path(notes_folder);
-
-    if path.exists() {
-        let mut settings = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default();
-        sanitize_settings(&mut settings);
-        settings
-    } else {
-        Settings::default()
-    }
-}
-
-// Save per-folder settings to disk
-fn save_settings(notes_folder: &str, settings: &Settings) -> Result<()> {
-    let path = get_settings_path(notes_folder);
-    let content = serde_json::to_string_pretty(settings)?;
-    std::fs::write(path, content)?;
-    Ok(())
-}
-
-fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch) {
-    if let Some(git_enabled) = patch.git_enabled {
-        settings.git_enabled = git_enabled;
-    }
-    if let Some(pinned_note_ids) = patch.pinned_note_ids {
-        settings.pinned_note_ids = pinned_note_ids;
-    }
-    if let Some(recent_note_ids) = patch.recent_note_ids {
-        settings.recent_note_ids = recent_note_ids;
-    }
-    if let Some(show_recent_notes) = patch.show_recent_notes {
-        settings.show_recent_notes = show_recent_notes;
-    }
-    if let Some(show_note_counts) = patch.show_note_counts {
-        settings.show_note_counts = show_note_counts.unwrap_or(true);
-    }
-    if let Some(default_note_name) = patch.default_note_name {
-        settings.default_note_name = default_note_name;
-    }
-    if let Some(ollama_model) = patch.ollama_model {
-        settings.ollama_model = ollama_model;
-    }
-    if let Some(folder_icons) = patch.folder_icons {
-        settings.folder_icons = folder_icons;
-    }
-    if let Some(collapsed_folders) = patch.collapsed_folders {
-        settings.collapsed_folders = collapsed_folders;
-    }
-    if let Some(note_list_date_mode) = patch.note_list_date_mode {
-        settings.note_list_date_mode = note_list_date_mode;
-    }
-    if let Some(show_note_list_filename) = patch.show_note_list_filename {
-        settings.show_note_list_filename = show_note_list_filename.unwrap_or(false);
-    }
-    if let Some(show_note_list_folder_path) = patch.show_note_list_folder_path {
-        settings.show_note_list_folder_path = show_note_list_folder_path.unwrap_or(true);
-    }
-    if let Some(show_note_list_preview) = patch.show_note_list_preview {
-        settings.show_note_list_preview = show_note_list_preview.unwrap_or(true);
-    }
-    if let Some(note_list_preview_lines) = patch.note_list_preview_lines {
-        settings.note_list_preview_lines = note_list_preview_lines.clamp(1, 3);
-    }
-    if let Some(note_sort_mode) = patch.note_sort_mode {
-        settings.note_sort_mode = note_sort_mode;
-    }
-    if let Some(folder_note_sort_modes) = patch.folder_note_sort_modes {
-        settings.folder_note_sort_modes = folder_note_sort_modes;
-    }
-    if let Some(folder_sort_mode) = patch.folder_sort_mode {
-        settings.folder_sort_mode = folder_sort_mode;
-    }
-    sanitize_settings(settings);
 }
 
 fn metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<i64> {
@@ -5056,10 +4842,6 @@ pub fn run() {
                 }
             }
 
-            if migrate_appearance_defaults(&mut app_config.appearance) {
-                app_config_dirty = true;
-            }
-
             // Load per-folder settings if notes folder is set
             let settings = if let Some(ref folder) = app_config.notes_folder {
                 load_settings(folder)
@@ -5268,6 +5050,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn note(id: &str, title: &str, modified: i64, created: i64) -> NoteMetadata {
         NoteMetadata {
@@ -5280,27 +5063,15 @@ mod tests {
     }
 
     fn old_default_appearance() -> AppearanceSettings {
-        AppearanceSettings {
-            mode: default_theme_mode(),
-            light_preset_id: default_light_preset_id(),
-            dark_preset_id: default_dark_preset_id(),
-            ui_font: FontChoice::preset("system-sans"),
-            note_font: FontChoice::preset("system-sans"),
-            code_font: FontChoice::preset("system-mono"),
-            note_typography: NoteTypographySettings {
-                base_font_size: 15.0,
-                bold_weight: default_note_bold_weight(),
-                line_height: 1.6,
-            },
-            text_direction: TextDirection::default(),
-            editor_width: default_editor_width(),
-            custom_editor_width_px: None,
-            interface_zoom: default_interface_zoom(),
-            pane_mode: default_pane_mode(),
-            custom_light_colors: None,
-            custom_dark_colors: None,
-            confirm_deletions: default_true(),
-        }
+        persistence::app_config::old_default_appearance()
+    }
+
+    fn temp_file_path(prefix: &str) -> PathBuf {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("sly-{prefix}-{unique}.json"))
     }
 
     #[cfg(target_os = "macos")]
@@ -5320,15 +5091,17 @@ mod tests {
     fn migrate_appearance_defaults_updates_only_old_default_fields() {
         let mut appearance = old_default_appearance();
 
-        assert!(migrate_appearance_defaults(&mut appearance));
+        assert!(persistence::app_config::migrate_appearance_defaults(
+            &mut appearance
+        ));
         assert_eq!(appearance.ui_font, FontChoice::preset("inter"));
         assert_eq!(
             appearance.note_font,
             FontChoice::preset("atkinson-hyperlegible-next")
         );
         assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
-        assert!(float_matches(appearance.note_typography.base_font_size, 16.0));
-        assert!(float_matches(appearance.note_typography.line_height, 1.5));
+        assert!((appearance.note_typography.base_font_size - 16.0).abs() < 0.0001);
+        assert!((appearance.note_typography.line_height - 1.5).abs() < 0.0001);
     }
 
     #[test]
@@ -5343,13 +5116,15 @@ mod tests {
         appearance.note_typography.base_font_size = 18.0;
         appearance.note_typography.line_height = 1.8;
 
-        assert!(!migrate_appearance_defaults(&mut appearance));
+        assert!(!persistence::app_config::migrate_appearance_defaults(
+            &mut appearance
+        ));
         assert_eq!(appearance.ui_font, FontChoice::preset("system-serif"));
         assert_eq!(appearance.note_font.kind, "custom");
         assert_eq!(appearance.note_font.value, "\"Literata\", serif");
         assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
-        assert!(float_matches(appearance.note_typography.base_font_size, 18.0));
-        assert!(float_matches(appearance.note_typography.line_height, 1.8));
+        assert!((appearance.note_typography.base_font_size - 18.0).abs() < 0.0001);
+        assert!((appearance.note_typography.line_height - 1.8).abs() < 0.0001);
     }
 
     #[test]
@@ -5358,12 +5133,151 @@ mod tests {
         appearance.note_font = FontChoice::preset("system-serif");
         appearance.note_typography.base_font_size = 18.0;
 
-        assert!(migrate_appearance_defaults(&mut appearance));
+        assert!(persistence::app_config::migrate_appearance_defaults(
+            &mut appearance
+        ));
         assert_eq!(appearance.ui_font, FontChoice::preset("inter"));
         assert_eq!(appearance.note_font, FontChoice::preset("system-serif"));
         assert_eq!(appearance.code_font, FontChoice::preset("jetbrains-mono"));
-        assert!(float_matches(appearance.note_typography.base_font_size, 18.0));
-        assert!(float_matches(appearance.note_typography.line_height, 1.5));
+        assert!((appearance.note_typography.base_font_size - 18.0).abs() < 0.0001);
+        assert!((appearance.note_typography.line_height - 1.5).abs() < 0.0001);
+    }
+
+    #[test]
+    fn load_app_config_migrates_legacy_file_and_writes_back_latest_schema() {
+        let path = temp_file_path("app-config");
+        std::fs::write(
+            &path,
+            r#"{
+  "notes_folder": "/notes",
+  "appearance": {
+    "mode": "system",
+    "lightPresetId": "nord-light",
+    "darkPresetId": "nord",
+    "uiFont": { "kind": "preset", "value": "system-sans" },
+    "noteFont": { "kind": "preset", "value": "system-sans" },
+    "codeFont": { "kind": "preset", "value": "system-mono" },
+    "noteTypography": { "baseFontSize": 15, "boldWeight": 600, "lineHeight": 1.6 },
+    "textDirection": "auto",
+    "editorWidth": "normal",
+    "interfaceZoom": 1,
+    "paneMode": 3,
+    "confirmDeletions": true
+  }
+}"#,
+        )
+        .unwrap();
+
+        let config = persistence::app_config::load_app_config_from_path(&path);
+
+        assert_eq!(
+            config.schema_version,
+            persistence::app_config::current_app_config_schema_version()
+        );
+        assert_eq!(config.appearance.ui_font, FontChoice::preset("inter"));
+        assert_eq!(
+            config.appearance.note_font,
+            FontChoice::preset("atkinson-hyperlegible-next")
+        );
+        assert_eq!(config.appearance.code_font, FontChoice::preset("jetbrains-mono"));
+        assert_eq!(config.appearance.folders_pane_width, 240);
+        assert_eq!(config.appearance.notes_pane_width, 304);
+
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(rewritten["schemaVersion"], serde_json::json!(1));
+        assert_eq!(rewritten["appearance"]["foldersPaneWidth"], serde_json::json!(240));
+        assert_eq!(rewritten["appearance"]["notesPaneWidth"], serde_json::json!(304));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_settings_migrates_legacy_file_and_writes_back_latest_schema() {
+        let path = temp_file_path("workspace-settings");
+        std::fs::write(
+            &path,
+            r#"{
+  "recentNoteIds": [" beta ", "", 42],
+  "folderIcons": {
+    "docs": { "icon": { "kind": "lucide", "name": "folder-open" }, "colorId": "blue" },
+    "": { "icon": { "kind": "lucide", "name": "" } }
+  },
+  "folderNoteSortModes": {
+    "docs": "titleDesc",
+    "": "createdAsc",
+    "bad": "invalid"
+  },
+  "noteListPreviewLines": 9,
+  "folderSortMode": "legacy"
+}"#,
+        )
+        .unwrap();
+
+        let settings = persistence::workspace_settings::load_settings_from_path(&path);
+
+        assert_eq!(
+            settings.schema_version,
+            persistence::workspace_settings::current_settings_schema_version()
+        );
+        assert!(!settings.show_notes_from_subfolders);
+        assert_eq!(settings.note_list_preview_lines, 3);
+        assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
+        assert_eq!(
+            settings.recent_note_ids,
+            Some(vec!["beta".to_string()])
+        );
+        assert_eq!(
+            settings.folder_note_sort_modes,
+            Some(HashMap::from([(
+                "docs".to_string(),
+                NoteSortMode::TitleDesc,
+            )]))
+        );
+        assert_eq!(settings.folder_icons.as_ref().map(HashMap::len), Some(1));
+
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(rewritten["schemaVersion"], serde_json::json!(1));
+        assert_eq!(rewritten["showNotesFromSubfolders"], serde_json::json!(false));
+        assert_eq!(rewritten["noteListPreviewLines"], serde_json::json!(3));
+        assert_eq!(rewritten["folderSortMode"], serde_json::json!("nameAsc"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_settings_leaves_current_schema_file_unchanged() {
+        let path = temp_file_path("workspace-settings-current");
+        let content = r#"{
+  "schemaVersion": 1,
+  "gitEnabled": null,
+  "pinnedNoteIds": null,
+  "recentNoteIds": ["alpha"],
+  "showRecentNotes": null,
+  "showNoteCounts": true,
+  "showNotesFromSubfolders": false,
+  "defaultNoteName": null,
+  "ollamaModel": null,
+  "folderIcons": null,
+  "collapsedFolders": null,
+  "noteListDateMode": "modified",
+  "showNoteListFilename": false,
+  "showNoteListFolderPath": true,
+  "showNoteListPreview": true,
+  "noteListPreviewLines": 2,
+  "noteSortMode": "modifiedDesc",
+  "folderNoteSortModes": null,
+  "folderSortMode": "nameAsc"
+}"#;
+        std::fs::write(&path, content).unwrap();
+
+        let settings = persistence::workspace_settings::load_settings_from_path(&path);
+
+        assert_eq!(settings.recent_note_ids, Some(vec!["alpha".to_string()]));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), content);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -5530,11 +5444,13 @@ mod tests {
     #[test]
     fn apply_settings_patch_updates_only_requested_fields() {
         let mut settings = Settings {
+            schema_version: persistence::workspace_settings::current_settings_schema_version(),
             git_enabled: Some(true),
             pinned_note_ids: Some(vec!["alpha".to_string()]),
             recent_note_ids: Some(vec!["alpha".to_string()]),
             show_recent_notes: Some(true),
             show_note_counts: true,
+            show_notes_from_subfolders: false,
             default_note_name: Some("Untitled".to_string()),
             ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
@@ -5558,6 +5474,7 @@ mod tests {
                 recent_note_ids: Some(Some(vec!["beta".to_string(), "alpha".to_string()])),
                 show_recent_notes: Some(Some(false)),
                 show_note_counts: Some(Some(false)),
+                show_notes_from_subfolders: Some(Some(true)),
                 default_note_name: Some(Some("Daily".to_string())),
                 ollama_model: Some(None),
                 note_list_date_mode: Some(NoteListDateMode::Off),
@@ -5582,6 +5499,7 @@ mod tests {
         );
         assert_eq!(settings.show_recent_notes, Some(false));
         assert!(!settings.show_note_counts);
+        assert!(settings.show_notes_from_subfolders);
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Off);
         assert!(settings.show_note_list_filename);
         assert!(!settings.show_note_list_folder_path);
@@ -5601,11 +5519,16 @@ mod tests {
     fn settings_default_matches_fresh_folder_defaults() {
         let settings = Settings::default();
 
+        assert_eq!(
+            settings.schema_version,
+            persistence::workspace_settings::current_settings_schema_version()
+        );
         assert_eq!(settings.git_enabled, None);
         assert_eq!(settings.pinned_note_ids, None);
         assert_eq!(settings.recent_note_ids, None);
         assert_eq!(settings.show_recent_notes, None);
         assert!(settings.show_note_counts);
+        assert!(!settings.show_notes_from_subfolders);
         assert_eq!(settings.default_note_name, None);
         assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.folder_icons, None);
@@ -5629,7 +5552,12 @@ mod tests {
             std::fs::read_to_string("../docs/demo-workspace/.sly/settings.json").unwrap();
         let settings: Settings = serde_json::from_str(&content).unwrap();
 
+        assert_eq!(
+            settings.schema_version,
+            persistence::workspace_settings::current_settings_schema_version()
+        );
         assert!(settings.show_note_counts);
+        assert!(!settings.show_notes_from_subfolders);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
         assert_eq!(settings.pinned_note_ids.as_ref().map(Vec::len), Some(2));
         assert_eq!(settings.recent_note_ids.as_ref().map(Vec::len), Some(5));

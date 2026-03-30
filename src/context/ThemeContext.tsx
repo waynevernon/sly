@@ -8,11 +8,9 @@ import {
 } from "react";
 import {
   DEFAULT_APPEARANCE_SETTINGS,
-  isThemePresetId,
   resolveFontFamily,
   resolveThemeTokens,
   themeColorsToCSSVariables,
-  normalizeFontChoice,
 } from "../lib/appearance";
 import {
   getAppearanceSettings,
@@ -95,94 +93,8 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
-function isEditorWidth(value: unknown): value is EditorWidth {
-  return (
-    value === "narrow" ||
-    value === "normal" ||
-    value === "wide" ||
-    value === "full" ||
-    value === "custom"
-  );
-}
-
-function isTextDirection(value: unknown): value is TextDirection {
-  return value === "auto" || value === "ltr" || value === "rtl";
-}
-
-function isPaneMode(value: unknown): value is PaneMode {
-  return value === 1 || value === 2 || value === 3;
-}
-
 function clampZoom(zoom: number) {
   return Math.round(Math.min(Math.max(zoom, 0.7), 1.5) * 20) / 20;
-}
-
-function normalizeAppearanceSettings(
-  appearance: AppearanceSettings | null | undefined,
-): AppearanceSettings {
-  const next = appearance ?? DEFAULT_APPEARANCE_SETTINGS;
-  const defaultAppearance = DEFAULT_APPEARANCE_SETTINGS;
-
-  return {
-    mode:
-      next.mode === "light" || next.mode === "dark" || next.mode === "system"
-        ? next.mode
-        : defaultAppearance.mode,
-    lightPresetId:
-      next.lightPresetId && isThemePresetId(next.lightPresetId)
-        ? next.lightPresetId
-        : defaultAppearance.lightPresetId,
-    darkPresetId:
-      next.darkPresetId && isThemePresetId(next.darkPresetId)
-        ? next.darkPresetId
-        : defaultAppearance.darkPresetId,
-    uiFont: normalizeFontChoice(next.uiFont, "inter"),
-    noteFont: normalizeFontChoice(next.noteFont, "atkinson-hyperlegible-next"),
-    codeFont: normalizeFontChoice(next.codeFont, "jetbrains-mono"),
-    noteTypography: {
-      baseFontSize:
-        typeof next.noteTypography?.baseFontSize === "number"
-          ? next.noteTypography.baseFontSize
-          : defaultAppearance.noteTypography.baseFontSize,
-      boldWeight:
-        typeof next.noteTypography?.boldWeight === "number"
-          ? next.noteTypography.boldWeight
-          : defaultAppearance.noteTypography.boldWeight,
-      lineHeight:
-        typeof next.noteTypography?.lineHeight === "number"
-          ? next.noteTypography.lineHeight
-          : defaultAppearance.noteTypography.lineHeight,
-    },
-    textDirection: isTextDirection(next.textDirection)
-      ? next.textDirection
-      : defaultAppearance.textDirection,
-    editorWidth: isEditorWidth(next.editorWidth)
-      ? next.editorWidth
-      : defaultAppearance.editorWidth,
-    customEditorWidthPx:
-      typeof next.customEditorWidthPx === "number" &&
-      next.customEditorWidthPx >= 480
-        ? next.customEditorWidthPx
-        : undefined,
-    interfaceZoom:
-      typeof next.interfaceZoom === "number"
-        ? clampZoom(next.interfaceZoom)
-        : defaultAppearance.interfaceZoom,
-    paneMode: isPaneMode(next.paneMode)
-      ? next.paneMode
-      : defaultAppearance.paneMode,
-    foldersPaneWidth:
-      typeof next.foldersPaneWidth === "number" && next.foldersPaneWidth >= 140
-        ? next.foldersPaneWidth
-        : defaultAppearance.foldersPaneWidth,
-    notesPaneWidth:
-      typeof next.notesPaneWidth === "number" && next.notesPaneWidth >= 180
-        ? next.notesPaneWidth
-        : defaultAppearance.notesPaneWidth,
-    customLightColors: next.customLightColors,
-    customDarkColors: next.customDarkColors,
-    confirmDeletions: next.confirmDeletions ?? true,
-  };
 }
 
 function applyAppearanceCSSVariables(
@@ -249,7 +161,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const updateAppearance = useCallback(
     (updater: (prev: AppearanceSettings) => AppearanceSettings) => {
       setAppearanceSettingsState((prev) => {
-        const next = normalizeAppearanceSettings(updater(prev));
+        const next = updater(prev);
         void persistAppearance(next);
         return next;
       });
@@ -260,7 +172,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const loadSettingsFromBackend = useCallback(async () => {
     try {
       const appearance = await getAppearanceSettings();
-      setAppearanceSettingsState(normalizeAppearanceSettings(appearance));
+      setAppearanceSettingsState(appearance);
     } catch (error) {
       console.error("Failed to load appearance settings:", error);
       setAppearanceSettingsState(DEFAULT_APPEARANCE_SETTINGS);
@@ -498,12 +410,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           appearanceSettings.customEditorWidthPx ?? DEFAULT_CUSTOM_WIDTH_PX,
         setCustomEditorWidthPx,
         setEditorMaxWidthLive,
-        foldersPaneWidth:
-          appearanceSettings.foldersPaneWidth ?? 240,
-        notesPaneWidth:
-          appearanceSettings.notesPaneWidth ?? 304,
+        foldersPaneWidth: appearanceSettings.foldersPaneWidth,
+        notesPaneWidth: appearanceSettings.notesPaneWidth,
         setPaneWidths,
-        confirmDeletions: appearanceSettings.confirmDeletions ?? true,
+        confirmDeletions: appearanceSettings.confirmDeletions,
         setConfirmDeletions,
       }}
     >

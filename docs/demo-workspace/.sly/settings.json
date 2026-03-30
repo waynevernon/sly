@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "gitEnabled": false,
   "pinnedNoteIds": [
     "Field Notes/Sly profile",
@@ -13,6 +14,7 @@
   ],
   "showRecentNotes": true,
   "showNoteCounts": true,
+  "showNotesFromSubfolders": false,
   "defaultNoteName": "Untitled",
   "ollamaModel": null,
   "folderIcons": {

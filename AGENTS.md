@@ -164,6 +164,7 @@ sly/
 │   ├── src/
 │   │   ├── lib.rs                 # Tauri commands, state, file watcher, search
 │   │   └── git.rs                 # Git CLI wrapper
+│   │   └── persistence/           # Config/settings schema migration and canonicalization
 │   ├── capabilities/default.json  # Tauri permissions config
 │   ├── Cargo.toml
 │   └── tauri.conf.json
@@ -189,6 +190,17 @@ Prefer service wrappers in `src/services/` over calling `invoke()` directly from
 
 - **App config**: `{APP_DATA}/config.json`
 - **Per-folder settings**: `{NOTES_FOLDER}/.sly/settings.json`
+
+Persistence ownership rules:
+
+- The Tauri backend is the only source of truth for persisted settings shape, defaults, sanitization, and migration.
+- Persisted config and workspace settings use a file-level `schemaVersion`. Treat files without a version as legacy and migrate them in Rust.
+- All persistence compatibility work belongs in `src-tauri/src/persistence/`, not in React contexts or components.
+- Frontend code may keep small UI fallbacks for rendering, but it must not act as a second migration layer or invent persisted defaults on load.
+- When adding a persisted field, update the Rust struct, migration/canonicalization path, Tauri command payload, and the matching TypeScript type together.
+- When changing the meaning, name, or shape of persisted data, add an explicit backend migration step and a Rust test with a legacy JSON fixture.
+- `serde(default)` is fine for additive fields with obvious defaults. Renames, moved fields, default rewrites, enum/value changes, or cleanup of legacy invalid data should be handled explicitly in backend migration/canonicalization.
+- Load flow for persisted files should stay: read raw JSON, migrate raw value to latest schema, deserialize latest struct, canonicalize, and write back only if the canonical form changed.
 
 The settings UI currently covers:
 
@@ -282,6 +294,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Keep the codebase clean and direct
 - Prefer shared primitives and shared patterns over local one-offs
 - Maintain type safety throughout the frontend and backend
+- Keep persistence changes centralized: schema, migration, and canonicalization belong in Tauri, while React should consume canonical data rather than re-normalizing persisted payloads
 - Avoid commented-out code and TODO-driven dead branches in production code
 - Prefer idiomatic, clean solutions over workarounds; if a workaround is the only viable path, flag it explicitly before proceeding
 - Prefer small, testable helper functions over large monolithic branches when logic is easy to isolate

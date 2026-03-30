@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Settings } from "../../types/note";
 import { FolderTreeView } from "./FolderTreeView";
 
 vi.mock("@dnd-kit/core", () => ({
@@ -37,13 +38,26 @@ type NotesHookValue = ReturnType<
 function makeNotesHookValue(
   overrides: Partial<NotesHookValue> = {},
 ): NotesHookValue {
+  const settings: Settings = {
+    schemaVersion: 1,
+    showNoteCounts: true,
+    showNotesFromSubfolders: false,
+    noteListDateMode: "modified",
+    showNoteListFilename: false,
+    showNoteListFolderPath: true,
+    showNoteListPreview: true,
+    noteListPreviewLines: 2,
+    noteSortMode: "modifiedDesc",
+    folderSortMode: "nameAsc",
+  };
+
   return {
     notes: [],
     recentNotes: [],
     knownFolders: [],
     hasLoadedFolders: true,
     notesFolder: "/notes",
-    settings: {},
+    settings,
     folderAppearances: {},
     folderSortMode: "nameAsc",
     folderRevealRequest: null,
@@ -277,13 +291,23 @@ describe("FolderTreeView", () => {
         "docs",
       );
       const [knownFolders, setKnownFolders] = useState(["docs", "docs/reference"]);
-      const [settings, setSettings] = useState({
+      const [settings, setSettings] = useState<Settings>({
+        schemaVersion: 1,
+        showNoteCounts: true,
+        showNotesFromSubfolders: false,
+        noteListDateMode: "modified",
+        showNoteListFilename: false,
+        showNoteListFolderPath: true,
+        showNoteListPreview: true,
+        noteListPreviewLines: 2,
+        noteSortMode: "modifiedDesc",
+        folderSortMode: "nameAsc",
         collapsedFolders: ["docs"],
       });
 
       const renameFolder = vi.fn().mockImplementation(async () => {
         setKnownFolders(["archive", "archive/reference"]);
-        setSettings({ collapsedFolders: ["archive"] });
+        setSettings((current) => ({ ...current, collapsedFolders: ["archive"] }));
         setSelectedFolderPath("archive");
       });
 

@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as notesService from "../../services/notes";
+import type { Settings } from "../../types/note";
 import { renderWithProviders } from "../../test/render";
 import { GeneralSettingsSection } from "./GeneralSettingsSection";
 
@@ -24,6 +25,20 @@ vi.mock("../../services/notes", () => ({
 }));
 
 describe("GeneralSettingsSection", () => {
+  const createSettings = (overrides: Partial<Settings> = {}): Settings => ({
+    schemaVersion: 1,
+    showNoteCounts: true,
+    showNotesFromSubfolders: false,
+    noteListDateMode: "modified",
+    showNoteListFilename: false,
+    showNoteListFolderPath: true,
+    showNoteListPreview: true,
+    noteListPreviewLines: 2,
+    noteSortMode: "modifiedDesc",
+    folderSortMode: "nameAsc",
+    ...overrides,
+  });
+
   beforeEach(async () => {
     const notesContext = await import("../../context/NotesContext");
     const gitContext = await import("../../context/GitContext");
@@ -53,9 +68,9 @@ describe("GeneralSettingsSection", () => {
       setConfirmDeletions: vi.fn(),
     } as never);
 
-    vi.mocked(notesService.getSettings).mockResolvedValue({
+    vi.mocked(notesService.getSettings).mockResolvedValue(createSettings({
       defaultNoteName: "Untitled",
-    });
+    }));
     vi.mocked(notesService.previewNoteName).mockResolvedValue("Daily Note");
     vi.mocked(notesService.patchSettings).mockResolvedValue();
   });

@@ -139,14 +139,18 @@ function getParentPath(path: string): string | null {
 }
 
 const RECENT_NOTES_LIMIT = 5;
-const VALID_NOTE_SORT_MODES: ReadonlySet<NoteSortMode> = new Set([
-  "modifiedDesc",
-  "modifiedAsc",
-  "createdDesc",
-  "createdAsc",
-  "titleAsc",
-  "titleDesc",
-]);
+const DEFAULT_SETTINGS: Settings = {
+  schemaVersion: 1,
+  showNoteCounts: true,
+  showNotesFromSubfolders: false,
+  noteListDateMode: "modified",
+  showNoteListFilename: false,
+  showNoteListFolderPath: true,
+  showNoteListPreview: true,
+  noteListPreviewLines: 2,
+  noteSortMode: DEFAULT_NOTE_SORT_MODE,
+  folderSortMode: DEFAULT_FOLDER_SORT_MODE,
+};
 
 function normalizeNoteIds(
   noteIds: Array<string | null | undefined> | null | undefined,
@@ -172,29 +176,6 @@ function sanitizeRecentNoteIds(
     RECENT_NOTES_LIMIT,
   );
   return normalizedIds.length > 0 ? normalizedIds : undefined;
-}
-
-function sanitizeFolderNoteSortModes(
-  folderNoteSortModes: Record<string, NoteSortMode> | null | undefined,
-): Record<string, NoteSortMode> | undefined {
-  if (!folderNoteSortModes) {
-    return undefined;
-  }
-
-  const normalizedEntries = Object.entries(folderNoteSortModes).flatMap(
-    ([path, noteSortMode]) => {
-      const normalizedPath = path.trim();
-      if (!normalizedPath || !VALID_NOTE_SORT_MODES.has(noteSortMode)) {
-        return [];
-      }
-
-      return [[normalizedPath, noteSortMode] as const];
-    },
-  );
-
-  return normalizedEntries.length > 0
-    ? Object.fromEntries(normalizedEntries)
-    : undefined;
 }
 
 function areNoteIdListsEqual(left: string[], right: string[]) {
@@ -392,31 +373,6 @@ function sanitizeCollapsedFolders(
   );
 }
 
-function normalizeSettings(settings: Settings | null | undefined): Settings {
-  const nextSettings = settings ? { ...settings } : {};
-  nextSettings.noteSortMode ??= DEFAULT_NOTE_SORT_MODE;
-  nextSettings.folderNoteSortModes = sanitizeFolderNoteSortModes(
-    nextSettings.folderNoteSortModes,
-  );
-  nextSettings.folderSortMode ??= DEFAULT_FOLDER_SORT_MODE;
-  nextSettings.recentNoteIds = sanitizeRecentNoteIds(nextSettings.recentNoteIds);
-  nextSettings.showRecentNotes ??= true;
-  nextSettings.showNoteCounts ??= true;
-  nextSettings.showNotesFromSubfolders ??= false;
-  nextSettings.noteListDateMode ??= "modified";
-  nextSettings.showNoteListFilename ??= false;
-  nextSettings.showNoteListFolderPath ??= true;
-  nextSettings.showNoteListPreview ??= true;
-  nextSettings.noteListPreviewLines ??= 2;
-  nextSettings.collapsedFolders = sanitizeCollapsedFolders(
-    nextSettings.collapsedFolders,
-  );
-  const folderIcons = sanitizeFolderAppearances(nextSettings.folderIcons);
-  nextSettings.folderIcons =
-    Object.keys(folderIcons).length > 0 ? folderIcons : undefined;
-  return nextSettings;
-}
-
 function areSettingValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
 
@@ -529,7 +485,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [knownFolders, setKnownFolders] = useState<string[]>([]);
   const [hasLoadedFolders, setHasLoadedFolders] = useState(false);
-  const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [recentScopeNoteIds, setRecentScopeNoteIds] = useState<
     string[] | undefined
   >(undefined);
@@ -653,14 +609,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applySettings = useCallback((nextSettings: Settings) => {
-    const normalizedSettings = normalizeSettings(nextSettings);
-    settingsRef.current = normalizedSettings;
-    setSettings(normalizedSettings);
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
     const nextFolderAppearances = sanitizeFolderAppearances(
-      normalizedSettings.folderIcons,
+      nextSettings.folderIcons ?? undefined,
     );
     setFolderAppearances(nextFolderAppearances);
-    return normalizedSettings;
+    return nextSettings;
   }, []);
 
   const refreshRecentScopeNoteIds = useCallback(
@@ -682,35 +637,35 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshSettings = useCallback(async () => {
-    const nextSettings = await notesService.getSettings();
-    const normalizedSettings = applySettings(nextSettings);
-    refreshRecentScopeNoteIds(normalizedSettings.recentNoteIds);
-    return normalizedSettings;
-  }, [applySettings, refreshRecentScopeNoteIds]);
+      const nextSettings = await notesService.getSettings();
+      const appliedSettings = applySettings(nextSettings);
+      refreshRecentScopeNoteIds(appliedSettings.recentNoteIds);
+      return appliedSettings;
+    }, [applySettings, refreshRecentScopeNoteIds]);
 
   const persistSettings = useCallback(
     async (updater: (currentSettings: Settings) => Settings) => {
       const currentSettings = settingsRef.current;
-      const nextSettings = normalizeSettings(updater(currentSettings));
+      const nextSettings = updater(currentSettings);
       const patch = buildSettingsPatch(currentSettings, nextSettings);
 
       if (!isSettingsPatchEmpty(patch)) {
         await notesService.patchSettings(patch);
       }
 
-      const normalizedSettings = applySettings(nextSettings);
+      const appliedSettings = applySettings(nextSettings);
 
       if (
         selectedScopeRef.current.type === "recent" &&
         !haveSameNoteIdMembers(
           recentScopeNoteIds,
-          normalizedSettings.recentNoteIds,
+          appliedSettings.recentNoteIds,
         )
       ) {
-        refreshRecentScopeNoteIds(normalizedSettings.recentNoteIds);
+        refreshRecentScopeNoteIds(appliedSettings.recentNoteIds);
       }
 
-      return normalizedSettings;
+      return appliedSettings;
     },
     [applySettings, recentScopeNoteIds, refreshRecentScopeNoteIds],
   );
@@ -833,7 +788,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           nextSettings.showNoteListPreview = noteListPreviewLines !== 0;
           if (noteListPreviewLines === 0) {
             nextSettings.noteListPreviewLines =
-              currentSettings.noteListPreviewLines ?? 2;
+              currentSettings.noteListPreviewLines;
           } else {
             nextSettings.noteListPreviewLines = noteListPreviewLines;
           }
@@ -1843,7 +1798,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNotesFolderState(path);
       setKnownFolders([]);
       setHasLoadedFolders(false);
-      applySettings({});
+      applySettings(DEFAULT_SETTINGS);
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
@@ -1866,7 +1821,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNotesFolderState(path);
       setKnownFolders([]);
       setHasLoadedFolders(false);
-      applySettings({});
+      applySettings(DEFAULT_SETTINGS);
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
@@ -1992,7 +1947,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         } else {
           setKnownFolders([]);
           setHasLoadedFolders(true);
-          applySettings({});
+          applySettings(DEFAULT_SETTINGS);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize");

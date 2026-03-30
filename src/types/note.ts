@@ -150,36 +150,37 @@ export interface AppearanceSettings {
   noteTypography: NoteTypographySettings;
   textDirection: TextDirection;
   editorWidth: EditorWidth;
-  customEditorWidthPx?: number;
+  customEditorWidthPx?: number | null;
   interfaceZoom: number;
   paneMode: PaneMode;
-  foldersPaneWidth?: number;
-  notesPaneWidth?: number;
-  customLightColors?: ThemeColors;
-  customDarkColors?: ThemeColors;
-  confirmDeletions?: boolean;
+  foldersPaneWidth: number;
+  notesPaneWidth: number;
+  customLightColors?: ThemeColors | null;
+  customDarkColors?: ThemeColors | null;
+  confirmDeletions: boolean;
 }
 
 // Per-folder settings (stored in .sly/settings.json)
 export interface Settings {
-  gitEnabled?: boolean;
-  pinnedNoteIds?: string[];
-  recentNoteIds?: string[];
-  showRecentNotes?: boolean;
-  showNoteCounts?: boolean;
-  showNotesFromSubfolders?: boolean;
-  defaultNoteName?: string;
-  ollamaModel?: string;
-  folderIcons?: Record<string, FolderAppearance>;
-  collapsedFolders?: string[];
-  noteListDateMode?: NoteListDateMode;
-  showNoteListFilename?: boolean;
-  showNoteListFolderPath?: boolean;
-  showNoteListPreview?: boolean;
-  noteListPreviewLines?: NoteListPreviewLines;
-  noteSortMode?: NoteSortMode;
-  folderNoteSortModes?: Record<string, NoteSortMode>;
-  folderSortMode?: FolderSortMode;
+  schemaVersion: number;
+  gitEnabled?: boolean | null;
+  pinnedNoteIds?: string[] | null;
+  recentNoteIds?: string[] | null;
+  showRecentNotes?: boolean | null;
+  showNoteCounts: boolean;
+  showNotesFromSubfolders: boolean;
+  defaultNoteName?: string | null;
+  ollamaModel?: string | null;
+  folderIcons?: Record<string, FolderAppearance> | null;
+  collapsedFolders?: string[] | null;
+  noteListDateMode: NoteListDateMode;
+  showNoteListFilename: boolean;
+  showNoteListFolderPath: boolean;
+  showNoteListPreview: boolean;
+  noteListPreviewLines: NoteListPreviewLines;
+  noteSortMode: NoteSortMode;
+  folderNoteSortModes?: Record<string, NoteSortMode> | null;
+  folderSortMode: FolderSortMode;
 }
 
 export interface SettingsPatch {

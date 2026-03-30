@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as gitService from "../services/git";
 import * as notesService from "../services/notes";
+import type { Settings } from "../types/note";
 import { GitProvider, useGit } from "./GitContext";
 import { useNotesData } from "./NotesContext";
 
@@ -43,6 +44,22 @@ function Wrapper({ children }: PropsWithChildren) {
   return <GitProvider>{children}</GitProvider>;
 }
 
+function createSettings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    schemaVersion: 1,
+    showNoteCounts: true,
+    showNotesFromSubfolders: false,
+    noteListDateMode: "modified",
+    showNoteListFilename: false,
+    showNoteListFolderPath: true,
+    showNoteListPreview: true,
+    noteListPreviewLines: 2,
+    noteSortMode: "modifiedDesc",
+    folderSortMode: "nameAsc",
+    ...overrides,
+  };
+}
+
 const baseStatus = {
   isRepo: true,
   hasRemote: true,
@@ -74,9 +91,9 @@ describe("GitContext", () => {
       message: "ok",
       error: null,
     });
-    vi.mocked(notesService.getSettings).mockResolvedValue({
+    vi.mocked(notesService.getSettings).mockResolvedValue(createSettings({
       gitEnabled: true,
-    });
+    }));
   });
 
   it("initializes a repo and refreshes status", async () => {
