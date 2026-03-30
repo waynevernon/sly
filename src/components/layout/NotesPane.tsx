@@ -609,11 +609,6 @@ export function NotesPane() {
                   : "No notes in this folder"
                 : "No notes yet"
           }
-          showFolderPrefix={
-            searchQuery.trim().length > 0 ||
-            selectedScope.type !== "folder" ||
-            showSubfolderNotesInCurrentView
-          }
         />
       </div>
     </div>

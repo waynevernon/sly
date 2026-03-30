@@ -148,7 +148,7 @@ describe("NoteList", () => {
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
   });
 
-  it("hides the folder path when the setting is off even if the view marks it as relevant", async () => {
+  it("hides the folder path when the setting is off", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
@@ -158,7 +158,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" showFolderPrefix />);
+    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
 
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
   });

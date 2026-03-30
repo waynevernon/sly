@@ -388,63 +388,68 @@ const FolderItem = memo(function FolderItem({
   ) : (
     <>
       <div className={`relative ${isDragging || isPendingMove ? "opacity-40" : ""}`}>
-        <div ref={setDropRef} className={rowClassName}>
-          <div className="flex items-center gap-1.5 pr-2 py-2" style={{ paddingLeft: `${depth * TREE_INDENT_WIDTH}px` }}>
-            <div className="min-w-0 flex flex-1 items-center gap-1.5">
-              {hasNestedFolders ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleCollapse(folder.path);
-                  }}
-                  className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
-                  aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
-                >
-                  {isCollapsed ? (
-                    <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-                  ) : (
-                    <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
-                  )}
-                </button>
-              ) : (
-                <span className="ml-2 h-5 w-5 shrink-0" aria-hidden="true" />
-              )}
+        <div
+          ref={setDropRef}
+          className={`${rowClassName} cursor-default`}
+          data-folder-row-select={folder.path}
+          onClick={() => onSelectFolder(folder.path)}
+        >
+          <div
+            className="flex items-center gap-1.5 pr-2 py-2"
+            style={{ paddingLeft: `${depth * TREE_INDENT_WIDTH}px` }}
+          >
+            {hasNestedFolders ? (
               <button
                 type="button"
-                ref={setDragRef}
-                {...dragAttributes}
-                {...dragListeners}
-                className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
-                aria-label={`Move ${folder.name}`}
-                style={folderIconStyle}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleCollapse(folder.path);
+                }}
+                className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+                aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
               >
-                <FolderGlyph
-                  icon={folderAppearance?.icon ?? null}
-                  open={hasNestedFolders && !isCollapsed}
-                  className="w-4.25 h-4.25 text-current shrink-0"
-                  strokeWidth={1.7}
-                />
+                {isCollapsed ? (
+                  <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 stroke-[1.6]" />
+                )}
               </button>
-              <button
-                type="button"
-                onClick={() => onSelectFolder(folder.path)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <span
-                  className="text-sm text-text truncate block"
-                  style={folderTextStyle}
-                >
-                  {folder.name}
-                </span>
-              </button>
-            </div>
-            {showNoteCounts && noteCount > 0 && (
-              <FolderRowTrailing
-                count={noteCount}
-                isActive={selectedFolderPath === folder.path}
-              />
+            ) : (
+              <span className="ml-2 h-5 w-5 shrink-0" aria-hidden="true" />
             )}
+            <button
+              type="button"
+              ref={setDragRef}
+              {...dragAttributes}
+              {...dragListeners}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+              aria-label={`Move ${folder.name}`}
+              style={folderIconStyle}
+            >
+              <FolderGlyph
+                icon={folderAppearance?.icon ?? null}
+                open={hasNestedFolders && !isCollapsed}
+                className="w-4.25 h-4.25 text-current shrink-0"
+                strokeWidth={1.7}
+              />
+            </button>
+            <div className="min-w-0 flex flex-1 items-center gap-1.5 text-left">
+              <span
+                className="min-w-0 flex-1 text-sm text-text truncate block"
+                style={folderTextStyle}
+              >
+                {folder.name}
+              </span>
+              {showNoteCounts && noteCount > 0 && (
+                <FolderRowTrailing
+                  count={noteCount}
+                  isActive={selectedFolderPath === folder.path}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

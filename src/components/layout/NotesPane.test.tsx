@@ -26,19 +26,14 @@ vi.mock("../notes/NoteList", () => ({
   NoteList: ({
     items,
     emptyMessage,
-    showFolderPrefix,
   }: {
     items: Array<{ id: string; title: string; created: number }>;
     emptyMessage: string;
-    showFolderPrefix?: boolean;
   }) => {
-    noteListSpy({ items, emptyMessage, showFolderPrefix });
+    noteListSpy({ items, emptyMessage });
     return (
       <div>
         <div data-testid="empty-message">{emptyMessage}</div>
-        <div data-testid="show-folder-prefix">
-          {showFolderPrefix ? "true" : "false"}
-        </div>
         <div data-testid="note-items">{JSON.stringify(items)}</div>
         <ul>
           {items.map((item) => (
@@ -208,7 +203,7 @@ describe("NotesPane", () => {
     expect(screen.getByTestId("note-items")).toHaveTextContent('"created":6');
   });
 
-  it("renders the recent notes heading and keeps folder prefixes visible", async () => {
+  it("renders the recent notes heading and items", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
@@ -234,7 +229,6 @@ describe("NotesPane", () => {
 
     expect(screen.getByText("Recent Notes")).toBeInTheDocument();
     expect(screen.getByText("Alpha note")).toBeInTheDocument();
-    expect(screen.getByTestId("show-folder-prefix")).toHaveTextContent("true");
   });
 
   it("shows the recent notes empty state", async () => {
@@ -351,34 +345,6 @@ describe("NotesPane", () => {
     expect(badge?.className).toMatch(/ui-count-badge--inline/);
     expect(badge?.className).toMatch(/ui-count-badge--plain/);
     expect(badge?.className).toMatch(/ui-count-badge--active/);
-  });
-
-  it("keeps folder prefixes relevant for recursive folder-scoped notes", async () => {
-    const notesContext = await import("../../context/NotesContext");
-    vi.mocked(notesContext.useNotes).mockReturnValue(
-      makeNotesHookValue({
-        scopedNotes: [
-          {
-            id: "docs/reference/alpha",
-            title: "Alpha note",
-            preview: "planning",
-            modified: 2,
-            created: 2,
-          },
-        ],
-        selectedScope: { type: "folder", path: "docs" },
-        selectedFolderPath: "docs",
-        showNotesFromSubfolders: true,
-      }),
-    );
-
-    render(
-      <TooltipProvider>
-        <NotesPane />
-      </TooltipProvider>,
-    );
-
-    expect(screen.getByTestId("show-folder-prefix")).toHaveTextContent("true");
   });
 
   it("shows the recursive folder empty state when enabled", async () => {

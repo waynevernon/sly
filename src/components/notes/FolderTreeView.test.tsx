@@ -397,6 +397,70 @@ describe("FolderTreeView", () => {
     expect(emptyRow?.querySelector(".ui-count-badge")).toBeNull();
   });
 
+  it("selects a folder when clicking its count badge area", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+    const selectFolder = vi.fn();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs"],
+        notes: [
+          {
+            id: "docs/alpha",
+            title: "Alpha",
+            preview: "preview",
+            modified: 1,
+            created: 1,
+          },
+        ],
+        selectFolder,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    const countBadge = docsRow?.querySelector(".ui-count-badge");
+
+    expect(countBadge).not.toBeNull();
+
+    await user.click(countBadge as HTMLElement);
+
+    expect(selectFolder).toHaveBeenCalledWith("docs");
+  });
+
+  it("selects a folder when clicking the row outside the label", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+    const selectFolder = vi.fn();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs"],
+        selectFolder,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    const row = document.querySelector('[data-folder-row-select="docs"]');
+
+    expect(row).not.toBeNull();
+
+    await user.click(row as HTMLElement);
+
+    expect(selectFolder).toHaveBeenCalledWith("docs");
+  });
+
   it("shows recursive folder note counts when enabled and still hides zero-count badges", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();

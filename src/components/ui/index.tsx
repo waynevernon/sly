@@ -155,6 +155,7 @@ interface ListItemProps {
   selectionState?: "none" | "selected" | "active";
   isPinned?: boolean;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
+  className?: string;
   /** Optional status icon to display next to meta */
 }
 
@@ -168,6 +169,7 @@ export function ListItem({
   selectionState = "none",
   isPinned = false,
   onClick,
+  className,
   onContextMenu,
 }: ListItemProps & { onContextMenu?: (e: React.MouseEvent) => void }) {
   const cleanSubtitlePrefix = subtitlePrefix
@@ -212,7 +214,8 @@ export function ListItem({
           ? "bg-bg-muted group-focus-visible/notelist:ring-1 group-focus-visible/notelist:ring-text-muted"
           : selectionState === "selected"
             ? "bg-bg-muted/75 hover:bg-bg-muted"
-            : "hover:bg-bg-muted"
+            : "hover:bg-bg-muted",
+        className
       )}
     >
       <div className="flex items-center gap-1 min-w-0">

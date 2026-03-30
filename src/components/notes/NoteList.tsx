@@ -43,7 +43,6 @@ export interface NoteListItem {
 interface NoteListProps {
   items: NoteListItem[];
   emptyMessage: string;
-  showFolderPrefix?: boolean;
 }
 
 function formatDate(timestamp: number): string {
@@ -104,7 +103,6 @@ interface NoteItemProps {
       ctrlKey: boolean;
     },
   ) => void;
-  showFolderPrefix?: boolean;
   noteListDateMode: "modified" | "created" | "off";
   noteListPreviewLines: 0 | 1 | 2 | 3;
   showNoteListFilename: boolean;
@@ -120,7 +118,6 @@ const NoteItem = memo(function NoteItem({
   selectionState,
   isPinned,
   onSelect,
-  showFolderPrefix = true,
   noteListDateMode,
   noteListPreviewLines,
   showNoteListFilename,
@@ -135,7 +132,7 @@ const NoteItem = memo(function NoteItem({
   }, [selectionState]);
 
   const folder =
-    showFolderPrefix && showNoteListFolderPath && id.includes("/")
+    showNoteListFolderPath && id.includes("/")
       ? id.substring(0, id.lastIndexOf("/"))
       : null;
   const filename = showNoteListFilename ? getNoteFilename(id) : "";
@@ -177,6 +174,7 @@ const NoteItem = memo(function NoteItem({
         secondaryOrder="subtitle-first"
         selectionState={selectionState}
         isPinned={isPinned}
+        className="cursor-default"
       />
     </div>
   );
@@ -276,7 +274,6 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             selectionState={selectionState}
             isPinned={isPinned}
             onSelect={onSelect}
-            showFolderPrefix={showFolderPrefix}
             noteListDateMode={noteListDateMode}
             noteListPreviewLines={noteListPreviewLines}
             showNoteListFilename={showNoteListFilename}
@@ -361,7 +358,6 @@ function getDeleteDialogCopy(noteIds: string[]) {
 export function NoteList({
   items,
   emptyMessage,
-  showFolderPrefix = true,
 }: NoteListProps) {
   const {
     selectedNoteId,
@@ -564,7 +560,6 @@ export function NoteList({
               }}
               onClearSelection={clearNoteSelection}
               onFocusList={focusList}
-              showFolderPrefix={showFolderPrefix}
               noteListDateMode={noteListDateMode}
               noteListPreviewLines={noteListPreviewLines}
               showNoteListFilename={showNoteListFilename}
