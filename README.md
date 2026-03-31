@@ -3,7 +3,7 @@
 </p>
 
 # Sly
-Sly is an editor-first markdown notes app for macOS, Windows, and Linux. It keeps your notes on disk as plain markdown files, stays fast and keyboard-friendly, and adds optional AI and Git workflows without locking your notes into a cloud service.
+Sly is an editor-first markdown notes app for macOS, Windows, and Linux. It keeps your notes on disk as plain markdown files, stays fast on real folders, and adds optional AI and Git workflows without turning your notes into a cloud product.
 
 Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project created by Eric Li.
 
@@ -15,17 +15,15 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 
 ## Features
 
-- Offline-first local notes stored as plain markdown files you own
-- Rich markdown editing with source mode, wikilinks, slash commands, Mermaid, KaTeX, tables, and syntax-highlighted code blocks
-- Editor-first workspace with 1, 2, and 3 pane layouts
-- Keyboard-friendly workflows with a command palette and extensive shortcuts
-- Fast note and folder organization with sorting, recursive subfolder views, note counts, drag-and-drop, inline naming, and customizable folder icons with colors or emoji
-- Appearance controls for theme presets, separate UI/note/code fonts, typography tuning, page width, text direction, and interface zoom
-- Optional Git workflows for repository setup, status, commits, remotes, and push flows
-- Optional AI editing through Claude Code, OpenAI Codex, OpenCode, and Ollama
-- Standalone preview mode for opening markdown files without choosing a notes folder first
-- Desktop `sly` CLI support on supported platforms
-- In-app update checks and release delivery through the Tauri updater
+- Plain markdown notes you own. Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
+- A serious writing and editing surface. Sly combines a polished rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
+- Fast navigation through large note collections. Full-text search, command palette workflows, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
+- Flexible organization that still feels lightweight. Use pinned and recent notes, recursive folder views, per-folder note sorting, folder sorting, note counts, drag-and-drop, multi-note move/delete, inline naming, and customizable folder icons with color or emoji.
+- Editor-first layouts that adapt to how you work. Switch between 1, 2, and 3 pane views, tune editor width, and keep folders, note lists, and the current note visible in the balance you want.
+- Optional AI help without AI lock-in. Run note editing flows through Claude Code, OpenAI Codex, OpenCode, or Ollama when you want assistance, while keeping plain files and local workflows at the center.
+- Built-in Git workflows for notes on disk. Initialize a repo, inspect status, commit changes, configure remotes, and push without leaving the app.
+- Deep workspace customization. Choose from 48 theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
+- Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms, and get in-app update checks through the Tauri updater.
 
 ## Platform Status
 
