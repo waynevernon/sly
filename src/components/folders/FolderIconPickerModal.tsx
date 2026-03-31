@@ -52,7 +52,7 @@ export function FolderIconPickerModal({
   open,
   value,
   title,
-  description = "Pick a folder icon or emoji and optionally apply a folder color.",
+  description = "Pick a folder icon or emoji and apply a folder color.",
   onOpenChange,
   onApply,
 }: FolderIconPickerModalProps) {
@@ -161,8 +161,6 @@ export function FolderIconPickerModal({
   const selectedEmojiId = selectedEmojiShortcode
     ? getEmojiItem(selectedEmojiShortcode)?.id ?? null
     : null;
-  const scrollAreaHeightClass =
-    "max-h-[clamp(11rem,calc(100vh-21rem),22rem)]";
 
   const handleSelectColor = (colorId: FolderColorId | null) => {
     setDraftAppearance((current) => {
@@ -256,7 +254,7 @@ export function FolderIconPickerModal({
         <Dialog.Content
           onOpenAutoFocus={(event) => event.preventDefault()}
           onKeyDown={handleKeyDown}
-          className={`fixed left-[50%] top-[50%] z-50 flex w-[min(calc(100vw-1.5rem),46rem)] max-h-[min(90vh,44rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden duration-200 data-[state=open]:animate-slide-down focus:outline-none ${dialogPanelClassName}`}
+          className={`fixed left-[50%] top-[50%] z-50 flex h-[min(90vh,44rem)] w-[min(calc(100vw-1.5rem),46rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden duration-200 data-[state=open]:animate-slide-down focus:outline-none ${dialogPanelClassName}`}
         >
           <div className="border-b border-border/80 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
@@ -412,7 +410,7 @@ export function FolderIconPickerModal({
           <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
             <div
               ref={scrollRef}
-              className={`ui-scrollbar-overlay min-h-0 flex-1 overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable ${scrollAreaHeightClass}`}
+              className="ui-scrollbar-overlay min-h-0 flex-1 overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
             >
               {source === "icons" ? (
                 <div ref={gridMeasureRef} className="w-full">

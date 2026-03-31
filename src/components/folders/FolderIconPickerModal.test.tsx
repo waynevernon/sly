@@ -181,6 +181,36 @@ describe("FolderIconPickerModal", () => {
     });
   });
 
+  it("keeps a stable dialog height when emoji searches return only a few matches", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider>
+        <FolderIconPickerModal
+          open
+          value={null}
+          title="Customize Folder"
+          onOpenChange={vi.fn()}
+          onApply={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Emoji" }));
+    fireEvent.change(
+      screen.getByPlaceholderText("Search emoji names or aliases..."),
+      {
+        target: { value: "open-book" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("1 emoji")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("dialog")).toHaveClass("h-[min(90vh,44rem)]");
+  });
+
   it("resets the draft back to the default folder style", async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
