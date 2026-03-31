@@ -21,6 +21,8 @@ export interface NoteMoveResult {
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ThemePresetId =
+  | "sly-light"
+  | "sly-dark"
   | "github-light-default"
   | "github-light-colorblind"
   | "github-light-high-contrast"
@@ -57,7 +59,16 @@ export type ThemePresetId =
   | "nord"
   | "solarized-dark"
   | "gruvbox-dark"
-  | "monokai";
+  | "gruvbox-material-dark"
+  | "monokai"
+  | "monokai-pro"
+  | "rose-pine"
+  | "rose-pine-moon"
+  | "everforest-dark"
+  | "kanagawa"
+  | "vscode-dark-modern"
+  | "vesper"
+  | "poimandres";
 
 export type FontPresetId =
   | "inter"

@@ -112,11 +112,11 @@ fn default_theme_mode() -> String {
 }
 
 fn default_light_preset_id() -> String {
-    "nord-light".to_string()
+    "sly-light".to_string()
 }
 
 fn default_dark_preset_id() -> String {
-    "nord".to_string()
+    "sly-dark".to_string()
 }
 
 fn default_note_list_preview_lines() -> u8 {
