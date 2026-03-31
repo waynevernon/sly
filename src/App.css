@@ -574,7 +574,7 @@ body {
 .prose table,
 table.not-prose,
 .tableWrapper {
-  --ui-scrollbar-size: 6px;
+  --ui-scrollbar-size: 8px;
   --ui-scrollbar-radius: 999px;
   --ui-scrollbar-thumb-color: transparent;
   --ui-scrollbar-thumb-hover: color-mix(
@@ -587,8 +587,6 @@ table.not-prose,
     var(--color-text-muted) 52%,
     transparent
   );
-  scrollbar-width: thin;
-  scrollbar-color: var(--ui-scrollbar-thumb-color) transparent;
 }
 
 .ui-scrollbar-overlay:hover,
@@ -596,7 +594,6 @@ table.not-prose,
 table.not-prose:hover,
 .tableWrapper:hover {
   --ui-scrollbar-thumb-color: var(--ui-scrollbar-thumb-hover);
-  scrollbar-color: var(--ui-scrollbar-thumb-color) transparent;
 }
 
 .ui-scrollbar-overlay::-webkit-scrollbar,
