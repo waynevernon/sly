@@ -1206,6 +1206,95 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [currentNote, persistSettings, scheduleRefresh]
   );
 
+  const search = useCallback(async (query: string) => {
+    const requestId = ++searchRequestIdRef.current;
+    setSearchQuery(query);
+
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const queryLower = trimmedQuery.toLowerCase();
+    // Instant local results for responsive UX while full-text search runs.
+    const instantResults: SearchResult[] = notesRef.current
+      .map((note) => {
+        const titleLower = note.title.toLowerCase();
+        const previewLower = note.preview.toLowerCase();
+        const titleStarts = titleLower.startsWith(queryLower);
+        const titleIncludes = titleLower.includes(queryLower);
+        const previewIncludes = previewLower.includes(queryLower);
+
+        let score = 0;
+        if (titleStarts) score += 4;
+        if (titleIncludes) score += 2;
+        if (previewIncludes) score += 1;
+
+        return { note, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        if (right.note.modified !== left.note.modified) {
+          return right.note.modified - left.note.modified;
+        }
+        return left.note.title.localeCompare(right.note.title);
+      })
+      .slice(0, 20)
+      .map(({ note, score }) => ({
+        id: note.id,
+        title: note.title,
+        preview: note.preview,
+        modified: note.modified,
+        score,
+      }));
+
+    // Show instant local matches immediately; clear stale results if none match.
+    setSearchResults(instantResults);
+
+    setIsSearching(true);
+    try {
+      const results = await notesService.searchNotes(trimmedQuery);
+      if (requestId !== searchRequestIdRef.current) return;
+      if (results.length === 0) {
+        // If neither backend nor instant matches found, clear results only now
+        // (after async search settles) to avoid transient empty states.
+        setSearchResults(instantResults);
+      } else {
+        // Merge backend + instant results, deduping by note id.
+        const merged = [...results];
+        const seen = new Set(results.map((result) => result.id));
+        for (const result of instantResults) {
+          if (!seen.has(result.id)) {
+            merged.push(result);
+          }
+        }
+        setSearchResults(merged);
+      }
+    } catch (err) {
+      console.error("Search failed:", err);
+    }
+    if (requestId !== searchRequestIdRef.current) return;
+    setIsSearching(false);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    searchRequestIdRef.current += 1;
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearching(false);
+  }, []);
+
+  const refreshActiveSearchResults = useCallback(async () => {
+    const activeQuery = searchQueryRef.current.trim();
+    if (!activeQuery) return;
+    await search(activeQuery);
+  }, [search]);
+
   const deleteNote = useCallback(
     async (id: string) => {
       try {
@@ -1837,95 +1926,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       );
     }
   }, [applySettings, refreshKnownFolders, refreshSettings, setSelectionState]);
-
-  const search = useCallback(async (query: string) => {
-    const requestId = ++searchRequestIdRef.current;
-    setSearchQuery(query);
-
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    const queryLower = trimmedQuery.toLowerCase();
-    // Instant local results for responsive UX while full-text search runs.
-    const instantResults: SearchResult[] = notesRef.current
-      .map((note) => {
-        const titleLower = note.title.toLowerCase();
-        const previewLower = note.preview.toLowerCase();
-        const titleStarts = titleLower.startsWith(queryLower);
-        const titleIncludes = titleLower.includes(queryLower);
-        const previewIncludes = previewLower.includes(queryLower);
-
-        let score = 0;
-        if (titleStarts) score += 4;
-        if (titleIncludes) score += 2;
-        if (previewIncludes) score += 1;
-
-        return { note, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((left, right) => {
-        if (right.score !== left.score) {
-          return right.score - left.score;
-        }
-        if (right.note.modified !== left.note.modified) {
-          return right.note.modified - left.note.modified;
-        }
-        return left.note.title.localeCompare(right.note.title);
-      })
-      .slice(0, 20)
-      .map(({ note, score }) => ({
-        id: note.id,
-        title: note.title,
-        preview: note.preview,
-        modified: note.modified,
-        score,
-      }));
-
-    // Show instant local matches immediately; clear stale results if none match.
-    setSearchResults(instantResults);
-
-    setIsSearching(true);
-    try {
-      const results = await notesService.searchNotes(trimmedQuery);
-      if (requestId !== searchRequestIdRef.current) return;
-      if (results.length === 0) {
-        // If neither backend nor instant matches found, clear results only now
-        // (after async search settles) to avoid transient empty states.
-        setSearchResults(instantResults);
-      } else {
-        // Merge backend + instant results, deduping by note id.
-        const merged = [...results];
-        const seen = new Set(results.map((result) => result.id));
-        for (const result of instantResults) {
-          if (!seen.has(result.id)) {
-            merged.push(result);
-          }
-        }
-        setSearchResults(merged);
-      }
-    } catch (err) {
-      console.error("Search failed:", err);
-    }
-    if (requestId !== searchRequestIdRef.current) return;
-    setIsSearching(false);
-  }, []);
-
-  const clearSearch = useCallback(() => {
-    searchRequestIdRef.current += 1;
-    setSearchQuery("");
-    setSearchResults([]);
-    setIsSearching(false);
-  }, []);
-
-  const refreshActiveSearchResults = useCallback(async () => {
-    const activeQuery = searchQueryRef.current.trim();
-    if (!activeQuery) return;
-    await search(activeQuery);
-  }, [search]);
 
   // Load initial state
   useEffect(() => {
