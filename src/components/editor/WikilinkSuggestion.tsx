@@ -33,7 +33,6 @@ export const WikilinkSuggestion = Extension.create({
         },
 
         items: ({ query }) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const notes = (
             (this.editor.storage as any).wikilink as WikilinkStorage | undefined
           )?.notes;

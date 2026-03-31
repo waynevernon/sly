@@ -149,7 +149,7 @@ export function CommandPalette({
     return () => {
       active = false;
     };
-  }, [open, currentNote?.id]);
+  }, [open, currentNote]);
 
   // Memoize commands array
   const commands = useMemo<Command[]>(() => {

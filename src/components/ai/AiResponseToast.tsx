@@ -137,7 +137,7 @@ function parseMarkdown(text: string): React.ReactNode {
 
 function parseInlineMarkdown(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
-  let remaining = text;
+  const remaining = text;
   let key = 0;
 
   // Order matters: code first (to avoid processing markdown inside code)

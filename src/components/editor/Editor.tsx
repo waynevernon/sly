@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { TextSearch } from "lucide-react";
 import {
   useEditor,
@@ -458,23 +458,28 @@ export function Editor({
   // Always call the hook (rules of hooks), but it returns null outside NotesProvider
   const notesCtx = useOptionalNotes();
 
-  const currentNote = previewMode
-    ? previewMode.content !== null
-      ? {
-          id: previewMode.filePath,
-          title: previewMode.title,
-          content: previewMode.content,
-          path: previewMode.filePath,
-          modified: previewMode.modified,
-        }
-      : null
-    : (notesCtx?.currentNote ?? null);
+  const currentNote = useMemo(() => {
+    if (!previewMode) return notesCtx?.currentNote ?? null;
+    if (previewMode.content === null) return null;
+    return {
+      id: previewMode.filePath,
+      title: previewMode.title,
+      content: previewMode.content,
+      path: previewMode.filePath,
+      modified: previewMode.modified,
+    };
+  }, [previewMode, notesCtx?.currentNote]);
 
-  const saveNote = previewMode
-    ? async (content: string, _noteId?: string) => {
-        await previewMode.save(content);
-      }
-    : notesCtx!.saveNote;
+  const notesSaveNote = notesCtx?.saveNote;
+  const saveNote = useMemo(
+    () =>
+      previewMode
+        ? async (content: string, _noteId?: string) => {
+            await previewMode.save(content);
+          }
+        : notesSaveNote!,
+    [previewMode, notesSaveNote]
+  );
 
   const createNote = notesCtx?.createNote;
   const consumePendingNewNote = notesCtx?.consumePendingNewNote;
@@ -1200,7 +1205,6 @@ export function Editor({
   // Sync notes list into editor storage for wikilink autocomplete
   useEffect(() => {
     if (!editor || !notes) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const storage = (editor.storage as any).wikilink as
       | WikilinkStorage
       | undefined;

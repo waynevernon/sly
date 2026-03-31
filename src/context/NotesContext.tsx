@@ -1921,11 +1921,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     setIsSearching(false);
   }, []);
 
-  async function refreshActiveSearchResults() {
+  const refreshActiveSearchResults = useCallback(async () => {
     const activeQuery = searchQueryRef.current.trim();
     if (!activeQuery) return;
     await search(activeQuery);
-  }
+  }, [search]);
 
   // Load initial state
   useEffect(() => {
