@@ -807,9 +807,6 @@ function App() {
     root.classList.add(isMac ? "platform-mac" : "platform-other");
     if (isTauri()) {
       root.classList.add("platform-tauri");
-      if (import.meta.env.PROD) {
-        root.classList.add("platform-tauri-release");
-      }
     }
     root.classList.toggle("window-mode-preview", isPreviewMode);
     root.classList.toggle("window-mode-print", isPrintMode);

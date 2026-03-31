@@ -252,7 +252,7 @@ body,
   --ui-titlebar-control-offset: 80px;
 }
 
-.platform-mac.platform-tauri-release {
+.platform-mac.platform-tauri {
   --ui-titlebar-native-control-center-y: 23px;
 }
 
