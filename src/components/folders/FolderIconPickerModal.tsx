@@ -22,6 +22,7 @@ import {
 import {
   LUCIDE_ICON_CATALOG,
   type LucideIconCatalogEntry,
+  searchLucideIcons,
 } from "../../lib/lucideIcons";
 import { Button, Input, IconButton } from "../ui";
 import {
@@ -69,19 +70,8 @@ export function FolderIconPickerModal({
   const deferredQuery = useDeferredValue(query);
 
   const filteredIcons = useMemo(() => {
-    const normalizedQuery = deferredQuery
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9-\s]/g, " ");
-    const terms = normalizedQuery.split(/[\s-]+/).filter(Boolean);
-
-    if (terms.length === 0) {
-      return ICON_CATALOG;
-    }
-
-    return ICON_CATALOG.filter((icon) =>
-      terms.every((term) => icon.searchText.includes(term)),
-    );
+    if (!deferredQuery.trim()) return ICON_CATALOG;
+    return searchLucideIcons(deferredQuery);
   }, [deferredQuery]);
 
   const emojiResults = useMemo(() => {

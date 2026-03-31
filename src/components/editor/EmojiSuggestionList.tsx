@@ -31,18 +31,24 @@ export const EmojiSuggestionList = forwardRef<
       }
 
       if (
-        item.matchedAlias &&
-        item.matchedAlias !== item.shortcode &&
-        item.matchedAlias !== item.primaryShortcode
+        item.matchedText &&
+        item.matchedKind &&
+        item.matchedText !== item.shortcode &&
+        item.matchedText !== item.primaryShortcode
       ) {
-        metadata.push(item.matchedAlias);
+        const matchLabel =
+          item.matchedStrategy === "fuzzy"
+            ? `fuzzy: ${item.matchedText}`
+            : `${item.matchedKind}: ${item.matchedText}`;
+
+        metadata.push(matchLabel);
       }
 
       for (const keyword of item.keywords) {
         if (
           keyword === item.shortcode ||
           keyword === item.primaryShortcode ||
-          keyword === item.matchedAlias
+          keyword === item.matchedText
         ) {
           continue;
         }

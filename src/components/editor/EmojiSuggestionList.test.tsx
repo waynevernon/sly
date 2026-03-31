@@ -18,6 +18,9 @@ describe("EmojiSuggestionList", () => {
             primaryShortcode: "open_book",
             aliases: ["open_book", "book"],
             keywords: ["book", "read", "library"],
+            matchedText: "book",
+            matchedKind: "keyword",
+            matchedStrategy: "exact",
           },
         ]}
         command={vi.fn()}
@@ -25,6 +28,8 @@ describe("EmojiSuggestionList", () => {
     );
 
     expect(screen.getByText(":open-book:")).toBeInTheDocument();
-    expect(screen.getByText("open_book · book · read · library")).toBeInTheDocument();
+    expect(
+      screen.getByText("open_book · keyword: book · read · library"),
+    ).toBeInTheDocument();
   });
 });

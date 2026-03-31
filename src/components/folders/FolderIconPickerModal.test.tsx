@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmojiCatalogItems, searchEmojiShortcodes } from "../../lib/emoji";
+import { searchLucideIcons } from "../../lib/lucideIcons";
 import { TooltipProvider } from "../ui";
 import { FolderIconPickerModal } from "./FolderIconPickerModal";
 
@@ -116,6 +117,32 @@ describe("FolderIconPickerModal", () => {
     await waitFor(() => {
       expect(
         screen.getByText(`${bookResults.length.toLocaleString()} emoji`),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows all Lucide icon matches for multi-word searches", async () => {
+    const folderOpenResults = searchLucideIcons("folder open");
+
+    render(
+      <TooltipProvider>
+        <FolderIconPickerModal
+          open
+          value={null}
+          title="Customize Folder"
+          onOpenChange={vi.fn()}
+          onApply={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Search Lucide icons..."), {
+      target: { value: "folder open" },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(`${folderOpenResults.length.toLocaleString()} icons`),
       ).toBeInTheDocument();
     });
   });

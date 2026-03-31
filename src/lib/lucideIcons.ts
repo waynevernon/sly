@@ -1,6 +1,7 @@
 import * as LucideIcons from "lucide-react";
 import type { ComponentType } from "react";
 import type { LucideIcon, LucideProps } from "lucide-react";
+import { buildCatalogSearchIndex, searchCatalog } from "./catalogSearch";
 
 export type LucideIconComponent = ComponentType<LucideProps> | LucideIcon;
 
@@ -89,3 +90,23 @@ export const LUCIDE_ICON_MAP = buildLucideIconMap(
 export const LUCIDE_ICON_CATALOG = buildLucideIconCatalog(
   LucideIcons as Record<string, unknown>,
 );
+
+const lucideIconSearchIndex = buildCatalogSearchIndex(
+  LUCIDE_ICON_CATALOG.map((icon) => ({
+    item: icon,
+    sortText: icon.name,
+    terms: [
+      { text: icon.name, kind: "primary" as const },
+      { text: icon.name.replace(/-/g, " "), kind: "alias" as const },
+    ],
+  })),
+);
+
+export function searchLucideIcons(
+  query: string,
+  limit?: number,
+): LucideIconCatalogEntry[] {
+  return searchCatalog(lucideIconSearchIndex, query, limit).map(
+    ({ item }) => item,
+  );
+}

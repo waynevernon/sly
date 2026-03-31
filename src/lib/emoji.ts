@@ -1,5 +1,12 @@
 import emojiCatalog from "emojilib/dist/emoji-en-US.json";
 import * as nodeEmoji from "node-emoji";
+import {
+  buildCatalogSearchIndex,
+  searchCatalog,
+  type CatalogSearchMatchStrategy,
+  type CatalogSearchTermInput,
+  type CatalogSearchTermKind,
+} from "./catalogSearch";
 
 export interface EmojiItem {
   id: string;
@@ -8,7 +15,9 @@ export interface EmojiItem {
   emoji: string;
   aliases: string[];
   keywords: string[];
-  matchedAlias?: string;
+  matchedText?: string;
+  matchedKind?: CatalogSearchTermKind;
+  matchedStrategy?: CatalogSearchMatchStrategy;
 }
 
 interface EmojiCatalogEntry {
@@ -17,12 +26,6 @@ interface EmojiCatalogEntry {
   primaryShortcode: string;
   aliases: string[];
   keywords: string[];
-}
-
-interface EmojiMatchCandidate {
-  alias: string;
-  score: number;
-  owned: boolean;
 }
 
 const rawEmojiCatalog = emojiCatalog as Record<string, string[]>;
@@ -59,10 +62,89 @@ function getShortcodeAliases(shortcode: string): string[] {
   return Array.from(new Set([underscored, hyphenated]));
 }
 
+function getSpacedShortcode(shortcode: string): string {
+  return normalizeRequestedShortcode(shortcode).replace(/_/g, " ");
+}
+
+function getDerivedSearchTerms(
+  primaryShortcode: string,
+  keywords: string[],
+): CatalogSearchTermInput[] {
+  const derivedTerms: CatalogSearchTermInput[] = [];
+  const primaryTokens = normalizeRequestedShortcode(primaryShortcode)
+    .split("_")
+    .filter(Boolean);
+
+  if (primaryTokens.length === 0) {
+    return derivedTerms;
+  }
+
+  const primaryHeadToken = primaryTokens[primaryTokens.length - 1];
+
+  const singleTokenKeywords = Array.from(
+    new Set(
+      keywords
+        .map(normalizeRequestedShortcode)
+        .filter((keyword) => keyword && !keyword.includes("_")),
+    ),
+  );
+
+  for (const keyword of singleTokenKeywords) {
+    if (keyword === primaryHeadToken) continue;
+
+    derivedTerms.push({
+      text: `${keyword} ${primaryHeadToken}`,
+      kind: "keyword",
+    });
+  }
+
+  return derivedTerms;
+}
+
+function getSearchTerms(
+  primaryShortcode: string,
+  keywords: string[],
+): CatalogSearchTermInput[] {
+  const terms: CatalogSearchTermInput[] = [];
+
+  for (const shortcode of getShortcodeAliases(primaryShortcode)) {
+    terms.push({
+      text: shortcode,
+      kind: shortcode === primaryShortcode ? "primary" : "alias",
+    });
+  }
+
+  terms.push({
+    text: getSpacedShortcode(primaryShortcode),
+    kind: "alias",
+  });
+
+  for (const keyword of keywords) {
+    terms.push({ text: keyword, kind: "keyword" });
+
+    for (const shortcode of getShortcodeAliases(keyword)) {
+      terms.push({ text: shortcode, kind: "keyword" });
+    }
+
+    terms.push({
+      text: getSpacedShortcode(keyword),
+      kind: "keyword",
+    });
+  }
+
+  terms.push(...getDerivedSearchTerms(primaryShortcode, keywords));
+
+  return terms;
+}
+
 function createEmojiItem(
   entry: EmojiCatalogEntry,
   shortcode: string,
-  matchedAlias?: string,
+  match?: {
+    text: string;
+    kind: CatalogSearchTermKind;
+    strategy: CatalogSearchMatchStrategy;
+  },
 ): EmojiItem {
   return {
     id: entry.id,
@@ -71,80 +153,14 @@ function createEmojiItem(
     emoji: entry.emoji,
     aliases: entry.aliases,
     keywords: entry.keywords,
-    ...(matchedAlias ? { matchedAlias } : {}),
+    ...(match
+      ? {
+          matchedText: match.text,
+          matchedKind: match.kind,
+          matchedStrategy: match.strategy,
+        }
+      : {}),
   };
-}
-
-function getSearchScore(alias: string, query: string): number | null {
-  const normalizedAlias = normalizeSearchValue(alias);
-
-  if (normalizedAlias === query) return 0;
-  if (normalizedAlias.startsWith(query)) return 1;
-  if (normalizedAlias.includes(query)) return 2;
-  return null;
-}
-
-function isPreferredAliasFormat(alias: string, prefersHyphen: boolean): boolean {
-  return prefersHyphen ? alias.includes("-") : !alias.includes("-");
-}
-
-function compareCandidates(
-  a: EmojiMatchCandidate,
-  b: EmojiMatchCandidate,
-  prefersHyphen: boolean,
-): number {
-  if (a.score !== b.score) return a.score - b.score;
-  if (a.alias.length !== b.alias.length) return a.alias.length - b.alias.length;
-
-  const aPreferred = isPreferredAliasFormat(a.alias, prefersHyphen) ? 0 : 1;
-  const bPreferred = isPreferredAliasFormat(b.alias, prefersHyphen) ? 0 : 1;
-  if (aPreferred !== bPreferred) return aPreferred - bPreferred;
-
-  if (a.owned !== b.owned) return a.owned ? -1 : 1;
-
-  return a.alias.localeCompare(b.alias);
-}
-
-function getCandidateAliases(entry: EmojiCatalogEntry): EmojiMatchCandidate[] {
-  const seen = new Set<string>();
-  const candidates: EmojiMatchCandidate[] = [];
-
-  for (const alias of entry.aliases) {
-    for (const candidate of getShortcodeAliases(alias)) {
-      if (seen.has(candidate)) continue;
-      seen.add(candidate);
-      candidates.push({
-        alias: candidate,
-        score: Number.POSITIVE_INFINITY,
-        owned: emojiEntriesByShortcode.get(candidate)?.id === entry.id,
-      });
-    }
-  }
-
-  return candidates;
-}
-
-function findBestMatch(
-  entry: EmojiCatalogEntry,
-  normalizedQuery: string,
-  prefersHyphen: boolean,
-): EmojiMatchCandidate | null {
-  let bestMatch: EmojiMatchCandidate | null = null;
-
-  for (const candidate of getCandidateAliases(entry)) {
-    const score = getSearchScore(candidate.alias, normalizedQuery);
-    if (score === null) continue;
-
-    const nextCandidate = { ...candidate, score };
-    if (
-      bestMatch === null ||
-      compareCandidates(nextCandidate, bestMatch, prefersHyphen) < 0
-    ) {
-      bestMatch = nextCandidate;
-    }
-  }
-
-  return bestMatch;
 }
 
 function getPreferredPrimaryShortcode(
@@ -155,6 +171,20 @@ function getPreferredPrimaryShortcode(
 
   const hyphenated = entry.primaryShortcode.replace(/_/g, "-");
   return hyphenated !== entry.primaryShortcode ? hyphenated : entry.primaryShortcode;
+}
+
+function getOwnedMatchedShortcode(
+  entry: EmojiCatalogEntry,
+  matchedText: string,
+  prefersHyphen: boolean,
+): string | null {
+  const normalized = normalizeRequestedShortcode(matchedText);
+  if (!VALID_SHORTCODE_REGEX.test(normalized)) return null;
+
+  const ownedEntry = emojiEntriesByShortcode.get(normalized);
+  if (ownedEntry?.id !== entry.id) return null;
+
+  return prefersHyphen ? normalized.replace(/_/g, "-") : normalized;
 }
 
 const emojiLookup = new Map<string, string>();
@@ -199,6 +229,14 @@ const emojiCatalogItems = [...emojiEntries]
   .sort((a, b) => a.primaryShortcode.localeCompare(b.primaryShortcode))
   .map((entry) => createEmojiItem(entry, entry.primaryShortcode));
 
+const emojiSearchIndex = buildCatalogSearchIndex(
+  emojiEntries.map((entry) => ({
+    item: entry,
+    sortText: entry.primaryShortcode,
+    terms: getSearchTerms(entry.primaryShortcode, entry.keywords),
+  })),
+);
+
 export function getEmojiCatalogItems(): readonly EmojiItem[] {
   return emojiCatalogItems;
 }
@@ -230,50 +268,43 @@ export function searchEmojiShortcodes(
   query: string,
   limit?: number,
 ): EmojiItem[] {
-  const normalizedQuery = normalizeSearchValue(query);
-  if (!normalizedQuery) return [];
-
   const prefersHyphen = normalizeEmojiShortcode(query).includes("-");
+  const normalizedQuery = normalizeSearchValue(query);
 
-  const matches = emojiEntries
-    .map((entry) => {
-      const bestMatch = findBestMatch(entry, normalizedQuery, prefersHyphen);
-      if (!bestMatch) return null;
-
-      const chosenShortcode = bestMatch.owned
-        ? bestMatch.alias
-        : getPreferredPrimaryShortcode(entry, prefersHyphen);
-
-      return {
-        item: createEmojiItem(
-          entry,
-          chosenShortcode,
-          bestMatch.alias !== chosenShortcode ? bestMatch.alias : undefined,
-        ),
-        match: bestMatch,
-      };
-    })
-    .filter(
-      (
-        entry,
-      ): entry is { item: EmojiItem; match: EmojiMatchCandidate } =>
-        entry !== null,
-    )
-    .sort((a, b) => {
-      const candidateOrder = compareCandidates(
-        a.match,
-        b.match,
+  const matches = searchCatalog(emojiSearchIndex, query).map(
+    ({ item, match }, index) => {
+      const matchedShortcode = getOwnedMatchedShortcode(
+        item,
+        match.text,
         prefersHyphen,
       );
-      if (candidateOrder !== 0) return candidateOrder;
+      const displayShortcode =
+        matchedShortcode ?? getPreferredPrimaryShortcode(item, prefersHyphen);
 
-      if (a.item.shortcode.length !== b.item.shortcode.length) {
-        return a.item.shortcode.length - b.item.shortcode.length;
-      }
+      return {
+        index,
+        item: createEmojiItem(item, displayShortcode, {
+          text: match.text,
+          kind: match.kind,
+          strategy: match.strategy,
+        }),
+      };
+    },
+  );
 
-      return a.item.shortcode.localeCompare(b.item.shortcode);
-    })
-    .map((entry) => entry.item);
+  matches.sort((left, right) => {
+    const leftExactDisplay =
+      normalizeSearchValue(left.item.shortcode) === normalizedQuery ? 0 : 1;
+    const rightExactDisplay =
+      normalizeSearchValue(right.item.shortcode) === normalizedQuery ? 0 : 1;
 
-  return typeof limit === "number" ? matches.slice(0, limit) : matches;
+    if (leftExactDisplay !== rightExactDisplay) {
+      return leftExactDisplay - rightExactDisplay;
+    }
+
+    return left.index - right.index;
+  });
+
+  const items = matches.map(({ item }) => item);
+  return typeof limit === "number" ? items.slice(0, limit) : items;
 }

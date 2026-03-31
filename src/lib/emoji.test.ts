@@ -28,6 +28,30 @@ describe("emoji", () => {
     expect(firstResult?.shortcode).toBe("book");
   });
 
+  it("matches multi-word searches across emoji keywords", () => {
+    const [firstResult] = searchEmojiShortcodes("red flag", 10);
+    expect(firstResult).toMatchObject({
+      emoji: "🚩",
+      primaryShortcode: "triangular_flag",
+    });
+  });
+
+  it("keeps non-country flag emoji in the top limited results for generic flag searches", () => {
+    const topFlagResults = searchEmojiShortcodes("flag", 10);
+    const triangularFlagIndex = topFlagResults.findIndex(
+      (item) => item.emoji === "🚩",
+    );
+    const canadaFlagIndex = topFlagResults.findIndex(
+      (item) => item.primaryShortcode === "flag_canada",
+    );
+
+    expect(topFlagResults).toHaveLength(10);
+    expect(triangularFlagIndex).toBeGreaterThanOrEqual(0);
+    if (canadaFlagIndex >= 0) {
+      expect(triangularFlagIndex).toBeLessThan(canadaFlagIndex);
+    }
+  });
+
   it("prefers hyphenated aliases when the query uses hyphens", () => {
     const [firstResult] = searchEmojiShortcodes("open-book", 1);
     expect(firstResult).toMatchObject({
@@ -42,13 +66,40 @@ describe("emoji", () => {
     expect(getEmojiForShortcode("open_book")).toBe(getEmojiForShortcode("open-book"));
   });
 
-  it("surfaces the matched alias separately when the stored shortcode must fall back", () => {
+  it("surfaces generic match metadata when a keyword drives the result", () => {
     const happyMatch = searchEmojiShortcodes("happy", 20).find(
-      (item) => item.matchedAlias && item.shortcode !== item.matchedAlias,
+      (item) =>
+        item.matchedText &&
+        item.shortcode !== item.matchedText &&
+        item.matchedKind === "keyword",
     );
 
     expect(happyMatch).toBeTruthy();
-    expect(happyMatch?.matchedAlias).toBe("happy");
+    expect(happyMatch?.matchedText).toBe("happy");
+    expect(happyMatch?.matchedStrategy).toBe("exact");
     expect(happyMatch?.shortcode).not.toBe("happy");
+  });
+
+  it("keeps open-book discoverable with spaced queries", () => {
+    const [firstResult] = searchEmojiShortcodes("open book", 10);
+    expect(firstResult).toMatchObject({
+      primaryShortcode: "open_book",
+    });
+  });
+
+  it("matches compact emoji shortcode queries without separators", () => {
+    const compactQueryMatch = searchEmojiShortcodes("orangecircle", 20).find(
+      (item) => item.primaryShortcode === "orange_circle",
+    );
+
+    expect(compactQueryMatch).toBeTruthy();
+  });
+
+  it("matches compact synthetic keyword-plus-primary queries without adding aliases", () => {
+    const redFlagResults = searchEmojiShortcodes("redflag", 10);
+
+    expect(redFlagResults[0]).toMatchObject({
+      primaryShortcode: "triangular_flag",
+    });
   });
 });
