@@ -595,7 +595,7 @@ impl SearchIndex {
             .parse_query(query_str)
             .or_else(|_| query_parser.parse_query(&format!("{}*", query_str)))?;
 
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(limit))?;
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(limit).order_by_score())?;
 
         let mut results = Vec::with_capacity(top_docs.len());
         for (score, doc_address) in top_docs {
