@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    ignore:
+      # ESLint 10 is blocked on eslint-plugin-react-hooks releasing stable support.
+      # Remove once a stable version with ESLint 10 peer support is released.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
     groups:
       tiptap:
         patterns:
