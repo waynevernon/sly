@@ -136,6 +136,10 @@ fn default_right_panel_width() -> u32 {
     260
 }
 
+fn default_right_panel_tab() -> String {
+    "outline".to_string()
+}
+
 fn default_editor_width() -> String {
     "normal".to_string()
 }
@@ -268,6 +272,8 @@ pub struct AppearanceSettings {
     pub right_panel_visible: bool,
     #[serde(default = "default_right_panel_width")]
     pub right_panel_width: u32,
+    #[serde(default = "default_right_panel_tab")]
+    pub right_panel_tab: String,
     #[serde(default)]
     pub custom_light_colors: Option<ThemeColors>,
     #[serde(default)]
@@ -295,6 +301,7 @@ impl Default for AppearanceSettings {
             notes_pane_width: default_notes_pane_width(),
             right_panel_visible: default_true(),
             right_panel_width: default_right_panel_width(),
+            right_panel_tab: default_right_panel_tab(),
             custom_light_colors: None,
             custom_dark_colors: None,
             confirm_deletions: true,
@@ -364,7 +371,10 @@ pub struct FolderAppearance {
 // App config (stored in app data directory)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    #[serde(rename = "schemaVersion", default = "persistence::app_config::current_app_config_schema_version")]
+    #[serde(
+        rename = "schemaVersion",
+        default = "persistence::app_config::current_app_config_schema_version"
+    )]
     pub schema_version: u32,
     pub notes_folder: Option<String>,
     #[serde(default)]
@@ -514,6 +524,50 @@ pub struct AiExecutionResult {
     pub success: bool,
     pub output: String,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantHistoryEntry {
+    pub role: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantTurnRequest {
+    pub provider: String,
+    pub note_id: String,
+    pub note_path: String,
+    pub note_title: String,
+    pub scope: String,
+    pub scope_label: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub snapshot_hash: String,
+    pub numbered_content: String,
+    pub user_prompt: String,
+    pub history: Vec<AssistantHistoryEntry>,
+    pub ollama_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantProposal {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub replacement: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantTurnResult {
+    pub reply_text: String,
+    pub proposals: Vec<AssistantProposal>,
+    pub warning: Option<String>,
 }
 
 // File watcher state
@@ -1666,15 +1720,13 @@ async fn read_note(id: String, state: State<'_, AppState>) -> Result<Note, Strin
         return Err("Note not found".to_string());
     }
 
-    let content = fs::read_to_string(&file_path)
-        .await
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::InvalidData {
-                "File is not valid UTF-8. Sly only supports UTF-8 encoded notes.".to_string()
-            } else {
-                e.to_string()
-            }
-        })?;
+    let content = fs::read_to_string(&file_path).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::InvalidData {
+            "File is not valid UTF-8. Sly only supports UTF-8 encoded notes.".to_string()
+        } else {
+            e.to_string()
+        }
+    })?;
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
 
     let modified = metadata
@@ -2756,15 +2808,13 @@ async fn read_file_direct(path: String) -> Result<FileContent, String> {
         return Err(format!("Not a file: {}", path));
     }
 
-    let content = fs::read_to_string(&canonical)
-        .await
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::InvalidData {
-                "File is not valid UTF-8. Sly only supports UTF-8 encoded files.".to_string()
-            } else {
-                "Failed to read file".to_string()
-            }
-        })?;
+    let content = fs::read_to_string(&canonical).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::InvalidData {
+            "File is not valid UTF-8. Sly only supports UTF-8 encoded files.".to_string()
+        } else {
+            "Failed to read file".to_string()
+        }
+    })?;
     let metadata = fs::metadata(&canonical)
         .await
         .map_err(|_| "Failed to read metadata".to_string())?;
@@ -3181,9 +3231,7 @@ fn setup_file_watcher(
 
     Ok(FileWatcherState {
         watcher,
-        folder: folder_path
-            .canonicalize()
-            .unwrap_or(folder_path),
+        folder: folder_path.canonicalize().unwrap_or(folder_path),
     })
 }
 
@@ -4053,7 +4101,8 @@ async fn execute_ai_cli(
             .unwrap_or(false);
 
         // Strip ANSI escape sequences from output (e.g. Ollama progress spinners)
-        let ansi_re = ANSI_RE.get_or_init(|| regex::Regex::new(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\].*?\x07").unwrap());
+        let ansi_re = ANSI_RE
+            .get_or_init(|| regex::Regex::new(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\].*?\x07").unwrap());
         let stdout_clean = ansi_re.replace_all(&stdout_str, "").to_string();
         let stderr_clean = ansi_re.replace_all(&stderr_str, "").trim().to_string();
 
@@ -4114,134 +4163,258 @@ async fn execute_ai_cli(
     Ok(result)
 }
 
-#[tauri::command]
-async fn ai_execute_claude(
-    file_path: String,
-    prompt: String,
-    state: State<'_, AppState>,
-) -> Result<AiExecutionResult, String> {
-    let folder = {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        app_config
-            .notes_folder
-            .clone()
-            .ok_or("Notes folder not set")?
-    };
-    let path = PathBuf::from(&file_path);
+fn validate_markdown_note_path(file_path: &str, notes_root: &Path) -> Result<PathBuf, String> {
+    let path = PathBuf::from(file_path);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     if !ext.eq_ignore_ascii_case("md") && !ext.eq_ignore_ascii_case("markdown") {
-        return Err("AI editing is only supported for markdown files".to_string());
+        return Err("AI features are only supported for markdown files".to_string());
     }
+
     let canonical = path
         .canonicalize()
         .map_err(|_| "Invalid file path".to_string())?;
-    let notes_root = PathBuf::from(&folder)
-        .canonicalize()
-        .map_err(|_| "Invalid notes folder".to_string())?;
-    if !canonical.starts_with(&notes_root) {
+    if !canonical.starts_with(notes_root) {
         return Err("File must be within notes folder".to_string());
     }
 
-    execute_ai_cli(
-        "Claude",
-        "claude".to_string(),
-        vec![
-            canonical.to_string_lossy().to_string(),
-            "--dangerously-skip-permissions".to_string(),
-            "--print".to_string(),
-        ],
-        prompt,
-        "Claude CLI not found. Please install it from https://claude.ai/code".to_string(),
-        None,
-        None,
-    )
-    .await
+    Ok(canonical)
 }
 
-#[tauri::command]
-async fn ai_execute_codex(file_path: String, prompt: String) -> Result<AiExecutionResult, String> {
-    let stdin_input = format!(
-        "Edit only this markdown file: {file_path}\n\
-         Apply the user's instructions below directly to that file.\n\
-         Do not create, delete, rename, or modify any other files.\n\
-         User instructions:\n\
-         {prompt}"
-    );
+fn strip_json_code_fences(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if !trimmed.starts_with("```") {
+        return trimmed.to_string();
+    }
 
-    execute_ai_cli(
-        "Codex",
-        "codex".to_string(),
-        vec![
-            "exec".to_string(),
-            "--skip-git-repo-check".to_string(),
-            "--dangerously-bypass-approvals-and-sandbox".to_string(),
-            "-".to_string(),
-        ],
-        stdin_input,
-        "Codex CLI not found. Please install it from https://github.com/openai/codex".to_string(),
-        None,
-        None,
-    )
-    .await
+    let mut lines = trimmed.lines();
+    let _ = lines.next();
+    let mut collected = lines.collect::<Vec<_>>();
+    if matches!(collected.last(), Some(line) if line.trim_start().starts_with("```")) {
+        let _ = collected.pop();
+    }
+    collected.join("\n").trim().to_string()
 }
 
-#[tauri::command]
-async fn ai_execute_opencode(
-    file_path: String,
-    prompt: String,
-    state: State<'_, AppState>,
-) -> Result<AiExecutionResult, String> {
-    let folder = {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        app_config
-            .notes_folder
-            .clone()
-            .ok_or("Notes folder not set")?
-    };
-    let path = PathBuf::from(&file_path);
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !ext.eq_ignore_ascii_case("md") && !ext.eq_ignore_ascii_case("markdown") {
-        return Err("AI editing is only supported for markdown files".to_string());
-    }
-    let canonical = path
-        .canonicalize()
-        .map_err(|_| "Invalid file path".to_string())?;
-    let notes_root = PathBuf::from(&folder)
-        .canonicalize()
-        .map_err(|_| "Invalid notes folder".to_string())?;
-    if !canonical.starts_with(&notes_root) {
-        return Err("File must be within notes folder".to_string());
+fn sanitize_assistant_result(mut result: AssistantTurnResult) -> AssistantTurnResult {
+    if result.reply_text.trim().is_empty() {
+        result.reply_text = "Assistant returned no plain-text reply.".to_string();
     }
 
-    let run_prompt = format!(
-        "Edit the attached markdown file in place.\n\
-         Do not create, delete, rename, or modify any other files.\n\
-         User instructions:\n\
-         {}",
-        prompt
-    );
+    result.proposals = result
+        .proposals
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, mut proposal)| {
+            if proposal.start_line == 0 || proposal.end_line < proposal.start_line {
+                return None;
+            }
 
-    execute_ai_cli(
-        "OpenCode",
-        "opencode".to_string(),
-        vec![
-            "run".to_string(),
-            "--file".to_string(),
-            canonical.to_string_lossy().to_string(),
-            "--".to_string(),
-            run_prompt,
-        ],
-        String::new(),
-        "OpenCode CLI not found. Please install it from https://opencode.ai".to_string(),
-        Some(notes_root.to_string_lossy().to_string()),
-        Some(vec![
-            (
-                "OPENCODE_PERMISSION".to_string(),
-                r#"{"*":"allow","bash":"deny","task":"deny","webfetch":"deny","websearch":"deny","codesearch":"deny","skill":"deny","external_directory":"deny","doom_loop":"deny"}"#.to_string(),
+            if proposal.id.trim().is_empty() {
+                proposal.id = format!("proposal-{}", index + 1);
+            }
+            if proposal.title.trim().is_empty() {
+                proposal.title = format!("Proposed edit {}", index + 1);
+            }
+            if proposal.summary.trim().is_empty() {
+                proposal.summary = "Replace the selected lines.".to_string();
+            }
+
+            Some(proposal)
+        })
+        .collect();
+
+    result
+}
+
+fn parse_assistant_result(raw_output: &str) -> AssistantTurnResult {
+    let trimmed = raw_output.trim();
+    let parsed = serde_json::from_str::<AssistantTurnResult>(trimmed).or_else(|_| {
+        let stripped = strip_json_code_fences(trimmed);
+        serde_json::from_str::<AssistantTurnResult>(&stripped)
+    });
+
+    match parsed {
+        Ok(result) => sanitize_assistant_result(result),
+        Err(_) => AssistantTurnResult {
+            reply_text: if trimmed.is_empty() {
+                "Assistant returned no output.".to_string()
+            } else {
+                trimmed.to_string()
+            },
+            proposals: Vec::new(),
+            warning: Some(
+                "Assistant returned non-JSON output, so Sly kept the reply as plain text."
+                    .to_string(),
             ),
-        ]),
+        },
+    }
+}
+
+fn build_assistant_prompt(request: &AssistantTurnRequest) -> String {
+    let history = if request.history.is_empty() {
+        "None.".to_string()
+    } else {
+        request
+            .history
+            .iter()
+            .map(|entry| format!("- {}: {}", entry.role, entry.text))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    format!(
+        "You are Sly's note assistant. You are helping with one markdown note.\n\
+         Reply with strict JSON only. Do not include markdown code fences.\n\
+         The JSON must match this exact shape:\n\
+         {{\"replyText\":\"string\",\"proposals\":[{{\"id\":\"string\",\"title\":\"string\",\"summary\":\"string\",\"startLine\":1,\"endLine\":1,\"replacement\":\"string\"}}],\"warning\":null}}\n\
+         Rules:\n\
+         - replyText must be a concise plain-text answer for the user.\n\
+         - proposals may be empty if discussion is enough.\n\
+         - If you propose edits, use the exact line numbers shown in the numbered content.\n\
+         - replacement must contain the complete replacement text for the inclusive line range.\n\
+         - Never mention JSON instructions or tool details in replyText.\n\
+         - warning should be null unless the provided scope is insufficient or ambiguous.\n\n\
+         Note title: {note_title}\n\
+         Note id: {note_id}\n\
+         Note path: {note_path}\n\
+         Scope: {scope} ({scope_label})\n\
+         Line range: {start_line}-{end_line}\n\
+         Snapshot hash: {snapshot_hash}\n\n\
+         Recent conversation:\n\
+         {history}\n\n\
+         Numbered markdown content:\n\
+         {numbered_content}\n\n\
+         User request:\n\
+         {user_prompt}\n",
+        note_title = request.note_title,
+        note_id = request.note_id,
+        note_path = request.note_path,
+        scope = request.scope,
+        scope_label = request.scope_label,
+        start_line = request.start_line,
+        end_line = request.end_line,
+        snapshot_hash = request.snapshot_hash,
+        history = history,
+        numbered_content = request.numbered_content,
+        user_prompt = request.user_prompt,
     )
-    .await
+}
+
+#[tauri::command]
+async fn ai_assistant_turn(
+    request: AssistantTurnRequest,
+    state: State<'_, AppState>,
+) -> Result<AssistantTurnResult, String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let notes_root = PathBuf::from(&folder)
+        .canonicalize()
+        .map_err(|_| "Invalid notes folder".to_string())?;
+    let _canonical = validate_markdown_note_path(&request.note_path, &notes_root)?;
+
+    let prompt = build_assistant_prompt(&request);
+    let provider = request.provider.trim().to_lowercase();
+
+    let result = match provider.as_str() {
+        "claude" => execute_ai_cli(
+            "Claude",
+            "claude".to_string(),
+            vec!["--print".to_string()],
+            prompt,
+            "Claude CLI not found. Please install it from https://claude.ai/code".to_string(),
+            Some(notes_root.to_string_lossy().to_string()),
+            None,
+        )
+        .await?,
+        "codex" => execute_ai_cli(
+            "Codex",
+            "codex".to_string(),
+            vec![
+                "exec".to_string(),
+                "--skip-git-repo-check".to_string(),
+                "--dangerously-bypass-approvals-and-sandbox".to_string(),
+                "-".to_string(),
+            ],
+            prompt,
+            "Codex CLI not found. Please install it from https://github.com/openai/codex".to_string(),
+            Some(notes_root.to_string_lossy().to_string()),
+            None,
+        )
+        .await?,
+        "opencode" => execute_ai_cli(
+            "OpenCode",
+            "opencode".to_string(),
+            vec!["run".to_string(), "--".to_string(), prompt],
+            String::new(),
+            "OpenCode CLI not found. Please install it from https://opencode.ai".to_string(),
+            Some(notes_root.to_string_lossy().to_string()),
+            Some(vec![
+                (
+                    "OPENCODE_PERMISSION".to_string(),
+                    r#"{"*":"allow","bash":"deny","task":"deny","webfetch":"deny","websearch":"deny","codesearch":"deny","skill":"deny","external_directory":"deny","doom_loop":"deny"}"#.to_string(),
+                ),
+            ]),
+        )
+        .await?,
+        "ollama" => {
+            let model_name = request
+                .ollama_model
+                .as_deref()
+                .unwrap_or("qwen3:8b")
+                .trim()
+                .to_string();
+
+            if !model_name.contains("cloud") {
+                let mn = model_name.clone();
+                let available = tauri::async_runtime::spawn_blocking(move || {
+                    let path = get_expanded_path();
+                    let mut cmd = no_window_cmd("ollama");
+                    cmd.env("PATH", &path);
+                    cmd.args(["show", &mn]);
+                    cmd.stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null());
+                    match cmd.status() {
+                        Ok(status) => status.success(),
+                        Err(_) => false,
+                    }
+                })
+                .await
+                .unwrap_or(false);
+
+                if !available {
+                    return Err(format!(
+                        "Model '{}' is not installed. Run `ollama pull {}` in your terminal.",
+                        model_name, model_name
+                    ));
+                }
+            }
+
+            execute_ai_cli(
+                "Ollama",
+                "ollama".to_string(),
+                vec!["run".to_string(), model_name.clone()],
+                prompt,
+                "Ollama CLI not found. Please install it from https://ollama.com".to_string(),
+                Some(notes_root.to_string_lossy().to_string()),
+                None,
+            )
+            .await?
+        }
+        _ => return Err(format!("Unsupported assistant provider: {}", request.provider)),
+    };
+
+    if !result.success {
+        return Err(result
+            .error
+            .unwrap_or_else(|| "Assistant request failed.".to_string()));
+    }
+
+    Ok(parse_assistant_result(&result.output))
 }
 
 #[tauri::command]
@@ -4252,153 +4425,6 @@ async fn ai_check_ollama_cli() -> Result<bool, String> {
     })
     .await
     .map_err(|e| format!("Failed to check Ollama CLI: {}", e))?
-}
-
-#[tauri::command]
-async fn ai_execute_ollama(
-    file_path: String,
-    prompt: String,
-    model: String,
-    state: State<'_, AppState>,
-) -> Result<AiExecutionResult, String> {
-    let folder = {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        app_config
-            .notes_folder
-            .clone()
-            .ok_or("Notes folder not set")?
-    };
-    let path = PathBuf::from(&file_path);
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !ext.eq_ignore_ascii_case("md") && !ext.eq_ignore_ascii_case("markdown") {
-        return Err("AI editing is only supported for markdown files".to_string());
-    }
-    let canonical = path
-        .canonicalize()
-        .map_err(|_| "Invalid file path".to_string())?;
-    let notes_root = PathBuf::from(&folder)
-        .canonicalize()
-        .map_err(|_| "Invalid notes folder".to_string())?;
-    if !canonical.starts_with(&notes_root) {
-        return Err("File must be within notes folder".to_string());
-    }
-
-    // Read the current file content
-    let file_content = tokio::fs::read_to_string(&canonical)
-        .await
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-
-    let stdin_input = format!(
-        "You are a markdown editor. Edit the markdown content below according to the user's instructions.\n\
-         Return ONLY the complete edited markdown content.\n\
-         Do NOT include any explanation, commentary, or code fences around the output.\n\
-         Do NOT add ```markdown or ``` wrappers.\n\n\
-         Current markdown content:\n{file_content}\n\n\
-         User instructions:\n{prompt}"
-    );
-
-    // Use the model provided (frontend reads from settings, defaults to "qwen3:8b")
-    let trimmed = model.trim();
-    let model_name = if trimmed.is_empty() {
-        "qwen3:8b".to_string()
-    } else {
-        trimmed.to_string()
-    };
-
-    // Check if the model is available locally before running (skip for cloud models)
-    if !model_name.contains("cloud") {
-        let mn = model_name.clone();
-        let available = tauri::async_runtime::spawn_blocking(move || {
-            let path = get_expanded_path();
-            let mut cmd = no_window_cmd("ollama");
-            cmd.env("PATH", &path);
-            cmd.args(["show", &mn]);
-            cmd.stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null());
-            match cmd.status() {
-                Ok(status) => status.success(),
-                Err(_) => false,
-            }
-        })
-        .await
-        .unwrap_or(false);
-
-        if !available {
-            return Ok(AiExecutionResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!(
-                    "Model '{}' is not installed. Run: ollama pull {}",
-                    model_name, model_name
-                )),
-            });
-        }
-    }
-
-    let result = execute_ai_cli(
-        "Ollama",
-        "ollama".to_string(),
-        vec!["run".to_string(), model_name.clone()],
-        stdin_input,
-        "Ollama CLI not found. Please install it from https://ollama.com".to_string(),
-        None,
-        None,
-    )
-    .await?;
-
-    // Improve error messages for common Ollama failures
-    if !result.success {
-        if let Some(ref err) = result.error {
-            let err_lower = err.to_lowercase();
-            if err_lower.contains("file does not exist")
-                || err_lower.contains("pull model manifest")
-                || err_lower.contains("model not found")
-                || err_lower.contains("model does not exist")
-            {
-                return Ok(AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!(
-                        "Model '{}' not found. Run `ollama pull {}` in your terminal to download it.",
-                        model_name, model_name
-                    )),
-                });
-            }
-            if err.contains("401") || err.contains("Unauthorized") {
-                return Ok(AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(
-                        "Authentication required. Run `ollama login` in your terminal to sign in."
-                            .to_string(),
-                    ),
-                });
-            }
-        }
-    }
-
-    // If successful, write the output back to the file
-    if result.success {
-        let edited_content = result.output.trim().to_string();
-        if edited_content.is_empty() {
-            return Ok(AiExecutionResult {
-                success: false,
-                output: String::new(),
-                error: Some("Ollama returned empty output. Please try again.".to_string()),
-            });
-        }
-        tokio::fs::write(&canonical, edited_content.as_bytes())
-            .await
-            .map_err(|e| format!("Failed to write edited file: {}", e))?;
-
-        Ok(AiExecutionResult {
-            success: true,
-            output: "Note edited successfully with Ollama.".to_string(),
-            error: None,
-        })
-    } else {
-        Ok(result)
-    }
 }
 
 /// Check if a markdown file is inside the configured notes folder.
@@ -4586,11 +4612,7 @@ fn create_print_window(app: &AppHandle, file_path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_note_window(
-    app: AppHandle,
-    note_id: String,
-    state: State<AppState>,
-) -> Result<(), String> {
+fn open_note_window(app: AppHandle, note_id: String, state: State<AppState>) -> Result<(), String> {
     if let Some(existing_label) = state
         .note_windows
         .lock()
@@ -5155,10 +5177,7 @@ pub fn run() {
             ai_check_codex_cli,
             ai_check_opencode_cli,
             ai_check_ollama_cli,
-            ai_execute_claude,
-            ai_execute_codex,
-            ai_execute_opencode,
-            ai_execute_ollama,
+            ai_assistant_turn,
             read_file_direct,
             save_file_direct,
             import_file_to_folder,
@@ -5337,17 +5356,27 @@ mod tests {
             config.appearance.note_font,
             FontChoice::preset("atkinson-hyperlegible-next")
         );
-        assert_eq!(config.appearance.code_font, FontChoice::preset("jetbrains-mono"));
+        assert_eq!(
+            config.appearance.code_font,
+            FontChoice::preset("jetbrains-mono")
+        );
         assert_eq!(config.appearance.folders_pane_width, 240);
         assert_eq!(config.appearance.notes_pane_width, 304);
         assert!(config.appearance.right_panel_visible);
         assert_eq!(config.appearance.right_panel_width, 260);
+        assert_eq!(config.appearance.right_panel_tab, "outline");
 
         let rewritten: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(rewritten["schemaVersion"], serde_json::json!(1));
-        assert_eq!(rewritten["appearance"]["foldersPaneWidth"], serde_json::json!(240));
-        assert_eq!(rewritten["appearance"]["notesPaneWidth"], serde_json::json!(304));
+        assert_eq!(
+            rewritten["appearance"]["foldersPaneWidth"],
+            serde_json::json!(240)
+        );
+        assert_eq!(
+            rewritten["appearance"]["notesPaneWidth"],
+            serde_json::json!(304)
+        );
         assert_eq!(
             rewritten["appearance"]["rightPanelVisible"],
             serde_json::json!(true)
@@ -5355,6 +5384,10 @@ mod tests {
         assert_eq!(
             rewritten["appearance"]["rightPanelWidth"],
             serde_json::json!(260)
+        );
+        assert_eq!(
+            rewritten["appearance"]["rightPanelTab"],
+            serde_json::json!("outline")
         );
 
         let _ = std::fs::remove_file(path);
@@ -5364,9 +5397,34 @@ mod tests {
     fn canonicalize_app_config_clamps_right_panel_width() {
         let mut config = AppConfig::default();
         config.appearance.right_panel_width = 999;
+        config.appearance.right_panel_tab = "legacy".to_string();
 
-        assert!(persistence::app_config::canonicalize_app_config(&mut config));
+        assert!(persistence::app_config::canonicalize_app_config(
+            &mut config
+        ));
         assert_eq!(config.appearance.right_panel_width, 420);
+        assert_eq!(config.appearance.right_panel_tab, "outline");
+    }
+
+    #[test]
+    fn parse_assistant_result_accepts_strict_json() {
+        let result = parse_assistant_result(
+            r#"{"replyText":"Done.","proposals":[{"id":"p1","title":"Rewrite intro","summary":"Tighten the opening.","startLine":3,"endLine":4,"replacement":"New intro"}],"warning":null}"#,
+        );
+
+        assert_eq!(result.reply_text, "Done.");
+        assert_eq!(result.proposals.len(), 1);
+        assert_eq!(result.proposals[0].id, "p1");
+        assert!(result.warning.is_none());
+    }
+
+    #[test]
+    fn parse_assistant_result_falls_back_to_plain_text_for_invalid_json() {
+        let result = parse_assistant_result("Not valid JSON");
+
+        assert_eq!(result.reply_text, "Not valid JSON");
+        assert!(result.proposals.is_empty());
+        assert!(result.warning.is_some());
     }
 
     #[test]
@@ -5400,10 +5458,7 @@ mod tests {
         assert!(!settings.show_notes_from_subfolders);
         assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
-        assert_eq!(
-            settings.recent_note_ids,
-            Some(vec!["beta".to_string()])
-        );
+        assert_eq!(settings.recent_note_ids, Some(vec!["beta".to_string()]));
         assert_eq!(
             settings.folder_note_sort_modes,
             Some(HashMap::from([(
@@ -5416,7 +5471,10 @@ mod tests {
         let rewritten: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(rewritten["schemaVersion"], serde_json::json!(1));
-        assert_eq!(rewritten["showNotesFromSubfolders"], serde_json::json!(false));
+        assert_eq!(
+            rewritten["showNotesFromSubfolders"],
+            serde_json::json!(false)
+        );
         assert_eq!(rewritten["noteListPreviewLines"], serde_json::json!(3));
         assert_eq!(rewritten["folderSortMode"], serde_json::json!("nameAsc"));
 
@@ -5725,8 +5783,7 @@ mod tests {
 
     #[test]
     fn deserialize_demo_workspace_settings_file() {
-        let content =
-            std::fs::read_to_string("../docs/demo-workspace/.sly/settings.json").unwrap();
+        let content = std::fs::read_to_string("../docs/demo-workspace/.sly/settings.json").unwrap();
         let settings: Settings = serde_json::from_str(&content).unwrap();
 
         assert_eq!(

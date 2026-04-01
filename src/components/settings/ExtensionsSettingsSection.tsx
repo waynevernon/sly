@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer } from "react";
+import { useEffect, useReducer } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { Button } from "../ui";
@@ -11,10 +11,8 @@ import {
   OllamaIcon,
 } from "../icons";
 import { AI_PROVIDER_ORDER, type AiProvider } from "../../services/ai";
-import * as aiService from "../../services/ai";
 import * as cliService from "../../services/cli";
 import type { CliStatus } from "../../services/cli";
-import { mod } from "../../lib/platform";
 
 type CliState = {
   status: CliStatus | null;
@@ -94,10 +92,18 @@ const AI_PROVIDER_INFO: Record<
   },
 };
 
-export function ExtensionsSettingsSection() {
+interface ExtensionsSettingsSectionProps {
+  aiProviders: AiProvider[];
+  aiProvidersLoading: boolean;
+  onRefreshAiProviders: () => Promise<void>;
+}
+
+export function ExtensionsSettingsSection({
+  aiProviders,
+  aiProvidersLoading,
+  onRefreshAiProviders,
+}: ExtensionsSettingsSectionProps) {
   const [cli, dispatchCli] = useReducer(cliReducer, cliInitialState);
-  const [aiProviders, setAiProviders] = useState<AiProvider[]>([]);
-  const [aiProvidersLoading, setAiProvidersLoading] = useState(true);
 
   useEffect(() => {
     cliService
@@ -110,18 +116,15 @@ export function ExtensionsSettingsSection() {
   }, []);
 
   useEffect(() => {
-    aiService
-      .getAvailableAiProviders()
-      .then(setAiProviders)
-      .catch(() => setAiProviders([]))
-      .finally(() => setAiProvidersLoading(false));
-  }, []);
+    void onRefreshAiProviders();
+  }, [onRefreshAiProviders]);
 
   const handleInstallCli = async () => {
     dispatchCli({ type: "operating" });
     try {
       await cliService.installCli();
       const status = await cliService.getCliStatus();
+      await onRefreshAiProviders();
       dispatchCli({ type: "operated", status });
       toast.success("CLI tool installed. Open a new terminal to use `sly`.");
     } catch (err) {
@@ -137,6 +140,7 @@ export function ExtensionsSettingsSection() {
     try {
       await cliService.uninstallCli();
       const status = await cliService.getCliStatus();
+      await onRefreshAiProviders();
       dispatchCli({ type: "operated", status });
       toast.success("CLI tool uninstalled.");
     } catch (err) {
@@ -153,8 +157,8 @@ export function ExtensionsSettingsSection() {
       <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">AI Providers</h2>
         <p className="text-sm text-text-muted mb-4">
-          Edit notes with AI from the command palette ({mod}P while editing a
-          note)
+          Use AI from the Assistant tab in the right panel while editing a
+          note
         </p>
 
         {aiProvidersLoading ? (

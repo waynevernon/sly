@@ -8,6 +8,13 @@ export interface OutlineItem {
   text: string;
 }
 
+export interface MarkdownHeadingRange {
+  level: number;
+  text: string;
+  startLine: number;
+  endLine: number;
+}
+
 function getOutlineText(node: ProseMirrorNode): string {
   let text = "";
 
@@ -86,4 +93,35 @@ export function findActiveOutlineFromHeadingTops(
   }
 
   return active ?? headings[0].item;
+}
+
+export function extractMarkdownHeadingRanges(markdown: string): MarkdownHeadingRange[] {
+  const lines = markdown.split(/\r?\n/);
+  const headings = lines
+    .map((line, index) => {
+      const match = /^(#{1,6})\s+(.*\S)\s*$/.exec(line);
+      if (!match) {
+        return null;
+      }
+
+      return {
+        level: match[1].length,
+        text: match[2].trim(),
+        startLine: index + 1,
+      };
+    })
+    .filter(
+      (
+        value,
+      ): value is { level: number; text: string; startLine: number } =>
+        value !== null,
+    );
+
+  return headings.map((heading, index) => ({
+    ...heading,
+    endLine:
+      index + 1 < headings.length
+        ? headings[index + 1].startLine - 1
+        : lines.length,
+  }));
 }

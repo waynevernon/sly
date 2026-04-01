@@ -39,6 +39,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { mod, alt, shift, isMac } from "../../lib/platform";
+import type { AssistantSelectionSnapshot } from "../../lib/assistant";
 
 // Validate URL scheme for safe opening
 function isAllowedUrlScheme(url: string): boolean {
@@ -197,6 +198,38 @@ const SearchHighlight = Extension.create<SearchHighlightOptions>({
           decorations: (state) => {
             return searchHighlightPluginKey.getState(state);
           },
+        },
+      }),
+    ];
+  },
+});
+
+const persistedSelectionHighlightPluginKey = new PluginKey(
+  "persistedSelectionHighlight",
+);
+
+const PersistedSelectionHighlight = Extension.create({
+  name: "persistedSelectionHighlight",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: persistedSelectionHighlightPluginKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply: (tr, oldSet) => {
+            const set = oldSet.map(tr.mapping, tr.doc);
+            const meta = tr.getMeta(persistedSelectionHighlightPluginKey);
+            if (meta !== undefined) {
+              return meta.decorationSet;
+            }
+
+            return set;
+          },
+        },
+        props: {
+          decorations: (state) =>
+            persistedSelectionHighlightPluginKey.getState(state),
         },
       }),
     ];
@@ -452,6 +485,7 @@ interface EditorProps {
   onRegisterFlushPendingSave?: (
     flushPendingSave: (() => Promise<void>) | null,
   ) => void;
+  assistantSelection?: AssistantSelectionSnapshot | null;
   onSaveToFolder?: () => void;
   saveToFolderDisabled?: boolean;
 }
@@ -466,6 +500,7 @@ export function Editor({
   onSourceModeChange,
   onRegisterScrollContainer,
   onRegisterFlushPendingSave,
+  assistantSelection,
   previewMode,
   onSaveToFolder,
   saveToFolderDisabled,
@@ -1073,6 +1108,7 @@ export function Editor({
       Emoji,
       AdjacentListNormalizer,
       Markdown.configure({}),
+      PersistedSelectionHighlight,
       SearchHighlight.configure({
         matches: [],
         currentIndex: 0,
@@ -1228,6 +1264,39 @@ export function Editor({
   useEffect(() => {
     onSourceModeChange?.(effectiveSourceMode);
   }, [effectiveSourceMode, onSourceModeChange]);
+
+  const updatePersistedSelectionDecorations = useCallback(
+    (
+      selection: AssistantSelectionSnapshot | null | undefined,
+      currentEditor: TiptapEditor | null,
+    ) => {
+      if (!currentEditor) {
+        return;
+      }
+
+      const { state } = currentEditor;
+      const from = selection ? Math.max(0, selection.from) : 0;
+      const to = selection ? Math.min(selection.to, state.doc.content.size) : 0;
+      const decorationSet =
+        from < to
+          ? DecorationSet.create(state.doc, [
+              Decoration.inline(from, to, {
+                class: "assistant-persisted-selection",
+              }),
+            ])
+          : DecorationSet.empty;
+
+      const tr = state.tr.setMeta(persistedSelectionHighlightPluginKey, {
+        decorationSet,
+      });
+      currentEditor.view.dispatch(tr);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    updatePersistedSelectionDecorations(assistantSelection, editor);
+  }, [assistantSelection, editor, updatePersistedSelectionDecorations]);
 
   // Sync notes list into editor storage for wikilink autocomplete
   useEffect(() => {

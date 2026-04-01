@@ -31,6 +31,7 @@ describe("ThemeContext", () => {
       notesPaneWidth: 304,
       rightPanelVisible: true,
       rightPanelWidth: 260,
+      rightPanelTab: "outline",
       confirmDeletions: true,
     });
     vi.mocked(notesService.updateAppearanceSettings).mockResolvedValue();
@@ -53,6 +54,7 @@ describe("ThemeContext", () => {
       notesPaneWidth: 320,
       rightPanelVisible: false,
       rightPanelWidth: 300,
+      rightPanelTab: "assistant",
       confirmDeletions: false,
     });
 
@@ -69,6 +71,7 @@ describe("ThemeContext", () => {
     expect(result.current.notesPaneWidth).toBe(320);
     expect(result.current.rightPanelVisible).toBe(false);
     expect(result.current.rightPanelWidth).toBe(300);
+    expect(result.current.rightPanelTab).toBe("assistant");
     expect(result.current.confirmDeletions).toBe(false);
   });
 

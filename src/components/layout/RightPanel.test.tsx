@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { Schema } from "@tiptap/pm/model";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RightPanel } from "./RightPanel";
 import { extractOutlineItems } from "./rightPanelOutline";
+import { TooltipProvider } from "../ui";
+import type { AiProvider } from "../../services/ai";
+import type { RightPanelAssistantProps } from "./RightPanelAssistant";
 
 const schema = new Schema({
   nodes: {
@@ -89,6 +93,33 @@ function makeDoc() {
   ]);
 }
 
+function makeAssistantProps(): RightPanelAssistantProps {
+  return {
+    hasNote: true,
+    providerCheckComplete: true,
+    availableProviders: ["claude"] as AiProvider[],
+    thread: {
+      provider: "claude" as const,
+      scope: "note" as const,
+      scopeManual: false,
+      draft: "",
+      turns: [],
+      pending: false,
+      lastSuccessfulSnapshotHash: null,
+    },
+    onProviderChange: vi.fn(),
+    onScopeChange: vi.fn(),
+    onDraftChange: vi.fn(),
+    onClearThread: vi.fn(),
+    onSubmit: vi.fn(),
+    onApplyProposal: vi.fn(),
+  };
+}
+
+function renderRightPanel(ui: ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
+
 describe("RightPanel", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
@@ -131,14 +162,17 @@ describe("RightPanel", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
-    render(
+    renderRightPanel(
       <RightPanel
         editor={editor}
         scrollContainer={scrollContainer}
         hasNote
         visible
         width={260}
+        activeTab="outline"
+        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -190,14 +224,17 @@ describe("RightPanel", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
-    render(
+    renderRightPanel(
       <RightPanel
         editor={editor as never}
         scrollContainer={scrollContainer}
         hasNote
         visible
         width={260}
+        activeTab="outline"
+        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -249,14 +286,17 @@ describe("RightPanel", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
-    render(
+    renderRightPanel(
       <RightPanel
         editor={editor as never}
         scrollContainer={scrollContainer}
         hasNote
         visible
         width={260}
+        activeTab="outline"
+        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -282,5 +322,28 @@ describe("RightPanel", () => {
     await waitFor(() => {
       expect(detailButton.className).toMatch(/bg-bg-muted/);
     });
+  });
+
+  it("renders assistant tab content inside the same panel shell", () => {
+    renderRightPanel(
+      <RightPanel
+        editor={null}
+        scrollContainer={null}
+        hasNote
+        visible
+        width={260}
+        activeTab="assistant"
+        onTabChange={vi.fn()}
+        onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Outline" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assistant" })).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ask about the current note, request a rewrite, or focus on the current section or selection."),
+    ).toBeInTheDocument();
   });
 });

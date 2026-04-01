@@ -21,6 +21,7 @@ import type {
   EditorWidth,
   FontChoice,
   PaneMode,
+  RightPanelTab,
   TextDirection,
   ThemeMode,
   ThemePresetId,
@@ -76,9 +77,11 @@ interface ThemeContextType {
   notesPaneWidth: number;
   rightPanelVisible: boolean;
   rightPanelWidth: number;
+  rightPanelTab: RightPanelTab;
   setPaneWidths: (folders: number, notes: number) => void;
   setRightPanelVisible: (visible: boolean) => void;
   setRightPanelWidth: (width: number) => void;
+  setRightPanelTab: (tab: RightPanelTab) => void;
   confirmDeletions: boolean;
   setConfirmDeletions: (v: boolean) => void;
 }
@@ -386,6 +389,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
+  const setRightPanelTab = useCallback(
+    (tab: RightPanelTab) => {
+      updateAppearance((prev) => ({ ...prev, rightPanelTab: tab }));
+    },
+    [updateAppearance],
+  );
+
   const setConfirmDeletions = useCallback(
     (v: boolean) => {
       updateAppearance((prev) => ({ ...prev, confirmDeletions: v }));
@@ -435,9 +445,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         notesPaneWidth: appearanceSettings.notesPaneWidth,
         rightPanelVisible: appearanceSettings.rightPanelVisible,
         rightPanelWidth: appearanceSettings.rightPanelWidth,
+        rightPanelTab: appearanceSettings.rightPanelTab,
         setPaneWidths,
         setRightPanelVisible,
         setRightPanelWidth,
+        setRightPanelTab,
         confirmDeletions: appearanceSettings.confirmDeletions,
         setConfirmDeletions,
       }}

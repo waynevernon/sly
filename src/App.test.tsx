@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { PropsWithChildren } from "react";
+import { useEffect, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
@@ -18,7 +18,9 @@ const notesState = {
   searchQuery: "",
   searchResults: [],
   reloadCurrentNote: vi.fn(),
+  saveNote: vi.fn(),
   currentNote: null,
+  settings: { ollamaModel: "qwen3:8b" },
   syncNotesFolder: vi.fn(),
 };
 
@@ -30,8 +32,10 @@ const themeState = {
   cyclePaneMode: vi.fn(),
   rightPanelVisible: true,
   rightPanelWidth: 260,
+  rightPanelTab: "outline" as const,
   setRightPanelVisible: vi.fn(),
   setRightPanelWidth: vi.fn(),
+  setRightPanelTab: vi.fn(),
 };
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -85,7 +89,18 @@ vi.mock("./components/layout/RightPanel", () => ({
 }));
 
 vi.mock("./components/editor/Editor", () => ({
-  Editor: () => <div>editor</div>,
+  Editor: ({
+    onRegisterFlushPendingSave,
+  }: {
+    onRegisterFlushPendingSave?: ((flushPendingSave: (() => Promise<void>) | null) => void) | null;
+  }) => {
+    useEffect(() => {
+      onRegisterFlushPendingSave?.(async () => {});
+      return () => onRegisterFlushPendingSave?.(null);
+    }, [onRegisterFlushPendingSave]);
+
+    return <div>editor</div>;
+  },
 }));
 
 vi.mock("./components/layout/FolderPicker", () => ({
@@ -102,13 +117,20 @@ vi.mock("./components/settings", () => ({
 }));
 
 vi.mock("./components/command-palette/CommandPalette", () => ({
-  CommandPalette: ({ open }: { open: boolean }) =>
-    open ? <div>command-palette</div> : null,
-}));
-
-vi.mock("./components/ai/AiEditModal", () => ({
-  AiEditModal: ({ open }: { open: boolean }) =>
-    open ? <div>ai-edit-modal</div> : null,
+  CommandPalette: ({
+    open,
+    flushPendingSave,
+  }: {
+    open: boolean;
+    flushPendingSave?: (() => Promise<void>) | null;
+  }) => (
+    <>
+      <div data-testid="flush-pending-save-type">
+        {typeof flushPendingSave}
+      </div>
+      {open ? <div>command-palette</div> : null}
+    </>
+  ),
 }));
 
 vi.mock("./components/preview/PreviewApp", () => ({
@@ -223,5 +245,13 @@ describe("App", () => {
     fireEvent.keyDown(window, { key: "4", metaKey: true });
 
     expect(themeState.setRightPanelVisible).toHaveBeenCalledWith(false);
+  });
+
+  it("stores the registered flush callback as a function", () => {
+    render(<App />);
+
+    expect(screen.getByTestId("flush-pending-save-type")).toHaveTextContent(
+      "function",
+    );
   });
 });
