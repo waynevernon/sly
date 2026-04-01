@@ -113,6 +113,11 @@
       var(--ui-control-height-compact) +
       var(--ui-titlebar-control-gap)
   );
+  --ui-titlebar-trailing-offset: calc(
+    var(--ui-pane-padding-end) +
+      var(--ui-control-height-compact) +
+      var(--ui-titlebar-control-gap)
+  );
   --ui-action-gap: 2px;
   --ui-count-badge-height: 20px;
   --ui-count-badge-width: 28px;
@@ -388,6 +393,13 @@ body {
   padding-right: var(--ui-pane-padding-end);
 }
 
+.ui-titlebar-pane-switch-right {
+  left: auto;
+  right: 0;
+  padding-left: var(--ui-pane-padding-end);
+  padding-right: var(--ui-pane-padding-end);
+}
+
 .ui-titlebar-control-cluster {
   position: relative;
   top: var(--ui-titlebar-control-offset-y);
@@ -395,6 +407,10 @@ body {
 
 .ui-titlebar-leading-offset {
   padding-left: var(--ui-titlebar-leading-offset);
+}
+
+.ui-titlebar-trailing-offset {
+  padding-right: var(--ui-titlebar-trailing-offset);
 }
 
 @layer components {

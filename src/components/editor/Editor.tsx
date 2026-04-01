@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
-import { PanelRight, TextSearch } from "lucide-react";
+import { TextSearch } from "lucide-react";
 import {
   useEditor,
   EditorContent,
@@ -436,12 +436,11 @@ export interface PreviewModeData {
 interface EditorProps {
   paneMode?: PaneMode;
   focusMode?: boolean;
-  rightPanelVisible?: boolean;
+  hasPinnedRightTitlebarControl?: boolean;
   printMode?: boolean;
   previewMode?: PreviewModeData;
   showPinControl?: boolean;
   onEditorReady?: (editor: TiptapEditor | null) => void;
-  onToggleRightPanel?: () => void;
   onSourceModeChange?: (sourceMode: boolean) => void;
   onRegisterScrollContainer?: (container: HTMLDivElement | null) => void;
   onRegisterFlushPendingSave?: (
@@ -454,11 +453,10 @@ interface EditorProps {
 export function Editor({
   paneMode = 2,
   focusMode,
-  rightPanelVisible = true,
+  hasPinnedRightTitlebarControl = false,
   printMode = false,
   showPinControl = true,
   onEditorReady,
-  onToggleRightPanel,
   onSourceModeChange,
   onRegisterScrollContainer,
   onRegisterFlushPendingSave,
@@ -1987,6 +1985,7 @@ export function Editor({
             className={cn(
               "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
               !navigationVisible && "ui-titlebar-leading-offset",
+              hasPinnedRightTitlebarControl && "ui-titlebar-trailing-offset",
             )}
             data-tauri-drag-region
           >
@@ -2078,25 +2077,6 @@ export function Editor({
                 ) : (
                   <MarkdownIcon className="w-4.75 h-4.75 stroke-[1.4]" />
                 )}
-              </IconButton>
-            </Tooltip>
-          )}
-          {onToggleRightPanel && (
-            <Tooltip
-              content={`${
-                rightPanelVisible ? "Hide" : "Show"
-              } Outline Panel (${mod}${isMac ? "" : "+"}4)`}
-            >
-              <IconButton
-                onClick={onToggleRightPanel}
-                className={rightPanelVisible ? "bg-bg-muted text-text" : ""}
-              >
-                <PanelRight
-                  className={cn(
-                    "w-4.25 h-4.25 stroke-[1.6]",
-                    rightPanelVisible && "text-text",
-                  )}
-                />
               </IconButton>
             </Tooltip>
           )}

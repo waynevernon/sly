@@ -7,7 +7,7 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import { NotesProvider, useNotes } from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -164,22 +164,44 @@ function PreviewFallback() {
 function TitlebarPaneSwitch({
   paneMode,
   onCyclePaneMode,
+  rightPanelVisible,
+  onToggleRightPanel,
 }: {
   paneMode: PaneMode;
   onCyclePaneMode: () => void;
+  rightPanelVisible: boolean;
+  onToggleRightPanel: () => void;
 }) {
   return (
-    <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
-      <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
-        <IconButton
-          onClick={onCyclePaneMode}
-          title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
-          className="shrink-0"
-        >
-          <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
-        </IconButton>
+    <>
+      <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
+        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+          <IconButton
+            onClick={onCyclePaneMode}
+            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
+            className="shrink-0"
+          >
+            <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
+          </IconButton>
+        </div>
       </div>
-    </div>
+      <div
+        className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
+        data-tauri-drag-region
+      >
+        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+          <IconButton
+            onClick={onToggleRightPanel}
+            title={`${
+              rightPanelVisible ? "Hide" : "Show"
+            } Outline Panel (${mod}${isMac ? "" : "+"}4)`}
+            className={rightPanelVisible ? "bg-bg-muted text-text shrink-0" : "shrink-0"}
+          >
+            <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
+          </IconButton>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -772,6 +794,8 @@ function AppContent() {
           <TitlebarPaneSwitch
             paneMode={paneMode}
             onCyclePaneMode={cyclePaneMode}
+            rightPanelVisible={rightPanelVisible}
+            onToggleRightPanel={toggleRightPanel}
           />
         )}
         {view === "settings" ? (
@@ -790,8 +814,7 @@ function AppContent() {
               <Editor
                 paneMode={paneMode}
                 focusMode={focusMode}
-                rightPanelVisible={rightPanelVisible}
-                onToggleRightPanel={toggleRightPanel}
+                hasPinnedRightTitlebarControl={!focusMode}
                 onSourceModeChange={setEditorSourceMode}
                 onRegisterScrollContainer={setEditorScrollContainer}
                 onRegisterFlushPendingSave={setFlushPendingSave}
