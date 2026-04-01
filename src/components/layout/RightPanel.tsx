@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
 import { ListTree, Sparkles } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { finishNoteOpenTiming, markNoteOpenTiming } from "../../lib/noteOpenTiming";
 import type { RightPanelTab } from "../../types/note";
 import { Tooltip } from "../ui";
 import {
@@ -19,6 +27,7 @@ import {
 interface RightPanelProps {
   editor: TiptapEditor | null;
   scrollContainer: HTMLDivElement | null;
+  noteId: string | null;
   hasNote: boolean;
   visible: boolean;
   width: number;
@@ -29,6 +38,7 @@ interface RightPanelProps {
 }
 
 const ACTIVE_HEADING_TOP_OFFSET = 72;
+const OUTLINE_UPDATE_DEBOUNCE_MS = 120;
 const RIGHT_PANEL_TABS: Array<{
   tab: RightPanelTab;
   label: string;
@@ -49,6 +59,7 @@ const RIGHT_PANEL_TABS: Array<{
 export function RightPanel({
   editor,
   scrollContainer,
+  noteId,
   hasNote,
   visible,
   width,
@@ -67,9 +78,18 @@ export function RightPanel({
   const liveWidthRef = useRef(liveWidth);
   const outlineScrollRef = useRef<HTMLDivElement>(null);
   const outlineItemsRef = useRef<OutlineItem[]>([]);
+  const panelHydrationFrameRef = useRef<number | null>(null);
+  const outlineHydrationFrameRef = useRef<number | null>(null);
+  const outlineViewportFrameRef = useRef<number | null>(null);
+  const outlineUpdateTimeoutRef = useRef<number | null>(null);
+  const [hydratedPanelKey, setHydratedPanelKey] = useState<string | null>(null);
   outlineItemsRef.current = outlineItems;
   liveWidthRef.current = liveWidth;
   const outlineActive = visible && activeTab === "outline";
+  const panelHydrationKey =
+    visible && hasNote && noteId ? `${noteId}:${activeTab}` : null;
+  const panelHydrated =
+    panelHydrationKey !== null && hydratedPanelKey === panelHydrationKey;
 
   useEffect(() => {
     if (!isResizing) {
@@ -77,8 +97,23 @@ export function RightPanel({
     }
   }, [width, isResizing]);
 
+  const clearPendingOutlineWork = useCallback(() => {
+    if (outlineHydrationFrameRef.current !== null) {
+      cancelAnimationFrame(outlineHydrationFrameRef.current);
+      outlineHydrationFrameRef.current = null;
+    }
+    if (outlineViewportFrameRef.current !== null) {
+      cancelAnimationFrame(outlineViewportFrameRef.current);
+      outlineViewportFrameRef.current = null;
+    }
+    if (outlineUpdateTimeoutRef.current !== null) {
+      window.clearTimeout(outlineUpdateTimeoutRef.current);
+      outlineUpdateTimeoutRef.current = null;
+    }
+  }, []);
+
   const updateOutline = useCallback(() => {
-    if (!editor || !hasNote) {
+    if (!editor || !hasNote || !noteId) {
       setOutlineItems([]);
       setActiveOutlineId(null);
       return;
@@ -91,11 +126,14 @@ export function RightPanel({
       nextItems,
       editor.state.selection.from,
     );
-    setActiveOutlineId(activeFromSelection?.id ?? null);
-  }, [editor, hasNote]);
+    startTransition(() => {
+      setOutlineItems(nextItems);
+      setActiveOutlineId(activeFromSelection?.id ?? null);
+    });
+  }, [editor, hasNote, noteId]);
 
   const updateActiveFromSelection = useCallback(() => {
-    if (!editor || !hasNote) {
+    if (!editor || !hasNote || !noteId) {
       setActiveOutlineId(null);
       return;
     }
@@ -105,16 +143,16 @@ export function RightPanel({
       editor.state.selection.from,
     );
     setActiveOutlineId(active?.id ?? null);
-  }, [editor, hasNote]);
+  }, [editor, hasNote, noteId]);
 
-  const updateActiveFromViewport = useCallback(() => {
-    if (!editor || !hasNote || !scrollContainer || outlineItemsRef.current.length === 0) {
+  const updateActiveFromViewport = useCallback((items = outlineItemsRef.current) => {
+    if (!editor || !hasNote || !scrollContainer || items.length === 0) {
       return;
     }
 
     const containerRect = scrollContainer.getBoundingClientRect();
     const thresholdTop = containerRect.top + ACTIVE_HEADING_TOP_OFFSET;
-    const headingTops = outlineItemsRef.current
+    const headingTops = items
       .map((item) => {
         const node = editor.view.nodeDOM(item.pos);
         if (!(node instanceof HTMLElement)) {
@@ -136,42 +174,90 @@ export function RightPanel({
   }, [editor, hasNote, scrollContainer]);
 
   useEffect(() => {
-    if (!editor || !hasNote || !outlineActive) {
+    if (panelHydrationFrameRef.current !== null) {
+      cancelAnimationFrame(panelHydrationFrameRef.current);
+      panelHydrationFrameRef.current = null;
+    }
+
+    if (!panelHydrationKey) {
+      setHydratedPanelKey(null);
+      return;
+    }
+
+    setHydratedPanelKey(null);
+    panelHydrationFrameRef.current = requestAnimationFrame(() => {
+      startTransition(() => {
+        setHydratedPanelKey(panelHydrationKey);
+      });
+      if (activeTab === "assistant" && noteId) {
+        finishNoteOpenTiming(noteId, "assistant panel hydrated");
+      }
+    });
+
+    return () => {
+      if (panelHydrationFrameRef.current !== null) {
+        cancelAnimationFrame(panelHydrationFrameRef.current);
+        panelHydrationFrameRef.current = null;
+      }
+    };
+  }, [activeTab, noteId, panelHydrationKey]);
+
+  useEffect(() => {
+    if (!editor || !hasNote || !outlineActive || !panelHydrated || !noteId) {
+      clearPendingOutlineWork();
       setOutlineItems([]);
       setActiveOutlineId(null);
       return;
     }
 
-    const handleUpdate = () => {
+    const hydrateOutline = (stage: "initial" | "update") => {
       updateOutline();
-      requestAnimationFrame(() => {
+      outlineViewportFrameRef.current = requestAnimationFrame(() => {
         updateActiveFromViewport();
+        if (stage === "initial") {
+          markNoteOpenTiming(noteId, "outline hydrated");
+          finishNoteOpenTiming(noteId, "right panel hydrated");
+        }
       });
+    };
+
+    outlineHydrationFrameRef.current = requestAnimationFrame(() => {
+      hydrateOutline("initial");
+    });
+
+    const handleUpdate = () => {
+      clearPendingOutlineWork();
+      outlineUpdateTimeoutRef.current = window.setTimeout(() => {
+        hydrateOutline("update");
+      }, OUTLINE_UPDATE_DEBOUNCE_MS);
     };
 
     const handleSelectionUpdate = () => {
       updateActiveFromSelection();
     };
 
-    handleUpdate();
     editor.on("update", handleUpdate);
     editor.on("selectionUpdate", handleSelectionUpdate);
 
     return () => {
+      clearPendingOutlineWork();
       editor.off("update", handleUpdate);
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [
+    clearPendingOutlineWork,
     editor,
     hasNote,
     outlineActive,
+    panelHydrated,
+    noteId,
     updateActiveFromSelection,
     updateActiveFromViewport,
     updateOutline,
   ]);
 
   useEffect(() => {
-    if (!scrollContainer || !outlineActive) return;
+    if (!scrollContainer || !outlineActive || !panelHydrated) return;
 
     const handleScroll = () => {
       updateActiveFromViewport();
@@ -182,16 +268,25 @@ export function RightPanel({
     return () => {
       scrollContainer.removeEventListener("scroll", handleScroll);
     };
-  }, [outlineActive, scrollContainer, updateActiveFromViewport]);
+  }, [outlineActive, panelHydrated, scrollContainer, updateActiveFromViewport]);
 
   useEffect(() => {
-    if (!outlineActive || !activeOutlineId) return;
+    if (!outlineActive || !panelHydrated || !activeOutlineId) return;
 
     const activeElement = outlineScrollRef.current?.querySelector<HTMLElement>(
       `[data-outline-id="${activeOutlineId}"]`,
     );
     activeElement?.scrollIntoView({ block: "nearest" });
-  }, [activeOutlineId, outlineActive]);
+  }, [activeOutlineId, outlineActive, panelHydrated]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingOutlineWork();
+      if (panelHydrationFrameRef.current !== null) {
+        cancelAnimationFrame(panelHydrationFrameRef.current);
+      }
+    };
+  }, [clearPendingOutlineWork]);
 
   const startResize = useCallback(
     (event: React.MouseEvent) => {
@@ -324,7 +419,11 @@ export function RightPanel({
               ref={outlineScrollRef}
               className="ui-scrollbar-overlay flex-1 overflow-y-auto px-2 py-2"
             >
-              {outlineItems.length === 0 ? (
+              {!panelHydrated && hasNote ? (
+                <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
+                  Loading outline...
+                </div>
+              ) : outlineItems.length === 0 ? (
                 <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
                   {emptyState}
                 </div>
@@ -353,8 +452,12 @@ export function RightPanel({
                 </div>
               )}
             </div>
-          ) : (
+          ) : panelHydrated || !hasNote ? (
             <RightPanelAssistant {...assistantProps} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
+              Preparing assistant...
+            </div>
           )}
         </div>
       </div>

@@ -40,6 +40,7 @@ import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { mod, alt, shift, isMac } from "../../lib/platform";
 import type { AssistantSelectionSnapshot } from "../../lib/assistant";
+import { markNoteOpenTiming } from "../../lib/noteOpenTiming";
 
 // Validate URL scheme for safe opening
 function isAllowedUrlScheme(url: string): boolean {
@@ -79,7 +80,7 @@ import {
 } from "../ui";
 import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
-import type { PaneMode, Settings } from "../../types/note";
+import type { NoteMetadata, PaneMode, Settings } from "../../types/note";
 import {
   BoldIcon,
   ItalicIcon,
@@ -472,6 +473,27 @@ export interface PreviewModeData {
   reload: () => Promise<void>;
 }
 
+export interface WorkspaceEditorData {
+  currentNote: {
+    id: string;
+    title: string;
+    content: string;
+    path: string;
+    modified: number;
+  } | null;
+  selectedNoteId: string | null;
+  notes: NoteMetadata[];
+  hasExternalChanges: boolean;
+  reloadVersion: number;
+  saveNote: (content: string, noteId?: string) => Promise<void>;
+  reloadCurrentNote: () => Promise<void>;
+  createNote: () => Promise<void>;
+  consumePendingNewNote: (id: string) => boolean;
+  pinNote: ((id: string) => Promise<void>) | undefined;
+  unpinNote: ((id: string) => Promise<void>) | undefined;
+  selectNote: ((id: string) => Promise<void>) | undefined;
+}
+
 interface EditorProps {
   paneMode?: PaneMode;
   focusMode?: boolean;
@@ -486,11 +508,29 @@ interface EditorProps {
     flushPendingSave: (() => Promise<void>) | null,
   ) => void;
   assistantSelection?: AssistantSelectionSnapshot | null;
+  workspaceMode?: WorkspaceEditorData;
   onSaveToFolder?: () => void;
   saveToFolderDisabled?: boolean;
 }
 
-export function Editor({
+interface EditorImplProps extends EditorProps {
+  fallbackNotesCtx: ReturnType<typeof useOptionalNotes> | null;
+}
+
+function ContextBackedEditor(props: EditorProps) {
+  const notesCtx = useOptionalNotes();
+  return <EditorImpl {...props} fallbackNotesCtx={notesCtx} />;
+}
+
+export function Editor(props: EditorProps) {
+  if (props.workspaceMode || props.previewMode) {
+    return <EditorImpl {...props} fallbackNotesCtx={null} />;
+  }
+
+  return <ContextBackedEditor {...props} />;
+}
+
+function EditorImpl({
   paneMode = 2,
   focusMode,
   hasPinnedRightTitlebarControl = false,
@@ -502,13 +542,17 @@ export function Editor({
   onRegisterFlushPendingSave,
   assistantSelection,
   previewMode,
+  workspaceMode,
   onSaveToFolder,
   saveToFolderDisabled,
-}: EditorProps) {
-  // Always call the hook (rules of hooks), but it returns null outside NotesProvider
-  const notesCtx = useOptionalNotes();
+  fallbackNotesCtx,
+}: EditorImplProps) {
+  const notesCtx = fallbackNotesCtx;
 
   const currentNote = useMemo(() => {
+    if (workspaceMode) {
+      return workspaceMode.currentNote;
+    }
     if (!previewMode) return notesCtx?.currentNote ?? null;
     if (previewMode.content === null) return null;
     return {
@@ -518,33 +562,41 @@ export function Editor({
       path: previewMode.filePath,
       modified: previewMode.modified,
     };
-  }, [previewMode, notesCtx?.currentNote]);
+  }, [previewMode, workspaceMode, notesCtx?.currentNote]);
 
-  const notesSaveNote = notesCtx?.saveNote;
   const saveNote = useMemo(
     () =>
       previewMode
         ? async (content: string, _noteId?: string) => {
             await previewMode.save(content);
           }
-        : notesSaveNote!,
-    [previewMode, notesSaveNote]
+        : workspaceMode
+          ? workspaceMode.saveNote
+          : notesCtx!.saveNote,
+    [previewMode, workspaceMode, notesCtx]
   );
 
-  const createNote = notesCtx?.createNote;
-  const consumePendingNewNote = notesCtx?.consumePendingNewNote;
+  const createNote = workspaceMode?.createNote ?? notesCtx?.createNote;
+  const consumePendingNewNote =
+    workspaceMode?.consumePendingNewNote ?? notesCtx?.consumePendingNewNote;
   const hasExternalChanges = previewMode
     ? previewMode.hasExternalChanges
-    : notesCtx!.hasExternalChanges;
+    : workspaceMode
+      ? workspaceMode.hasExternalChanges
+      : notesCtx!.hasExternalChanges;
   const reloadCurrentNote = previewMode
     ? previewMode.reload
-    : notesCtx!.reloadCurrentNote;
+    : workspaceMode
+      ? workspaceMode.reloadCurrentNote
+      : notesCtx!.reloadCurrentNote;
   const reloadVersion = previewMode
     ? previewMode.reloadVersion
-    : notesCtx!.reloadVersion;
-  const pinNote = notesCtx?.pinNote;
-  const unpinNote = notesCtx?.unpinNote;
-  const notes = notesCtx?.notes;
+    : workspaceMode
+      ? workspaceMode.reloadVersion
+      : notesCtx!.reloadVersion;
+  const pinNote = workspaceMode?.pinNote ?? notesCtx?.pinNote;
+  const unpinNote = workspaceMode?.unpinNote ?? notesCtx?.unpinNote;
+  const notes = workspaceMode?.notes ?? notesCtx?.notes;
   const { textDirection } = useTheme();
   const [isSaving, setIsSaving] = useState(false);
   // Force re-render when selection changes to update toolbar active states
@@ -590,8 +642,8 @@ export function Editor({
   // Stable refs for wikilink click handler (avoids re-registering listener on every notes change)
   const notesRef = useRef(notes);
   notesRef.current = notes;
-  const notesCtxRef = useRef(notesCtx);
-  notesCtxRef.current = notesCtx;
+  const selectNoteRef = useRef(workspaceMode?.selectNote ?? notesCtx?.selectNote);
+  selectNoteRef.current = workspaceMode?.selectNote ?? notesCtx?.selectNote;
 
   // Keep ref in sync with current note ID
   currentNoteIdRef.current = currentNote?.id ?? null;
@@ -1370,7 +1422,7 @@ export function Editor({
             (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
           );
           if (note) {
-            notesCtxRef.current?.selectNote(note.id);
+            selectNoteRef.current?.(note.id);
           } else {
             toast.info(`Note "${noteTitle}" does not exist yet`);
           }
@@ -1463,6 +1515,7 @@ export function Editor({
         } else {
           editor.commands.setContent(currentNote.content);
         }
+        markNoteOpenTiming(currentNote.id, "editor content set");
         isLoadingRef.current = false;
         return;
       }
@@ -1496,6 +1549,7 @@ export function Editor({
     } else {
       editor.commands.setContent(currentNote.content);
     }
+    markNoteOpenTiming(currentNote.id, "editor content set");
 
     // Scroll to top after content is set (must be after setContent to work reliably)
     scrollContainerRef.current?.scrollTo(0, 0);
@@ -1510,6 +1564,7 @@ export function Editor({
 
       // Scroll again in RAF to ensure it takes effect after DOM updates
       scrollContainerRef.current?.scrollTo(0, 0);
+      markNoteOpenTiming(loadingNoteId, "editor paint");
 
       isLoadingRef.current = false;
 
@@ -1996,7 +2051,7 @@ export function Editor({
     }
 
     // A note is selected but not yet loaded — show loading spinner to avoid empty state flash
-    if (notesCtx?.selectedNoteId) {
+    if ((workspaceMode?.selectedNoteId ?? notesCtx?.selectedNoteId) !== null) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>

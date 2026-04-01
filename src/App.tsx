@@ -1,4 +1,6 @@
 import {
+  memo,
+  startTransition,
   useState,
   useEffect,
   useCallback,
@@ -9,7 +11,11 @@ import {
 } from "react";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
-import { NotesProvider, useNotes } from "./context/NotesContext";
+import {
+  NotesProvider,
+  useNotesActions,
+  useNotesData,
+} from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
@@ -17,11 +23,12 @@ import { GitProvider } from "./context/GitContext";
 import { IconButton, TooltipProvider, Toaster } from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
+import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
-import type { PaneMode } from "./types/note";
+import type { PaneMode, RightPanelTab } from "./types/note";
 import type { SettingsTab } from "./components/settings/SettingsPage";
 import {
   SpinnerIcon,
@@ -51,6 +58,7 @@ import {
   serializeEditorMarkdown,
   type AssistantSelectionSnapshot,
 } from "./lib/assistant";
+import type { WorkspaceEditorData } from "./components/editor/Editor";
 
 const loadCommandPalette = () => import("./components/command-palette/CommandPalette");
 const loadPreviewApp = () => import("./components/preview/PreviewApp");
@@ -217,6 +225,84 @@ function PreviewFallback() {
   return <FullScreenFallback label="Opening preview..." />;
 }
 
+interface WorkspaceMainProps {
+  paneMode: PaneMode;
+  focusMode: boolean;
+  showRightPanel: boolean;
+  rightPanelWidth: number;
+  rightPanelTab: RightPanelTab;
+  editorInstance: TiptapEditor | null;
+  editorScrollContainer: HTMLDivElement | null;
+  currentNoteId: string | null;
+  currentAssistantSelection: AssistantSelectionSnapshot | null;
+  assistantProps: RightPanelAssistantProps;
+  workspaceEditorData: WorkspaceEditorData;
+  onOpenSettings: (tab?: "general" | "editor" | "shortcuts" | "about") => void;
+  onEditorSourceModeChange: (sourceMode: boolean) => void;
+  onRegisterScrollContainer: (container: HTMLDivElement | null) => void;
+  onRegisterFlushPendingSave: (
+    flushPendingSave: (() => Promise<void>) | null,
+  ) => void;
+  onEditorReady: (editor: TiptapEditor | null) => void;
+  onRightPanelTabChange: (tab: RightPanelTab) => void;
+  onRightPanelWidthChange: (width: number) => void;
+}
+
+const WorkspaceMain = memo(function WorkspaceMain({
+  paneMode,
+  focusMode,
+  showRightPanel,
+  rightPanelWidth,
+  rightPanelTab,
+  editorInstance,
+  editorScrollContainer,
+  currentNoteId,
+  currentAssistantSelection,
+  assistantProps,
+  workspaceEditorData,
+  onOpenSettings,
+  onEditorSourceModeChange,
+  onRegisterScrollContainer,
+  onRegisterFlushPendingSave,
+  onEditorReady,
+  onRightPanelTabChange,
+  onRightPanelWidthChange,
+}: WorkspaceMainProps) {
+  return (
+    <>
+      <WorkspaceNavigation
+        paneMode={focusMode ? 1 : paneMode}
+        onOpenSettings={onOpenSettings}
+      />
+      <div className="flex min-w-0 flex-1">
+        <Editor
+          paneMode={paneMode}
+          focusMode={focusMode}
+          hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
+          workspaceMode={workspaceEditorData}
+          assistantSelection={currentAssistantSelection}
+          onSourceModeChange={onEditorSourceModeChange}
+          onRegisterScrollContainer={onRegisterScrollContainer}
+          onRegisterFlushPendingSave={onRegisterFlushPendingSave}
+          onEditorReady={onEditorReady}
+        />
+        <RightPanel
+          editor={editorInstance}
+          scrollContainer={editorScrollContainer}
+          noteId={currentNoteId}
+          hasNote={Boolean(currentNoteId)}
+          visible={showRightPanel}
+          width={rightPanelWidth}
+          activeTab={rightPanelTab}
+          onTabChange={onRightPanelTabChange}
+          onWidthChange={onRightPanelWidthChange}
+          assistantProps={assistantProps}
+        />
+      </div>
+    </>
+  );
+});
+
 function TitlebarPaneSwitch({
   paneMode,
   onCyclePaneMode,
@@ -265,23 +351,31 @@ function AppContent() {
   const {
     notesFolder,
     isLoading,
-    createNote,
-    duplicateNote,
+    notes,
     scopedNotes,
     selectedNoteId,
     selectedNoteIds,
-    selectNote,
-    selectNoteRange,
-    clearNoteSelection,
-    selectAllVisibleNotes,
-    searchQuery,
-    searchResults,
-    reloadCurrentNote,
-    saveNote,
     currentNote,
     settings,
+    searchQuery,
+    searchResults,
+    hasExternalChanges,
+    reloadVersion,
+  } = useNotesData();
+  const {
+    clearNoteSelection,
+    createNote,
+    duplicateNote,
+    consumePendingNewNote,
+    pinNote,
+    reloadCurrentNote,
+    saveNote,
+    selectNote,
+    selectNoteRange,
+    selectAllVisibleNotes,
     syncNotesFolder,
-  } = useNotes();
+    unpinNote,
+  } = useNotesActions();
   const {
     interfaceZoom,
     setInterfaceZoom,
@@ -346,6 +440,7 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
+  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
 
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
@@ -527,28 +622,80 @@ function AppContent() {
     currentNote && assistantSelectionState?.noteId === currentNote.id
       ? assistantSelectionState.selection
       : null;
+  const assistantSyncActive = showRightPanel && rightPanelTab === "assistant";
+
+  const syncAssistantSelectionFromEditor = useCallback(
+    (options?: { clearWhenEmpty?: boolean }) => {
+      const currentEditor = editorRef.current;
+      const noteId = currentNote?.id;
+      if (!noteId || !currentEditor) {
+        return null;
+      }
+
+      const nextSelection = getMeaningfulEditorSelectionSnapshot(currentEditor);
+      if (nextSelection) {
+        const nextStoredSelection = {
+          noteId,
+          selection: nextSelection,
+        };
+        lastAssistantSelectionRef.current = nextStoredSelection;
+        startTransition(() => {
+          setAssistantSelectionState(nextStoredSelection);
+        });
+        return nextSelection;
+      }
+
+      if (options?.clearWhenEmpty !== false) {
+        lastAssistantSelectionRef.current = null;
+        startTransition(() => {
+          setAssistantSelectionState(null);
+        });
+      }
+
+      return null;
+    },
+    [currentNote?.id],
+  );
+
+  const syncAutoAssistantScopeFromEditor = useCallback(
+    (
+      selection: AssistantSelectionSnapshot | null,
+      threadOverride?: AssistantThreadState | null,
+    ) => {
+      const noteId = currentNote?.id;
+      const currentEditor = editorRef.current;
+      const threadState = threadOverride ?? currentAssistantThread;
+
+      if (!noteId || !currentEditor || !threadState || threadState.scopeManual) {
+        return threadState?.scope ?? "note";
+      }
+
+      const nextScope = getAutoAssistantScope(currentEditor, selection);
+      if (threadState.scope !== nextScope) {
+        updateCurrentAssistantThread((thread) => {
+          if (thread.scopeManual || thread.scope === nextScope) {
+            return thread;
+          }
+
+          return {
+            ...thread,
+            scope: nextScope,
+          };
+        });
+      }
+
+      return nextScope;
+    },
+    [currentAssistantThread, currentNote?.id, updateCurrentAssistantThread],
+  );
 
   useEffect(() => {
-    if (!currentNote?.id || !editorInstance) {
+    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
       return;
     }
 
     const syncStoredAssistantSelection = () => {
-      const nextSelection = getMeaningfulEditorSelectionSnapshot(editorInstance);
-      if (nextSelection) {
-        const nextStoredSelection = {
-          noteId: currentNote.id,
-          selection: nextSelection,
-        };
-        lastAssistantSelectionRef.current = nextStoredSelection;
-        setAssistantSelectionState(nextStoredSelection);
-        return;
-      }
-
-      if (editorInstance.isFocused) {
-        lastAssistantSelectionRef.current = null;
-        setAssistantSelectionState(null);
-      }
+      syncAssistantSelectionFromEditor({ clearWhenEmpty: editorInstance.isFocused });
     };
 
     syncStoredAssistantSelection();
@@ -557,34 +704,18 @@ function AppContent() {
     return () => {
       editorInstance.off("selectionUpdate", syncStoredAssistantSelection);
     };
-  }, [currentNote?.id, editorInstance]);
+  }, [assistantSyncActive, currentNote?.id, editorInstance, syncAssistantSelectionFromEditor]);
 
   useEffect(() => {
-    if (!currentNote?.id || !editorInstance) {
+    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
       return;
     }
 
     const syncAutoAssistantScope = () => {
-      const storedSelection =
-        lastAssistantSelectionRef.current?.noteId === currentNote.id
-          ? lastAssistantSelectionRef.current.selection
-          : null;
-      const nextScope = getAutoAssistantScope(editorInstance, storedSelection);
-
-      updateCurrentAssistantThread((thread) => {
-        if (thread.scopeManual) {
-          return thread;
-        }
-
-        if (thread.scope === nextScope) {
-          return thread;
-        }
-
-        return {
-          ...thread,
-          scope: nextScope,
-        };
+      const storedSelection = syncAssistantSelectionFromEditor({
+        clearWhenEmpty: editorInstance.isFocused,
       });
+      syncAutoAssistantScopeFromEditor(storedSelection);
     };
 
     syncAutoAssistantScope();
@@ -593,7 +724,13 @@ function AppContent() {
     return () => {
       editorInstance.off("selectionUpdate", syncAutoAssistantScope);
     };
-  }, [currentNote?.id, editorInstance, updateCurrentAssistantThread]);
+  }, [
+    assistantSyncActive,
+    currentNote?.id,
+    editorInstance,
+    syncAssistantSelectionFromEditor,
+    syncAutoAssistantScopeFromEditor,
+  ]);
 
   const applyPaneModeSelection = useCallback(
     (mode: PaneMode) => {
@@ -695,11 +832,7 @@ function AppContent() {
   );
 
   const handleClearAssistantThread = useCallback(() => {
-    const preservedSelection = lastAssistantSelectionRef.current;
-    const storedSelection =
-      preservedSelection && preservedSelection.noteId === currentNote?.id
-        ? preservedSelection.selection
-        : null;
+    const storedSelection = syncAssistantSelectionFromEditor();
     const nextScope = getAutoAssistantScope(editorRef.current, storedSelection);
 
     updateCurrentAssistantThread((thread) => ({
@@ -711,7 +844,7 @@ function AppContent() {
       pending: false,
       lastSuccessfulSnapshotHash: null,
     }));
-  }, [currentNote?.id, updateCurrentAssistantThread]);
+  }, [syncAssistantSelectionFromEditor, updateCurrentAssistantThread]);
 
   const handleAssistantSubmit = useCallback(async () => {
     if (!currentNote || !currentAssistantThread || currentAssistantThread.pending) {
@@ -730,14 +863,17 @@ function AppContent() {
         editorRef.current,
         currentNote.content,
       );
-      const storedSelection =
-        lastAssistantSelectionRef.current?.noteId === currentNote.id
-          ? lastAssistantSelectionRef.current.selection
-          : null;
+      const storedSelection = syncAssistantSelectionFromEditor();
+      const effectiveScope = currentAssistantThread.scopeManual
+        ? currentAssistantThread.scope
+        : syncAutoAssistantScopeFromEditor(
+            storedSelection,
+            currentAssistantThread,
+          );
       const context = buildAssistantDocumentContext(
         markdown,
         editorRef.current,
-        currentAssistantThread.scope,
+        effectiveScope,
         storedSelection,
       );
       const createdAt = Date.now();
@@ -746,7 +882,7 @@ function AppContent() {
         kind: "user",
         text: prompt,
         createdAt,
-        scope: currentAssistantThread.scope,
+        scope: effectiveScope,
         scopeLabel: context.scopeLabel,
         lineLabel: context.lineLabel,
         snapshotHash: context.snapshotHash,
@@ -824,6 +960,8 @@ function AppContent() {
     currentNote,
     flushPendingSave,
     settings.ollamaModel,
+    syncAssistantSelectionFromEditor,
+    syncAutoAssistantScopeFromEditor,
     updateCurrentAssistantThread,
   ]);
 
@@ -1282,6 +1420,69 @@ function AppContent() {
     setPaletteOpen(false);
   }, []);
 
+  const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
+    editorRef.current = editor;
+    setEditorInstance(editor);
+  }, []);
+
+  const workspaceEditorData = useMemo<WorkspaceEditorData>(
+    () => ({
+      currentNote,
+      selectedNoteId,
+      notes,
+      hasExternalChanges,
+      reloadVersion,
+      saveNote,
+      reloadCurrentNote,
+      createNote,
+      consumePendingNewNote,
+      pinNote,
+      unpinNote,
+      selectNote,
+    }),
+    [
+      consumePendingNewNote,
+      createNote,
+      currentNote,
+      hasExternalChanges,
+      notes,
+      pinNote,
+      reloadVersion,
+      reloadCurrentNote,
+      saveNote,
+      selectNote,
+      selectedNoteId,
+      unpinNote,
+    ],
+  );
+
+  const assistantProps = useMemo<RightPanelAssistantProps>(
+    () => ({
+      hasNote: Boolean(currentNote),
+      providerCheckComplete: assistantProvidersLoaded,
+      availableProviders: availableAssistantProviders,
+      thread: currentAssistantThread,
+      onProviderChange: handleAssistantProviderChange,
+      onScopeChange: handleAssistantScopeChange,
+      onDraftChange: handleAssistantDraftChange,
+      onClearThread: handleClearAssistantThread,
+      onSubmit: handleAssistantSubmit,
+      onApplyProposal: handleApplyAssistantProposal,
+    }),
+    [
+      assistantProvidersLoaded,
+      availableAssistantProviders,
+      currentAssistantThread,
+      currentNote,
+      handleApplyAssistantProposal,
+      handleAssistantDraftChange,
+      handleAssistantProviderChange,
+      handleAssistantScopeChange,
+      handleAssistantSubmit,
+      handleClearAssistantThread,
+    ],
+  );
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-bg-secondary">
@@ -1296,8 +1497,6 @@ function AppContent() {
   if (!notesFolder) {
     return <FolderPicker />;
   }
-
-  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
 
   return (
     <>
@@ -1320,49 +1519,26 @@ function AppContent() {
             onRefreshAiProviders={refreshAssistantProviders}
           />
         ) : (
-          <>
-            <WorkspaceNavigation
-              paneMode={focusMode ? 1 : paneMode}
-              onOpenSettings={openSettings}
-            />
-            <div className="flex min-w-0 flex-1">
-              <Editor
-                paneMode={paneMode}
-                focusMode={focusMode}
-                hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
-                assistantSelection={currentAssistantSelection}
-                onSourceModeChange={setEditorSourceMode}
-                onRegisterScrollContainer={setEditorScrollContainer}
-                onRegisterFlushPendingSave={handleRegisterFlushPendingSave}
-                onEditorReady={(editor) => {
-                  editorRef.current = editor;
-                  setEditorInstance(editor);
-                }}
-              />
-              <RightPanel
-                editor={editorInstance}
-                scrollContainer={editorScrollContainer}
-                hasNote={Boolean(currentNote)}
-                visible={showRightPanel}
-                width={rightPanelWidth}
-                activeTab={rightPanelTab}
-                onTabChange={setRightPanelTab}
-                onWidthChange={setRightPanelWidth}
-                assistantProps={{
-                  hasNote: Boolean(currentNote),
-                  providerCheckComplete: assistantProvidersLoaded,
-                  availableProviders: availableAssistantProviders,
-                  thread: currentAssistantThread,
-                  onProviderChange: handleAssistantProviderChange,
-                  onScopeChange: handleAssistantScopeChange,
-                  onDraftChange: handleAssistantDraftChange,
-                  onClearThread: handleClearAssistantThread,
-                  onSubmit: handleAssistantSubmit,
-                  onApplyProposal: handleApplyAssistantProposal,
-                }}
-              />
-            </div>
-          </>
+          <WorkspaceMain
+            paneMode={paneMode}
+            focusMode={focusMode}
+            showRightPanel={showRightPanel}
+            rightPanelWidth={rightPanelWidth}
+            rightPanelTab={rightPanelTab}
+            editorInstance={editorInstance}
+            editorScrollContainer={editorScrollContainer}
+            currentNoteId={currentNote?.id ?? null}
+            currentAssistantSelection={currentAssistantSelection}
+            assistantProps={assistantProps}
+            workspaceEditorData={workspaceEditorData}
+            onOpenSettings={openSettings}
+            onEditorSourceModeChange={setEditorSourceMode}
+            onRegisterScrollContainer={setEditorScrollContainer}
+            onRegisterFlushPendingSave={handleRegisterFlushPendingSave}
+            onEditorReady={handleEditorReady}
+            onRightPanelTabChange={setRightPanelTab}
+            onRightPanelWidthChange={setRightPanelWidth}
+          />
         )}
       </div>
 

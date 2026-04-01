@@ -1,27 +1,42 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
-const notesState = {
+const notesDataState = {
   notesFolder: "/notes",
   isLoading: false,
-  createNote: vi.fn(),
-  duplicateNote: vi.fn(),
+  notes: [],
   scopedNotes: [],
   selectedNoteId: "alpha",
   selectedNoteIds: ["alpha"],
+  currentNote: {
+    id: "alpha",
+    title: "Alpha",
+    content: "# Alpha",
+    path: "/notes/alpha.md",
+    modified: 1,
+  },
+  settings: { ollamaModel: "qwen3:8b" },
+  searchQuery: "",
+  searchResults: [],
+  hasExternalChanges: false,
+  reloadVersion: 0,
+};
+
+const notesActionsState = {
+  createNote: vi.fn(),
+  duplicateNote: vi.fn(),
   selectNote: vi.fn(),
   selectNoteRange: vi.fn(),
   clearNoteSelection: vi.fn(),
   selectAllVisibleNotes: vi.fn(),
-  searchQuery: "",
-  searchResults: [],
   reloadCurrentNote: vi.fn(),
   saveNote: vi.fn(),
-  currentNote: null,
-  settings: { ollamaModel: "qwen3:8b" },
   syncNotesFolder: vi.fn(),
+  consumePendingNewNote: vi.fn(() => false),
+  pinNote: vi.fn(),
+  unpinNote: vi.fn(),
 };
 
 const themeState = {
@@ -32,7 +47,7 @@ const themeState = {
   cyclePaneMode: vi.fn(),
   rightPanelVisible: true,
   rightPanelWidth: 260,
-  rightPanelTab: "outline" as const,
+  rightPanelTab: "outline" as "outline" | "assistant",
   setRightPanelVisible: vi.fn(),
   setRightPanelWidth: vi.fn(),
   setRightPanelTab: vi.fn(),
@@ -58,7 +73,8 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
 
 vi.mock("./context/NotesContext", () => ({
   NotesProvider: ({ children }: PropsWithChildren) => children,
-  useNotes: () => notesState,
+  useNotesData: () => notesDataState,
+  useNotesActions: () => notesActionsState,
 }));
 
 vi.mock("./context/ThemeContext", () => ({
@@ -69,6 +85,26 @@ vi.mock("./context/ThemeContext", () => ({
 vi.mock("./context/GitContext", () => ({
   GitProvider: ({ children }: PropsWithChildren) => children,
 }));
+
+const editorListeners = {
+  selectionUpdate: new Set<() => void>(),
+};
+
+const fakeEditor = {
+  isFocused: true,
+  state: {
+    selection: { from: 1, to: 6, empty: false },
+    doc: {
+      textBetween: vi.fn(() => "Alpha"),
+    },
+  },
+  on: vi.fn((event: "selectionUpdate", callback: () => void) => {
+    editorListeners[event].add(callback);
+  }),
+  off: vi.fn((event: "selectionUpdate", callback: () => void) => {
+    editorListeners[event].delete(callback);
+  }),
+};
 
 vi.mock("./components/layout/WorkspaceNavigation", () => ({
   WorkspaceNavigation: ({
@@ -91,13 +127,16 @@ vi.mock("./components/layout/RightPanel", () => ({
 vi.mock("./components/editor/Editor", () => ({
   Editor: ({
     onRegisterFlushPendingSave,
+    onEditorReady,
   }: {
     onRegisterFlushPendingSave?: ((flushPendingSave: (() => Promise<void>) | null) => void) | null;
+    onEditorReady?: ((editor: typeof fakeEditor | null) => void) | null;
   }) => {
     useEffect(() => {
       onRegisterFlushPendingSave?.(async () => {});
+      onEditorReady?.(fakeEditor);
       return () => onRegisterFlushPendingSave?.(null);
-    }, [onRegisterFlushPendingSave]);
+    }, [onEditorReady, onRegisterFlushPendingSave]);
 
     return <div>editor</div>;
   },
@@ -157,8 +196,19 @@ describe("App", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
     vi.clearAllMocks();
+    editorListeners.selectionUpdate.clear();
+    fakeEditor.state.selection = { from: 1, to: 6, empty: false };
+    fakeEditor.state.doc.textBetween = vi.fn(() => "Alpha");
+    notesDataState.currentNote = {
+      id: "alpha",
+      title: "Alpha",
+      content: "# Alpha",
+      path: "/notes/alpha.md",
+      modified: 1,
+    };
     themeState.paneMode = 3;
     themeState.rightPanelVisible = true;
+    themeState.rightPanelTab = "outline";
   });
 
   afterEach(() => {
@@ -177,6 +227,32 @@ describe("App", () => {
     fireEvent.click(screen.getByText("open settings"));
 
     expect(await screen.findByText("settings-page")).toBeInTheDocument();
+  });
+
+  it("only attaches assistant selection listeners while the assistant tab is active", async () => {
+    const { rerender } = render(<App />);
+
+    await waitFor(() => {
+      expect(fakeEditor.on).not.toHaveBeenCalledWith(
+        "selectionUpdate",
+        expect.any(Function),
+      );
+    });
+
+    themeState.rightPanelTab = "assistant";
+    rerender(<App />);
+
+    await waitFor(() => {
+      expect(fakeEditor.on.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(editorListeners.selectionUpdate.size).toBe(2);
+    });
+
+    themeState.rightPanelTab = "outline";
+    rerender(<App />);
+
+    await waitFor(() => {
+      expect(editorListeners.selectionUpdate.size).toBe(0);
+    });
   });
 
   it("renders preview mode without folder mode shell", async () => {
