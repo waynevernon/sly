@@ -1,4 +1,10 @@
-import { useEffect, useRef, useCallback, useState, useMemo } from "react";
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  useMemo,
+} from "react";
 import { TextSearch } from "lucide-react";
 import {
   useEditor,
@@ -1989,10 +1995,10 @@ export function Editor({
             )}
             data-tauri-drag-region
           >
-        <div
-          className={`ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        >
-          {hasExternalChanges ? (
+            <div
+              className={`ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+            >
+              {hasExternalChanges ? (
             <Tooltip
               content={`External changes detected (${mod}${isMac ? "" : "+"}R to refresh)`}
             >
@@ -2159,8 +2165,8 @@ export function Editor({
                 )}
               </IconButton>
             </Tooltip>
-          )}
-        </div>
+              )}
+            </div>
           </div>
 
           {/* Header with format bar – border aligns with FoldersPane / NotesPane */}

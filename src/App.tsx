@@ -195,7 +195,7 @@ function TitlebarPaneSwitch({
             title={`${
               rightPanelVisible ? "Hide" : "Show"
             } Outline Panel (${mod}${isMac ? "" : "+"}4)`}
-            className={rightPanelVisible ? "bg-bg-muted text-text shrink-0" : "shrink-0"}
+            className="shrink-0"
           >
             <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
@@ -814,7 +814,7 @@ function AppContent() {
               <Editor
                 paneMode={paneMode}
                 focusMode={focusMode}
-                hasPinnedRightTitlebarControl={!focusMode}
+                hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
                 onSourceModeChange={setEditorSourceMode}
                 onRegisterScrollContainer={setEditorScrollContainer}
                 onRegisterFlushPendingSave={setFlushPendingSave}

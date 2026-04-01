@@ -246,7 +246,7 @@ export function RightPanel({
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header border-border/80">
             <div className="min-w-0">
-              <h2 className="truncate text-sm font-medium text-text">
+              <h2 className="truncate text-base font-medium text-text">
                 {activeTab === "outline" ? "Outline" : ""}
               </h2>
             </div>
