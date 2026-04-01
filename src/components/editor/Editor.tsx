@@ -47,6 +47,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
+import { AdjacentListNormalizer } from "./AdjacentListNormalizer";
 import { Frontmatter } from "./Frontmatter";
 import { Emoji } from "./Emoji";
 import { EmojiSuggestion } from "./EmojiSuggestion";
@@ -1056,6 +1057,7 @@ export function Editor({
       }),
       Frontmatter,
       Emoji,
+      AdjacentListNormalizer,
       Markdown.configure({}),
       SearchHighlight.configure({
         matches: [],
