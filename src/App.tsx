@@ -42,6 +42,8 @@ import { UpdateToast } from "./components/updater/UpdateToast";
 const loadCommandPalette = () => import("./components/command-palette/CommandPalette");
 const loadAiEditModal = () => import("./components/ai/AiEditModal");
 const loadPreviewApp = () => import("./components/preview/PreviewApp");
+const loadWorkspaceNoteApp = () =>
+  import("./components/preview/WorkspaceNoteApp");
 
 const CommandPalette = lazy(() =>
   loadCommandPalette().then((module) => ({ default: module.CommandPalette })),
@@ -52,24 +54,83 @@ const AiEditModal = lazy(() =>
 const PreviewApp = lazy(() =>
   loadPreviewApp().then((module) => ({ default: module.PreviewApp })),
 );
+const WorkspaceNoteApp = lazy(() =>
+  loadWorkspaceNoteApp().then((module) => ({
+    default: module.WorkspaceNoteApp,
+  })),
+);
 
-type WindowMode = "folder" | "preview" | "print";
+type DetachedSource = "workspace-note" | "external-file";
+type DetachedPresentation = "interactive" | "print";
 
-// Detect preview/print mode from URL search params
-function getWindowMode(): {
-  mode: WindowMode;
-  filePath: string | null;
-} {
+function getWindowMode():
+  | { mode: "folder" }
+  | {
+      mode: "detached";
+      source: DetachedSource;
+      presentation: DetachedPresentation;
+      filePath: string | null;
+      noteId: string | null;
+    } {
   const params = new URLSearchParams(window.location.search);
   const rawMode = params.get("mode");
   const file = params.get("file");
-  const mode: WindowMode =
-    rawMode === "preview" || rawMode === "print" ? rawMode : "folder";
+  const noteId = params.get("note");
 
-  return {
-    mode: mode !== "folder" && file ? mode : "folder",
-    filePath: file,
-  };
+  if (rawMode === "preview" && file) {
+    return {
+      mode: "detached",
+      source: "external-file",
+      presentation: "interactive",
+      filePath: file,
+      noteId: null,
+    };
+  }
+
+  if (rawMode === "print" && file) {
+    return {
+      mode: "detached",
+      source: "external-file",
+      presentation: "print",
+      filePath: file,
+      noteId: null,
+    };
+  }
+
+  if (rawMode === "detached") {
+    const source = params.get("source");
+    const presentation = params.get("presentation");
+
+    if (
+      source === "workspace-note" &&
+      presentation === "interactive" &&
+      noteId
+    ) {
+      return {
+        mode: "detached",
+        source,
+        presentation,
+        filePath: null,
+        noteId,
+      };
+    }
+
+    if (
+      source === "external-file" &&
+      (presentation === "interactive" || presentation === "print") &&
+      file
+    ) {
+      return {
+        mode: "detached",
+        source,
+        presentation,
+        filePath: file,
+        noteId: null,
+      };
+    }
+  }
+
+  return { mode: "folder" };
 }
 
 type ViewState = "notes" | "settings";
@@ -785,9 +846,16 @@ async function showUpdateToast(): Promise<"update" | "no-update" | "error"> {
 export { showUpdateToast };
 
 function App() {
-  const { mode, filePath } = useMemo(getWindowMode, []);
-  const isPreviewMode = mode === "preview";
-  const isPrintMode = mode === "print";
+  const route = useMemo(getWindowMode, []);
+  const isDetachedMode = route.mode === "detached";
+  const isPreviewMode =
+    isDetachedMode &&
+    route.source === "external-file" &&
+    route.presentation === "interactive";
+  const isPrintMode =
+    isDetachedMode &&
+    route.source === "external-file" &&
+    route.presentation === "print";
 
   // Cmd/Ctrl+W — close window (works in both preview and folder mode)
   useEffect(() => {
@@ -818,23 +886,45 @@ function App() {
 
   // Check for app updates on startup (folder mode only)
   useEffect(() => {
-    if (mode !== "folder") return;
+    if (route.mode !== "folder") return;
     const timer = setTimeout(() => showUpdateToast(), 3000);
     return () => clearTimeout(timer);
-  }, [mode]);
+  }, [route]);
 
-  // Preview/print modes: lightweight editor without sidebar, search, git
-  if ((isPreviewMode || isPrintMode) && filePath) {
+  if (
+    route.mode === "detached" &&
+    route.source === "external-file" &&
+    route.filePath
+  ) {
     return (
       <ThemeProvider>
         <Toaster />
         <TooltipProvider>
           <Suspense fallback={<PreviewFallback />}>
             <PreviewApp
-              filePath={decodeURIComponent(filePath)}
-              mode={isPrintMode ? "print" : "preview"}
+              filePath={decodeURIComponent(route.filePath)}
+              presentation={route.presentation}
             />
           </Suspense>
+        </TooltipProvider>
+      </ThemeProvider>
+    );
+  }
+
+  if (
+    route.mode === "detached" &&
+    route.source === "workspace-note" &&
+    route.noteId
+  ) {
+    return (
+      <ThemeProvider>
+        <Toaster />
+        <TooltipProvider>
+          <NotesProvider>
+            <Suspense fallback={<PreviewFallback />}>
+              <WorkspaceNoteApp noteId={decodeURIComponent(route.noteId)} />
+            </Suspense>
+          </NotesProvider>
         </TooltipProvider>
       </ThemeProvider>
     );

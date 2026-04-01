@@ -136,3 +136,14 @@ export async function startFileWatcher(): Promise<void> {
 export async function previewNoteName(template: string): Promise<string> {
   return invoke("preview_note_name", { template });
 }
+
+export async function openNoteWindow(noteId: string): Promise<void> {
+  return invoke("open_note_window", { noteId });
+}
+
+export async function syncNoteWindowIdentity(
+  noteId: string,
+  title: string,
+): Promise<void> {
+  return invoke("sync_note_window_identity", { noteId, title });
+}

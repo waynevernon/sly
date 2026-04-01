@@ -509,6 +509,7 @@ pub struct AiExecutionResult {
 pub struct FileWatcherState {
     #[allow(dead_code)]
     watcher: RecommendedWatcher,
+    folder: PathBuf,
 }
 
 // Tantivy search index state
@@ -687,6 +688,7 @@ pub struct AppState {
     pub settings: RwLock<Settings>,    // per-folder settings (stored in .sly/)
     pub notes_cache: RwLock<HashMap<String, NoteMetadata>>,
     pub file_watcher: Mutex<Option<FileWatcherState>>,
+    pub note_windows: Mutex<HashMap<String, String>>,
     pub search_index: Mutex<Option<SearchIndex>>,
     pub debounce_map: Arc<Mutex<HashMap<PathBuf, Instant>>>,
 }
@@ -698,6 +700,7 @@ impl Default for AppState {
             settings: RwLock::new(Settings::default()),
             notes_cache: RwLock::new(HashMap::new()),
             file_watcher: Mutex::new(None),
+            note_windows: Mutex::new(HashMap::new()),
             search_index: Mutex::new(None),
             debounce_map: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -3165,7 +3168,12 @@ fn setup_file_watcher(
         .watch(&folder_path, RecursiveMode::Recursive)
         .map_err(|e| e.to_string())?;
 
-    Ok(FileWatcherState { watcher })
+    Ok(FileWatcherState {
+        watcher,
+        folder: folder_path
+            .canonicalize()
+            .unwrap_or(folder_path),
+    })
 }
 
 #[tauri::command]
@@ -3178,12 +3186,23 @@ fn start_file_watcher(app: AppHandle, state: State<AppState>) -> Result<(), Stri
             .ok_or("Notes folder not set")?
     };
 
+    let canonical_folder = PathBuf::from(&folder)
+        .canonicalize()
+        .unwrap_or_else(|_| PathBuf::from(&folder));
+
     // Clean up debounce map before starting
     cleanup_debounce_map(&state.debounce_map);
 
-    let watcher_state = setup_file_watcher(app, &folder, Arc::clone(&state.debounce_map))?;
-
     let mut file_watcher = state.file_watcher.lock().expect("file watcher mutex");
+    if file_watcher
+        .as_ref()
+        .map(|watcher_state| watcher_state.folder == canonical_folder)
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+
+    let watcher_state = setup_file_watcher(app, &folder, Arc::clone(&state.debounce_map))?;
     *file_watcher = Some(watcher_state);
 
     Ok(())
@@ -4427,6 +4446,70 @@ fn is_markdown_extension(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn format_sly_window_title(title: &str) -> String {
+    format!("{} — Sly", title)
+}
+
+fn focus_window_after_build(window: &tauri::WebviewWindow) {
+    let win = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let _ = win.set_focus();
+    });
+}
+
+fn register_note_window(state: &AppState, note_id: &str, label: &str) {
+    let mut note_windows = state.note_windows.lock().expect("note windows mutex");
+    note_windows.retain(|_, existing_label| existing_label != label);
+    note_windows.insert(note_id.to_string(), label.to_string());
+}
+
+fn clear_note_window_label(state: &AppState, label: &str) {
+    let mut note_windows = state.note_windows.lock().expect("note windows mutex");
+    note_windows.retain(|_, existing_label| existing_label != label);
+}
+
+fn detached_external_file_url(file_path: &str, presentation: &str) -> String {
+    let encoded_path = urlencoding::encode(file_path);
+    format!(
+        "index.html?mode=detached&source=external-file&presentation={}&file={}",
+        presentation, encoded_path
+    )
+}
+
+fn detached_workspace_note_url(note_id: &str) -> String {
+    let encoded_note = urlencoding::encode(note_id);
+    format!(
+        "index.html?mode=detached&source=workspace-note&presentation=interactive&note={}",
+        encoded_note
+    )
+}
+
+fn create_window_with_builder(
+    app: &AppHandle,
+    label: &str,
+    url: String,
+    title: String,
+    inner_size: (f64, f64),
+    min_inner_size: (f64, f64),
+) -> Result<tauri::WebviewWindow, String> {
+    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+        .title(title)
+        .inner_size(inner_size.0, inner_size.1)
+        .min_inner_size(min_inner_size.0, min_inner_size.1)
+        .resizable(true)
+        .decorations(true);
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+
+    builder
+        .build()
+        .map_err(|e| format!("Failed to create window: {}", e))
+}
+
 // Preview mode: create a lightweight window for editing a single file
 fn create_preview_window(app: &AppHandle, file_path: &str) -> Result<(), String> {
     use std::collections::hash_map::DefaultHasher;
@@ -4447,34 +4530,16 @@ fn create_preview_window(app: &AppHandle, file_path: &str) -> Result<(), String>
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "Preview".to_string());
-
-    let encoded_path = urlencoding::encode(file_path);
-    let url = format!("index.html?mode=preview&file={}", encoded_path);
-
-    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
-        .title(format!("{} — Sly", filename))
-        .inner_size(800.0, 600.0)
-        .min_inner_size(400.0, 300.0)
-        .resizable(true)
-        .decorations(true);
-
-    #[cfg(target_os = "macos")]
-    let builder = builder
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true);
-
-    let window = builder
-        .build()
-        .map_err(|e| format!("Failed to create preview window: {}", e))?;
-
-    // Focus the preview window so it appears on top of the main window.
-    // Use a short delay because during cold start the main window may steal
-    // focus after its WebView finishes loading.
-    let win = window.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        let _ = win.set_focus();
-    });
+    let url = detached_external_file_url(file_path, "interactive");
+    let window = create_window_with_builder(
+        app,
+        &label,
+        url,
+        format_sly_window_title(&filename),
+        (800.0, 600.0),
+        (400.0, 300.0),
+    )?;
+    focus_window_after_build(&window);
 
     Ok(())
 }
@@ -4495,33 +4560,97 @@ fn create_print_window(app: &AppHandle, file_path: &str) -> Result<(), String> {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "Print".to_string());
-
-    let encoded_path = urlencoding::encode(file_path);
-    let url = format!("index.html?mode=print&file={}", encoded_path);
-
-    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
-        .title(format!("{} — Print — Sly", filename))
-        .inner_size(900.0, 700.0)
-        .min_inner_size(480.0, 360.0)
-        .resizable(true)
-        .decorations(true);
-
-    #[cfg(target_os = "macos")]
-    let builder = builder
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true);
-
-    let window = builder
-        .build()
-        .map_err(|e| format!("Failed to create print window: {}", e))?;
-
-    let win = window.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        let _ = win.set_focus();
-    });
+    let url = detached_external_file_url(file_path, "print");
+    let window = create_window_with_builder(
+        app,
+        &label,
+        url,
+        format!("{} — Print — Sly", filename),
+        (900.0, 700.0),
+        (480.0, 360.0),
+    )?;
+    focus_window_after_build(&window);
 
     Ok(())
+}
+
+#[tauri::command]
+fn open_note_window(
+    app: AppHandle,
+    note_id: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    if let Some(existing_label) = state
+        .note_windows
+        .lock()
+        .expect("note windows mutex")
+        .get(&note_id)
+        .cloned()
+    {
+        if let Some(window) = app.get_webview_window(&existing_label) {
+            window.show().map_err(|e| e.to_string())?;
+            window.unminimize().map_err(|e| e.to_string())?;
+            window.set_focus().map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+    }
+
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let folder_path = PathBuf::from(&folder);
+    let file_path = abs_path_from_id(&folder_path, &note_id)?;
+    if !file_path.exists() {
+        return Err("Note not found".to_string());
+    }
+
+    let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let title = extract_title(&content);
+
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    note_id.hash(&mut hasher);
+    let label = format!("note-{:x}", hasher.finish());
+
+    if let Some(window) = app.get_webview_window(&label) {
+        register_note_window(&state, &note_id, &label);
+        window.show().map_err(|e| e.to_string())?;
+        window.unminimize().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let window = create_window_with_builder(
+        &app,
+        &label,
+        detached_workspace_note_url(&note_id),
+        format_sly_window_title(&title),
+        (900.0, 700.0),
+        (480.0, 360.0),
+    )?;
+    register_note_window(&state, &note_id, &label);
+    focus_window_after_build(&window);
+
+    Ok(())
+}
+
+#[tauri::command]
+fn sync_note_window_identity(
+    window: tauri::WebviewWindow,
+    note_id: String,
+    title: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    register_note_window(&state, &note_id, window.label());
+    window
+        .set_title(&format_sly_window_title(&title))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4871,6 +5000,7 @@ pub fn run() {
                 settings: RwLock::new(settings),
                 notes_cache: RwLock::new(HashMap::new()),
                 file_watcher: Mutex::new(None),
+                note_windows: Mutex::new(HashMap::new()),
                 search_index: Mutex::new(search_index),
                 debounce_map: Arc::new(Mutex::new(HashMap::new())),
             };
@@ -4936,6 +5066,12 @@ pub fn run() {
                         api.prevent_close();
                         let _ = window.hide();
                     }
+                }
+
+                tauri::WindowEvent::Destroyed => {
+                    let app = window.app_handle();
+                    let state = app.state::<AppState>();
+                    clear_note_window_label(&state, window.label());
                 }
 
                 // Handle drag-and-drop of .md files onto any window
@@ -5008,6 +5144,8 @@ pub fn run() {
             import_file_to_folder,
             open_file_preview,
             open_print_preview,
+            open_note_window,
+            sync_note_window_identity,
             install_cli,
             uninstall_cli,
             get_cli_status,

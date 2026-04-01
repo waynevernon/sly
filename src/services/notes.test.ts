@@ -88,4 +88,38 @@ describe("notes service", () => {
       },
     ]);
   });
+
+  it("routes open_note_window with the provided note id", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+
+    await notesService.openNoteWindow("alpha");
+
+    expect(calls).toEqual([
+      {
+        cmd: "open_note_window",
+        payload: { noteId: "alpha" },
+      },
+    ]);
+  });
+
+  it("routes sync_note_window_identity with the latest note identity", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+
+    await notesService.syncNoteWindowIdentity("alpha-renamed", "Alpha Renamed");
+
+    expect(calls).toEqual([
+      {
+        cmd: "sync_note_window_identity",
+        payload: { noteId: "alpha-renamed", title: "Alpha Renamed" },
+      },
+    ]);
+  });
 });

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FilePlusCorner } from "lucide-react";
+import { FilePlusCorner, SquareArrowOutUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -257,6 +257,21 @@ export function CommandPalette({
               onClose();
             } catch (error) {
               console.error("Failed to duplicate note:", error);
+            }
+          },
+        },
+        {
+          id: "open-note-window",
+          label: "Open Current Note in New Window",
+          icon: <SquareArrowOutUpRight className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: async () => {
+            try {
+              await flushPendingSave?.();
+              await notesService.openNoteWindow(currentNote.id);
+              onClose();
+            } catch (error) {
+              console.error("Failed to open note window:", error);
+              toast.error("Failed to open note in new window");
             }
           },
         },

@@ -438,6 +438,7 @@ interface EditorProps {
   focusMode?: boolean;
   printMode?: boolean;
   previewMode?: PreviewModeData;
+  showPinControl?: boolean;
   onEditorReady?: (editor: TiptapEditor | null) => void;
   onRegisterFlushPendingSave?: (
     flushPendingSave: (() => Promise<void>) | null,
@@ -450,6 +451,7 @@ export function Editor({
   paneMode = 2,
   focusMode,
   printMode = false,
+  showPinControl = true,
   onEditorReady,
   onRegisterFlushPendingSave,
   previewMode,
@@ -2001,7 +2003,7 @@ export function Editor({
               </div>
             </Tooltip>
           )}
-          {currentNote && pinNote && unpinNote && (
+          {showPinControl && currentNote && pinNote && unpinNote && (
             <Tooltip content={isPinned ? "Unpin note" : "Pin note"}>
               <IconButton
                 onClick={async () => {

@@ -10,6 +10,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
+import { SquareArrowOutUpRight } from "lucide-react";
+import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import {
@@ -186,6 +188,7 @@ interface NoteItemWithMenuProps extends NoteItemProps {
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
+  onOpenInNewWindow: (id: string) => void;
   onDelete: (ids: string[]) => void;
   onClearSelection: () => void;
   onFocusList: () => void;
@@ -205,6 +208,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onPin,
   onUnpin,
   onDuplicate,
+  onOpenInNewWindow,
   onDelete,
   onClearSelection,
   onFocusList,
@@ -313,6 +317,13 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
               >
                 <CopyIcon className="w-4 h-4 stroke-[1.6]" />
                 Duplicate
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onOpenInNewWindow(id)}
+              >
+                <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
+                Open in New Window
               </ContextMenu.Item>
               <ContextMenu.Item
                 className={menuItemClassName}
@@ -554,6 +565,14 @@ export function NoteList({
               onPin={pinNote}
               onUnpin={unpinNote}
               onDuplicate={duplicateNote}
+              onOpenInNewWindow={(noteId) => {
+                void notesService
+                  .openNoteWindow(noteId)
+                  .catch((error) => {
+                    console.error("Failed to open note window:", error);
+                    toast.error("Failed to open note in new window");
+                  });
+              }}
               onDelete={(ids) => {
                 void openDeleteDialogForNotes(ids);
               }}

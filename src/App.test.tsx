@@ -105,14 +105,20 @@ vi.mock("./components/ai/AiEditModal", () => ({
 vi.mock("./components/preview/PreviewApp", () => ({
   PreviewApp: ({
     filePath,
-    mode,
+    presentation,
   }: {
     filePath: string;
-    mode?: "preview" | "print";
+    presentation?: "interactive" | "print";
   }) => (
     <div>
-      preview-app:{mode ?? "preview"}:{filePath}
+      preview-app:{presentation ?? "interactive"}:{filePath}
     </div>
+  ),
+}));
+
+vi.mock("./components/preview/WorkspaceNoteApp", () => ({
+  WorkspaceNoteApp: ({ noteId }: { noteId: string }) => (
+    <div>workspace-note-app:{noteId}</div>
   ),
 }));
 
@@ -149,7 +155,7 @@ describe("App", () => {
     render(<App />);
 
     expect(
-      await screen.findByText("preview-app:preview:/tmp/preview-note.md"),
+      await screen.findByText("preview-app:interactive:/tmp/preview-note.md"),
     ).toBeInTheDocument();
     expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
@@ -167,6 +173,23 @@ describe("App", () => {
 
     expect(
       await screen.findByText("preview-app:print:/tmp/print-note.md"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText("editor")).not.toBeInTheDocument();
+    expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
+  });
+
+  it("renders detached workspace-note mode without folder mode shell", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?mode=detached&source=workspace-note&presentation=interactive&note=docs%2Falpha",
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("workspace-note-app:docs/alpha"),
     ).toBeInTheDocument();
     expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
