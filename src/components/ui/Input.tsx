@@ -13,7 +13,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-sm text-text",
           "ring-offset-bg file:border-0 file:bg-transparent file:text-sm file:font-medium",
           "placeholder:text-text-muted",
-          "focus-visible:border-accent",
           "disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
