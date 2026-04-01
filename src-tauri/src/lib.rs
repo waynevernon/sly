@@ -34,6 +34,7 @@ const MENU_SETTINGS_ID: &str = "app-settings";
 const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
 const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
 const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
+const MENU_TOGGLE_OUTLINE_PANEL_ID: &str = "view-toggle-outline-panel";
 const MENU_FOCUS_MODE_ID: &str = "view-focus-mode";
 const MENU_ABOUT_ID: &str = "app-about";
 const MENU_VIEW_GITHUB_ID: &str = "help-view-github";
@@ -129,6 +130,10 @@ fn default_folders_pane_width() -> u32 {
 
 fn default_notes_pane_width() -> u32 {
     304
+}
+
+fn default_right_panel_width() -> u32 {
+    260
 }
 
 fn default_editor_width() -> String {
@@ -259,6 +264,10 @@ pub struct AppearanceSettings {
     pub folders_pane_width: u32,
     #[serde(default = "default_notes_pane_width")]
     pub notes_pane_width: u32,
+    #[serde(default = "default_true")]
+    pub right_panel_visible: bool,
+    #[serde(default = "default_right_panel_width")]
+    pub right_panel_width: u32,
     #[serde(default)]
     pub custom_light_colors: Option<ThemeColors>,
     #[serde(default)]
@@ -284,6 +293,8 @@ impl Default for AppearanceSettings {
             pane_mode: default_pane_mode(),
             folders_pane_width: default_folders_pane_width(),
             notes_pane_width: default_notes_pane_width(),
+            right_panel_visible: default_true(),
+            right_panel_width: default_right_panel_width(),
             custom_light_colors: None,
             custom_dark_colors: None,
             confirm_deletions: true,
@@ -4747,6 +4758,10 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
         .accelerator("CmdOrCtrl+3")
         .build(app)?;
+    let outline_panel_item =
+        MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Outline Panel")
+            .accelerator("CmdOrCtrl+4")
+            .build(app)?;
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
@@ -4811,6 +4826,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &one_pane_item,
             &two_pane_item,
             &three_pane_item,
+            &outline_panel_item,
             &PredefinedMenuItem::separator(app)?,
             &focus_mode_item,
             &PredefinedMenuItem::fullscreen(app, None)?,
@@ -4908,6 +4924,10 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_VIEW_3_PANE_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "set-pane-mode", 3_i32);
+        }
+        MENU_TOGGLE_OUTLINE_PANEL_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "toggle-right-panel", ());
         }
         MENU_FOCUS_MODE_ID => {
             focus_main_window(app);
@@ -5320,14 +5340,33 @@ mod tests {
         assert_eq!(config.appearance.code_font, FontChoice::preset("jetbrains-mono"));
         assert_eq!(config.appearance.folders_pane_width, 240);
         assert_eq!(config.appearance.notes_pane_width, 304);
+        assert!(config.appearance.right_panel_visible);
+        assert_eq!(config.appearance.right_panel_width, 260);
 
         let rewritten: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(rewritten["schemaVersion"], serde_json::json!(1));
         assert_eq!(rewritten["appearance"]["foldersPaneWidth"], serde_json::json!(240));
         assert_eq!(rewritten["appearance"]["notesPaneWidth"], serde_json::json!(304));
+        assert_eq!(
+            rewritten["appearance"]["rightPanelVisible"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            rewritten["appearance"]["rightPanelWidth"],
+            serde_json::json!(260)
+        );
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn canonicalize_app_config_clamps_right_panel_width() {
+        let mut config = AppConfig::default();
+        config.appearance.right_panel_width = 999;
+
+        assert!(persistence::app_config::canonicalize_app_config(&mut config));
+        assert_eq!(config.appearance.right_panel_width, 420);
     }
 
     #[test]

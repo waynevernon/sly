@@ -25,9 +25,13 @@ const notesState = {
 const themeState = {
   interfaceZoom: 1,
   setInterfaceZoom: vi.fn(),
-  paneMode: 3 as const,
+  paneMode: 3 as 1 | 2 | 3,
   setPaneMode: vi.fn(),
   cyclePaneMode: vi.fn(),
+  rightPanelVisible: true,
+  rightPanelWidth: 260,
+  setRightPanelVisible: vi.fn(),
+  setRightPanelWidth: vi.fn(),
 };
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -73,6 +77,11 @@ vi.mock("./components/layout/WorkspaceNavigation", () => ({
       <button onClick={() => onOpenSettings()}>open settings</button>
     </div>
   ),
+}));
+
+vi.mock("./components/layout/RightPanel", () => ({
+  RightPanel: ({ visible }: { visible: boolean }) =>
+    visible ? <div>right-panel</div> : null,
 }));
 
 vi.mock("./components/editor/Editor", () => ({
@@ -126,6 +135,8 @@ describe("App", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
     vi.clearAllMocks();
+    themeState.paneMode = 3;
+    themeState.rightPanelVisible = true;
   });
 
   afterEach(() => {
@@ -137,6 +148,7 @@ describe("App", () => {
 
     expect(screen.getByText("workspace-navigation")).toBeInTheDocument();
     expect(screen.getByText("editor")).toBeInTheDocument();
+    expect(screen.getByText("right-panel")).toBeInTheDocument();
     expect(screen.queryByText("settings-page")).not.toBeInTheDocument();
     expect(screen.queryByText(/preview-app:/)).not.toBeInTheDocument();
 
@@ -194,5 +206,22 @@ describe("App", () => {
     expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
+  });
+
+  it("keeps the right panel visible in 1-pane layout when enabled", () => {
+    themeState.paneMode = 1;
+
+    render(<App />);
+
+    expect(screen.getByText("editor")).toBeInTheDocument();
+    expect(screen.getByText("right-panel")).toBeInTheDocument();
+  });
+
+  it("toggles the right panel with Cmd/Ctrl+4", () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "4", metaKey: true });
+
+    expect(themeState.setRightPanelVisible).toHaveBeenCalledWith(false);
   });
 });

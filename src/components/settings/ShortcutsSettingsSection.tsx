@@ -78,6 +78,11 @@ const shortcuts: Shortcut[] = [
     category: "Navigation",
   },
   {
+    keys: [mod, "4"],
+    description: "Toggle outline panel",
+    category: "Navigation",
+  },
+  {
     keys: [mod, "\\"],
     description: "Cycle workspace layout",
     category: "Navigation",

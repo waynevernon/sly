@@ -29,6 +29,8 @@ describe("ThemeContext", () => {
       paneMode: 3,
       foldersPaneWidth: 240,
       notesPaneWidth: 304,
+      rightPanelVisible: true,
+      rightPanelWidth: 260,
       confirmDeletions: true,
     });
     vi.mocked(notesService.updateAppearanceSettings).mockResolvedValue();
@@ -49,6 +51,8 @@ describe("ThemeContext", () => {
       paneMode: 2,
       foldersPaneWidth: 260,
       notesPaneWidth: 320,
+      rightPanelVisible: false,
+      rightPanelWidth: 300,
       confirmDeletions: false,
     });
 
@@ -63,6 +67,8 @@ describe("ThemeContext", () => {
     expect(result.current.paneMode).toBe(2);
     expect(result.current.foldersPaneWidth).toBe(260);
     expect(result.current.notesPaneWidth).toBe(320);
+    expect(result.current.rightPanelVisible).toBe(false);
+    expect(result.current.rightPanelWidth).toBe(300);
     expect(result.current.confirmDeletions).toBe(false);
   });
 
@@ -85,6 +91,27 @@ describe("ThemeContext", () => {
     const lastUpdate = updateCalls[updateCalls.length - 1]?.[0];
 
     expect(lastUpdate?.interfaceZoom).toBe(1.5);
+  });
+
+  it("clamps right panel width before persisting", async () => {
+    const { result } = renderHook(() => useTheme(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.rightPanelWidth).toBe(260);
+    });
+
+    act(() => {
+      result.current.setRightPanelWidth(999);
+    });
+
+    await waitFor(() => {
+      expect(notesService.updateAppearanceSettings).toHaveBeenCalled();
+    });
+
+    const updateCalls = vi.mocked(notesService.updateAppearanceSettings).mock.calls;
+    const lastUpdate = updateCalls[updateCalls.length - 1]?.[0];
+
+    expect(lastUpdate?.rightPanelWidth).toBe(420);
   });
 
   it("keeps pane mode unchanged when resetting typography and layout settings", async () => {

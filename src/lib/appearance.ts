@@ -41,6 +41,8 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   paneMode: 3,
   foldersPaneWidth: 240,
   notesPaneWidth: 304,
+  rightPanelVisible: true,
+  rightPanelWidth: 260,
   confirmDeletions: true,
 };
 

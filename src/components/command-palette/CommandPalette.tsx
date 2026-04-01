@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FilePlusCorner, SquareArrowOutUpRight } from "lucide-react";
+import { FilePlusCorner, PanelRight, SquareArrowOutUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -75,6 +75,8 @@ interface CommandPaletteProps {
   onOpenAiModal?: (provider: AiProvider) => void;
   focusMode?: boolean;
   onToggleFocusMode?: () => void;
+  rightPanelVisible?: boolean;
+  onToggleRightPanel?: () => void;
   editorRef?: React.RefObject<Editor | null>;
   flushPendingSave?: (() => Promise<void>) | null;
 }
@@ -86,6 +88,8 @@ export function CommandPalette({
   onOpenAiModal,
   focusMode,
   onToggleFocusMode,
+  rightPanelVisible = true,
+  onToggleRightPanel,
   editorRef,
   flushPendingSave,
 }: CommandPaletteProps) {
@@ -468,6 +472,16 @@ export function CommandPalette({
     // Focus mode and source toggle
     baseCommands.push(
       {
+        id: "toggle-outline-panel",
+        label: `${rightPanelVisible ? "Hide" : "Show"} Outline Panel`,
+        shortcut: `${mod} 4`,
+        icon: <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          onToggleRightPanel?.();
+          onClose();
+        },
+      },
+      {
         id: "focus-mode",
         label: focusMode ? "Exit Focus Mode" : "Enter Focus Mode",
         shortcut: `${mod} ${shift} Enter`,
@@ -574,6 +588,8 @@ export function CommandPalette({
     unpinNote,
     focusMode,
     onToggleFocusMode,
+    onToggleRightPanel,
+    rightPanelVisible,
     notesFolder,
   ]);
 

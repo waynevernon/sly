@@ -166,6 +166,8 @@ export interface AppearanceSettings {
   paneMode: PaneMode;
   foldersPaneWidth: number;
   notesPaneWidth: number;
+  rightPanelVisible: boolean;
+  rightPanelWidth: number;
   customLightColors?: ThemeColors | null;
   customDarkColors?: ThemeColors | null;
   confirmDeletions: boolean;

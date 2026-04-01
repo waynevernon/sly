@@ -139,6 +139,8 @@ pub(crate) fn old_default_appearance() -> AppearanceSettings {
         pane_mode: crate::default_pane_mode(),
         folders_pane_width: crate::default_folders_pane_width(),
         notes_pane_width: crate::default_notes_pane_width(),
+        right_panel_visible: crate::default_true(),
+        right_panel_width: crate::default_right_panel_width(),
         custom_light_colors: None,
         custom_dark_colors: None,
         confirm_deletions: crate::default_true(),
@@ -232,6 +234,8 @@ fn normalize_appearance_value(root: &mut Map<String, Value>) {
     normalize_i32_field(appearance, "paneMode");
     normalize_u32_field(appearance, "foldersPaneWidth");
     normalize_u32_field(appearance, "notesPaneWidth");
+    normalize_bool_field(appearance, "rightPanelVisible");
+    normalize_u32_field(appearance, "rightPanelWidth");
     normalize_bool_field(appearance, "confirmDeletions");
 }
 
@@ -292,6 +296,12 @@ fn canonicalize_appearance_settings(appearance: &mut AppearanceSettings) -> bool
     let notes_width = appearance.notes_pane_width.clamp(180, 560);
     if notes_width != appearance.notes_pane_width {
         appearance.notes_pane_width = notes_width;
+        changed = true;
+    }
+
+    let right_panel_width = appearance.right_panel_width.clamp(200, 420);
+    if right_panel_width != appearance.right_panel_width {
+        appearance.right_panel_width = right_panel_width;
         changed = true;
     }
 

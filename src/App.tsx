@@ -16,6 +16,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
 import { IconButton, TooltipProvider, Toaster } from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
+import { RightPanel } from "./components/layout/RightPanel";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
@@ -207,11 +208,17 @@ function AppContent() {
     paneMode,
     setPaneMode,
     cyclePaneMode,
+    rightPanelVisible,
+    rightPanelWidth,
+    setRightPanelVisible,
+    setRightPanelWidth,
   } = useTheme();
   const interfaceZoomRef = useRef(interfaceZoom);
   interfaceZoomRef.current = interfaceZoom;
   const paneModeRef = useRef(paneMode);
   paneModeRef.current = paneMode;
+  const rightPanelVisibleRef = useRef(rightPanelVisible);
+  rightPanelVisibleRef.current = rightPanelVisible;
   const currentNoteRef = useRef(currentNote);
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -224,6 +231,10 @@ function AppContent() {
     (() => Promise<void>) | null
   >(null);
   const editorRef = useRef<TiptapEditor | null>(null);
+  const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
+  const [editorScrollContainer, setEditorScrollContainer] =
+    useState<HTMLDivElement | null>(null);
+  const [editorSourceMode, setEditorSourceMode] = useState(false);
 
   // Refs for volatile state consumed by the keydown handler so the effect
   // doesn't need to re-register on every note selection or filter change.
@@ -306,12 +317,17 @@ function AppContent() {
     [setPaneMode],
   );
 
+  const toggleRightPanel = useCallback(() => {
+    setRightPanelVisible(!rightPanelVisibleRef.current);
+  }, [setRightPanelVisible]);
+
   useEffect(() => {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
     let unlistenOpenSettingsAbout: (() => void) | undefined;
     let unlistenSetPaneMode: (() => void) | undefined;
     let unlistenToggleFocusMode: (() => void) | undefined;
+    let unlistenToggleRightPanel: (() => void) | undefined;
 
     listen("open-settings", () => {
       openSettings();
@@ -344,14 +360,22 @@ function AppContent() {
       else unlistenToggleFocusMode = fn;
     });
 
+    listen("toggle-right-panel", () => {
+      toggleRightPanel();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenToggleRightPanel = fn;
+    });
+
     return () => {
       cancelled = true;
       unlistenOpenSettings?.();
       unlistenOpenSettingsAbout?.();
       unlistenSetPaneMode?.();
       unlistenToggleFocusMode?.();
+      unlistenToggleRightPanel?.();
     };
-  }, [applyPaneModeSelection, openSettings, toggleFocusMode]);
+  }, [applyPaneModeSelection, openSettings, toggleFocusMode, toggleRightPanel]);
 
   // Go back to command palette from AI modal
   const handleBackToPalette = useCallback(() => {
@@ -433,12 +457,13 @@ function AppContent() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInEditor = !!target.closest(".ProseMirror");
+      const target = e.target;
+      const targetElement = target instanceof Element ? target : null;
+      const isInEditor = !!targetElement?.closest(".ProseMirror");
       const isInInput =
-        target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+        targetElement?.tagName === "INPUT" || targetElement?.tagName === "TEXTAREA";
       const isInNoteList =
-        !!target.closest("[data-note-list]") ||
+        !!targetElement?.closest("[data-note-list]") ||
         !!document.activeElement?.closest("[data-note-list]");
       const isEditorEmpty =
         isInEditor && currentNoteRef.current?.content.trim() === "";
@@ -476,6 +501,13 @@ function AppContent() {
         return;
       }
 
+      // Cmd/Ctrl+4 - Toggle outline panel
+      if ((e.metaKey || e.ctrlKey) && e.key === "4") {
+        e.preventDefault();
+        toggleRightPanel();
+        return;
+      }
+
       // Block all other shortcuts when in settings view
       if (viewRef.current === "settings") {
         return;
@@ -507,7 +539,7 @@ function AppContent() {
       }
 
       // Let dialogs handle their own keyboard events (Tab, Enter, etc.)
-      if (target.closest("[role='dialog'], [role='alertdialog']")) {
+      if (targetElement?.closest("[role='dialog'], [role='alertdialog']")) {
         return;
       }
 
@@ -605,7 +637,7 @@ function AppContent() {
 
       // Arrow keys for note navigation
       // Skip if folder tree view is handling its own navigation
-      const isInFolderTree = !!(e.target as HTMLElement).closest("[data-folder-tree]");
+      const isInFolderTree = !!targetElement?.closest("[data-folder-tree]");
       if (
         displayItemsRef.current.length > 0 &&
         (e.key === "ArrowDown" || e.key === "ArrowUp") &&
@@ -660,7 +692,9 @@ function AppContent() {
       // Escape to blur editor and go back to note list
       if (e.key === "Escape" && isInEditor) {
         e.preventDefault();
-        (target as HTMLElement).blur();
+        if (targetElement instanceof HTMLElement) {
+          targetElement.blur();
+        }
         if (!focusModeRef.current && paneModeRef.current >= 2) {
           window.dispatchEvent(new CustomEvent("focus-note-list"));
         }
@@ -704,6 +738,7 @@ function AppContent() {
     clearNoteSelection,
     selectAllVisibleNotes,
     setPaneMode,
+    toggleRightPanel,
     openSettings,
     toggleFocusMode,
     setInterfaceZoom,
@@ -728,6 +763,8 @@ function AppContent() {
     return <FolderPicker />;
   }
 
+  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
+
   return (
     <>
       <div className="relative h-screen flex bg-bg overflow-hidden">
@@ -749,14 +786,29 @@ function AppContent() {
               paneMode={focusMode ? 1 : paneMode}
               onOpenSettings={openSettings}
             />
-            <Editor
-              paneMode={paneMode}
-              focusMode={focusMode}
-              onRegisterFlushPendingSave={setFlushPendingSave}
-              onEditorReady={(editor) => {
-                editorRef.current = editor;
-              }}
-            />
+            <div className="flex min-w-0 flex-1">
+              <Editor
+                paneMode={paneMode}
+                focusMode={focusMode}
+                rightPanelVisible={rightPanelVisible}
+                onToggleRightPanel={toggleRightPanel}
+                onSourceModeChange={setEditorSourceMode}
+                onRegisterScrollContainer={setEditorScrollContainer}
+                onRegisterFlushPendingSave={setFlushPendingSave}
+                onEditorReady={(editor) => {
+                  editorRef.current = editor;
+                  setEditorInstance(editor);
+                }}
+              />
+              <RightPanel
+                editor={editorInstance}
+                scrollContainer={editorScrollContainer}
+                hasNote={Boolean(currentNote)}
+                visible={showRightPanel}
+                width={rightPanelWidth}
+                onWidthChange={setRightPanelWidth}
+              />
+            </div>
           </>
         )}
       </div>
@@ -772,6 +824,8 @@ function AppContent() {
           }}
           focusMode={focusMode}
           onToggleFocusMode={toggleFocusMode}
+          rightPanelVisible={rightPanelVisible}
+          onToggleRightPanel={toggleRightPanel}
           editorRef={editorRef}
           flushPendingSave={flushPendingSave}
         />

@@ -74,7 +74,11 @@ interface ThemeContextType {
   setEditorMaxWidthLive: (value: string) => void;
   foldersPaneWidth: number;
   notesPaneWidth: number;
+  rightPanelVisible: boolean;
+  rightPanelWidth: number;
   setPaneWidths: (folders: number, notes: number) => void;
+  setRightPanelVisible: (visible: boolean) => void;
+  setRightPanelWidth: (width: number) => void;
   confirmDeletions: boolean;
   setConfirmDeletions: (v: boolean) => void;
 }
@@ -365,6 +369,23 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
+  const setRightPanelVisible = useCallback(
+    (visible: boolean) => {
+      updateAppearance((prev) => ({ ...prev, rightPanelVisible: visible }));
+    },
+    [updateAppearance],
+  );
+
+  const setRightPanelWidth = useCallback(
+    (width: number) => {
+      updateAppearance((prev) => ({
+        ...prev,
+        rightPanelWidth: Math.min(Math.max(Math.round(width), 200), 420),
+      }));
+    },
+    [updateAppearance],
+  );
+
   const setConfirmDeletions = useCallback(
     (v: boolean) => {
       updateAppearance((prev) => ({ ...prev, confirmDeletions: v }));
@@ -412,7 +433,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setEditorMaxWidthLive,
         foldersPaneWidth: appearanceSettings.foldersPaneWidth,
         notesPaneWidth: appearanceSettings.notesPaneWidth,
+        rightPanelVisible: appearanceSettings.rightPanelVisible,
+        rightPanelWidth: appearanceSettings.rightPanelWidth,
         setPaneWidths,
+        setRightPanelVisible,
+        setRightPanelWidth,
         confirmDeletions: appearanceSettings.confirmDeletions,
         setConfirmDeletions,
       }}
