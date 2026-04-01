@@ -22,7 +22,7 @@ jobs:
             args: ""
             rust_targets: ""
           - platform: windows-latest
-            args: ""
+            args: "--bundles nsis"
             rust_targets: ""
 
     runs-on: ${{ matrix.platform }}
