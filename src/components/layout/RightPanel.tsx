@@ -69,6 +69,7 @@ export function RightPanel({
   const outlineItemsRef = useRef<OutlineItem[]>([]);
   outlineItemsRef.current = outlineItems;
   liveWidthRef.current = liveWidth;
+  const outlineActive = visible && activeTab === "outline";
 
   useEffect(() => {
     if (!isResizing) {
@@ -135,7 +136,7 @@ export function RightPanel({
   }, [editor, scrollContainer]);
 
   useEffect(() => {
-    if (!editor) {
+    if (!editor || !outlineActive) {
       setOutlineItems([]);
       setActiveOutlineId(null);
       return;
@@ -160,10 +161,16 @@ export function RightPanel({
       editor.off("update", handleUpdate);
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
-  }, [editor, updateActiveFromSelection, updateActiveFromViewport, updateOutline]);
+  }, [
+    editor,
+    outlineActive,
+    updateActiveFromSelection,
+    updateActiveFromViewport,
+    updateOutline,
+  ]);
 
   useEffect(() => {
-    if (!scrollContainer || !visible) return;
+    if (!scrollContainer || !outlineActive) return;
 
     const handleScroll = () => {
       updateActiveFromViewport();
@@ -174,16 +181,16 @@ export function RightPanel({
     return () => {
       scrollContainer.removeEventListener("scroll", handleScroll);
     };
-  }, [scrollContainer, updateActiveFromViewport, visible]);
+  }, [outlineActive, scrollContainer, updateActiveFromViewport]);
 
   useEffect(() => {
-    if (!visible || !activeOutlineId) return;
+    if (!outlineActive || !activeOutlineId) return;
 
     const activeElement = outlineScrollRef.current?.querySelector<HTMLElement>(
       `[data-outline-id="${activeOutlineId}"]`,
     );
     activeElement?.scrollIntoView({ block: "nearest" });
-  }, [activeOutlineId, visible]);
+  }, [activeOutlineId, outlineActive]);
 
   const startResize = useCallback(
     (event: React.MouseEvent) => {

@@ -343,7 +343,52 @@ describe("RightPanel", () => {
     expect(screen.getByRole("button", { name: "Assistant" })).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(
-      screen.getByText("Ask about the current note, request a rewrite, or focus on the current section or selection."),
+      screen.getByPlaceholderText(
+        "Ask about the current note, request a rewrite, or focus on the current section or selection.",
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("does not attach outline listeners while the assistant tab is active", () => {
+    const doc = makeDoc();
+    const positions = extractOutlineItems(doc);
+    const nodeMap = new Map<number, HTMLElement>();
+
+    positions.forEach((item) => {
+      const element = document.createElement("h2");
+      element.getBoundingClientRect = () =>
+        ({
+          top: 0,
+          bottom: 20,
+          left: 0,
+          right: 100,
+          width: 100,
+          height: 20,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      nodeMap.set(item.pos, element);
+    });
+
+    const editor = new FakeEditor(doc, nodeMap);
+    const scrollContainer = document.createElement("div");
+
+    renderRightPanel(
+      <RightPanel
+        editor={editor as never}
+        scrollContainer={scrollContainer}
+        hasNote
+        visible
+        width={260}
+        activeTab="assistant"
+        onTabChange={vi.fn()}
+        onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
+      />,
+    );
+
+    expect(editor.listeners.update.size).toBe(0);
+    expect(editor.listeners.selectionUpdate.size).toBe(0);
   });
 });
