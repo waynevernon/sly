@@ -1,0 +1,45 @@
+name: Update Beta Updater Manifest
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  publish-beta-manifest:
+    if: github.event.release.prerelease == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download latest.json from the published beta release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "latest.json" \
+            --dir release-assets
+
+      - name: Publish manifest to updater-beta branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          publish_dir="$(mktemp -d)"
+          cp release-assets/latest.json "${publish_dir}/latest.json"
+
+          cd "${publish_dir}"
+          git init
+          git checkout -b updater-beta
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          git commit -m "Update beta manifest for ${{ github.event.release.tag_name }}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git push --force origin updater-beta

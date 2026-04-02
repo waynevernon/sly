@@ -30,6 +30,40 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Derive release metadata
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(node -p "require('./package.json').version")"
+
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v${version}"
+          fi
+
+          if [[ "${tag}" != "v${version}" ]]; then
+            echo "Tag ${tag} does not match package.json version v${version}" >&2
+            exit 1
+          fi
+
+          if [[ "${tag}" == *-* ]]; then
+            channel="beta"
+            prerelease="true"
+          else
+            channel="stable"
+            prerelease="false"
+          fi
+
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "channel=${channel}"
+            echo "prerelease=${prerelease}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Install system dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -56,6 +90,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Set updater channel
+        run: node scripts/set-updater-channel.mjs "${{ steps.release_meta.outputs.channel }}"
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -69,10 +106,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: "Sly v__VERSION__"
-          releaseBody: "https://github.com/waynevernon/sly/releases/tag/v__VERSION__"
+          tagName: ${{ steps.release_meta.outputs.tag }}
+          releaseName: "Sly v${{ steps.release_meta.outputs.version }}"
+          releaseBody: "https://github.com/waynevernon/sly/releases/tag/${{ steps.release_meta.outputs.tag }}"
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ steps.release_meta.outputs.prerelease }}
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

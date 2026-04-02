@@ -1,0 +1,89 @@
+name: Update Homebrew Tap
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  update-homebrew-tap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Derive cask metadata
+        id: release_meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_json="$(gh release view "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --json tagName,isPrerelease,assets)"
+          export RELEASE_JSON="${release_json}"
+
+          node <<'NODE' >> "${GITHUB_OUTPUT}"
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          const version = release.tagName.replace(/^v/, "");
+          const assetName = `Sly_${version}_universal.dmg`;
+          const asset = release.assets.find((candidate) => candidate.name === assetName);
+
+          if (!asset) {
+            console.error(`Missing release asset ${assetName}`);
+            process.exit(1);
+          }
+
+          if (!asset.digest || !asset.digest.startsWith("sha256:")) {
+            console.error(`Missing SHA-256 digest for ${assetName}`);
+            process.exit(1);
+          }
+
+          const channel = release.isPrerelease ? "beta" : "stable";
+          const caskToken = release.isPrerelease ? "sly@beta" : "sly";
+
+          console.log(`channel=${channel}`);
+          console.log(`version=${version}`);
+          console.log(`sha256=${asset.digest.slice("sha256:".length)}`);
+          console.log(`cask_token=${caskToken}`);
+NODE
+
+      - name: Clone tap repository
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/waynevernon/homebrew-sly.git" "${RUNNER_TEMP}/homebrew-sly"
+
+      - name: Update cask file
+        run: |
+          set -euo pipefail
+          node scripts/update-homebrew-cask.mjs \
+            --tap-dir "${RUNNER_TEMP}/homebrew-sly" \
+            --channel "${{ steps.release_meta.outputs.channel }}" \
+            --version "${{ steps.release_meta.outputs.version }}" \
+            --sha256 "${{ steps.release_meta.outputs.sha256 }}"
+
+      - name: Commit and push cask bump
+        working-directory: ${{ runner.temp }}/homebrew-sly
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet; then
+            echo "No tap changes to publish"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Casks/${{ steps.release_meta.outputs.cask_token }}.rb"
+          git commit -m "Update ${{ steps.release_meta.outputs.cask_token }} to v${{ steps.release_meta.outputs.version }}"
+          git push origin HEAD

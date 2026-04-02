@@ -35,7 +35,23 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 
 ### macOS
 
-Download the latest release from the [Releases](https://github.com/waynevernon/sly/releases) page, open the DMG, and drag Sly to Applications.
+Install stable from Homebrew:
+
+```bash
+brew tap waynevernon/sly
+brew install --cask waynevernon/sly/sly
+```
+
+Install the beta channel from Homebrew:
+
+```bash
+brew tap waynevernon/sly
+brew install --cask waynevernon/sly/sly@beta
+```
+
+Homebrew stable and beta installs conflict by design, so install one channel or the other.
+
+If you prefer a direct install, download the latest DMG from the [Releases](https://github.com/waynevernon/sly/releases) page, open it, and drag Sly to Applications.
 
 ### Windows
 

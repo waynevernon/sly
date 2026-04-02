@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "verify": "npm run lint && npm run test && npm run build",
     "preview": "vite preview",
+    "release:set-channel": "node scripts/set-updater-channel.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
