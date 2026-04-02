@@ -68,7 +68,17 @@ export type ThemePresetId =
   | "kanagawa"
   | "vscode-dark-modern"
   | "vesper"
-  | "poimandres";
+  | "poimandres"
+  | "bear-light"
+  | "bear-dark"
+  | "things-light"
+  | "things-dark"
+  | "obsidian-light"
+  | "obsidian-dark"
+  | "claude-light"
+  | "claude-dark"
+  | "evernote-light"
+  | "evernote-dark";
 
 export type FontPresetId =
   | "inter"
