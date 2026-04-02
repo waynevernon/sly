@@ -245,7 +245,7 @@ export function ListItem({
             {hasMeta && (
               <div
                 className={cn(
-                  "text-xs whitespace-nowrap shrink-0",
+                  "text-xs truncate max-w-full",
                   "text-text-muted",
                   isSelected ? "opacity-80" : "opacity-60"
                 )}
@@ -266,7 +266,7 @@ export function ListItem({
             {hasMeta && (
               <div
                 className={cn(
-                  "text-xs whitespace-nowrap shrink-0",
+                  "text-xs whitespace-nowrap shrink-0 truncate",
                   isSelected ? "text-text" : "text-text-muted"
                 )}
               >
