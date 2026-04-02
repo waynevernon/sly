@@ -1,14 +1,13 @@
 import { memo, useCallback } from "react";
 import { toast } from "sonner";
 import { useGit } from "../../context/GitContext";
-import { Button, IconButton, Tooltip } from "../ui";
+import { Button, IconButton, LoadingSpinner, Tooltip } from "../ui";
 import {
   GitBranchIcon,
   GitBranchDeletedIcon,
   GitCommitIcon,
   RefreshCwIcon,
   SettingsIcon,
-  SpinnerIcon,
 } from "../icons";
 import { cn } from "../../lib/utils";
 import { isMac, mod } from "../../lib/platform";
@@ -88,7 +87,7 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
 
     // Show spinner only when loading and no error to display
     if (isLoading && !lastError) {
-      return <SpinnerIcon className="w-3 h-3 text-text-muted animate-spin" />;
+      return <LoadingSpinner size="xs" tone="muted" />;
     }
 
     const hasChanges = status ? status.changedCount > 0 : false;
@@ -170,7 +169,7 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
                 aria-label="Sync"
               >
                 {isSyncing ? (
-                  <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+                  <LoadingSpinner size="lg" tone="inherit" />
                 ) : (
                   <span className="relative flex items-center">
                     <RefreshCwIcon
@@ -196,7 +195,7 @@ export const Footer = memo(function Footer({ onOpenSettings }: FooterProps) {
               title="Quick commit"
             >
               {isCommitting ? (
-                <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+                <LoadingSpinner size="lg" tone="inherit" />
               ) : (
                 <GitCommitIcon className="w-4.5 h-4.5 stroke-[1.5]" />
               )}

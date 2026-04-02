@@ -9,20 +9,20 @@ import type {
 import type { AiProvider } from "../../services/ai";
 import { cn } from "../../lib/utils";
 import {
-  Button,
   IconButton,
+  LoadingSpinner,
   Tooltip,
   menuItemClassName,
   menuSurfaceClassName,
 } from "../ui";
 import {
+  ArrowUpIcon,
   ChevronDownIcon,
   ClaudeIcon,
   CodexIcon,
   NoteIcon,
   OpenCodeIcon,
   OllamaIcon,
-  SpinnerIcon,
 } from "../icons";
 
 const PROVIDER_LABELS: Record<AiProvider, string> = {
@@ -83,19 +83,19 @@ function AssistantSelectMenu<T extends string>({
           type="button"
           aria-label={ariaLabel}
           className={cn(
-            "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-left text-sm text-text transition-colors",
+            "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-left text-sm leading-none text-text transition-colors",
             "hover:bg-bg-muted data-[state=open]:bg-bg-muted",
             triggerClassName,
           )}
         >
           <span className="min-w-0 flex-1 truncate">
-            <span className="inline-flex min-w-0 items-center gap-2 truncate">
+            <span className="inline-flex min-w-0 items-center gap-2 truncate leading-none">
               {selectedItem?.leading ? (
                 <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
                   {selectedItem.leading}
                 </span>
               ) : null}
-              <span className="truncate">{selectedItem?.label ?? value}</span>
+              <span className="truncate leading-none">{selectedItem?.label ?? value}</span>
             </span>
           </span>
           <ChevronDownIcon className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
@@ -119,7 +119,7 @@ function AssistantSelectMenu<T extends string>({
               <DropdownMenu.RadioItem
                 key={item.value}
                 value={item.value}
-                className={cn(menuItemClassName, "gap-2")}
+                className={cn(menuItemClassName, "gap-2 leading-none")}
               >
                 <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                   {item.value === value ? (
@@ -131,7 +131,7 @@ function AssistantSelectMenu<T extends string>({
                     {item.leading}
                   </span>
                 ) : null}
-                <span className="truncate">{item.label}</span>
+                <span className="truncate leading-none">{item.label}</span>
               </DropdownMenu.RadioItem>
             ))}
           </DropdownMenu.RadioGroup>
@@ -341,7 +341,7 @@ export function RightPanelAssistant({
   if (!providerCheckComplete) {
     return (
       <div className="flex flex-1 items-center justify-center gap-2 px-4 py-6 text-sm text-text-muted">
-        <SpinnerIcon className="h-4 w-4 animate-spin" />
+        <LoadingSpinner size="md" tone="muted" />
         Detecting installed providers...
       </div>
     );
@@ -485,16 +485,20 @@ export function RightPanelAssistant({
               />
             </div>
             <div className="shrink-0">
-              <Button
+              <IconButton
                 type="button"
-                size="sm"
+                size="md"
                 variant="primary"
                 disabled={thread.pending || thread.draft.trim().length === 0}
-                title="Send (Cmd/Ctrl+Enter)"
+                title={thread.pending ? "Working..." : "Send"}
                 onClick={onSubmit}
               >
-                {thread.pending ? "Working..." : "Send"}
-              </Button>
+                {thread.pending ? (
+                  <LoadingSpinner size="md" tone="inherit" />
+                ) : (
+                  <ArrowUpIcon className="h-4 w-4" />
+                )}
+              </IconButton>
             </div>
           </div>
         </div>

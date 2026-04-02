@@ -5,13 +5,11 @@ import { useNotes } from "../../context/NotesContext";
 import { useGit } from "../../context/GitContext";
 import { useTheme } from "../../context/ThemeContext";
 import * as notesService from "../../services/notes";
-import { Button } from "../ui";
-import { Input } from "../ui";
+import { Button, Input, LoadingSpinner } from "../ui";
 import {
   FolderIcon,
   FoldersIcon,
   ExternalLinkIcon,
-  SpinnerIcon,
   CloudPlusIcon,
   ChevronRightIcon,
 } from "../icons";
@@ -284,7 +282,7 @@ export function GeneralSettingsSection() {
           </div>
         ) : isLoading ? (
           <div className="ui-settings-panel p-4 flex items-center justify-center">
-            <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
+            <LoadingSpinner size="lg" tone="muted" />
           </div>
         ) : !status?.isRepo ? (
           <div className="ui-settings-panel p-4">
@@ -378,7 +376,7 @@ export function GeneralSettingsSection() {
                         >
                           {isPushing ? (
                             <>
-                              <SpinnerIcon className="w-3.25 h-3.25 mr-2 animate-spin" />
+                              <LoadingSpinner size="sm" tone="inherit" className="mr-2" />
                               Pushing...
                             </>
                           ) : (
@@ -421,7 +419,7 @@ export function GeneralSettingsSection() {
                         >
                           {isAddingRemote ? (
                             <>
-                              <SpinnerIcon className="w-3 h-3 mr-2 animate-spin" />
+                              <LoadingSpinner size="xs" tone="inherit" className="mr-2" />
                               Connecting...
                             </>
                           ) : (

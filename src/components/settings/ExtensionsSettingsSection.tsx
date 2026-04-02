@@ -1,9 +1,8 @@
 import { useEffect, useReducer, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import { Button } from "../ui";
+import { Button, LoadingSpinner } from "../ui";
 import {
-  SpinnerIcon,
   CheckIcon,
   ClaudeIcon,
   CodexIcon,
@@ -230,7 +229,7 @@ export function ExtensionsSettingsSection({
 
         {aiProvidersLoading ? (
           <div className="flex items-center gap-2 p-3">
-            <SpinnerIcon className="w-4 h-4 animate-spin text-text-muted" />
+            <LoadingSpinner size="md" tone="muted" />
             <span className="text-sm text-text-muted">
               Detecting installed providers...
             </span>
@@ -285,7 +284,7 @@ export function ExtensionsSettingsSection({
 
         {!aiWorkingDirectoryLoaded ? (
           <div className="ui-settings-panel p-4 flex items-center justify-center">
-            <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
+            <LoadingSpinner size="lg" tone="muted" />
           </div>
         ) : (
           <>
@@ -358,7 +357,7 @@ export function ExtensionsSettingsSection({
               </div>
             ) : cli.status === null ? (
               <div className="ui-settings-panel p-4 flex items-center justify-center">
-                <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
+                <LoadingSpinner size="lg" tone="muted" />
               </div>
             ) : cli.status.installed ? (
               <>
@@ -403,7 +402,7 @@ export function ExtensionsSettingsSection({
                 >
                   {cli.operating ? (
                     <>
-                      <SpinnerIcon className="w-3.25 h-3.25 mr-2 animate-spin" />
+                      <LoadingSpinner size="sm" tone="inherit" className="mr-2" />
                       Uninstalling...
                     </>
                   ) : (
@@ -424,7 +423,7 @@ export function ExtensionsSettingsSection({
                 >
                   {cli.operating ? (
                     <>
-                      <SpinnerIcon className="w-3.25 h-3.25 mr-2 animate-spin" />
+                      <LoadingSpinner size="sm" tone="inherit" className="mr-2" />
                       Installing...
                     </>
                   ) : (

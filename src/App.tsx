@@ -20,7 +20,12 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
-import { IconButton, TooltipProvider, Toaster } from "./components/ui";
+import {
+  IconButton,
+  LoadingSpinner,
+  TooltipProvider,
+  Toaster,
+} from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
@@ -30,9 +35,6 @@ import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
 import type { PaneMode, RightPanelTab } from "./types/note";
 import type { SettingsTab } from "./components/settings/SettingsPage";
-import {
-  SpinnerIcon,
-} from "./components/icons";
 import {
   check as checkForUpdate,
 } from "@tauri-apps/plugin-updater";
@@ -214,7 +216,7 @@ function FullScreenFallback({ label }: { label: string }) {
   return (
     <div className="h-screen flex items-center justify-center bg-bg-secondary">
       <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
-        <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+        <LoadingSpinner size="lg" className="text-current" />
         {label}
       </div>
     </div>
@@ -1487,7 +1489,7 @@ function AppContent() {
     return (
       <div className="h-screen flex items-center justify-center bg-bg-secondary">
         <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
-          <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+          <LoadingSpinner size="lg" className="text-current" />
           Initializing Sly...
         </div>
       </div>

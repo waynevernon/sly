@@ -73,6 +73,7 @@ import { plainTextFromMarkdown } from "../../lib/plainText";
 import {
   Button,
   IconButton,
+  LoadingSpinner,
   ToolbarButton,
   Tooltip,
   menuItemClassName,
@@ -102,7 +103,6 @@ import {
   BracketsIcon,
   ImageIcon,
   TableIcon,
-  SpinnerIcon,
   CircleCheckIcon,
   CopyIcon,
   DownloadIcon,
@@ -2051,7 +2051,7 @@ function EditorImpl({
             </>
           )}
           <div className="flex-1 flex items-center justify-center">
-            <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
+            <LoadingSpinner size="xl" tone="muted" />
           </div>
         </div>
       );
@@ -2064,7 +2064,7 @@ function EditorImpl({
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header" />
           <div className="flex-1 flex items-center justify-center">
-            <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
+            <LoadingSpinner size="xl" tone="muted" />
           </div>
         </div>
       );
@@ -2144,7 +2144,7 @@ function EditorImpl({
           ) : isSaving ? (
             <Tooltip content="Saving...">
               <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center">
-                <SpinnerIcon className="w-4.5 h-4.5 text-text-muted/40 stroke-[1.5] animate-spin" />
+                <LoadingSpinner size="lg" tone="subtle" />
               </div>
             </Tooltip>
           ) : (
@@ -2290,7 +2290,7 @@ function EditorImpl({
                 disabled={saveToFolderDisabled}
               >
                 {saveToFolderDisabled ? (
-                  <SpinnerIcon className="w-4.25 h-4.25 animate-spin" />
+                  <LoadingSpinner size="md" tone="inherit" />
                 ) : (
                   <FolderPlusIcon className="w-4.25 h-4.25 stroke-[1.6]" />
                 )}
