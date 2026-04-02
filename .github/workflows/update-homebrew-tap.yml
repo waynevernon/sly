@@ -4,6 +4,12 @@ name: Update Homebrew Tap
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Release tag to publish to the Homebrew tap
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -24,11 +30,17 @@ jobs:
         id: release_meta
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.inputs.tag_name || github.event.release.tag_name }}
         shell: bash
         run: |
           set -euo pipefail
 
-          release_json="$(gh release view "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --json tagName,isPrerelease,assets)"
+          if [[ -z "${RELEASE_TAG}" ]]; then
+            echo "Missing release tag"
+            exit 1
+          fi
+
+          release_json="$(gh release view "${RELEASE_TAG}" --repo "${{ github.repository }}" --json tagName,isPrerelease,assets)"
           export RELEASE_JSON="${release_json}"
 
           node <<'NODE' >> "${GITHUB_OUTPUT}"
