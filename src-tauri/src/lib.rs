@@ -377,6 +377,8 @@ pub struct AppConfig {
     )]
     pub schema_version: u32,
     pub notes_folder: Option<String>,
+    #[serde(rename = "aiWorkingDirectory")]
+    pub ai_working_directory: Option<String>,
     #[serde(default)]
     pub appearance: AppearanceSettings,
 }
@@ -386,6 +388,7 @@ impl Default for AppConfig {
         Self {
             schema_version: persistence::app_config::current_app_config_schema_version(),
             notes_folder: None,
+            ai_working_directory: None,
             appearance: AppearanceSettings::default(),
         }
     }
@@ -2676,6 +2679,32 @@ fn get_appearance_settings(state: State<AppState>) -> AppearanceSettings {
 }
 
 #[tauri::command]
+fn get_ai_working_directory(state: State<AppState>) -> Option<String> {
+    state
+        .app_config
+        .read()
+        .expect("app_config read lock")
+        .ai_working_directory
+        .clone()
+}
+
+#[tauri::command]
+fn set_ai_working_directory(
+    path: Option<String>,
+    app: AppHandle,
+    state: State<AppState>,
+) -> Result<Option<String>, String> {
+    let updated_config = {
+        let mut app_config = state.app_config.write().expect("app_config write lock");
+        app_config.ai_working_directory = path;
+        app_config.clone()
+    };
+
+    save_app_config(&app, &updated_config).map_err(|e| e.to_string())?;
+    Ok(updated_config.ai_working_directory)
+}
+
+#[tauri::command]
 fn update_appearance_settings(
     new_settings: AppearanceSettings,
     app: AppHandle,
@@ -4180,6 +4209,41 @@ fn validate_markdown_note_path(file_path: &str, notes_root: &Path) -> Result<Pat
     Ok(canonical)
 }
 
+fn resolve_ai_working_directory(
+    app_config: &AppConfig,
+    notes_root: &Path,
+) -> Result<PathBuf, String> {
+    let Some(path) = app_config.ai_working_directory.as_ref() else {
+        return Ok(notes_root.to_path_buf());
+    };
+
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Ok(notes_root.to_path_buf());
+    }
+
+    PathBuf::from(trimmed).canonicalize().map_err(|_| {
+        "AI reference folder is invalid. Clear or reselect it in Settings > Extensions.".to_string()
+    })
+}
+
+fn resolve_assistant_workspace(
+    note_path: &str,
+    app_config: &AppConfig,
+) -> Result<(PathBuf, PathBuf), String> {
+    let notes_folder = app_config
+        .notes_folder
+        .clone()
+        .ok_or("Notes folder not set")?;
+    let notes_root = PathBuf::from(&notes_folder)
+        .canonicalize()
+        .map_err(|_| "Invalid notes folder".to_string())?;
+    let _canonical_note = validate_markdown_note_path(note_path, &notes_root)?;
+    let execution_dir = resolve_ai_working_directory(app_config, &notes_root)?;
+
+    Ok((notes_root, execution_dir))
+}
+
 fn strip_json_code_fences(raw: &str) -> String {
     let trimmed = raw.trim();
     if !trimmed.starts_with("```") {
@@ -4305,17 +4369,13 @@ async fn ai_assistant_turn(
     request: AssistantTurnRequest,
     state: State<'_, AppState>,
 ) -> Result<AssistantTurnResult, String> {
-    let folder = {
-        let app_config = state.app_config.read().expect("app_config read lock");
-        app_config
-            .notes_folder
-            .clone()
-            .ok_or("Notes folder not set")?
-    };
-    let notes_root = PathBuf::from(&folder)
-        .canonicalize()
-        .map_err(|_| "Invalid notes folder".to_string())?;
-    let _canonical = validate_markdown_note_path(&request.note_path, &notes_root)?;
+    let app_config = state
+        .app_config
+        .read()
+        .expect("app_config read lock")
+        .clone();
+    let (_notes_root, execution_dir) =
+        resolve_assistant_workspace(&request.note_path, &app_config)?;
 
     let prompt = build_assistant_prompt(&request);
     let provider = request.provider.trim().to_lowercase();
@@ -4327,7 +4387,7 @@ async fn ai_assistant_turn(
             vec!["--print".to_string()],
             prompt,
             "Claude CLI not found. Please install it from https://claude.ai/code".to_string(),
-            Some(notes_root.to_string_lossy().to_string()),
+            Some(execution_dir.to_string_lossy().to_string()),
             None,
         )
         .await?,
@@ -4342,7 +4402,7 @@ async fn ai_assistant_turn(
             ],
             prompt,
             "Codex CLI not found. Please install it from https://github.com/openai/codex".to_string(),
-            Some(notes_root.to_string_lossy().to_string()),
+            Some(execution_dir.to_string_lossy().to_string()),
             None,
         )
         .await?,
@@ -4352,7 +4412,7 @@ async fn ai_assistant_turn(
             vec!["run".to_string(), "--".to_string(), prompt],
             String::new(),
             "OpenCode CLI not found. Please install it from https://opencode.ai".to_string(),
-            Some(notes_root.to_string_lossy().to_string()),
+            Some(execution_dir.to_string_lossy().to_string()),
             Some(vec![
                 (
                     "OPENCODE_PERMISSION".to_string(),
@@ -4400,7 +4460,7 @@ async fn ai_assistant_turn(
                 vec!["run".to_string(), model_name.clone()],
                 prompt,
                 "Ollama CLI not found. Please install it from https://ollama.com".to_string(),
-                Some(notes_root.to_string_lossy().to_string()),
+                Some(execution_dir.to_string_lossy().to_string()),
                 None,
             )
             .await?
@@ -5150,6 +5210,8 @@ pub fn run() {
             move_folder,
             get_settings,
             get_appearance_settings,
+            get_ai_working_directory,
+            set_ai_working_directory,
             update_appearance_settings,
             patch_settings,
             update_git_enabled,
@@ -5249,6 +5311,14 @@ mod tests {
             .expect("system time")
             .as_nanos();
         std::env::temp_dir().join(format!("sly-{prefix}-{unique}.json"))
+    }
+
+    fn temp_dir_path(prefix: &str) -> PathBuf {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("sly-{prefix}-{unique}"))
     }
 
     #[cfg(target_os = "macos")]
@@ -5394,6 +5464,63 @@ mod tests {
     }
 
     #[test]
+    fn load_app_config_trims_ai_working_directory_and_rewrites_empty_value() {
+        let path = temp_file_path("app-config-ai-working-directory");
+        std::fs::write(
+            &path,
+            r#"{
+  "schemaVersion": 1,
+  "notes_folder": "/notes",
+  "aiWorkingDirectory": "   ",
+  "appearance": {
+    "mode": "system",
+    "lightPresetId": "sly-light",
+    "darkPresetId": "sly-dark",
+    "uiFont": { "kind": "preset", "value": "inter" },
+    "noteFont": { "kind": "preset", "value": "atkinson-hyperlegible-next" },
+    "codeFont": { "kind": "preset", "value": "jetbrains-mono" },
+    "noteTypography": { "baseFontSize": 16, "boldWeight": 600, "lineHeight": 1.5 },
+    "textDirection": "auto",
+    "editorWidth": "normal",
+    "interfaceZoom": 1,
+    "paneMode": 3,
+    "foldersPaneWidth": 240,
+    "notesPaneWidth": 304,
+    "rightPanelVisible": true,
+    "rightPanelWidth": 260,
+    "rightPanelTab": "outline",
+    "confirmDeletions": true
+  }
+}"#,
+        )
+        .unwrap();
+
+        let config = persistence::app_config::load_app_config_from_path(&path);
+
+        assert_eq!(config.ai_working_directory, None);
+
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(rewritten["aiWorkingDirectory"], serde_json::Value::Null);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn canonicalize_app_config_trims_ai_working_directory() {
+        let mut config = AppConfig::default();
+        config.ai_working_directory = Some("  /tmp/reference  ".to_string());
+
+        assert!(persistence::app_config::canonicalize_app_config(
+            &mut config
+        ));
+        assert_eq!(
+            config.ai_working_directory,
+            Some("/tmp/reference".to_string())
+        );
+    }
+
+    #[test]
     fn canonicalize_app_config_clamps_right_panel_width() {
         let mut config = AppConfig::default();
         config.appearance.right_panel_width = 999;
@@ -5404,6 +5531,99 @@ mod tests {
         ));
         assert_eq!(config.appearance.right_panel_width, 420);
         assert_eq!(config.appearance.right_panel_tab, "outline");
+    }
+
+    #[test]
+    fn resolve_assistant_workspace_uses_notes_folder_when_no_override_is_set() {
+        let notes_root = temp_dir_path("notes-root");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        let note_path = notes_root.join("note.md");
+        std::fs::write(&note_path, "# Note\n").unwrap();
+
+        let mut config = AppConfig::default();
+        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
+
+        let (resolved_notes_root, execution_dir) =
+            resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
+
+        assert_eq!(resolved_notes_root, notes_root.canonicalize().unwrap());
+        assert_eq!(execution_dir, notes_root.canonicalize().unwrap());
+
+        let _ = std::fs::remove_file(note_path);
+        let _ = std::fs::remove_dir(notes_root);
+    }
+
+    #[test]
+    fn resolve_assistant_workspace_uses_custom_ai_working_directory_when_valid() {
+        let notes_root = temp_dir_path("notes-root");
+        let reference_root = temp_dir_path("reference-root");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        std::fs::create_dir_all(&reference_root).unwrap();
+        let note_path = notes_root.join("note.md");
+        std::fs::write(&note_path, "# Note\n").unwrap();
+
+        let mut config = AppConfig::default();
+        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
+        config.ai_working_directory = Some(reference_root.to_string_lossy().into_owned());
+
+        let (_resolved_notes_root, execution_dir) =
+            resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
+
+        assert_eq!(execution_dir, reference_root.canonicalize().unwrap());
+
+        let _ = std::fs::remove_file(note_path);
+        let _ = std::fs::remove_dir(notes_root);
+        let _ = std::fs::remove_dir(reference_root);
+    }
+
+    #[test]
+    fn resolve_assistant_workspace_rejects_invalid_ai_working_directory_override() {
+        let notes_root = temp_dir_path("notes-root");
+        let missing_reference_root = temp_dir_path("missing-reference-root");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        let note_path = notes_root.join("note.md");
+        std::fs::write(&note_path, "# Note\n").unwrap();
+
+        let mut config = AppConfig::default();
+        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
+        config.ai_working_directory = Some(missing_reference_root.to_string_lossy().into_owned());
+
+        let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
+            .expect_err("invalid override should fail");
+
+        assert!(
+            error.contains("AI reference folder is invalid"),
+            "unexpected error: {error}"
+        );
+
+        let _ = std::fs::remove_file(note_path);
+        let _ = std::fs::remove_dir(notes_root);
+    }
+
+    #[test]
+    fn resolve_assistant_workspace_still_rejects_note_outside_notes_folder_with_override() {
+        let notes_root = temp_dir_path("notes-root");
+        let reference_root = temp_dir_path("reference-root");
+        let external_root = temp_dir_path("external-root");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        std::fs::create_dir_all(&reference_root).unwrap();
+        std::fs::create_dir_all(&external_root).unwrap();
+        let note_path = external_root.join("note.md");
+        std::fs::write(&note_path, "# Note\n").unwrap();
+
+        let mut config = AppConfig::default();
+        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
+        config.ai_working_directory = Some(reference_root.to_string_lossy().into_owned());
+
+        let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
+            .expect_err("note outside notes folder should fail");
+
+        assert_eq!(error, "File must be within notes folder");
+
+        let _ = std::fs::remove_file(note_path);
+        let _ = std::fs::remove_dir(notes_root);
+        let _ = std::fs::remove_dir(reference_root);
+        let _ = std::fs::remove_dir(external_root);
     }
 
     #[test]

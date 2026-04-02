@@ -57,6 +57,7 @@ import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import { AdjacentListNormalizer } from "./AdjacentListNormalizer";
 import { Frontmatter } from "./Frontmatter";
+import { shouldShowPendingSelectionSpinner } from "./editorState";
 import { Emoji } from "./Emoji";
 import { EmojiSuggestion } from "./EmojiSuggestion";
 import { BlockMathEditor } from "./BlockMathEditor";
@@ -597,6 +598,12 @@ function EditorImpl({
   const pinNote = workspaceMode?.pinNote ?? notesCtx?.pinNote;
   const unpinNote = workspaceMode?.unpinNote ?? notesCtx?.unpinNote;
   const notes = workspaceMode?.notes ?? notesCtx?.notes;
+  const selectedNoteId =
+    workspaceMode?.selectedNoteId ?? notesCtx?.selectedNoteId ?? null;
+  const showPendingSelectionSpinner = shouldShowPendingSelectionSpinner(
+    selectedNoteId,
+    notes,
+  );
   const { textDirection } = useTheme();
   const [isSaving, setIsSaving] = useState(false);
   // Force re-render when selection changes to update toolbar active states
@@ -2051,7 +2058,7 @@ function EditorImpl({
     }
 
     // A note is selected but not yet loaded — show loading spinner to avoid empty state flash
-    if ((workspaceMode?.selectedNoteId ?? notesCtx?.selectedNoteId) !== null) {
+    if (showPendingSelectionSpinner) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>

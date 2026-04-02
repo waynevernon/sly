@@ -94,6 +94,16 @@ export async function getAppearanceSettings(): Promise<AppearanceSettings> {
   return invoke("get_appearance_settings");
 }
 
+export async function getAiWorkingDirectory(): Promise<string | null> {
+  return invoke("get_ai_working_directory");
+}
+
+export async function setAiWorkingDirectory(
+  path: string | null,
+): Promise<string | null> {
+  return invoke("set_ai_working_directory", { path });
+}
+
 export async function updateAppearanceSettings(
   settings: AppearanceSettings,
 ): Promise<void> {

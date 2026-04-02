@@ -310,7 +310,13 @@ function getScopedNotes(
   noteSortMode: NoteSortMode = DEFAULT_NOTE_SORT_MODE,
 ): NoteMetadata[] {
   if (scope.type === "all") {
-    return sortNoteMetadataList(notes, pinnedNoteIds, noteSortMode);
+    return sortNoteMetadataList(
+      showNotesFromSubfolders
+        ? notes
+        : notes.filter((note) => getParentFolderPath(note.id) === null),
+      pinnedNoteIds,
+      noteSortMode,
+    );
   }
 
   if (scope.type === "recent") {

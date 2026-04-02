@@ -40,7 +40,7 @@ describe("FoldersPane", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("shows the recent notes and note count toggles in the folders view menu", async () => {
+  it("shows the recent and note count toggles in the folders view menu", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
     const setShowRecentNotes = vi.fn();
@@ -62,7 +62,7 @@ describe("FoldersPane", () => {
     expect(screen.queryByRole("menuitemradio", { name: /Manual/i })).not.toBeInTheDocument();
 
     const toggle = screen.getByRole("menuitemcheckbox", {
-      name: /Recent Notes/i,
+      name: /Recent/i,
     });
     expect(toggle).toHaveAttribute("data-state", "checked");
 

@@ -88,7 +88,7 @@ describe("FolderTreeView", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("renders Recent Notes above All Notes and selects it via the dedicated action", async () => {
+  it("renders Recent above Notes and selects it via the dedicated action", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
     const selectRecentNotes = vi.fn();
@@ -118,11 +118,13 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Recent/i })).toBeInTheDocument();
     });
 
-    const recentButton = screen.getByRole("button", { name: /Recent Notes/i });
-    const allNotesButton = screen.getByRole("button", { name: /All Notes/i });
+    const recentButton = screen.getByRole("button", { name: /Recent/i });
+    const allNotesButton = screen.getByRole("button", {
+      name: /^Notes(?: \d+)?$/i,
+    });
 
     expect(
       recentButton.compareDocumentPosition(allNotesButton) &
@@ -147,11 +149,11 @@ describe("FolderTreeView", () => {
     const { rerender } = render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Recent/i })).toBeInTheDocument();
     });
 
     expect(
-      screen.getByRole("button", { name: /Recent Notes/i }).className,
+      screen.getByRole("button", { name: /Recent/i }).className,
     ).toMatch(/(^|\s)bg-bg-muted($|\s)/);
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
@@ -163,14 +165,17 @@ describe("FolderTreeView", () => {
     rerender(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
     });
 
     expect(
-      screen.getByRole("button", { name: /Recent Notes/i }).className,
+      screen.getByRole("button", { name: /Recent/i }).className,
     ).not.toMatch(/(^|\s)bg-bg-muted($|\s)/);
     expect(
-      screen.getByRole("button", { name: /All Notes/i }).parentElement?.className,
+      screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }).parentElement
+        ?.className,
     ).toContain("bg-bg-muted");
   });
 
@@ -186,11 +191,13 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
     });
 
     expect(
-      screen.queryByRole("button", { name: /Recent Notes/i }),
+      screen.queryByRole("button", { name: /Recent/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -231,23 +238,29 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
     });
 
     expect(screen.queryByText("1")).not.toBeInTheDocument();
     expect(screen.queryByText("2")).not.toBeInTheDocument();
   });
 
-  it("opens root folder creation from the All Notes context menu", async () => {
+  it("opens root folder creation from the Notes context menu", async () => {
     const user = userEvent.setup();
 
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
     });
 
-    fireEvent.contextMenu(screen.getByRole("button", { name: /All Notes/i }));
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+    );
 
     expect(screen.queryByRole("separator")).not.toBeInTheDocument();
 
@@ -258,7 +271,7 @@ describe("FolderTreeView", () => {
     });
   });
 
-  it("creates a root note from the All Notes context menu", async () => {
+  it("creates a root note from the Notes context menu", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();
     const createNote = vi.fn();
@@ -272,10 +285,14 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /All Notes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
     });
 
-    fireEvent.contextMenu(screen.getByRole("button", { name: /All Notes/i }));
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+    );
 
     await user.click(screen.getByRole("menuitem", { name: /^New Note$/i }));
 
@@ -570,11 +587,13 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Recent Notes/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Recent/i })).toBeInTheDocument();
     });
 
-    const recentButton = screen.getByRole("button", { name: /Recent Notes/i });
-    const allNotesButton = screen.getByRole("button", { name: /All Notes/i });
+    const recentButton = screen.getByRole("button", { name: /Recent/i });
+    const allNotesButton = screen.getByRole("button", {
+      name: /^Notes(?: \d+)?$/i,
+    });
     const recentBadge = recentButton.querySelector(".ui-count-badge");
     const allNotesBadge = allNotesButton.querySelector(".ui-count-badge");
 

@@ -106,7 +106,7 @@ describe("WorkspaceNavigation", () => {
     expect(revealFolder).toHaveBeenCalledWith("target");
   });
 
-  it("moves folders to root when dropped on All Notes", async () => {
+  it("moves folders to root when dropped on Notes", async () => {
     const notesContext = await import("../../context/NotesContext");
     const moveFolder = vi.fn();
 

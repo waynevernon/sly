@@ -114,6 +114,17 @@ pub(crate) fn canonicalize_app_config(config: &mut AppConfig) -> bool {
         }
     }
 
+    if let Some(ai_working_directory) = &config.ai_working_directory {
+        let trimmed = ai_working_directory.trim();
+        if trimmed.is_empty() {
+            config.ai_working_directory = None;
+            changed = true;
+        } else if trimmed != ai_working_directory {
+            config.ai_working_directory = Some(trimmed.to_string());
+            changed = true;
+        }
+    }
+
     changed |= canonicalize_appearance_settings(&mut config.appearance);
     changed
 }
@@ -196,6 +207,7 @@ fn canonicalize_app_config_value(value: &mut Value) {
     );
 
     normalize_optional_string_field(object, "notes_folder");
+    normalize_optional_string_field(object, "aiWorkingDirectory");
     normalize_appearance_value(object);
 }
 

@@ -41,6 +41,42 @@ describe("notes service", () => {
     ]);
   });
 
+  it("routes get_ai_working_directory without a payload", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return "/tmp/reference";
+    });
+
+    await expect(notesService.getAiWorkingDirectory()).resolves.toBe(
+      "/tmp/reference",
+    );
+
+    expect(calls).toEqual([
+      {
+        cmd: "get_ai_working_directory",
+        payload: {},
+      },
+    ]);
+  });
+
+  it("routes set_ai_working_directory with a nullable path", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return null;
+    });
+
+    await expect(notesService.setAiWorkingDirectory(null)).resolves.toBeNull();
+
+    expect(calls).toEqual([
+      {
+        cmd: "set_ai_working_directory",
+        payload: { path: null },
+      },
+    ]);
+  });
+
   it("routes preview_note_name with the template payload", async () => {
     mockIPC((cmd, payload) => {
       expect(cmd).toBe("preview_note_name");

@@ -630,6 +630,7 @@ export function FolderTreeView({
       showNotesFromSubfolders ? countNotesInFolder(folder) : folder.notes.length,
     [showNotesFromSubfolders],
   );
+  const rootNoteCount = showNotesFromSubfolders ? notes.length : tree.rootNotes.length;
 
   useEffect(() => {
     if (!hasLoadedFolders || !selectedFolderPath) {
@@ -995,7 +996,7 @@ export function FolderTreeView({
             <span className="flex items-center gap-2 min-w-0 flex-1">
               <History className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
               <span className="text-sm font-medium text-text truncate">
-                Recent Notes
+                Recent
               </span>
             </span>
             {showNoteCounts && (
@@ -1029,12 +1030,12 @@ export function FolderTreeView({
                     strokeWidth={1.7}
                   />
                   <span className="text-sm font-medium text-text truncate">
-                    All Notes
+                    Notes
                   </span>
                 </span>
                 {showNoteCounts && (
                   <FolderRowTrailing
-                    count={notes.length}
+                    count={rootNoteCount}
                     isActive={selectedScope.type === "all"}
                   />
                 )}

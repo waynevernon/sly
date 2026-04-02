@@ -81,7 +81,7 @@ export function FoldersPane({
                   <span className="text-xs leading-none">✓</span>
                 </DropdownMenu.ItemIndicator>
               </span>
-              <span>Recent Notes</span>
+              <span>Recent</span>
             </DropdownMenu.CheckboxItem>
             <DropdownMenu.CheckboxItem
               checked={showNoteCounts}

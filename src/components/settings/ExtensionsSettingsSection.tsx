@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { Button } from "../ui";
@@ -13,6 +13,7 @@ import {
 import { AI_PROVIDER_ORDER, type AiProvider } from "../../services/ai";
 import * as cliService from "../../services/cli";
 import type { CliStatus } from "../../services/cli";
+import * as notesService from "../../services/notes";
 
 type CliState = {
   status: CliStatus | null;
@@ -104,6 +105,11 @@ export function ExtensionsSettingsSection({
   onRefreshAiProviders,
 }: ExtensionsSettingsSectionProps) {
   const [cli, dispatchCli] = useReducer(cliReducer, cliInitialState);
+  const [aiWorkingDirectory, setAiWorkingDirectory] = useState<string | null>(
+    null,
+  );
+  const [aiWorkingDirectoryLoaded, setAiWorkingDirectoryLoaded] = useState(false);
+  const [aiWorkingDirectorySaving, setAiWorkingDirectorySaving] = useState(false);
 
   useEffect(() => {
     cliService
@@ -118,6 +124,67 @@ export function ExtensionsSettingsSection({
   useEffect(() => {
     void onRefreshAiProviders();
   }, [onRefreshAiProviders]);
+
+  useEffect(() => {
+    notesService
+      .getAiWorkingDirectory()
+      .then((path) => {
+        setAiWorkingDirectory(path);
+        setAiWorkingDirectoryLoaded(true);
+      })
+      .catch((err) => {
+        console.error("Failed to load AI reference folder:", err);
+        setAiWorkingDirectoryLoaded(true);
+      });
+  }, []);
+
+  const formatPath = (path: string | null): string => {
+    if (!path) return "Notes folder";
+    const maxLength = 56;
+    if (path.length <= maxLength) return path;
+    return `${path.slice(0, 24)}...${path.slice(-28)}`;
+  };
+
+  const saveAiWorkingDirectory = async (path: string | null) => {
+    setAiWorkingDirectorySaving(true);
+    try {
+      const savedPath = await notesService.setAiWorkingDirectory(path);
+      setAiWorkingDirectory(savedPath);
+      return savedPath;
+    } finally {
+      setAiWorkingDirectorySaving(false);
+    }
+  };
+
+  const handleSelectAiWorkingDirectory = async () => {
+    try {
+      const selected = await invoke<string | null>("open_folder_dialog", {
+        defaultPath: aiWorkingDirectory,
+      });
+
+      if (!selected) return;
+
+      await saveAiWorkingDirectory(selected);
+      toast.success("AI reference folder updated.");
+    } catch (err) {
+      console.error("Failed to update AI reference folder:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update AI reference folder",
+      );
+    }
+  };
+
+  const handleResetAiWorkingDirectory = async () => {
+    try {
+      await saveAiWorkingDirectory(null);
+      toast.success("AI reference folder reset to notes folder.");
+    } catch (err) {
+      console.error("Failed to reset AI reference folder:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to reset AI reference folder",
+      );
+    }
+  };
 
   const handleInstallCli = async () => {
     dispatchCli({ type: "operating" });
@@ -203,6 +270,68 @@ export function ExtensionsSettingsSection({
               );
             })}
           </div>
+        )}
+      </section>
+
+      <div className="ui-settings-separator" />
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-medium mb-0.5">AI Reference Folder</h2>
+        <p className="text-sm text-text-muted mb-4">
+          Sly runs AI CLIs from this folder. Custom folders can affect files
+          like <code className="ui-kbd font-mono">CLAUDE.md</code> and other
+          repo-local instructions.
+        </p>
+
+        {!aiWorkingDirectoryLoaded ? (
+          <div className="ui-settings-panel p-4 flex items-center justify-center">
+            <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin text-text-muted" />
+          </div>
+        ) : (
+          <>
+            <div className="ui-settings-panel p-4 space-y-3 mb-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text font-medium">Mode</span>
+                <span className="text-sm text-text-muted">
+                  {aiWorkingDirectory ? "Custom folder" : "Notes folder"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text font-medium">Path</span>
+                <span
+                  className="text-sm text-text-muted truncate max-w-72 text-right"
+                  title={aiWorkingDirectory || undefined}
+                >
+                  {formatPath(aiWorkingDirectory)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                onClick={handleSelectAiWorkingDirectory}
+                disabled={aiWorkingDirectorySaving}
+                variant="outline"
+                size="md"
+              >
+                {aiWorkingDirectorySaving
+                  ? "Saving..."
+                  : aiWorkingDirectory
+                    ? "Change Folder"
+                    : "Choose Custom Folder"}
+              </Button>
+              {aiWorkingDirectory ? (
+                <Button
+                  onClick={handleResetAiWorkingDirectory}
+                  disabled={aiWorkingDirectorySaving}
+                  variant="outline"
+                  size="md"
+                >
+                  Use Notes Folder
+                </Button>
+              ) : null}
+            </div>
+          </>
         )}
       </section>
 
