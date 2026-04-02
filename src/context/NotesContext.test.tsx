@@ -1564,6 +1564,82 @@ describe("NotesContext", () => {
     ]);
   });
 
+  it("shows pinned scope in note sort order and filters out unpinned notes", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/zulu",
+        title: "Zulu",
+        preview: "z",
+        modified: 9,
+        created: 9,
+      },
+      {
+        id: "docs/alpha",
+        title: "Alpha",
+        preview: "a",
+        modified: 1,
+        created: 1,
+      },
+      {
+        id: "drafts/mike",
+        title: "Mike",
+        preview: "m",
+        modified: 5,
+        created: 5,
+      },
+    ]);
+    vi.mocked(notesService.getSettings).mockResolvedValue(
+      createSettings({
+        pinnedNoteIds: ["docs/zulu", "docs/alpha"],
+        noteSortMode: "titleAsc",
+      }),
+    );
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.selectPinnedNotes();
+    });
+
+    expect(result.current.selectedScope).toEqual({ type: "pinned" });
+    expect(result.current.pinnedNotes.map((note) => note.id)).toEqual([
+      "docs/alpha",
+      "docs/zulu",
+    ]);
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "docs/alpha",
+      "docs/zulu",
+    ]);
+  });
+
+  it("defaults showPinnedNotes on and can hide the pinned scope", async () => {
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.showPinnedNotes).toBe(true);
+
+    act(() => {
+      result.current.selectPinnedNotes();
+    });
+
+    await act(async () => {
+      await result.current.setShowPinnedNotes(false);
+    });
+
+    expect(notesService.patchSettings).toHaveBeenCalledWith({
+      showPinnedNotes: false,
+    });
+    expect(result.current.showPinnedNotes).toBe(false);
+    expect(result.current.selectedScope).toEqual({ type: "all" });
+  });
+
   it("defaults showRecentNotes on and can hide the recent scope", async () => {
     const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
 

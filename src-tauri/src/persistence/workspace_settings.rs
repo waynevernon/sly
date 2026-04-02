@@ -69,6 +69,9 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(recent_note_ids) = patch.recent_note_ids {
         settings.recent_note_ids = recent_note_ids;
     }
+    if let Some(show_pinned_notes) = patch.show_pinned_notes {
+        settings.show_pinned_notes = show_pinned_notes;
+    }
     if let Some(show_recent_notes) = patch.show_recent_notes {
         settings.show_recent_notes = show_recent_notes;
     }
@@ -237,6 +240,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_optional_bool_field(object, "gitEnabled");
     normalize_optional_string_array_field(object, "pinnedNoteIds");
     normalize_optional_string_array_field(object, "recentNoteIds");
+    normalize_optional_bool_field(object, "showPinnedNotes");
     normalize_optional_bool_field(object, "showRecentNotes");
     normalize_bool_field(object, "showNoteCounts");
     normalize_bool_field(object, "showNotesFromSubfolders");

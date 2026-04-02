@@ -231,6 +231,34 @@ describe("NotesPane", () => {
     expect(screen.getByText("Alpha note")).toBeInTheDocument();
   });
 
+  it("renders the pinned notes heading and items", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "pinned" },
+        selectedFolderPath: null,
+        scopedNotes: [
+          {
+            id: "work/alpha",
+            title: "Alpha note",
+            preview: "planning",
+            modified: 2,
+            created: 2,
+          },
+        ],
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Pinned")).toBeInTheDocument();
+    expect(screen.getByText("Alpha note")).toBeInTheDocument();
+  });
+
   it("shows the recent notes empty state", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
@@ -249,6 +277,27 @@ describe("NotesPane", () => {
 
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No recent notes yet",
+    );
+  });
+
+  it("shows the pinned notes empty state", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "pinned" },
+        selectedFolderPath: null,
+        scopedNotes: [],
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("empty-message")).toHaveTextContent(
+      "No pinned notes yet",
     );
   });
 
@@ -335,9 +384,37 @@ describe("NotesPane", () => {
       screen.getByRole("button", { name: "Note List Options" }),
     );
 
-    expect(screen.getByText("Recent View")).toBeInTheDocument();
+    expect(screen.queryByText("Recent View")).not.toBeInTheDocument();
     expect(screen.getByText("View Options")).toBeInTheDocument();
     expect(screen.queryByText("Last Modified")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("separator")).toHaveLength(1);
+  });
+
+  it("shows pinned-note view options with sort controls but no subfolder toggle", async () => {
+    const user = userEvent.setup();
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedScope: { type: "pinned" },
+        selectedFolderPath: null,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Note List Options" }),
+    );
+
+    expect(screen.getByText("Sort Pinned")).toBeInTheDocument();
+    expect(screen.getByText("Last Modified")).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
     ).not.toBeInTheDocument();

@@ -36,6 +36,7 @@ import {
 } from "../ui";
 import {
   ChevronRightIcon,
+  PinIcon,
   SearchIcon,
   SearchOffIcon,
   TrashIcon,
@@ -105,6 +106,7 @@ const noteSortItems: SortMenuItem<NoteSortMode>[] = [
 ];
 
 function getScopeLabel(scope: NoteScope, path: string | null): string {
+  if (scope.type === "pinned") return "Pinned";
   if (scope.type === "recent") return "Recent";
   if (!path) return "Notes";
   const parts = path.split("/");
@@ -112,6 +114,7 @@ function getScopeLabel(scope: NoteScope, path: string | null): string {
 }
 
 function getSortMenuTitle(scope: NoteScope): string {
+  if (scope.type === "pinned") return "Sort Pinned";
   if (scope.type === "recent") return "Recent View";
   if (scope.type === "all") return "Sort Notes";
   return "Sort This Folder";
@@ -200,9 +203,11 @@ export function NotesPane() {
     : getScopeLabel(selectedScope, selectedFolderPath);
   const sortMenuTitle = getSortMenuTitle(selectedScope);
   const showSortItems = selectedScope.type !== "recent";
+  const scopeSupportsSubfolderToggle =
+    selectedScope.type === "all" || selectedScope.type === "folder";
   const noteCount = displayItems.length;
   const showSubfolderNotesInCurrentView =
-    selectedScope.type !== "recent" && showNotesFromSubfolders;
+    scopeSupportsSubfolderToggle && showNotesFromSubfolders;
   const selectedFolderAppearance = getFolderAppearance(
     folderAppearances,
     selectedFolderPath,
@@ -298,7 +303,9 @@ export function NotesPane() {
       <div className="ui-pane-header border-border/80">
         <div className="min-w-0 flex items-center gap-1.5">
           {!searchQuery.trim() && !hasBatchSelection && (
-            selectedScope.type === "recent" ? (
+            selectedScope.type === "pinned" ? (
+              <PinIcon className="w-4.5 h-4.5 text-text-muted/80 shrink-0 stroke-[1.7]" />
+            ) : selectedScope.type === "recent" ? (
               <History className="w-4.5 h-4.5 text-text-muted/80 shrink-0 stroke-[1.7]" />
             ) : (
               <FolderGlyph
@@ -359,18 +366,21 @@ export function NotesPane() {
                 <SortMenuButton
                   title="Note List Options"
                   menuTitle={sortMenuTitle}
+                  showMenuHeader={showSortItems}
                   value={noteSortMode}
                   items={showSortItems ? noteSortItems : []}
                   onChange={(nextMode) => {
                     void setNoteSortMode(nextMode);
                   }}
                 >
-                  <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  {showSortItems && (
+                    <DropdownMenu.Separator className={menuSeparatorClassName} />
+                  )}
                   <DropdownMenu.Label className={menuLabelClassName}>
                     View Options
                   </DropdownMenu.Label>
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
-                  {selectedScope.type !== "recent" && (
+                  {scopeSupportsSubfolderToggle && (
                     <>
                       <DropdownMenu.CheckboxItem
                         checked={showNotesFromSubfolders}
@@ -620,6 +630,8 @@ export function NotesPane() {
           emptyMessage={
             searchQuery.trim()
               ? "No results found"
+              : selectedScope.type === "pinned"
+                ? "No pinned notes yet"
               : selectedScope.type === "recent"
                 ? "No recent notes yet"
                 : selectedFolderPath

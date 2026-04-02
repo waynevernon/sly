@@ -408,6 +408,8 @@ pub struct Settings {
     pub pinned_note_ids: Option<Vec<String>>,
     #[serde(rename = "recentNoteIds")]
     pub recent_note_ids: Option<Vec<String>>,
+    #[serde(rename = "showPinnedNotes")]
+    pub show_pinned_notes: Option<bool>,
     #[serde(rename = "showRecentNotes")]
     pub show_recent_notes: Option<bool>,
     #[serde(rename = "showNoteCounts", default = "default_true")]
@@ -450,6 +452,7 @@ impl Default for Settings {
             git_enabled: None,
             pinned_note_ids: None,
             recent_note_ids: None,
+            show_pinned_notes: None,
             show_recent_notes: None,
             show_note_counts: true,
             show_notes_from_subfolders: false,
@@ -478,6 +481,8 @@ pub struct SettingsPatch {
     pub pinned_note_ids: Option<Option<Vec<String>>>,
     #[serde(default)]
     pub recent_note_ids: Option<Option<Vec<String>>>,
+    #[serde(default)]
+    pub show_pinned_notes: Option<Option<bool>>,
     #[serde(default)]
     pub show_recent_notes: Option<Option<bool>>,
     #[serde(default)]
@@ -5740,6 +5745,7 @@ mod tests {
   "gitEnabled": null,
   "pinnedNoteIds": null,
   "recentNoteIds": ["alpha"],
+  "showPinnedNotes": null,
   "showRecentNotes": null,
   "showNoteCounts": true,
   "showNotesFromSubfolders": false,
@@ -5934,6 +5940,7 @@ mod tests {
             git_enabled: Some(true),
             pinned_note_ids: Some(vec!["alpha".to_string()]),
             recent_note_ids: Some(vec!["alpha".to_string()]),
+            show_pinned_notes: Some(true),
             show_recent_notes: Some(true),
             show_note_counts: true,
             show_notes_from_subfolders: false,
@@ -5958,6 +5965,7 @@ mod tests {
             &mut settings,
             SettingsPatch {
                 recent_note_ids: Some(Some(vec!["beta".to_string(), "alpha".to_string()])),
+                show_pinned_notes: Some(Some(false)),
                 show_recent_notes: Some(Some(false)),
                 show_note_counts: Some(Some(false)),
                 show_notes_from_subfolders: Some(Some(true)),
@@ -5983,6 +5991,7 @@ mod tests {
             settings.recent_note_ids,
             Some(vec!["beta".to_string(), "alpha".to_string()])
         );
+        assert_eq!(settings.show_pinned_notes, Some(false));
         assert_eq!(settings.show_recent_notes, Some(false));
         assert!(!settings.show_note_counts);
         assert!(settings.show_notes_from_subfolders);
@@ -6012,6 +6021,7 @@ mod tests {
         assert_eq!(settings.git_enabled, None);
         assert_eq!(settings.pinned_note_ids, None);
         assert_eq!(settings.recent_note_ids, None);
+        assert_eq!(settings.show_pinned_notes, None);
         assert_eq!(settings.show_recent_notes, None);
         assert!(settings.show_note_counts);
         assert!(!settings.show_notes_from_subfolders);

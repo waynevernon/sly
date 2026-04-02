@@ -52,6 +52,7 @@ import {
   ChevronRightIcon,
   FolderPlusIcon,
   PencilIcon,
+  PinIcon,
   SwatchIcon,
   TrashIcon,
 } from "../icons";
@@ -546,6 +547,7 @@ export function FolderTreeView({
 } = {}) {
   const {
     notes,
+    pinnedNotes,
     recentNotes,
     knownFolders,
     hasLoadedFolders,
@@ -554,12 +556,14 @@ export function FolderTreeView({
     folderAppearances,
     folderSortMode,
     folderRevealRequest,
+    showPinnedNotes,
     showRecentNotes,
     showNoteCounts,
     showNotesFromSubfolders,
     selectedScope,
     selectedFolderPath,
     selectFolder,
+    selectPinnedNotes,
     selectRecentNotes,
     createNote,
     createNoteInFolder,
@@ -983,6 +987,30 @@ export function FolderTreeView({
         data-folder-tree
         className="flex flex-col gap-1 px-1.5 pb-1.5 outline-none"
       >
+        {showPinnedNotes && (
+          <button
+            type="button"
+            onClick={selectPinnedNotes}
+            className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              selectedScope.type === "pinned"
+                ? "bg-bg-muted"
+                : "hover:bg-bg-muted/80"
+            }`}
+          >
+            <span className="flex items-center gap-2 min-w-0 flex-1">
+              <PinIcon className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
+              <span className="text-sm font-medium text-text truncate">
+                Pinned
+              </span>
+            </span>
+            {showNoteCounts && (
+              <FolderRowTrailing
+                count={pinnedNotes.length}
+                isActive={selectedScope.type === "pinned"}
+              />
+            )}
+          </button>
+        )}
         {showRecentNotes && (
           <button
             type="button"

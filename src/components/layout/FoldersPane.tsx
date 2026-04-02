@@ -42,10 +42,12 @@ export function FoldersPane({
 }: FoldersPaneProps) {
   const {
     folderSortMode,
+    showPinnedNotes,
     showRecentNotes,
     showNoteCounts,
     setFolderSortMode,
     setNoteListViewOptions,
+    setShowPinnedNotes,
     setShowRecentNotes,
   } = useNotes();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,20 @@ export function FoldersPane({
               View
             </DropdownMenu.Label>
             <DropdownMenu.Separator className={menuSeparatorClassName} />
+            <DropdownMenu.CheckboxItem
+              checked={showPinnedNotes}
+              className={menuItemClassName}
+              onCheckedChange={(checked) => {
+                void setShowPinnedNotes(checked === true);
+              }}
+            >
+              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                <DropdownMenu.ItemIndicator>
+                  <span className="text-xs leading-none">✓</span>
+                </DropdownMenu.ItemIndicator>
+              </span>
+              <span>Pinned</span>
+            </DropdownMenu.CheckboxItem>
             <DropdownMenu.CheckboxItem
               checked={showRecentNotes}
               className={menuItemClassName}

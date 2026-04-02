@@ -53,6 +53,7 @@ function makeNotesHookValue(
 
   return {
     notes: [],
+    pinnedNotes: [],
     recentNotes: [],
     knownFolders: [],
     hasLoadedFolders: true,
@@ -61,12 +62,14 @@ function makeNotesHookValue(
     folderAppearances: {},
     folderSortMode: "nameAsc",
     folderRevealRequest: null,
+    showPinnedNotes: true,
     showRecentNotes: true,
     showNoteCounts: true,
     showNotesFromSubfolders: false,
     selectedScope: { type: "all" },
     selectedFolderPath: null,
     selectFolder: vi.fn(),
+    selectPinnedNotes: vi.fn(),
     selectRecentNotes: vi.fn(),
     revealFolder: vi.fn(),
     setShowRecentNotes: vi.fn(),
@@ -88,13 +91,23 @@ describe("FolderTreeView", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("renders Recent above Notes and selects it via the dedicated action", async () => {
+  it("renders Pinned and Recent above Notes and selects them via dedicated actions", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
+    const selectPinnedNotes = vi.fn();
     const selectRecentNotes = vi.fn();
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
+        pinnedNotes: [
+          {
+            id: "pinned/alpha",
+            title: "Pinned alpha",
+            preview: "preview",
+            modified: 3,
+            created: 3,
+          },
+        ],
         recentNotes: [
           {
             id: "alpha",
@@ -111,6 +124,7 @@ describe("FolderTreeView", () => {
             created: 2,
           },
         ],
+        selectPinnedNotes,
         selectRecentNotes,
       }),
     );
@@ -118,22 +132,31 @@ describe("FolderTreeView", () => {
     render(<FolderTreeView />);
 
     await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Pinned/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Recent/i })).toBeInTheDocument();
     });
 
+    const pinnedButton = screen.getByRole("button", { name: /Pinned/i });
     const recentButton = screen.getByRole("button", { name: /Recent/i });
     const allNotesButton = screen.getByRole("button", {
       name: /^Notes(?: \d+)?$/i,
     });
 
     expect(
+      pinnedButton.compareDocumentPosition(recentButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
       recentButton.compareDocumentPosition(allNotesButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
+    await user.click(pinnedButton);
     await user.click(recentButton);
 
+    expect(selectPinnedNotes).toHaveBeenCalledTimes(1);
     expect(selectRecentNotes).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
@@ -142,18 +165,18 @@ describe("FolderTreeView", () => {
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
-        selectedScope: { type: "recent" },
+        selectedScope: { type: "pinned" },
       }),
     );
 
     const { rerender } = render(<FolderTreeView />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Recent/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Pinned/i })).toBeInTheDocument();
     });
 
     expect(
-      screen.getByRole("button", { name: /Recent/i }).className,
+      screen.getByRole("button", { name: /Pinned/i }).className,
     ).toMatch(/(^|\s)bg-bg-muted($|\s)/);
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
@@ -171,12 +194,34 @@ describe("FolderTreeView", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: /Recent/i }).className,
+      screen.getByRole("button", { name: /Pinned/i }).className,
     ).not.toMatch(/(^|\s)bg-bg-muted($|\s)/);
     expect(
       screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }).parentElement
         ?.className,
     ).toContain("bg-bg-muted");
+  });
+
+  it("hides the pinned notes row when the setting is disabled", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        showPinnedNotes: false,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /Pinned/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the recent notes row when the setting is disabled", async () => {

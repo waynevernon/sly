@@ -45,9 +45,11 @@ interface FolderRevealRequest {
 interface NotesDataContextValue {
   notes: NoteMetadata[];
   scopedNotes: NoteMetadata[];
+  pinnedNotes: NoteMetadata[];
   recentNotes: NoteMetadata[];
   knownFolders: string[];
   hasLoadedFolders: boolean;
+  showPinnedNotes: boolean;
   showRecentNotes: boolean;
   showNoteCounts: boolean;
   showNotesFromSubfolders: boolean;
@@ -84,6 +86,7 @@ interface NotesActionsContextValue {
   clearNoteSelection: () => void;
   selectAllVisibleNotes: () => void;
   selectFolder: (path: string | null) => void;
+  selectPinnedNotes: () => void;
   selectRecentNotes: () => void;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
@@ -123,6 +126,7 @@ interface NotesActionsContextValue {
     showNoteListPreview?: boolean;
   }) => Promise<void>;
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
+  setShowPinnedNotes: (showPinnedNotes: boolean) => Promise<void>;
   setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
 }
 
@@ -319,6 +323,17 @@ function getScopedNotes(
     );
   }
 
+  if (scope.type === "pinned") {
+    const pinnedIdSet = new Set(normalizeNoteIds(pinnedNoteIds));
+    if (pinnedIdSet.size === 0) return [];
+
+    return sortNoteMetadataList(
+      notes.filter((note) => pinnedIdSet.has(note.id)),
+      pinnedNoteIds,
+      noteSortMode,
+    );
+  }
+
   if (scope.type === "recent") {
     const recentSet = sanitizeRecentNoteIds(recentNoteIds) ?? [];
     if (recentSet.length === 0) return [];
@@ -437,6 +452,7 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
 
   assignNullableField("pinnedNoteIds", current.pinnedNoteIds, next.pinnedNoteIds);
   assignNullableField("recentNoteIds", current.recentNoteIds, next.recentNoteIds);
+  assignField("showPinnedNotes", current.showPinnedNotes, next.showPinnedNotes);
   assignField("showRecentNotes", current.showRecentNotes, next.showRecentNotes);
   assignField("showNoteCounts", current.showNoteCounts, next.showNoteCounts);
   assignField(
@@ -548,6 +564,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const folderLoadRequestIdRef = useRef(0);
   const folderRevealVersionRef = useRef(0);
   const selectedFolderPath = getFolderPathFromScope(selectedScope);
+  const showPinnedNotes = settings.showPinnedNotes ?? true;
   const showRecentNotes = settings.showRecentNotes ?? true;
   const showNoteCounts = settings.showNoteCounts ?? true;
   const showNotesFromSubfolders = settings.showNotesFromSubfolders ?? false;
@@ -829,6 +846,21 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [persistSettings],
   );
 
+  const setShowPinnedNotes = useCallback(
+    async (showPinnedNotes: boolean) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        showPinnedNotes,
+      }));
+      setSelectedScope((prevScope) =>
+        !showPinnedNotes && prevScope.type === "pinned"
+          ? { type: "all" }
+          : prevScope,
+      );
+    },
+    [persistSettings],
+  );
+
   const setShowRecentNotes = useCallback(
     async (showRecentNotes: boolean) => {
       await persistSettings((currentSettings) => ({
@@ -917,6 +949,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     selectScope({ type: "recent" });
   }, [selectScope]);
 
+  const selectPinnedNotes = useCallback(() => {
+    selectScope({ type: "pinned" });
+  }, [selectScope]);
+
   const updateRecentNoteIds = useCallback(
     async (updater: (currentRecentNoteIds: string[]) => string[]) => {
       const currentRecentNoteIds = settingsRef.current.recentNoteIds ?? [];
@@ -984,7 +1020,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         );
       }
       // Expand parent folders so the note is visible in the tree
-      if (parentFolder && selectedScopeRef.current.type !== "recent") {
+      if (
+        parentFolder &&
+        selectedScopeRef.current.type !== "recent" &&
+        selectedScopeRef.current.type !== "pinned"
+      ) {
         revealFolder(parentFolder);
       }
       const note = await notesService.readNote(id);
@@ -2070,6 +2110,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder, refreshNotes]);
 
+  const pinnedNotes = useMemo(
+    () =>
+      getScopedNotes(
+        notes,
+        { type: "pinned" },
+        settings.recentNoteIds,
+        false,
+        settings.pinnedNoteIds,
+        settings.noteSortMode ?? DEFAULT_NOTE_SORT_MODE,
+      ),
+    [notes, settings.noteSortMode, settings.pinnedNoteIds, settings.recentNoteIds],
+  );
+
   const recentNotes = useMemo(
     () =>
       getScopedNotes(
@@ -2104,10 +2157,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    if (!showPinnedNotes && selectedScope.type === "pinned") {
+      setSelectedScope({ type: "all" });
+      return;
+    }
+
     if (!showRecentNotes && selectedScope.type === "recent") {
       setSelectedScope({ type: "all" });
     }
-  }, [selectedScope, showRecentNotes]);
+  }, [selectedScope, showPinnedNotes, showRecentNotes]);
 
   useEffect(() => {
     const visibleNoteIds = getVisibleNoteIds();
@@ -2165,9 +2223,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     () => ({
       notes,
       scopedNotes,
+      pinnedNotes,
       recentNotes,
       knownFolders,
       hasLoadedFolders,
+      showPinnedNotes,
       showRecentNotes,
       showNoteCounts,
       showNotesFromSubfolders,
@@ -2198,9 +2258,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [
       notes,
       scopedNotes,
+      pinnedNotes,
       recentNotes,
       knownFolders,
       hasLoadedFolders,
+      showPinnedNotes,
       showRecentNotes,
       showNoteCounts,
       showNotesFromSubfolders,
@@ -2238,6 +2300,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearNoteSelection,
       selectAllVisibleNotes,
       selectFolder,
+      selectPinnedNotes,
       selectRecentNotes,
       createNote,
       consumePendingNewNote,
@@ -2266,6 +2329,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setNoteListViewOptions,
       setFolderSortMode,
+      setShowPinnedNotes,
       setShowRecentNotes,
     }),
     [
@@ -2275,6 +2339,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearNoteSelection,
       selectAllVisibleNotes,
       selectFolder,
+      selectPinnedNotes,
       selectRecentNotes,
       createNote,
       consumePendingNewNote,
@@ -2303,6 +2368,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNoteSortMode,
       setNoteListViewOptions,
       setFolderSortMode,
+      setShowPinnedNotes,
       setShowRecentNotes,
     ]
   );

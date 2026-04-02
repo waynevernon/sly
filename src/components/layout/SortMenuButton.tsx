@@ -24,6 +24,7 @@ export interface SortMenuItem<T extends string> {
 interface SortMenuButtonProps<T extends string> {
   title: string;
   menuTitle?: string;
+  showMenuHeader?: boolean;
   value: T;
   items: SortMenuItem<T>[];
   onChange: (value: T) => void;
@@ -33,6 +34,7 @@ interface SortMenuButtonProps<T extends string> {
 export function SortMenuButton<T extends string>({
   title,
   menuTitle,
+  showMenuHeader = true,
   value,
   items,
   onChange,
@@ -90,34 +92,42 @@ export function SortMenuButton<T extends string>({
           }}
           className={`${menuSurfaceClassName} min-w-52 z-50`}
         >
-          <DropdownMenu.Label className={menuLabelClassName}>
-            {menuTitle ?? title}
-          </DropdownMenu.Label>
-          <DropdownMenu.Separator className={menuSeparatorClassName} />
-          <div className="flex flex-col gap-0.5">
-            {items.map((item) => {
-              const isActive = item.isActive(value);
-              return (
-                <DropdownMenu.Item
-                  key={item.key}
-                  className={cn(menuItemClassName, isActive && "bg-bg-muted")}
-                  onSelect={() => {
-                    onChange(item.getNextValue(value));
-                  }}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex h-4 w-4 shrink-0 items-center justify-center",
-                      isActive ? "text-text" : "text-text-muted",
-                    )}
-                  >
-                    {item.renderIcon(value, isActive)}
-                  </span>
-                  {item.label}
-                </DropdownMenu.Item>
-              );
-            })}
-          </div>
+          {showMenuHeader && (
+            <DropdownMenu.Label className={menuLabelClassName}>
+              {menuTitle ?? title}
+            </DropdownMenu.Label>
+          )}
+          {items.length > 0 && (
+            <>
+              {showMenuHeader && (
+                <DropdownMenu.Separator className={menuSeparatorClassName} />
+              )}
+              <div className="flex flex-col gap-0.5">
+                {items.map((item) => {
+                  const isActive = item.isActive(value);
+                  return (
+                    <DropdownMenu.Item
+                      key={item.key}
+                      className={cn(menuItemClassName, isActive && "bg-bg-muted")}
+                      onSelect={() => {
+                        onChange(item.getNextValue(value));
+                      }}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex h-4 w-4 shrink-0 items-center justify-center",
+                          isActive ? "text-text" : "text-text-muted",
+                        )}
+                      >
+                        {item.renderIcon(value, isActive)}
+                      </span>
+                      {item.label}
+                    </DropdownMenu.Item>
+                  );
+                })}
+              </div>
+            </>
+          )}
           {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

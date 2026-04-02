@@ -25,10 +25,12 @@ function makeNotesHookValue(
 ): NotesHookValue {
   return {
     folderSortMode: "nameAsc",
+    showPinnedNotes: true,
     showRecentNotes: true,
     showNoteCounts: true,
     setFolderSortMode: vi.fn(),
     setNoteListViewOptions: vi.fn(),
+    setShowPinnedNotes: vi.fn(),
     setShowRecentNotes: vi.fn(),
     ...overrides,
   } as never;
@@ -40,14 +42,19 @@ describe("FoldersPane", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("shows the recent and note count toggles in the folders view menu", async () => {
+  it("shows the pinned, recent, and note count toggles in the folders view menu", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
+    const setShowPinnedNotes = vi.fn();
     const setShowRecentNotes = vi.fn();
     const setNoteListViewOptions = vi.fn();
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
-      makeNotesHookValue({ setShowRecentNotes, setNoteListViewOptions }),
+      makeNotesHookValue({
+        setShowPinnedNotes,
+        setShowRecentNotes,
+        setNoteListViewOptions,
+      }),
     );
 
     render(
@@ -61,6 +68,14 @@ describe("FoldersPane", () => {
     expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.queryByRole("menuitemradio", { name: /Manual/i })).not.toBeInTheDocument();
 
+    const pinnedToggle = screen.getByRole("menuitemcheckbox", {
+      name: /Pinned/i,
+    });
+    expect(pinnedToggle).toHaveAttribute("data-state", "checked");
+
+    await user.click(pinnedToggle);
+    await user.click(screen.getByRole("button", { name: "Sort Folders" }));
+
     const toggle = screen.getByRole("menuitemcheckbox", {
       name: /Recent/i,
     });
@@ -70,6 +85,7 @@ describe("FoldersPane", () => {
     await user.click(screen.getByRole("button", { name: "Sort Folders" }));
     await user.click(screen.getByRole("menuitemcheckbox", { name: /Note Count/i }));
 
+    expect(setShowPinnedNotes).toHaveBeenCalledWith(false);
     expect(setShowRecentNotes).toHaveBeenCalledWith(false);
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
       showNoteCounts: false,
