@@ -725,9 +725,7 @@ export function NoteList({
             }}
           />
           <AlertDialogFooter>
-            <Button variant="outline" onClick={closeRenameDialog} disabled={isRenaming}>
-              Cancel
-            </Button>
+            <AlertDialogCancel disabled={isRenaming}>Cancel</AlertDialogCancel>
             <Button onClick={handleRenameConfirm} disabled={isRenaming}>
               {isRenaming ? "Renaming..." : "Rename"}
             </Button>
