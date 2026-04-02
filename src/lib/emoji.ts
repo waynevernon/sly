@@ -194,7 +194,7 @@ const emojiEntries = Object.entries(rawEmojiCatalog)
   .map(([fallbackEmoji, aliases]) => {
     const normalizedAliases = Array.from(
       new Set(
-        aliases.map(normalizeSearchValue).filter((alias) =>
+        aliases.map(normalizeRequestedShortcode).filter((alias) =>
           VALID_SHORTCODE_REGEX.test(alias),
         ),
       ),
