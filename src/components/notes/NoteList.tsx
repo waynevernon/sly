@@ -33,6 +33,7 @@ import {
   menuSurfaceClassName,
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
+import { sanitizeNoteFilename } from "../../lib/noteIdentity";
 import * as notesService from "../../services/notes";
 import { CopyIcon, PinIcon, PencilIcon, TrashIcon, XIcon } from "../icons";
 
@@ -397,6 +398,7 @@ export function NoteList({
     renameNote,
     pinNote,
     unpinNote,
+    notes,
     isLoading,
     noteListDateMode,
     noteListPreviewLines,
@@ -412,6 +414,7 @@ export function NoteList({
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [noteIdToRename, setNoteIdToRename] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [suggestedName, setSuggestedName] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -506,11 +509,14 @@ export function NoteList({
     (noteId: string) => {
       focusList();
       const baseName = getNoteLeaf(noteId);
+      const note = notes.find((n) => n.id === noteId);
+      const suggested = note ? sanitizeNoteFilename(note.title) : null;
       setNoteIdToRename(noteId);
       setRenameValue(baseName);
+      setSuggestedName(suggested !== baseName ? suggested : null);
       setRenameDialogOpen(true);
     },
-    [focusList],
+    [focusList, notes],
   );
 
   const closeRenameDialog = useCallback(() => {
@@ -518,6 +524,7 @@ export function NoteList({
     setRenameDialogOpen(false);
     setNoteIdToRename(null);
     setRenameValue("");
+    setSuggestedName(null);
   }, [isRenaming]);
 
   const handleRenameConfirm = useCallback(async () => {
@@ -711,22 +718,40 @@ export function NoteList({
               Choose a new file name. The `.md` extension is kept automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input
-            ref={renameInputRef}
-            value={renameValue}
-            onChange={(event) => setRenameValue(event.target.value)}
-            placeholder="Untitled"
-            disabled={isRenaming}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void handleRenameConfirm();
-              }
-            }}
-          />
+          <div className="flex flex-col gap-3">
+            <Input
+              ref={renameInputRef}
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              placeholder="Untitled"
+              disabled={isRenaming}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleRenameConfirm();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className={`self-start text-xs text-text-muted hover:text-text underline underline-offset-2 decoration-text-muted/50 hover:decoration-text text-left transition-colors truncate max-w-full ${suggestedName && suggestedName !== renameValue ? "visible" : "invisible pointer-events-none"}`}
+              onClick={() => suggestedName && setRenameValue(suggestedName)}
+            >
+              Use title: <span className="font-medium">{suggestedName ?? ""}</span>
+            </button>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRenaming}>Cancel</AlertDialogCancel>
-            <Button onClick={handleRenameConfirm} disabled={isRenaming}>
+            <Button
+              onClick={handleRenameConfirm}
+              disabled={
+                isRenaming ||
+                !renameValue.trim() ||
+                (noteIdToRename !== null &&
+                  (renameValue.trim() === getNoteLeaf(noteIdToRename) ||
+                    renameValue.trim() === `${getNoteLeaf(noteIdToRename)}.md`))
+              }
+            >
               {isRenaming ? "Renaming..." : "Rename"}
             </Button>
           </AlertDialogFooter>
