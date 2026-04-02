@@ -17,6 +17,7 @@ export { Checkbox } from "./Checkbox";
 export { CountBadge, type CountBadgeProps } from "./CountBadge";
 export { Input } from "./Input";
 export { InlineNameEditor } from "./InlineNameEditor";
+export { LoadingSpinner } from "./LoadingSpinner";
 export { Select } from "./Select";
 export { Toaster } from "./Toaster";
 export { DialogShell } from "./DialogShell";

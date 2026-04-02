@@ -43,6 +43,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   notesPaneWidth: 304,
   rightPanelVisible: true,
   rightPanelWidth: 260,
+  rightPanelTab: "outline",
   confirmDeletions: true,
 };
 

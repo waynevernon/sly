@@ -207,7 +207,8 @@ fn migrate_and_canonicalize_settings_value(original_value: Value) -> (Value, boo
     if canonicalize_settings(&mut settings) {
         migrated = true;
     }
-    let canonical_value = serde_json::to_value(&settings).unwrap_or_else(|_| Value::Object(Map::new()));
+    let canonical_value =
+        serde_json::to_value(&settings).unwrap_or_else(|_| Value::Object(Map::new()));
 
     if canonical_value != value {
         migrated = true;
@@ -243,11 +244,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_optional_string_field(object, "ollamaModel");
     normalize_folder_icons_field(object, "folderIcons");
     normalize_optional_string_array_field(object, "collapsedFolders");
-    normalize_string_enum_field(
-        object,
-        "noteListDateMode",
-        &["modified", "created", "off"],
-    );
+    normalize_string_enum_field(object, "noteListDateMode", &["modified", "created", "off"]);
     normalize_bool_field(object, "showNoteListFilename");
     normalize_bool_field(object, "showNoteListFolderPath");
     normalize_bool_field(object, "showNoteListPreview");

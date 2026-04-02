@@ -227,7 +227,7 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByText("Recent Notes")).toBeInTheDocument();
+    expect(screen.getByText("Recent")).toBeInTheDocument();
     expect(screen.getByText("Alpha note")).toBeInTheDocument();
   });
 
@@ -296,7 +296,7 @@ describe("NotesPane", () => {
     });
   });
 
-  it("uses folder-scoped wording for the root notes view", async () => {
+  it("shows the root notes view options for the Notes scope", async () => {
     const user = userEvent.setup();
 
     render(
@@ -309,10 +309,10 @@ describe("NotesPane", () => {
       screen.getByRole("button", { name: "Note List Options" }),
     );
 
-    expect(screen.getByText("Sort This Folder")).toBeInTheDocument();
+    expect(screen.getByText("Sort Notes")).toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows recent-note view options without folder or sort controls", async () => {
@@ -335,7 +335,7 @@ describe("NotesPane", () => {
       screen.getByRole("button", { name: "Note List Options" }),
     );
 
-    expect(screen.getByText("Recent Notes View")).toBeInTheDocument();
+    expect(screen.getByText("Recent View")).toBeInTheDocument();
     expect(screen.getByText("View Options")).toBeInTheDocument();
     expect(screen.queryByText("Last Modified")).not.toBeInTheDocument();
     expect(
@@ -416,6 +416,28 @@ describe("NotesPane", () => {
 
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
       "No notes in this folder or its subfolders",
+    );
+  });
+
+  it("shows the top-level root empty state when subfolders are hidden", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        scopedNotes: [],
+        selectedScope: { type: "all" },
+        selectedFolderPath: null,
+        showNotesFromSubfolders: false,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("empty-message")).toHaveTextContent(
+      "No notes at the top level",
     );
   });
 });

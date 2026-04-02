@@ -105,14 +105,15 @@ const noteSortItems: SortMenuItem<NoteSortMode>[] = [
 ];
 
 function getScopeLabel(scope: NoteScope, path: string | null): string {
-  if (scope.type === "recent") return "Recent Notes";
-  if (!path) return "All Notes";
+  if (scope.type === "recent") return "Recent";
+  if (!path) return "Notes";
   const parts = path.split("/");
   return parts[parts.length - 1];
 }
 
 function getSortMenuTitle(scope: NoteScope): string {
-  if (scope.type === "recent") return "Recent Notes View";
+  if (scope.type === "recent") return "Recent View";
+  if (scope.type === "all") return "Sort Notes";
   return "Sort This Folder";
 }
 
@@ -201,7 +202,7 @@ export function NotesPane() {
   const showSortItems = selectedScope.type !== "recent";
   const noteCount = displayItems.length;
   const showSubfolderNotesInCurrentView =
-    selectedScope.type === "folder" && showNotesFromSubfolders;
+    selectedScope.type !== "recent" && showNotesFromSubfolders;
   const selectedFolderAppearance = getFolderAppearance(
     folderAppearances,
     selectedFolderPath,
@@ -369,7 +370,7 @@ export function NotesPane() {
                     View Options
                   </DropdownMenu.Label>
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
-                  {selectedScope.type === "folder" && (
+                  {selectedScope.type !== "recent" && (
                     <>
                       <DropdownMenu.CheckboxItem
                         checked={showNotesFromSubfolders}
@@ -625,7 +626,9 @@ export function NotesPane() {
                 ? showSubfolderNotesInCurrentView
                   ? "No notes in this folder or its subfolders"
                   : "No notes in this folder"
-                : "No notes yet"
+                : showSubfolderNotesInCurrentView
+                  ? "No notes yet"
+                  : "No notes at the top level"
           }
         />
       </div>

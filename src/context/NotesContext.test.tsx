@@ -325,6 +325,53 @@ describe("NotesContext", () => {
     ]);
   });
 
+  it("keeps the root notes scope top-level-only unless notes from subfolders is enabled", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "alpha",
+        title: "Alpha",
+        preview: "",
+        modified: 3,
+        created: 3,
+      },
+      {
+        id: "docs/beta",
+        title: "Beta",
+        preview: "",
+        modified: 2,
+        created: 2,
+      },
+      {
+        id: "docs/reference/gamma",
+        title: "Gamma",
+        preview: "",
+        modified: 1,
+        created: 1,
+      },
+    ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.selectedScope).toEqual({ type: "all" });
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual(["alpha"]);
+
+    await act(async () => {
+      await result.current.setNoteListViewOptions({
+        showNotesFromSubfolders: true,
+      });
+    });
+
+    expect(result.current.scopedNotes.map((note) => note.id)).toEqual([
+      "alpha",
+      "docs/beta",
+      "docs/reference/gamma",
+    ]);
+  });
+
   it("keeps the active descendant note selected when folder scope includes subfolders", async () => {
     vi.mocked(notesService.listNotes).mockResolvedValue([
       {

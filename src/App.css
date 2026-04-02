@@ -577,6 +577,14 @@ body {
   background-color: var(--color-selection);
 }
 
+.ProseMirror .assistant-persisted-selection {
+  background-color: var(--color-selection);
+}
+
+.ProseMirror-focused .assistant-persisted-selection {
+  background-color: transparent;
+}
+
 /* Keep layout width stable when vertical scrollbar appears */
 .scrollbar-gutter-stable {
   scrollbar-gutter: stable;

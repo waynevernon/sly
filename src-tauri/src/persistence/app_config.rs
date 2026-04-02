@@ -5,8 +5,8 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use crate::{
     default_code_font, default_editor_width, default_note_base_font_size, default_note_font,
-    default_note_line_height, default_theme_mode, default_ui_font, AppConfig,
-    AppearanceSettings, FontChoice, NoteTypographySettings,
+    default_note_line_height, default_right_panel_tab, default_theme_mode, default_ui_font,
+    AppConfig, AppearanceSettings, FontChoice, NoteTypographySettings,
 };
 
 const CURRENT_APP_CONFIG_SCHEMA_VERSION: u32 = 1;
@@ -114,6 +114,17 @@ pub(crate) fn canonicalize_app_config(config: &mut AppConfig) -> bool {
         }
     }
 
+    if let Some(ai_working_directory) = &config.ai_working_directory {
+        let trimmed = ai_working_directory.trim();
+        if trimmed.is_empty() {
+            config.ai_working_directory = None;
+            changed = true;
+        } else if trimmed != ai_working_directory {
+            config.ai_working_directory = Some(trimmed.to_string());
+            changed = true;
+        }
+    }
+
     changed |= canonicalize_appearance_settings(&mut config.appearance);
     changed
 }
@@ -141,6 +152,7 @@ pub(crate) fn old_default_appearance() -> AppearanceSettings {
         notes_pane_width: crate::default_notes_pane_width(),
         right_panel_visible: crate::default_true(),
         right_panel_width: crate::default_right_panel_width(),
+        right_panel_tab: crate::default_right_panel_tab(),
         custom_light_colors: None,
         custom_dark_colors: None,
         confirm_deletions: crate::default_true(),
@@ -166,7 +178,8 @@ fn migrate_and_canonicalize_app_config_value(original_value: Value) -> (Value, b
     if canonicalize_app_config(&mut config) {
         migrated = true;
     }
-    let canonical_value = serde_json::to_value(&config).unwrap_or_else(|_| Value::Object(Map::new()));
+    let canonical_value =
+        serde_json::to_value(&config).unwrap_or_else(|_| Value::Object(Map::new()));
 
     if canonical_value != value {
         migrated = true;
@@ -194,6 +207,7 @@ fn canonicalize_app_config_value(value: &mut Value) {
     );
 
     normalize_optional_string_field(object, "notes_folder");
+    normalize_optional_string_field(object, "aiWorkingDirectory");
     normalize_appearance_value(object);
 }
 
@@ -217,12 +231,7 @@ fn normalize_appearance_value(root: &mut Map<String, Value>) {
     normalize_font_choice_field(appearance, "noteFont");
     normalize_font_choice_field(appearance, "codeFont");
     normalize_note_typography_value(appearance);
-    normalize_string_enum_field(
-        appearance,
-        "textDirection",
-        &["auto", "ltr", "rtl"],
-        None,
-    );
+    normalize_string_enum_field(appearance, "textDirection", &["auto", "ltr", "rtl"], None);
     normalize_string_enum_field(
         appearance,
         "editorWidth",
@@ -236,6 +245,12 @@ fn normalize_appearance_value(root: &mut Map<String, Value>) {
     normalize_u32_field(appearance, "notesPaneWidth");
     normalize_bool_field(appearance, "rightPanelVisible");
     normalize_u32_field(appearance, "rightPanelWidth");
+    normalize_string_enum_field(
+        appearance,
+        "rightPanelTab",
+        &["outline", "assistant"],
+        Some(default_right_panel_tab()),
+    );
     normalize_bool_field(appearance, "confirmDeletions");
 }
 
@@ -258,7 +273,11 @@ fn canonicalize_appearance_settings(appearance: &mut AppearanceSettings) -> bool
     let mut changed = false;
 
     changed |= migrate_appearance_defaults(appearance);
-    changed |= normalize_mode(&mut appearance.mode, &["light", "dark", "system"], default_theme_mode());
+    changed |= normalize_mode(
+        &mut appearance.mode,
+        &["light", "dark", "system"],
+        default_theme_mode(),
+    );
     changed |= normalize_font_choice(&mut appearance.ui_font, default_ui_font());
     changed |= normalize_font_choice(&mut appearance.note_font, default_note_font());
     changed |= normalize_font_choice(&mut appearance.code_font, default_code_font());
@@ -268,7 +287,10 @@ fn canonicalize_appearance_settings(appearance: &mut AppearanceSettings) -> bool
         default_editor_width(),
     );
 
-    if !float_matches(appearance.interface_zoom, clamp_zoom(appearance.interface_zoom)) {
+    if !float_matches(
+        appearance.interface_zoom,
+        clamp_zoom(appearance.interface_zoom),
+    ) {
         appearance.interface_zoom = clamp_zoom(appearance.interface_zoom);
         changed = true;
     }
@@ -304,6 +326,12 @@ fn canonicalize_appearance_settings(appearance: &mut AppearanceSettings) -> bool
         appearance.right_panel_width = right_panel_width;
         changed = true;
     }
+
+    changed |= normalize_mode(
+        &mut appearance.right_panel_tab,
+        &["outline", "assistant"],
+        default_right_panel_tab(),
+    );
 
     changed
 }

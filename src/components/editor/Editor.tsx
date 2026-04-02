@@ -39,6 +39,8 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { mod, alt, shift, isMac } from "../../lib/platform";
+import type { AssistantSelectionSnapshot } from "../../lib/assistant";
+import { markNoteOpenTiming } from "../../lib/noteOpenTiming";
 
 // Validate URL scheme for safe opening
 function isAllowedUrlScheme(url: string): boolean {
@@ -55,6 +57,7 @@ import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import { AdjacentListNormalizer } from "./AdjacentListNormalizer";
 import { Frontmatter } from "./Frontmatter";
+import { shouldShowPendingSelectionSpinner } from "./editorState";
 import { Emoji } from "./Emoji";
 import { EmojiSuggestion } from "./EmojiSuggestion";
 import { BlockMathEditor } from "./BlockMathEditor";
@@ -70,6 +73,7 @@ import { plainTextFromMarkdown } from "../../lib/plainText";
 import {
   Button,
   IconButton,
+  LoadingSpinner,
   ToolbarButton,
   Tooltip,
   menuItemClassName,
@@ -78,7 +82,7 @@ import {
 } from "../ui";
 import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
-import type { PaneMode, Settings } from "../../types/note";
+import type { NoteMetadata, PaneMode, Settings } from "../../types/note";
 import {
   BoldIcon,
   ItalicIcon,
@@ -99,7 +103,6 @@ import {
   BracketsIcon,
   ImageIcon,
   TableIcon,
-  SpinnerIcon,
   CircleCheckIcon,
   CopyIcon,
   DownloadIcon,
@@ -197,6 +200,38 @@ const SearchHighlight = Extension.create<SearchHighlightOptions>({
           decorations: (state) => {
             return searchHighlightPluginKey.getState(state);
           },
+        },
+      }),
+    ];
+  },
+});
+
+const persistedSelectionHighlightPluginKey = new PluginKey(
+  "persistedSelectionHighlight",
+);
+
+const PersistedSelectionHighlight = Extension.create({
+  name: "persistedSelectionHighlight",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: persistedSelectionHighlightPluginKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply: (tr, oldSet) => {
+            const set = oldSet.map(tr.mapping, tr.doc);
+            const meta = tr.getMeta(persistedSelectionHighlightPluginKey);
+            if (meta !== undefined) {
+              return meta.decorationSet;
+            }
+
+            return set;
+          },
+        },
+        props: {
+          decorations: (state) =>
+            persistedSelectionHighlightPluginKey.getState(state),
         },
       }),
     ];
@@ -439,6 +474,27 @@ export interface PreviewModeData {
   reload: () => Promise<void>;
 }
 
+export interface WorkspaceEditorData {
+  currentNote: {
+    id: string;
+    title: string;
+    content: string;
+    path: string;
+    modified: number;
+  } | null;
+  selectedNoteId: string | null;
+  notes: NoteMetadata[];
+  hasExternalChanges: boolean;
+  reloadVersion: number;
+  saveNote: (content: string, noteId?: string) => Promise<void>;
+  reloadCurrentNote: () => Promise<void>;
+  createNote: () => Promise<void>;
+  consumePendingNewNote: (id: string) => boolean;
+  pinNote: ((id: string) => Promise<void>) | undefined;
+  unpinNote: ((id: string) => Promise<void>) | undefined;
+  selectNote: ((id: string) => Promise<void>) | undefined;
+}
+
 interface EditorProps {
   paneMode?: PaneMode;
   focusMode?: boolean;
@@ -452,11 +508,30 @@ interface EditorProps {
   onRegisterFlushPendingSave?: (
     flushPendingSave: (() => Promise<void>) | null,
   ) => void;
+  assistantSelection?: AssistantSelectionSnapshot | null;
+  workspaceMode?: WorkspaceEditorData;
   onSaveToFolder?: () => void;
   saveToFolderDisabled?: boolean;
 }
 
-export function Editor({
+interface EditorImplProps extends EditorProps {
+  fallbackNotesCtx: ReturnType<typeof useOptionalNotes> | null;
+}
+
+function ContextBackedEditor(props: EditorProps) {
+  const notesCtx = useOptionalNotes();
+  return <EditorImpl {...props} fallbackNotesCtx={notesCtx} />;
+}
+
+export function Editor(props: EditorProps) {
+  if (props.workspaceMode || props.previewMode) {
+    return <EditorImpl {...props} fallbackNotesCtx={null} />;
+  }
+
+  return <ContextBackedEditor {...props} />;
+}
+
+function EditorImpl({
   paneMode = 2,
   focusMode,
   hasPinnedRightTitlebarControl = false,
@@ -466,14 +541,19 @@ export function Editor({
   onSourceModeChange,
   onRegisterScrollContainer,
   onRegisterFlushPendingSave,
+  assistantSelection,
   previewMode,
+  workspaceMode,
   onSaveToFolder,
   saveToFolderDisabled,
-}: EditorProps) {
-  // Always call the hook (rules of hooks), but it returns null outside NotesProvider
-  const notesCtx = useOptionalNotes();
+  fallbackNotesCtx,
+}: EditorImplProps) {
+  const notesCtx = fallbackNotesCtx;
 
   const currentNote = useMemo(() => {
+    if (workspaceMode) {
+      return workspaceMode.currentNote;
+    }
     if (!previewMode) return notesCtx?.currentNote ?? null;
     if (previewMode.content === null) return null;
     return {
@@ -483,33 +563,47 @@ export function Editor({
       path: previewMode.filePath,
       modified: previewMode.modified,
     };
-  }, [previewMode, notesCtx?.currentNote]);
+  }, [previewMode, workspaceMode, notesCtx?.currentNote]);
 
-  const notesSaveNote = notesCtx?.saveNote;
   const saveNote = useMemo(
     () =>
       previewMode
         ? async (content: string, _noteId?: string) => {
             await previewMode.save(content);
           }
-        : notesSaveNote!,
-    [previewMode, notesSaveNote]
+        : workspaceMode
+          ? workspaceMode.saveNote
+          : notesCtx!.saveNote,
+    [previewMode, workspaceMode, notesCtx]
   );
 
-  const createNote = notesCtx?.createNote;
-  const consumePendingNewNote = notesCtx?.consumePendingNewNote;
+  const createNote = workspaceMode?.createNote ?? notesCtx?.createNote;
+  const consumePendingNewNote =
+    workspaceMode?.consumePendingNewNote ?? notesCtx?.consumePendingNewNote;
   const hasExternalChanges = previewMode
     ? previewMode.hasExternalChanges
-    : notesCtx!.hasExternalChanges;
+    : workspaceMode
+      ? workspaceMode.hasExternalChanges
+      : notesCtx!.hasExternalChanges;
   const reloadCurrentNote = previewMode
     ? previewMode.reload
-    : notesCtx!.reloadCurrentNote;
+    : workspaceMode
+      ? workspaceMode.reloadCurrentNote
+      : notesCtx!.reloadCurrentNote;
   const reloadVersion = previewMode
     ? previewMode.reloadVersion
-    : notesCtx!.reloadVersion;
-  const pinNote = notesCtx?.pinNote;
-  const unpinNote = notesCtx?.unpinNote;
-  const notes = notesCtx?.notes;
+    : workspaceMode
+      ? workspaceMode.reloadVersion
+      : notesCtx!.reloadVersion;
+  const pinNote = workspaceMode?.pinNote ?? notesCtx?.pinNote;
+  const unpinNote = workspaceMode?.unpinNote ?? notesCtx?.unpinNote;
+  const notes = workspaceMode?.notes ?? notesCtx?.notes;
+  const selectedNoteId =
+    workspaceMode?.selectedNoteId ?? notesCtx?.selectedNoteId ?? null;
+  const showPendingSelectionSpinner = shouldShowPendingSelectionSpinner(
+    selectedNoteId,
+    notes,
+  );
   const { textDirection } = useTheme();
   const [isSaving, setIsSaving] = useState(false);
   // Force re-render when selection changes to update toolbar active states
@@ -555,8 +649,8 @@ export function Editor({
   // Stable refs for wikilink click handler (avoids re-registering listener on every notes change)
   const notesRef = useRef(notes);
   notesRef.current = notes;
-  const notesCtxRef = useRef(notesCtx);
-  notesCtxRef.current = notesCtx;
+  const selectNoteRef = useRef(workspaceMode?.selectNote ?? notesCtx?.selectNote);
+  selectNoteRef.current = workspaceMode?.selectNote ?? notesCtx?.selectNote;
 
   // Keep ref in sync with current note ID
   currentNoteIdRef.current = currentNote?.id ?? null;
@@ -1073,6 +1167,7 @@ export function Editor({
       Emoji,
       AdjacentListNormalizer,
       Markdown.configure({}),
+      PersistedSelectionHighlight,
       SearchHighlight.configure({
         matches: [],
         currentIndex: 0,
@@ -1229,6 +1324,39 @@ export function Editor({
     onSourceModeChange?.(effectiveSourceMode);
   }, [effectiveSourceMode, onSourceModeChange]);
 
+  const updatePersistedSelectionDecorations = useCallback(
+    (
+      selection: AssistantSelectionSnapshot | null | undefined,
+      currentEditor: TiptapEditor | null,
+    ) => {
+      if (!currentEditor) {
+        return;
+      }
+
+      const { state } = currentEditor;
+      const from = selection ? Math.max(0, selection.from) : 0;
+      const to = selection ? Math.min(selection.to, state.doc.content.size) : 0;
+      const decorationSet =
+        from < to
+          ? DecorationSet.create(state.doc, [
+              Decoration.inline(from, to, {
+                class: "assistant-persisted-selection",
+              }),
+            ])
+          : DecorationSet.empty;
+
+      const tr = state.tr.setMeta(persistedSelectionHighlightPluginKey, {
+        decorationSet,
+      });
+      currentEditor.view.dispatch(tr);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    updatePersistedSelectionDecorations(assistantSelection, editor);
+  }, [assistantSelection, editor, updatePersistedSelectionDecorations]);
+
   // Sync notes list into editor storage for wikilink autocomplete
   useEffect(() => {
     if (!editor || !notes) return;
@@ -1301,7 +1429,7 @@ export function Editor({
             (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
           );
           if (note) {
-            notesCtxRef.current?.selectNote(note.id);
+            selectNoteRef.current?.(note.id);
           } else {
             toast.info(`Note "${noteTitle}" does not exist yet`);
           }
@@ -1394,6 +1522,7 @@ export function Editor({
         } else {
           editor.commands.setContent(currentNote.content);
         }
+        markNoteOpenTiming(currentNote.id, "editor content set");
         isLoadingRef.current = false;
         return;
       }
@@ -1427,6 +1556,7 @@ export function Editor({
     } else {
       editor.commands.setContent(currentNote.content);
     }
+    markNoteOpenTiming(currentNote.id, "editor content set");
 
     // Scroll to top after content is set (must be after setContent to work reliably)
     scrollContainerRef.current?.scrollTo(0, 0);
@@ -1441,6 +1571,7 @@ export function Editor({
 
       // Scroll again in RAF to ensure it takes effect after DOM updates
       scrollContainerRef.current?.scrollTo(0, 0);
+      markNoteOpenTiming(loadingNoteId, "editor paint");
 
       isLoadingRef.current = false;
 
@@ -1920,20 +2051,20 @@ export function Editor({
             </>
           )}
           <div className="flex-1 flex items-center justify-center">
-            <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
+            <LoadingSpinner size="xl" tone="muted" />
           </div>
         </div>
       );
     }
 
     // A note is selected but not yet loaded — show loading spinner to avoid empty state flash
-    if (notesCtx?.selectedNoteId) {
+    if (showPendingSelectionSpinner) {
       return (
         <div className="flex-1 flex flex-col bg-bg">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header" />
           <div className="flex-1 flex items-center justify-center">
-            <SpinnerIcon className="w-6 h-6 text-text-muted animate-spin" />
+            <LoadingSpinner size="xl" tone="muted" />
           </div>
         </div>
       );
@@ -2013,7 +2144,7 @@ export function Editor({
           ) : isSaving ? (
             <Tooltip content="Saving...">
               <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center">
-                <SpinnerIcon className="w-4.5 h-4.5 text-text-muted/40 stroke-[1.5] animate-spin" />
+                <LoadingSpinner size="lg" tone="subtle" />
               </div>
             </Tooltip>
           ) : (
@@ -2159,7 +2290,7 @@ export function Editor({
                 disabled={saveToFolderDisabled}
               >
                 {saveToFolderDisabled ? (
-                  <SpinnerIcon className="w-4.25 h-4.25 animate-spin" />
+                  <LoadingSpinner size="md" tone="inherit" />
                 ) : (
                   <FolderPlusIcon className="w-4.25 h-4.25 stroke-[1.6]" />
                 )}

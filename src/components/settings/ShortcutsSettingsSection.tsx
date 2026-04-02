@@ -79,7 +79,7 @@ const shortcuts: Shortcut[] = [
   },
   {
     keys: [mod, "4"],
-    description: "Toggle outline panel",
+    description: "Toggle right panel",
     category: "Navigation",
   },
   {
@@ -134,7 +134,7 @@ const shortcuts: Shortcut[] = [
   },
   {
     keys: [mod, alt, "3"],
-    description: "Go to Extensions settings tab",
+    description: "Go to Assistant & CLI settings tab",
     category: "Settings",
   },
   {

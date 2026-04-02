@@ -33,6 +33,7 @@ import {
   type FolderAppearanceMap,
 } from "../lib/folderIcons";
 import { rewriteFolderPathList } from "../lib/folderTree";
+import { markNoteOpenTiming, startNoteOpenTiming } from "../lib/noteOpenTiming";
 
 interface FolderRevealRequest {
   path: string;
@@ -309,7 +310,13 @@ function getScopedNotes(
   noteSortMode: NoteSortMode = DEFAULT_NOTE_SORT_MODE,
 ): NoteMetadata[] {
   if (scope.type === "all") {
-    return sortNoteMetadataList(notes, pinnedNoteIds, noteSortMode);
+    return sortNoteMetadataList(
+      showNotesFromSubfolders
+        ? notes
+        : notes.filter((note) => getParentFolderPath(note.id) === null),
+      pinnedNoteIds,
+      noteSortMode,
+    );
   }
 
   if (scope.type === "recent") {
@@ -946,6 +953,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const selectNote = useCallback(async (id: string) => {
     const requestId = ++selectRequestIdRef.current;
     try {
+      startNoteOpenTiming(id);
       if (pendingNewNoteIdRef.current !== id) {
         pendingNewNoteIdRef.current = null;
       }
@@ -981,6 +989,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       }
       const note = await notesService.readNote(id);
       if (requestId !== selectRequestIdRef.current) return;
+      markNoteOpenTiming(id, "read_note resolved");
       setCurrentNote(note);
       void recordRecentNoteView(note.id);
     } catch (err) {

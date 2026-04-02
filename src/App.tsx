@@ -1,4 +1,6 @@
 import {
+  memo,
+  startTransition,
   useState,
   useEffect,
   useCallback,
@@ -9,48 +11,64 @@ import {
 } from "react";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
-import { NotesProvider, useNotes } from "./context/NotesContext";
+import {
+  NotesProvider,
+  useNotesActions,
+  useNotesData,
+} from "./context/NotesContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
-import { IconButton, TooltipProvider, Toaster } from "./components/ui";
+import {
+  IconButton,
+  LoadingSpinner,
+  TooltipProvider,
+  Toaster,
+} from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
+import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
-import type { PaneMode } from "./types/note";
+import type { PaneMode, RightPanelTab } from "./types/note";
 import type { SettingsTab } from "./components/settings/SettingsPage";
-import {
-  SpinnerIcon,
-  ClaudeIcon,
-  CodexIcon,
-  OpenCodeIcon,
-  OllamaIcon,
-} from "./components/icons";
-import { AiResponseToast } from "./components/ai/AiResponseToast";
 import {
   check as checkForUpdate,
 } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as aiService from "./services/ai";
+import * as assistantService from "./services/assistant";
 import type { AiProvider } from "./services/ai";
+import type {
+  AssistantAssistantTurn,
+  AssistantProposal,
+  AssistantThreadState,
+  AssistantTurn,
+} from "./types/assistant";
 import { isMac, mod } from "./lib/platform";
 import { UpdateToast } from "./components/updater/UpdateToast";
+import {
+  applyLineReplacement,
+  buildAssistantDocumentContext,
+  getAutoAssistantScope,
+  hashText,
+  hasMeaningfulAssistantSelection,
+  isProposalRangeWithinScope,
+  serializeEditorMarkdown,
+  type AssistantSelectionSnapshot,
+} from "./lib/assistant";
+import type { WorkspaceEditorData } from "./components/editor/Editor";
 
 const loadCommandPalette = () => import("./components/command-palette/CommandPalette");
-const loadAiEditModal = () => import("./components/ai/AiEditModal");
 const loadPreviewApp = () => import("./components/preview/PreviewApp");
 const loadWorkspaceNoteApp = () =>
   import("./components/preview/WorkspaceNoteApp");
 
 const CommandPalette = lazy(() =>
   loadCommandPalette().then((module) => ({ default: module.CommandPalette })),
-);
-const AiEditModal = lazy(() =>
-  loadAiEditModal().then((module) => ({ default: module.AiEditModal })),
 );
 const PreviewApp = lazy(() =>
   loadPreviewApp().then((module) => ({ default: module.PreviewApp })),
@@ -146,11 +164,59 @@ function getNextPaneMode(mode: PaneMode): PaneMode {
   return mode === 1 ? 3 : ((mode - 1) as PaneMode);
 }
 
+function getDefaultAssistantProvider(
+  providers: AiProvider[],
+): AiProvider {
+  return providers[0] ?? "claude";
+}
+
+function createAssistantThreadState(
+  provider: AiProvider,
+): AssistantThreadState {
+  return {
+    provider,
+    scope: "note",
+    scopeManual: false,
+    draft: "",
+    turns: [],
+    pending: false,
+    lastSuccessfulSnapshotHash: null,
+  };
+}
+
+function getMeaningfulEditorSelectionSnapshot(
+  editor: TiptapEditor | null,
+): AssistantSelectionSnapshot | null {
+  if (!editor || !hasMeaningfulAssistantSelection(editor)) {
+    return null;
+  }
+
+  const { from, to } = editor.state.selection;
+  return { from, to };
+}
+
+function createAssistantTurnId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toAssistantHistory(turns: AssistantTurn[]) {
+  return turns
+    .filter(
+      (turn): turn is Extract<AssistantTurn, { kind: "user" | "assistant" }> =>
+        turn.kind === "user" || turn.kind === "assistant",
+    )
+    .slice(-8)
+    .map((turn) => ({
+      role: turn.kind,
+      text: turn.kind === "user" ? turn.text : turn.replyText,
+    }));
+}
+
 function FullScreenFallback({ label }: { label: string }) {
   return (
     <div className="h-screen flex items-center justify-center bg-bg-secondary">
       <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
-        <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+        <LoadingSpinner size="lg" className="text-current" />
         {label}
       </div>
     </div>
@@ -160,6 +226,84 @@ function FullScreenFallback({ label }: { label: string }) {
 function PreviewFallback() {
   return <FullScreenFallback label="Opening preview..." />;
 }
+
+interface WorkspaceMainProps {
+  paneMode: PaneMode;
+  focusMode: boolean;
+  showRightPanel: boolean;
+  rightPanelWidth: number;
+  rightPanelTab: RightPanelTab;
+  editorInstance: TiptapEditor | null;
+  editorScrollContainer: HTMLDivElement | null;
+  currentNoteId: string | null;
+  currentAssistantSelection: AssistantSelectionSnapshot | null;
+  assistantProps: RightPanelAssistantProps;
+  workspaceEditorData: WorkspaceEditorData;
+  onOpenSettings: (tab?: "general" | "editor" | "shortcuts" | "about") => void;
+  onEditorSourceModeChange: (sourceMode: boolean) => void;
+  onRegisterScrollContainer: (container: HTMLDivElement | null) => void;
+  onRegisterFlushPendingSave: (
+    flushPendingSave: (() => Promise<void>) | null,
+  ) => void;
+  onEditorReady: (editor: TiptapEditor | null) => void;
+  onRightPanelTabChange: (tab: RightPanelTab) => void;
+  onRightPanelWidthChange: (width: number) => void;
+}
+
+const WorkspaceMain = memo(function WorkspaceMain({
+  paneMode,
+  focusMode,
+  showRightPanel,
+  rightPanelWidth,
+  rightPanelTab,
+  editorInstance,
+  editorScrollContainer,
+  currentNoteId,
+  currentAssistantSelection,
+  assistantProps,
+  workspaceEditorData,
+  onOpenSettings,
+  onEditorSourceModeChange,
+  onRegisterScrollContainer,
+  onRegisterFlushPendingSave,
+  onEditorReady,
+  onRightPanelTabChange,
+  onRightPanelWidthChange,
+}: WorkspaceMainProps) {
+  return (
+    <>
+      <WorkspaceNavigation
+        paneMode={focusMode ? 1 : paneMode}
+        onOpenSettings={onOpenSettings}
+      />
+      <div className="flex min-w-0 flex-1">
+        <Editor
+          paneMode={paneMode}
+          focusMode={focusMode}
+          hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
+          workspaceMode={workspaceEditorData}
+          assistantSelection={currentAssistantSelection}
+          onSourceModeChange={onEditorSourceModeChange}
+          onRegisterScrollContainer={onRegisterScrollContainer}
+          onRegisterFlushPendingSave={onRegisterFlushPendingSave}
+          onEditorReady={onEditorReady}
+        />
+        <RightPanel
+          editor={editorInstance}
+          scrollContainer={editorScrollContainer}
+          noteId={currentNoteId}
+          hasNote={Boolean(currentNoteId)}
+          visible={showRightPanel}
+          width={rightPanelWidth}
+          activeTab={rightPanelTab}
+          onTabChange={onRightPanelTabChange}
+          onWidthChange={onRightPanelWidthChange}
+          assistantProps={assistantProps}
+        />
+      </div>
+    </>
+  );
+});
 
 function TitlebarPaneSwitch({
   paneMode,
@@ -194,7 +338,7 @@ function TitlebarPaneSwitch({
             onClick={onToggleRightPanel}
             title={`${
               rightPanelVisible ? "Hide" : "Show"
-            } Outline Panel (${mod}${isMac ? "" : "+"}4)`}
+            } Right Panel (${mod}${isMac ? "" : "+"}4)`}
             className="shrink-0"
           >
             <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -209,21 +353,31 @@ function AppContent() {
   const {
     notesFolder,
     isLoading,
-    createNote,
-    duplicateNote,
+    notes,
     scopedNotes,
     selectedNoteId,
     selectedNoteIds,
-    selectNote,
-    selectNoteRange,
-    clearNoteSelection,
-    selectAllVisibleNotes,
+    currentNote,
+    settings,
     searchQuery,
     searchResults,
+    hasExternalChanges,
+    reloadVersion,
+  } = useNotesData();
+  const {
+    clearNoteSelection,
+    createNote,
+    duplicateNote,
+    consumePendingNewNote,
+    pinNote,
     reloadCurrentNote,
-    currentNote,
+    saveNote,
+    selectNote,
+    selectNoteRange,
+    selectAllVisibleNotes,
     syncNotesFolder,
-  } = useNotes();
+    unpinNote,
+  } = useNotesActions();
   const {
     interfaceZoom,
     setInterfaceZoom,
@@ -232,8 +386,10 @@ function AppContent() {
     cyclePaneMode,
     rightPanelVisible,
     rightPanelWidth,
+    rightPanelTab,
     setRightPanelVisible,
     setRightPanelWidth,
+    setRightPanelTab,
   } = useTheme();
   const interfaceZoomRef = useRef(interfaceZoom);
   interfaceZoomRef.current = interfaceZoom;
@@ -245,18 +401,36 @@ function AppContent() {
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [view, setView] = useState<ViewState>("notes");
-  const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [aiEditing, setAiEditing] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [aiProvider, setAiProvider] = useState<AiProvider>("claude");
   const [flushPendingSave, setFlushPendingSave] = useState<
     (() => Promise<void>) | null
   >(null);
+  const handleRegisterFlushPendingSave = useCallback(
+    (nextFlushPendingSave: (() => Promise<void>) | null) => {
+      setFlushPendingSave(() => nextFlushPendingSave);
+    },
+    [],
+  );
   const editorRef = useRef<TiptapEditor | null>(null);
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
   const [editorScrollContainer, setEditorScrollContainer] =
     useState<HTMLDivElement | null>(null);
   const [editorSourceMode, setEditorSourceMode] = useState(false);
+  const [availableAssistantProviders, setAvailableAssistantProviders] = useState<
+    AiProvider[]
+  >([]);
+  const [assistantProvidersLoaded, setAssistantProvidersLoaded] = useState(false);
+  const [assistantThreads, setAssistantThreads] = useState<
+    Record<string, AssistantThreadState>
+  >({});
+  const [assistantSelectionState, setAssistantSelectionState] = useState<{
+    noteId: string;
+    selection: AssistantSelectionSnapshot;
+  } | null>(null);
+  const lastAssistantSelectionRef = useRef<{
+    noteId: string;
+    selection: AssistantSelectionSnapshot;
+  } | null>(null);
 
   // Refs for volatile state consumed by the keydown handler so the effect
   // doesn't need to re-register on every note selection or filter change.
@@ -268,6 +442,7 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
+  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
 
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
@@ -289,7 +464,6 @@ function AppContent() {
   useEffect(() => {
     const preloadSurfaces = () => {
       void loadCommandPalette();
-      void loadAiEditModal();
     };
 
     if ("requestIdleCallback" in window) {
@@ -300,6 +474,92 @@ function AppContent() {
     const timeoutId = globalThis.setTimeout(preloadSurfaces, 300);
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
+
+  const refreshAssistantProviders = useCallback(async () => {
+    setAssistantProvidersLoaded(false);
+    try {
+      const providers = await aiService.getAvailableAiProviders();
+      setAvailableAssistantProviders(providers);
+    } catch (error) {
+      console.error("Failed to detect assistant providers:", error);
+      setAvailableAssistantProviders([]);
+    } finally {
+      setAssistantProvidersLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadProviders = async () => {
+      setAssistantProvidersLoaded(false);
+      try {
+        const providers = await aiService.getAvailableAiProviders();
+        if (active) {
+          setAvailableAssistantProviders(providers);
+        }
+      } catch (error) {
+        console.error("Failed to detect assistant providers:", error);
+        if (active) {
+          setAvailableAssistantProviders([]);
+        }
+      } finally {
+        if (active) {
+          setAssistantProvidersLoaded(true);
+        }
+      }
+    };
+
+    void loadProviders();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentNote?.id) {
+      return;
+    }
+
+    const defaultProvider = getDefaultAssistantProvider(availableAssistantProviders);
+    setAssistantThreads((prev) => {
+      const existing = prev[currentNote.id];
+      if (!existing) {
+        return {
+          ...prev,
+          [currentNote.id]: createAssistantThreadState(defaultProvider),
+        };
+      }
+      if (
+        availableAssistantProviders.length > 0 &&
+        !availableAssistantProviders.includes(existing.provider)
+      ) {
+        return {
+          ...prev,
+          [currentNote.id]: {
+            ...existing,
+            provider: defaultProvider,
+          },
+        };
+      }
+      return prev;
+    });
+  }, [currentNote?.id, availableAssistantProviders]);
+
+  useEffect(() => {
+    if (!currentNote?.id) {
+      lastAssistantSelectionRef.current = null;
+      setAssistantSelectionState(null);
+      return;
+    }
+
+    const storedSelection = lastAssistantSelectionRef.current;
+    if (storedSelection && storedSelection.noteId !== currentNote.id) {
+      lastAssistantSelectionRef.current = null;
+      setAssistantSelectionState(null);
+    }
+  }, [currentNote?.id]);
 
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
@@ -318,7 +578,6 @@ function AppContent() {
     (tab?: "general" | "editor" | "shortcuts" | "about") => {
       const validTab = typeof tab === "string" ? tab : undefined;
       setPaletteOpen(false);
-      setAiModalOpen(false);
       setSettingsInitialTab(validTab);
       setSettingsKey((k) => k + 1);
       setView("settings");
@@ -330,6 +589,150 @@ function AppContent() {
     setSettingsInitialTab(undefined);
     setView("notes");
   }, []);
+
+  const updateCurrentAssistantThread = useCallback(
+    (updater: (thread: AssistantThreadState) => AssistantThreadState) => {
+      if (!currentNote?.id) {
+        return;
+      }
+
+      const defaultProvider = getDefaultAssistantProvider(availableAssistantProviders);
+      setAssistantThreads((prev) => {
+        const currentThread =
+          prev[currentNote.id] ?? createAssistantThreadState(defaultProvider);
+        const nextThread = updater(currentThread);
+        if (nextThread === currentThread && prev[currentNote.id]) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [currentNote.id]: nextThread,
+        };
+      });
+    },
+    [availableAssistantProviders, currentNote?.id],
+  );
+
+  const currentAssistantThread = currentNote
+    ? assistantThreads[currentNote.id] ??
+      createAssistantThreadState(
+        getDefaultAssistantProvider(availableAssistantProviders),
+      )
+    : null;
+  const currentAssistantSelection =
+    currentNote && assistantSelectionState?.noteId === currentNote.id
+      ? assistantSelectionState.selection
+      : null;
+  const assistantSyncActive = showRightPanel && rightPanelTab === "assistant";
+
+  const syncAssistantSelectionFromEditor = useCallback(
+    (options?: { clearWhenEmpty?: boolean }) => {
+      const currentEditor = editorRef.current;
+      const noteId = currentNote?.id;
+      if (!noteId || !currentEditor) {
+        return null;
+      }
+
+      const nextSelection = getMeaningfulEditorSelectionSnapshot(currentEditor);
+      if (nextSelection) {
+        const nextStoredSelection = {
+          noteId,
+          selection: nextSelection,
+        };
+        lastAssistantSelectionRef.current = nextStoredSelection;
+        startTransition(() => {
+          setAssistantSelectionState(nextStoredSelection);
+        });
+        return nextSelection;
+      }
+
+      if (options?.clearWhenEmpty !== false) {
+        lastAssistantSelectionRef.current = null;
+        startTransition(() => {
+          setAssistantSelectionState(null);
+        });
+      }
+
+      return null;
+    },
+    [currentNote?.id],
+  );
+
+  const syncAutoAssistantScopeFromEditor = useCallback(
+    (
+      selection: AssistantSelectionSnapshot | null,
+      threadOverride?: AssistantThreadState | null,
+    ) => {
+      const noteId = currentNote?.id;
+      const currentEditor = editorRef.current;
+      const threadState = threadOverride ?? currentAssistantThread;
+
+      if (!noteId || !currentEditor || !threadState || threadState.scopeManual) {
+        return threadState?.scope ?? "note";
+      }
+
+      const nextScope = getAutoAssistantScope(currentEditor, selection);
+      if (threadState.scope !== nextScope) {
+        updateCurrentAssistantThread((thread) => {
+          if (thread.scopeManual || thread.scope === nextScope) {
+            return thread;
+          }
+
+          return {
+            ...thread,
+            scope: nextScope,
+          };
+        });
+      }
+
+      return nextScope;
+    },
+    [currentAssistantThread, currentNote?.id, updateCurrentAssistantThread],
+  );
+
+  useEffect(() => {
+    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
+      return;
+    }
+
+    const syncStoredAssistantSelection = () => {
+      syncAssistantSelectionFromEditor({ clearWhenEmpty: editorInstance.isFocused });
+    };
+
+    syncStoredAssistantSelection();
+    editorInstance.on("selectionUpdate", syncStoredAssistantSelection);
+
+    return () => {
+      editorInstance.off("selectionUpdate", syncStoredAssistantSelection);
+    };
+  }, [assistantSyncActive, currentNote?.id, editorInstance, syncAssistantSelectionFromEditor]);
+
+  useEffect(() => {
+    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
+      return;
+    }
+
+    const syncAutoAssistantScope = () => {
+      const storedSelection = syncAssistantSelectionFromEditor({
+        clearWhenEmpty: editorInstance.isFocused,
+      });
+      syncAutoAssistantScopeFromEditor(storedSelection);
+    };
+
+    syncAutoAssistantScope();
+    editorInstance.on("selectionUpdate", syncAutoAssistantScope);
+
+    return () => {
+      editorInstance.off("selectionUpdate", syncAutoAssistantScope);
+    };
+  }, [
+    assistantSyncActive,
+    currentNote?.id,
+    editorInstance,
+    syncAssistantSelectionFromEditor,
+    syncAutoAssistantScopeFromEditor,
+  ]);
 
   const applyPaneModeSelection = useCallback(
     (mode: PaneMode) => {
@@ -399,74 +802,324 @@ function AppContent() {
     };
   }, [applyPaneModeSelection, openSettings, toggleFocusMode, toggleRightPanel]);
 
-  // Go back to command palette from AI modal
-  const handleBackToPalette = useCallback(() => {
-    setAiModalOpen(false);
-    setPaletteOpen(true);
-  }, []);
+  const handleAssistantProviderChange = useCallback(
+    (provider: AiProvider) => {
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        provider,
+      }));
+    },
+    [updateCurrentAssistantThread],
+  );
 
-  // AI Edit handler
-  const handleAiEdit = useCallback(
-    async (prompt: string, ollamaModel?: string) => {
-      if (!currentNote) {
-        toast.error("No note selected");
+  const handleAssistantScopeChange = useCallback(
+    (scope: AssistantThreadState["scope"]) => {
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        scope,
+        scopeManual: true,
+      }));
+    },
+    [updateCurrentAssistantThread],
+  );
+
+  const handleAssistantDraftChange = useCallback(
+    (draft: string) => {
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        draft,
+      }));
+    },
+    [updateCurrentAssistantThread],
+  );
+
+  const handleClearAssistantThread = useCallback(() => {
+    const storedSelection = syncAssistantSelectionFromEditor();
+    const nextScope = getAutoAssistantScope(editorRef.current, storedSelection);
+
+    updateCurrentAssistantThread((thread) => ({
+      ...thread,
+      scope: nextScope,
+      draft: "",
+      scopeManual: false,
+      turns: [],
+      pending: false,
+      lastSuccessfulSnapshotHash: null,
+    }));
+  }, [syncAssistantSelectionFromEditor, updateCurrentAssistantThread]);
+
+  const handleAssistantSubmit = useCallback(async () => {
+    if (!currentNote || !currentAssistantThread || currentAssistantThread.pending) {
+      return;
+    }
+
+    const prompt = currentAssistantThread.draft.trim();
+    if (!prompt) {
+      return;
+    }
+
+    try {
+      await flushPendingSave?.();
+
+      const markdown = serializeEditorMarkdown(
+        editorRef.current,
+        currentNote.content,
+      );
+      const storedSelection = syncAssistantSelectionFromEditor();
+      const effectiveScope = currentAssistantThread.scopeManual
+        ? currentAssistantThread.scope
+        : syncAutoAssistantScopeFromEditor(
+            storedSelection,
+            currentAssistantThread,
+          );
+      const context = buildAssistantDocumentContext(
+        markdown,
+        editorRef.current,
+        effectiveScope,
+        storedSelection,
+      );
+      const createdAt = Date.now();
+      const userTurn: Extract<AssistantTurn, { kind: "user" }> = {
+        id: createAssistantTurnId("assistant-user"),
+        kind: "user",
+        text: prompt,
+        createdAt,
+        scope: effectiveScope,
+        scopeLabel: context.scopeLabel,
+        lineLabel: context.lineLabel,
+        snapshotHash: context.snapshotHash,
+        notice: context.notice,
+      };
+
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        draft: "",
+        pending: true,
+        turns: [...thread.turns, userTurn],
+      }));
+
+      const result = await assistantService.executeAssistantTurn({
+        provider: currentAssistantThread.provider,
+        noteId: currentNote.id,
+        notePath: currentNote.path,
+        noteTitle: currentNote.title,
+        scope: context.effectiveScope === "note" ? "note" : context.effectiveScope,
+        scopeLabel: context.scopeLabel,
+        startLine: context.startLine,
+        endLine: context.endLine,
+        snapshotHash: context.snapshotHash,
+        numberedContent: context.numberedContent,
+        userPrompt: prompt,
+        history: toAssistantHistory(currentAssistantThread.turns),
+        ollamaModel:
+          currentAssistantThread.provider === "ollama"
+            ? settings.ollamaModel || "qwen3:8b"
+            : undefined,
+      });
+
+      const assistantTurn: AssistantAssistantTurn = {
+        id: createAssistantTurnId("assistant-response"),
+        kind: "assistant",
+        replyText: result.replyText,
+        proposals: result.proposals,
+        createdAt: Date.now(),
+        snapshotHash: context.snapshotHash,
+        snapshotMarkdown: context.fullMarkdown,
+        scopeStartLine: context.startLine,
+        scopeEndLine: context.endLine,
+        warning: result.warning ?? null,
+        executionDir: result.executionDir ?? null,
+        invalidReason: null,
+        invalidProposalIds: [],
+      };
+
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        pending: false,
+        turns: [...thread.turns, assistantTurn],
+        lastSuccessfulSnapshotHash: context.snapshotHash,
+      }));
+    } catch (error) {
+      console.error("[Assistant] Error:", error);
+      const message =
+        error instanceof Error ? error.message : "Unknown assistant error";
+      updateCurrentAssistantThread((thread) => ({
+        ...thread,
+        pending: false,
+        turns: [
+          ...thread.turns,
+          {
+            id: createAssistantTurnId("assistant-system"),
+            kind: "system",
+            text: `Assistant request failed: ${message}`,
+            createdAt: Date.now(),
+          },
+        ],
+      }));
+      toast.error(`Assistant request failed: ${message}`);
+    }
+  }, [
+    currentAssistantThread,
+    currentNote,
+    flushPendingSave,
+    settings.ollamaModel,
+    syncAssistantSelectionFromEditor,
+    syncAutoAssistantScopeFromEditor,
+    updateCurrentAssistantThread,
+  ]);
+
+  const handleApplyAssistantProposal = useCallback(
+    async (turn: AssistantAssistantTurn, proposal: AssistantProposal) => {
+      if (!currentNote || !currentAssistantThread) {
         return;
       }
 
-      setAiEditing(true);
-
       try {
-        let result: aiService.AiExecutionResult;
-        if (aiProvider === "codex") {
-          result = await aiService.executeCodexEdit(currentNote.path, prompt);
-        } else if (aiProvider === "opencode") {
-          result = await aiService.executeOpenCodeEdit(currentNote.path, prompt);
-        } else if (aiProvider === "ollama") {
-          result = await aiService.executeOllamaEdit(
-            currentNote.path,
-            prompt,
-            ollamaModel || "qwen3:8b",
-          );
-        } else {
-          result = await aiService.executeClaudeEdit(currentNote.path, prompt);
+        await flushPendingSave?.();
+
+        const latestMarkdown = serializeEditorMarkdown(
+          editorRef.current,
+          currentNote.content,
+        );
+        const latestHash = hashText(latestMarkdown);
+
+        if (latestHash !== turn.snapshotHash) {
+          updateCurrentAssistantThread((threadState) => ({
+            ...threadState,
+            turns: threadState.turns.flatMap((item) => {
+              if (item.kind === "assistant" && item.id === turn.id) {
+                return [{ ...item, stale: true }];
+              }
+
+              return [item];
+            }).concat({
+              id: createAssistantTurnId("assistant-system"),
+              kind: "system",
+              text: "The note changed after this proposal was generated. Send a new request before applying edits.",
+              createdAt: Date.now(),
+            }),
+          }));
+          return;
         }
 
-        // Reload the current note from disk
+        const totalLines = latestMarkdown.split(/\r?\n/).length;
+        if (
+          proposal.startLine < 1 ||
+          proposal.endLine < proposal.startLine ||
+          proposal.endLine > totalLines
+        ) {
+          updateCurrentAssistantThread((threadState) => ({
+            ...threadState,
+            turns: threadState.turns.map((item) => {
+              if (item.kind !== "assistant" || item.id !== turn.id) {
+                return item;
+              }
+
+              const invalidProposalIds = Array.from(
+                new Set([...(item.invalidProposalIds ?? []), proposal.id]),
+              );
+
+              return {
+                ...item,
+                invalidProposalIds,
+                invalidReason:
+                  "One or more proposals from this response contained invalid line ranges and cannot be applied.",
+              };
+            }).concat({
+              id: createAssistantTurnId("assistant-system"),
+              kind: "system",
+              text: `Could not apply “${proposal.title}” because the returned line range was invalid.`,
+              createdAt: Date.now(),
+            }),
+          }));
+          return;
+        }
+
+        if (
+          !isProposalRangeWithinScope(
+            proposal.startLine,
+            proposal.endLine,
+            turn.scopeStartLine,
+            turn.scopeEndLine,
+          )
+        ) {
+          updateCurrentAssistantThread((threadState) => ({
+            ...threadState,
+            turns: threadState.turns.map((item) => {
+              if (item.kind !== "assistant" || item.id !== turn.id) {
+                return item;
+              }
+
+              const invalidProposalIds = Array.from(
+                new Set([...(item.invalidProposalIds ?? []), proposal.id]),
+              );
+
+              return {
+                ...item,
+                invalidProposalIds,
+                invalidReason:
+                  "One or more proposals from this response fell outside the scoped excerpt and cannot be applied.",
+              };
+            }).concat({
+              id: createAssistantTurnId("assistant-system"),
+              kind: "system",
+              text: `Could not apply “${proposal.title}” because it falls outside the original ${turn.scopeStartLine === turn.scopeEndLine ? `line ${turn.scopeStartLine}` : `lines ${turn.scopeStartLine}-${turn.scopeEndLine}`} scope that Sly sent to the assistant.`,
+              createdAt: Date.now(),
+            }),
+          }));
+          return;
+        }
+
+        const nextMarkdown = applyLineReplacement(
+          latestMarkdown,
+          proposal.startLine,
+          proposal.endLine,
+          proposal.replacement,
+        );
+
+        await saveNote(nextMarkdown, currentNote.id);
         await reloadCurrentNote();
 
-        // Show results
-        if (result.success) {
-          // Close modal after success
-          setAiModalOpen(false);
-
-          // Show success toast with provider response
-          toast(
-            <AiResponseToast output={result.output} provider={aiProvider} />,
+        updateCurrentAssistantThread((threadState) => ({
+          ...threadState,
+          turns: [
+            ...threadState.turns,
             {
-              duration: Infinity,
-              closeButton: true,
-              className: "!min-w-[450px] !max-w-[600px]",
+              id: createAssistantTurnId("assistant-system"),
+              kind: "system",
+              text: `Applied “${proposal.title}”.`,
+              createdAt: Date.now(),
             },
-          );
-        } else {
-          toast.error(
-            <div className="space-y-1">
-              <div className="font-medium">AI Edit Failed</div>
-              <div className="text-xs">{result.error || "Unknown error"}</div>
-            </div>,
-            { duration: Infinity, closeButton: true },
-          );
-        }
+          ],
+        }));
+        toast.success(`Applied “${proposal.title}”`);
       } catch (error) {
-        console.error("[AI] Error:", error);
-        toast.error(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-      } finally {
-        setAiEditing(false);
+        console.error("[Assistant] Apply failed:", error);
+        const message =
+          error instanceof Error ? error.message : "Unknown apply error";
+        updateCurrentAssistantThread((threadState) => ({
+          ...threadState,
+          turns: [
+            ...threadState.turns,
+            {
+              id: createAssistantTurnId("assistant-system"),
+              kind: "system",
+              text: `Failed to apply “${proposal.title}”: ${message}`,
+              createdAt: Date.now(),
+            },
+          ],
+        }));
+        toast.error(`Failed to apply “${proposal.title}”`);
       }
     },
-    [aiProvider, currentNote, reloadCurrentNote],
+    [
+      currentAssistantThread,
+      currentNote,
+      flushPendingSave,
+      reloadCurrentNote,
+      saveNote,
+      updateCurrentAssistantThread,
+    ],
   );
 
   // Memoize display items to prevent unnecessary recalculations
@@ -770,11 +1423,74 @@ function AppContent() {
     setPaletteOpen(false);
   }, []);
 
+  const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
+    editorRef.current = editor;
+    setEditorInstance(editor);
+  }, []);
+
+  const workspaceEditorData = useMemo<WorkspaceEditorData>(
+    () => ({
+      currentNote,
+      selectedNoteId,
+      notes,
+      hasExternalChanges,
+      reloadVersion,
+      saveNote,
+      reloadCurrentNote,
+      createNote,
+      consumePendingNewNote,
+      pinNote,
+      unpinNote,
+      selectNote,
+    }),
+    [
+      consumePendingNewNote,
+      createNote,
+      currentNote,
+      hasExternalChanges,
+      notes,
+      pinNote,
+      reloadVersion,
+      reloadCurrentNote,
+      saveNote,
+      selectNote,
+      selectedNoteId,
+      unpinNote,
+    ],
+  );
+
+  const assistantProps = useMemo<RightPanelAssistantProps>(
+    () => ({
+      hasNote: Boolean(currentNote),
+      providerCheckComplete: assistantProvidersLoaded,
+      availableProviders: availableAssistantProviders,
+      thread: currentAssistantThread,
+      onProviderChange: handleAssistantProviderChange,
+      onScopeChange: handleAssistantScopeChange,
+      onDraftChange: handleAssistantDraftChange,
+      onClearThread: handleClearAssistantThread,
+      onSubmit: handleAssistantSubmit,
+      onApplyProposal: handleApplyAssistantProposal,
+    }),
+    [
+      assistantProvidersLoaded,
+      availableAssistantProviders,
+      currentAssistantThread,
+      currentNote,
+      handleApplyAssistantProposal,
+      handleAssistantDraftChange,
+      handleAssistantProviderChange,
+      handleAssistantScopeChange,
+      handleAssistantSubmit,
+      handleClearAssistantThread,
+    ],
+  );
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-bg-secondary">
         <div className="text-text-muted/70 text-sm flex items-center gap-1.5 font-medium">
-          <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+          <LoadingSpinner size="lg" className="text-current" />
           Initializing Sly...
         </div>
       </div>
@@ -784,8 +1500,6 @@ function AppContent() {
   if (!notesFolder) {
     return <FolderPicker />;
   }
-
-  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
 
   return (
     <>
@@ -803,36 +1517,31 @@ function AppContent() {
             key={settingsKey}
             onBack={closeSettings}
             initialTab={settingsInitialTab}
+            availableAiProviders={availableAssistantProviders}
+            aiProvidersLoading={!assistantProvidersLoaded}
+            onRefreshAiProviders={refreshAssistantProviders}
           />
         ) : (
-          <>
-            <WorkspaceNavigation
-              paneMode={focusMode ? 1 : paneMode}
-              onOpenSettings={openSettings}
-            />
-            <div className="flex min-w-0 flex-1">
-              <Editor
-                paneMode={paneMode}
-                focusMode={focusMode}
-                hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
-                onSourceModeChange={setEditorSourceMode}
-                onRegisterScrollContainer={setEditorScrollContainer}
-                onRegisterFlushPendingSave={setFlushPendingSave}
-                onEditorReady={(editor) => {
-                  editorRef.current = editor;
-                  setEditorInstance(editor);
-                }}
-              />
-              <RightPanel
-                editor={editorInstance}
-                scrollContainer={editorScrollContainer}
-                hasNote={Boolean(currentNote)}
-                visible={showRightPanel}
-                width={rightPanelWidth}
-                onWidthChange={setRightPanelWidth}
-              />
-            </div>
-          </>
+          <WorkspaceMain
+            paneMode={paneMode}
+            focusMode={focusMode}
+            showRightPanel={showRightPanel}
+            rightPanelWidth={rightPanelWidth}
+            rightPanelTab={rightPanelTab}
+            editorInstance={editorInstance}
+            editorScrollContainer={editorScrollContainer}
+            currentNoteId={currentNote?.id ?? null}
+            currentAssistantSelection={currentAssistantSelection}
+            assistantProps={assistantProps}
+            workspaceEditorData={workspaceEditorData}
+            onOpenSettings={openSettings}
+            onEditorSourceModeChange={setEditorSourceMode}
+            onRegisterScrollContainer={setEditorScrollContainer}
+            onRegisterFlushPendingSave={handleRegisterFlushPendingSave}
+            onEditorReady={handleEditorReady}
+            onRightPanelTabChange={setRightPanelTab}
+            onRightPanelWidthChange={setRightPanelWidth}
+          />
         )}
       </div>
 
@@ -841,10 +1550,6 @@ function AppContent() {
           open={paletteOpen}
           onClose={handleClosePalette}
           onOpenSettings={openSettings}
-          onOpenAiModal={(provider) => {
-            setAiProvider(provider);
-            setAiModalOpen(true);
-          }}
           focusMode={focusMode}
           onToggleFocusMode={toggleFocusMode}
           rightPanelVisible={rightPanelVisible}
@@ -853,41 +1558,6 @@ function AppContent() {
           flushPendingSave={flushPendingSave}
         />
       </Suspense>
-      <Suspense fallback={null}>
-        <AiEditModal
-          open={aiModalOpen}
-          provider={aiProvider}
-          onBack={handleBackToPalette}
-          onExecute={handleAiEdit}
-          isExecuting={aiEditing}
-        />
-      </Suspense>
-
-      {/* AI Editing Overlay */}
-      {aiEditing && (
-        <div className="fixed inset-0 bg-bg/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="flex items-center gap-2">
-            {aiProvider === "codex" ? (
-              <CodexIcon className="w-4.5 h-4.5 fill-text-muted animate-spin-slow" />
-            ) : aiProvider === "opencode" ? (
-              <OpenCodeIcon className="w-4.5 h-4.5 fill-text-muted animate-pulse-gentle" />
-            ) : aiProvider === "ollama" ? (
-              <OllamaIcon className="w-4.5 h-4.5 fill-text-muted animate-bounce-gentle" />
-            ) : (
-              <ClaudeIcon className="w-4.5 h-4.5 fill-text-muted animate-spin-slow" />
-            )}
-            <div className="text-sm font-medium text-text">
-              {aiProvider === "codex"
-                ? "Codex is editing your note..."
-                : aiProvider === "opencode"
-                  ? "OpenCode is editing your note..."
-                : aiProvider === "ollama"
-                  ? "Ollama is editing your note..."
-                  : "Claude is editing your note..."}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

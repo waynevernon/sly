@@ -1,36 +1,73 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
+import { ListTree, Sparkles } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { finishNoteOpenTiming, markNoteOpenTiming } from "../../lib/noteOpenTiming";
+import type { RightPanelTab } from "../../types/note";
+import { Tooltip } from "../ui";
 import {
   extractOutlineItems,
   findActiveOutlineFromHeadingTops,
   findActiveOutlineFromSelection,
   type OutlineItem,
 } from "./rightPanelOutline";
-
-type RightPanelTab = "outline";
+import {
+  RightPanelAssistant,
+  type RightPanelAssistantProps,
+} from "./RightPanelAssistant";
 
 interface RightPanelProps {
   editor: TiptapEditor | null;
   scrollContainer: HTMLDivElement | null;
+  noteId: string | null;
   hasNote: boolean;
   visible: boolean;
   width: number;
+  activeTab: RightPanelTab;
+  onTabChange: (tab: RightPanelTab) => void;
   onWidthChange: (width: number) => void;
+  assistantProps: RightPanelAssistantProps;
 }
 
 const ACTIVE_HEADING_TOP_OFFSET = 72;
+const OUTLINE_UPDATE_DEBOUNCE_MS = 120;
+const RIGHT_PANEL_TABS: Array<{
+  tab: RightPanelTab;
+  label: string;
+  Icon: typeof ListTree;
+}> = [
+  {
+    tab: "outline",
+    label: "Outline",
+    Icon: ListTree,
+  },
+  {
+    tab: "assistant",
+    label: "Assistant",
+    Icon: Sparkles,
+  },
+];
 
 export function RightPanel({
   editor,
   scrollContainer,
+  noteId,
   hasNote,
   visible,
   width,
+  activeTab,
+  onTabChange,
   onWidthChange,
+  assistantProps,
 }: RightPanelProps) {
-  const [activeTab] = useState<RightPanelTab>("outline");
   const [outlineItems, setOutlineItems] = useState<OutlineItem[]>([]);
   const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
   const [liveWidth, setLiveWidth] = useState(width);
@@ -41,8 +78,18 @@ export function RightPanel({
   const liveWidthRef = useRef(liveWidth);
   const outlineScrollRef = useRef<HTMLDivElement>(null);
   const outlineItemsRef = useRef<OutlineItem[]>([]);
+  const panelHydrationFrameRef = useRef<number | null>(null);
+  const outlineHydrationFrameRef = useRef<number | null>(null);
+  const outlineViewportFrameRef = useRef<number | null>(null);
+  const outlineUpdateTimeoutRef = useRef<number | null>(null);
+  const [hydratedPanelKey, setHydratedPanelKey] = useState<string | null>(null);
   outlineItemsRef.current = outlineItems;
   liveWidthRef.current = liveWidth;
+  const outlineActive = visible && activeTab === "outline";
+  const panelHydrationKey =
+    visible && hasNote && noteId ? `${noteId}:${activeTab}` : null;
+  const panelHydrated =
+    panelHydrationKey !== null && hydratedPanelKey === panelHydrationKey;
 
   useEffect(() => {
     if (!isResizing) {
@@ -50,8 +97,23 @@ export function RightPanel({
     }
   }, [width, isResizing]);
 
+  const clearPendingOutlineWork = useCallback(() => {
+    if (outlineHydrationFrameRef.current !== null) {
+      cancelAnimationFrame(outlineHydrationFrameRef.current);
+      outlineHydrationFrameRef.current = null;
+    }
+    if (outlineViewportFrameRef.current !== null) {
+      cancelAnimationFrame(outlineViewportFrameRef.current);
+      outlineViewportFrameRef.current = null;
+    }
+    if (outlineUpdateTimeoutRef.current !== null) {
+      window.clearTimeout(outlineUpdateTimeoutRef.current);
+      outlineUpdateTimeoutRef.current = null;
+    }
+  }, []);
+
   const updateOutline = useCallback(() => {
-    if (!editor) {
+    if (!editor || !hasNote || !noteId) {
       setOutlineItems([]);
       setActiveOutlineId(null);
       return;
@@ -64,11 +126,14 @@ export function RightPanel({
       nextItems,
       editor.state.selection.from,
     );
-    setActiveOutlineId(activeFromSelection?.id ?? null);
-  }, [editor]);
+    startTransition(() => {
+      setOutlineItems(nextItems);
+      setActiveOutlineId(activeFromSelection?.id ?? null);
+    });
+  }, [editor, hasNote, noteId]);
 
   const updateActiveFromSelection = useCallback(() => {
-    if (!editor) {
+    if (!editor || !hasNote || !noteId) {
       setActiveOutlineId(null);
       return;
     }
@@ -78,16 +143,16 @@ export function RightPanel({
       editor.state.selection.from,
     );
     setActiveOutlineId(active?.id ?? null);
-  }, [editor]);
+  }, [editor, hasNote, noteId]);
 
-  const updateActiveFromViewport = useCallback(() => {
-    if (!editor || !scrollContainer || outlineItemsRef.current.length === 0) {
+  const updateActiveFromViewport = useCallback((items = outlineItemsRef.current) => {
+    if (!editor || !hasNote || !scrollContainer || items.length === 0) {
       return;
     }
 
     const containerRect = scrollContainer.getBoundingClientRect();
     const thresholdTop = containerRect.top + ACTIVE_HEADING_TOP_OFFSET;
-    const headingTops = outlineItemsRef.current
+    const headingTops = items
       .map((item) => {
         const node = editor.view.nodeDOM(item.pos);
         if (!(node instanceof HTMLElement)) {
@@ -106,38 +171,93 @@ export function RightPanel({
     if (active) {
       setActiveOutlineId(active.id);
     }
-  }, [editor, scrollContainer]);
+  }, [editor, hasNote, scrollContainer]);
 
   useEffect(() => {
-    if (!editor) {
+    if (panelHydrationFrameRef.current !== null) {
+      cancelAnimationFrame(panelHydrationFrameRef.current);
+      panelHydrationFrameRef.current = null;
+    }
+
+    if (!panelHydrationKey) {
+      setHydratedPanelKey(null);
+      return;
+    }
+
+    setHydratedPanelKey(null);
+    panelHydrationFrameRef.current = requestAnimationFrame(() => {
+      startTransition(() => {
+        setHydratedPanelKey(panelHydrationKey);
+      });
+      if (activeTab === "assistant" && noteId) {
+        finishNoteOpenTiming(noteId, "assistant panel hydrated");
+      }
+    });
+
+    return () => {
+      if (panelHydrationFrameRef.current !== null) {
+        cancelAnimationFrame(panelHydrationFrameRef.current);
+        panelHydrationFrameRef.current = null;
+      }
+    };
+  }, [activeTab, noteId, panelHydrationKey]);
+
+  useEffect(() => {
+    if (!editor || !hasNote || !outlineActive || !panelHydrated || !noteId) {
+      clearPendingOutlineWork();
       setOutlineItems([]);
       setActiveOutlineId(null);
       return;
     }
 
-    const handleUpdate = () => {
+    const hydrateOutline = (stage: "initial" | "update") => {
       updateOutline();
-      requestAnimationFrame(() => {
+      outlineViewportFrameRef.current = requestAnimationFrame(() => {
         updateActiveFromViewport();
+        if (stage === "initial") {
+          markNoteOpenTiming(noteId, "outline hydrated");
+          finishNoteOpenTiming(noteId, "right panel hydrated");
+        }
       });
+    };
+
+    outlineHydrationFrameRef.current = requestAnimationFrame(() => {
+      hydrateOutline("initial");
+    });
+
+    const handleUpdate = () => {
+      clearPendingOutlineWork();
+      outlineUpdateTimeoutRef.current = window.setTimeout(() => {
+        hydrateOutline("update");
+      }, OUTLINE_UPDATE_DEBOUNCE_MS);
     };
 
     const handleSelectionUpdate = () => {
       updateActiveFromSelection();
     };
 
-    handleUpdate();
     editor.on("update", handleUpdate);
     editor.on("selectionUpdate", handleSelectionUpdate);
 
     return () => {
+      clearPendingOutlineWork();
       editor.off("update", handleUpdate);
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
-  }, [editor, updateActiveFromSelection, updateActiveFromViewport, updateOutline]);
+  }, [
+    clearPendingOutlineWork,
+    editor,
+    hasNote,
+    outlineActive,
+    panelHydrated,
+    noteId,
+    updateActiveFromSelection,
+    updateActiveFromViewport,
+    updateOutline,
+  ]);
 
   useEffect(() => {
-    if (!scrollContainer || !visible) return;
+    if (!scrollContainer || !outlineActive || !panelHydrated) return;
 
     const handleScroll = () => {
       updateActiveFromViewport();
@@ -148,16 +268,25 @@ export function RightPanel({
     return () => {
       scrollContainer.removeEventListener("scroll", handleScroll);
     };
-  }, [scrollContainer, updateActiveFromViewport, visible]);
+  }, [outlineActive, panelHydrated, scrollContainer, updateActiveFromViewport]);
 
   useEffect(() => {
-    if (!visible || !activeOutlineId) return;
+    if (!outlineActive || !panelHydrated || !activeOutlineId) return;
 
     const activeElement = outlineScrollRef.current?.querySelector<HTMLElement>(
       `[data-outline-id="${activeOutlineId}"]`,
     );
     activeElement?.scrollIntoView({ block: "nearest" });
-  }, [activeOutlineId, visible]);
+  }, [activeOutlineId, outlineActive, panelHydrated]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingOutlineWork();
+      if (panelHydrationFrameRef.current !== null) {
+        cancelAnimationFrame(panelHydrationFrameRef.current);
+      }
+    };
+  }, [clearPendingOutlineWork]);
 
   const startResize = useCallback(
     (event: React.MouseEvent) => {
@@ -214,6 +343,21 @@ export function RightPanel({
     return "No section headings in this note yet.";
   }, [hasNote]);
 
+  const headerTitle = useMemo(() => {
+    if (activeTab === "assistant") {
+      return (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate">Assistant</span>
+          <span className="inline-flex shrink-0 rounded-full border border-border bg-bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-text-muted">
+            Beta
+          </span>
+        </div>
+      );
+    }
+
+    return "Outline";
+  }, [activeTab]);
+
   return (
     <div className={cn("h-full shrink-0 flex", isResizing && "select-none")}>
       {visible && (
@@ -242,47 +386,79 @@ export function RightPanel({
         )}
         style={visible ? { width: liveWidth } : undefined}
       >
-        <div className="h-full flex flex-col">
+        <div className="flex h-full min-h-0 flex-col">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header border-border/80">
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-medium text-text">
-                {activeTab === "outline" ? "Outline" : ""}
-              </h2>
+            <div className="min-w-0 font-medium text-base text-text">
+              {headerTitle}
+            </div>
+            <div className="ui-pane-header-actions ml-auto">
+              {RIGHT_PANEL_TABS.map(({ tab, label, Icon }) => (
+                <Tooltip key={tab} content={label}>
+                  <button
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={activeTab === tab}
+                    onClick={() => onTabChange(tab)}
+                    className={cn(
+                      "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] items-center justify-center rounded-[var(--ui-radius-md)] transition-colors",
+                      activeTab === tab
+                        ? "bg-bg-muted text-text"
+                        : "text-text-muted hover:bg-bg-muted hover:text-text",
+                    )}
+                  >
+                    <Icon className="h-4 w-4 stroke-[1.7]" />
+                  </button>
+                </Tooltip>
+              ))}
             </div>
           </div>
 
-          <div
-            ref={outlineScrollRef}
-            className="ui-scrollbar-overlay flex-1 overflow-y-auto px-2 py-2"
-          >
-            {outlineItems.length === 0 ? (
-              <div className="px-2 py-3 text-xs text-text-muted">{emptyState}</div>
-            ) : (
-              <div className="space-y-0.5">
-                {outlineItems.map((item) => {
-                  const isActive = item.id === activeOutlineId;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      data-outline-id={item.id}
-                      onClick={() => handleOutlineSelect(item)}
-                      className={cn(
-                        "ui-focus-ring flex w-full items-start rounded-[var(--ui-radius-md)] px-2 py-1.5 text-left text-sm transition-colors",
-                        isActive
-                          ? "bg-bg-muted text-text"
-                          : "text-text-muted hover:bg-bg-muted hover:text-text",
-                      )}
-                      style={{ paddingLeft: `${item.level * 10}px` }}
-                    >
-                      <span className="line-clamp-2 break-words">{item.text}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {activeTab === "outline" ? (
+            <div
+              ref={outlineScrollRef}
+              className="ui-scrollbar-overlay flex-1 overflow-y-auto px-2 py-2"
+            >
+              {!panelHydrated && hasNote ? (
+                <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
+                  Loading outline...
+                </div>
+              ) : outlineItems.length === 0 ? (
+                <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
+                  {emptyState}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {outlineItems.map((item) => {
+                    const isActive = item.id === activeOutlineId;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        data-outline-id={item.id}
+                        onClick={() => handleOutlineSelect(item)}
+                        className={cn(
+                          "ui-focus-ring flex w-full items-start rounded-[var(--ui-radius-md)] px-2 py-1.5 text-left text-sm transition-colors",
+                          isActive
+                            ? "bg-bg-muted text-text"
+                            : "text-text-muted hover:bg-bg-muted hover:text-text",
+                        )}
+                        style={{ paddingLeft: `${item.level * 10}px` }}
+                      >
+                        <span className="line-clamp-2 break-words">{item.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : panelHydrated || !hasNote ? (
+            <RightPanelAssistant {...assistantProps} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
+              Preparing assistant...
+            </div>
+          )}
         </div>
       </div>
     </div>

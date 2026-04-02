@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { Sparkles } from "lucide-react";
 import {
   ArrowLeftIcon,
   FolderIcon,
   SwatchIcon,
   KeyboardIcon,
   InfoIcon,
-  WorkflowIcon,
 } from "../icons";
 import { Button, IconButton } from "../ui";
 import { GeneralSettingsSection } from "./GeneralSettingsSection";
@@ -14,10 +14,14 @@ import { ExtensionsSettingsSection } from "./ExtensionsSettingsSection";
 import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
 import { AboutSettingsSection } from "./AboutSettingsSection";
 import { alt, isMac, mod, shortcut } from "../../lib/platform";
+import type { AiProvider } from "../../services/ai";
 
 interface SettingsPageProps {
   onBack: () => void;
   initialTab?: SettingsTab;
+  availableAiProviders: AiProvider[];
+  aiProvidersLoading: boolean;
+  onRefreshAiProviders: () => Promise<void>;
 }
 
 export type SettingsTab = "general" | "editor" | "extensions" | "shortcuts" | "about";
@@ -25,7 +29,7 @@ export type SettingsTab = "general" | "editor" | "extensions" | "shortcuts" | "a
 const tabs: {
   id: SettingsTab;
   label: string;
-  icon: typeof FolderIcon;
+  icon: React.ComponentType<{ className?: string }>;
   shortcutLabel: string;
 }[] = [
   {
@@ -42,8 +46,8 @@ const tabs: {
   },
   {
     id: "extensions",
-    label: "Extensions",
-    icon: WorkflowIcon,
+    label: "Assistant & CLI",
+    icon: Sparkles,
     shortcutLabel: shortcut(mod, alt, "3"),
   },
   {
@@ -60,7 +64,13 @@ const tabs: {
   },
 ];
 
-export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
+export function SettingsPage({
+  onBack,
+  initialTab,
+  availableAiProviders,
+  aiProvidersLoading,
+  onRefreshAiProviders,
+}: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -157,7 +167,13 @@ export function SettingsPage({ onBack, initialTab }: SettingsPageProps) {
           <div className="w-full max-w-[56rem] mx-auto px-8 pb-8">
             {activeTab === "general" && <GeneralSettingsSection />}
             {activeTab === "editor" && <AppearanceSettingsSection />}
-            {activeTab === "extensions" && <ExtensionsSettingsSection />}
+            {activeTab === "extensions" && (
+              <ExtensionsSettingsSection
+                aiProviders={availableAiProviders}
+                aiProvidersLoading={aiProvidersLoading}
+                onRefreshAiProviders={onRefreshAiProviders}
+              />
+            )}
             {activeTab === "shortcuts" && <ShortcutsSettingsSection />}
             {activeTab === "about" && <AboutSettingsSection />}
           </div>

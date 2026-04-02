@@ -3,8 +3,8 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { showUpdateToast } from "../../App";
-import { Button } from "../ui";
-import { RefreshCwIcon, SpinnerIcon, GithubIcon } from "../icons";
+import { Button, LoadingSpinner } from "../ui";
+import { RefreshCwIcon, GithubIcon } from "../icons";
 
 const REPOSITORY_URL = "https://github.com/waynevernon/sly";
 const ISSUES_URL = "https://github.com/waynevernon/sly/issues";
@@ -60,7 +60,7 @@ export function AboutSettingsSection() {
         >
           {checkingUpdate ? (
             <>
-              <SpinnerIcon className="w-4.5 h-4.5 stroke-[1.5] animate-spin" />
+              <LoadingSpinner size="lg" tone="inherit" />
               Checking...
             </>
           ) : (
