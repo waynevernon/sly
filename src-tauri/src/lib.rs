@@ -5765,7 +5765,7 @@ mod tests {
     "notesPaneWidth": 304,
     "rightPanelVisible": true,
     "rightPanelWidth": 260,
-    "rightPanelTab": "outline",
+    "rightPanelTab": "assistant",
     "confirmDeletions": true
   }
 }"#,
