@@ -1,6 +1,6 @@
 name: Update Homebrew Tap
 
-on:
+"on":
   release:
     types:
       - published
@@ -54,7 +54,7 @@ jobs:
           console.log(`version=${version}`);
           console.log(`sha256=${asset.digest.slice("sha256:".length)}`);
           console.log(`cask_token=${caskToken}`);
-NODE
+          NODE
 
       - name: Clone tap repository
         env:
