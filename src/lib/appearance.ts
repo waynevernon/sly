@@ -121,6 +121,62 @@ export function getFontPresetOptionLabel(
 }
 
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
+  "apple-notes-light": {
+    id: "apple-notes-light",
+    label: "Apple Notes Light",
+    mode: "light",
+    tokens: {
+      bg: "#fffef2",
+      bgSecondary: "#f5f3ec",
+      bgMuted: "rgba(60, 50, 0, 0.05)",
+      bgEmphasis: "rgba(60, 50, 0, 0.09)",
+      text: "#1c1c1e",
+      textMuted: "#6e6e73",
+      textInverse: "#ffffff",
+      border: "rgba(60, 50, 0, 0.08)",
+      borderSolid: "#e8e4d8",
+      accent: "#f5a623",
+      selection: "rgba(245, 166, 35, 0.20)",
+      code: "#c0392b",
+      syntaxKeyword: "#9b59b6",
+      syntaxString: "#27ae60",
+      syntaxNumber: "#2980b9",
+      syntaxComment: "#8e8e93",
+      syntaxFunction: "#e67e22",
+      syntaxVariable: "#e67e22",
+      syntaxType: "#16a085",
+      syntaxOperator: "#9b59b6",
+      syntaxAttr: "#16a085",
+    },
+  },
+  "apple-notes-dark": {
+    id: "apple-notes-dark",
+    label: "Apple Notes Dark",
+    mode: "dark",
+    tokens: {
+      bg: "#1c1914",
+      bgSecondary: "#161410",
+      bgMuted: "rgba(255, 250, 220, 0.06)",
+      bgEmphasis: "rgba(255, 250, 220, 0.10)",
+      text: "#f5f0e4",
+      textMuted: "#8a8070",
+      textInverse: "#1c1914",
+      border: "rgba(255, 250, 220, 0.09)",
+      borderSolid: "#383020",
+      accent: "#ffd60a",
+      selection: "rgba(255, 214, 10, 0.18)",
+      code: "#ff6b6b",
+      syntaxKeyword: "#bf5af2",
+      syntaxString: "#32d74b",
+      syntaxNumber: "#0a84ff",
+      syntaxComment: "#636356",
+      syntaxFunction: "#ffd60a",
+      syntaxVariable: "#ff9f0a",
+      syntaxType: "#5ac8fa",
+      syntaxOperator: "#bf5af2",
+      syntaxAttr: "#5ac8fa",
+    },
+  },
   "sly-light": {
     id: "sly-light",
     label: "Sly Light",
@@ -1749,6 +1805,7 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
 
 export const LIGHT_THEME_PRESETS = [
   THEME_PRESETS["sly-light"],
+  THEME_PRESETS["apple-notes-light"],
   THEME_PRESETS["ayu-light"],
   THEME_PRESETS["bear-light"],
   THEME_PRESETS["catppuccin-latte"],
@@ -1774,6 +1831,7 @@ export const LIGHT_THEME_PRESETS = [
 
 export const DARK_THEME_PRESETS = [
   THEME_PRESETS["sly-dark"],
+  THEME_PRESETS["apple-notes-dark"],
   THEME_PRESETS["ayu-dark"],
   THEME_PRESETS["ayu-mirage"],
   THEME_PRESETS["bear-dark"],

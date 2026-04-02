@@ -78,7 +78,9 @@ export type ThemePresetId =
   | "claude-light"
   | "claude-dark"
   | "evernote-light"
-  | "evernote-dark";
+  | "evernote-dark"
+  | "apple-notes-light"
+  | "apple-notes-dark";
 
 export type FontPresetId =
   | "inter"
@@ -150,6 +152,7 @@ export interface FolderAppearance {
 }
 export type NoteScope =
   | { type: "all" }
+  | { type: "pinned" }
   | { type: "recent" }
   | { type: "folder"; path: string };
 
@@ -191,6 +194,7 @@ export interface Settings {
   gitEnabled?: boolean | null;
   pinnedNoteIds?: string[] | null;
   recentNoteIds?: string[] | null;
+  showPinnedNotes?: boolean | null;
   showRecentNotes?: boolean | null;
   showNoteCounts: boolean;
   showNotesFromSubfolders: boolean;
@@ -212,6 +216,7 @@ export interface SettingsPatch {
   gitEnabled?: boolean | null;
   pinnedNoteIds?: string[] | null;
   recentNoteIds?: string[] | null;
+  showPinnedNotes?: boolean | null;
   showRecentNotes?: boolean | null;
   showNoteCounts?: boolean | null;
   showNotesFromSubfolders?: boolean | null;
