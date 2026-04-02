@@ -18,11 +18,11 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 - Plain markdown notes you own. Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
 - A serious writing and editing surface. Sly combines a polished rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
 - Fast navigation through large note collections. Full-text search, command palette workflows, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
-- Flexible organization that still feels lightweight. Use pinned and recent notes, recursive folder views, per-folder note sorting, folder sorting, note counts, drag-and-drop, multi-note move/delete, inline naming, and customizable folder icons with color or emoji.
+- Flexible organization that still feels lightweight. Use pinned and recent notes, a dedicated pinned notes view, recursive folder views, per-folder note sorting, folder sorting, note counts, drag-and-drop, multi-note move/delete, rename and duplicate commands, and customizable folder icons with color or emoji.
 - Editor-first layouts that adapt to how you work. Switch between 1, 2, and 3 pane views, detach notes into their own windows, tune editor width, and keep folders, note lists, outline, assistant, and the current note visible in the balance you want.
 - Optional AI help without AI lock-in. Use the built-in side assistant or run note editing flows through Claude Code, OpenAI Codex, OpenCode, or Ollama when you want assistance, while keeping plain files and local workflows at the center.
 - Built-in Git workflows for notes on disk. Initialize a repo, inspect status, commit changes, configure remotes, and push without leaving the app.
-- Deep workspace customization. Choose from 48 theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
+- Deep workspace customization. Choose from a growing set of theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
 - Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms, and get in-app update checks through the Tauri updater.
 
 ## Platform Status

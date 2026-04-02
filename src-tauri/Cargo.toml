@@ -1,6 +1,6 @@
 [package]
 name = "sly"
-version = "1.3.0-beta.2"
+version = "1.3.0-beta.3"
 description = "An offline markdown-based notes app"
 authors = ["Wayne Vernon"]
 edition = "2021"

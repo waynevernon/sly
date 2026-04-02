@@ -5578,20 +5578,24 @@ mod tests {
         persistence::app_config::old_default_appearance()
     }
 
-    fn temp_file_path(prefix: &str) -> PathBuf {
+    fn next_temp_suffix() -> String {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        std::env::temp_dir().join(format!("sly-{prefix}-{unique}.json"))
+        let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        format!("{unique}-{counter}")
+    }
+
+    fn temp_file_path(prefix: &str) -> PathBuf {
+        let suffix = next_temp_suffix();
+        std::env::temp_dir().join(format!("sly-{prefix}-{suffix}.json"))
     }
 
     fn temp_dir_path(prefix: &str) -> PathBuf {
-        let unique = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        std::env::temp_dir().join(format!("sly-{prefix}-{unique}"))
+        let suffix = next_temp_suffix();
+        std::env::temp_dir().join(format!("sly-{prefix}-{suffix}"))
     }
 
     #[cfg(target_os = "macos")]
