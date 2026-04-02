@@ -48,6 +48,7 @@ function makeNotesHookValue(
     deleteNote: vi.fn(),
     deleteSelectedNotes: vi.fn(),
     duplicateNote: vi.fn(),
+    renameNote: vi.fn(),
     pinNote: vi.fn(),
     unpinNote: vi.fn(),
     isLoading: false,

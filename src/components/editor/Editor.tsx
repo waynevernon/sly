@@ -41,6 +41,11 @@ import { toast } from "sonner";
 import { mod, alt, shift, isMac } from "../../lib/platform";
 import type { AssistantSelectionSnapshot } from "../../lib/assistant";
 import { markNoteOpenTiming } from "../../lib/noteOpenTiming";
+import {
+  deriveNoteTitleFromMarkdown,
+  isDefaultPlaceholderNoteId,
+  isDefaultPlaceholderTitle,
+} from "../../lib/noteIdentity";
 
 // Validate URL scheme for safe opening
 function isAllowedUrlScheme(url: string): boolean {
@@ -148,6 +153,25 @@ function focusAndSelectTitle(editor: TiptapEditor): boolean {
     .run();
 
   return true;
+}
+
+function selectionIsInsideH1(editor: TiptapEditor): boolean {
+  const { selection, doc } = editor.state;
+  let insideHeading = false;
+
+  doc.nodesBetween(selection.from, selection.to, (node) => {
+    if (node.type.name === "heading" && node.attrs.level === 1) {
+      insideHeading = true;
+      return false;
+    }
+    return true;
+  });
+
+  return insideHeading;
+}
+
+function isDuplicateDraftTitle(title: string): boolean {
+  return title.trimEnd().endsWith(" (Copy)");
 }
 
 // Standard number-field shortcuts for KaTeX (shared between inline and block math)
@@ -487,6 +511,7 @@ export interface WorkspaceEditorData {
   hasExternalChanges: boolean;
   reloadVersion: number;
   saveNote: (content: string, noteId?: string) => Promise<void>;
+  renameNote: (noteId: string, newName: string) => Promise<void>;
   reloadCurrentNote: () => Promise<void>;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
@@ -576,6 +601,7 @@ function EditorImpl({
           : notesCtx!.saveNote,
     [previewMode, workspaceMode, notesCtx]
   );
+  const renameNote = workspaceMode?.renameNote ?? notesCtx?.renameNote;
 
   const createNote = workspaceMode?.createNote ?? notesCtx?.createNote;
   const consumePendingNewNote =
@@ -646,6 +672,8 @@ function EditorImpl({
   const currentNoteIdRef = useRef<string | null>(null);
   // Track if we need to save (use ref to avoid computing markdown on every keystroke)
   const needsSaveRef = useRef(false);
+  const provisionalFilenameNoteIdRef = useRef<string | null>(null);
+  const committingFilenameNoteIdRef = useRef<string | null>(null);
   // Stable refs for wikilink click handler (avoids re-registering listener on every notes change)
   const notesRef = useRef(notes);
   notesRef.current = notes;
@@ -700,7 +728,6 @@ function EditorImpl({
   // Calculate if current note is pinned
   const isPinned =
     settings?.pinnedNoteIds?.includes(currentNote?.id || "") || false;
-
   // Find all matches for search query (case-insensitive)
   const findMatches = useCallback(
     (query: string, editorInstance: TiptapEditor | null) => {
@@ -824,6 +851,46 @@ function EditorImpl({
       await saveImmediately(loadedNoteIdRef.current, markdown);
     }
   }, [saveImmediately, getMarkdown]);
+
+  const finalizeProvisionalFilename = useCallback(async () => {
+    const noteId = provisionalFilenameNoteIdRef.current;
+    const currentEditor = editorRef.current;
+    if (
+      !noteId ||
+      !currentEditor ||
+      !renameNote ||
+      currentNoteIdRef.current !== noteId ||
+      committingFilenameNoteIdRef.current === noteId
+    ) {
+      return;
+    }
+
+    committingFilenameNoteIdRef.current = noteId;
+
+    try {
+      const markdown = getMarkdown(currentEditor);
+      const derivedTitle = deriveNoteTitleFromMarkdown(markdown);
+      if (
+        !derivedTitle.trim() ||
+        isDefaultPlaceholderTitle(derivedTitle)
+      ) {
+        return;
+      }
+
+      await flushPendingSave();
+      await renameNote(noteId, derivedTitle);
+    } catch (error) {
+      console.error("Failed to commit provisional filename:", error);
+      toast.error("Failed to rename file");
+    } finally {
+      if (provisionalFilenameNoteIdRef.current === noteId) {
+        provisionalFilenameNoteIdRef.current = null;
+      }
+      if (committingFilenameNoteIdRef.current === noteId) {
+        committingFilenameNoteIdRef.current = null;
+      }
+    }
+  }, [flushPendingSave, getMarkdown, renameNote]);
 
   useEffect(() => {
     onRegisterFlushPendingSave?.(flushPendingSave);
@@ -1294,6 +1361,18 @@ function EditorImpl({
     onSelectionUpdate: () => {
       // Trigger re-render to update toolbar active states
       setSelectionKey((k) => k + 1);
+      if (
+        provisionalFilenameNoteIdRef.current &&
+        editorRef.current &&
+        !selectionIsInsideH1(editorRef.current)
+      ) {
+        void finalizeProvisionalFilename();
+      }
+    },
+    onBlur: () => {
+      if (provisionalFilenameNoteIdRef.current) {
+        void finalizeProvisionalFilename();
+      }
     },
     // Prevent flash of unstyled content during initial render
     immediatelyRender: false,
@@ -1576,11 +1655,18 @@ function EditorImpl({
       isLoadingRef.current = false;
 
       if (consumePendingNewNote?.(loadingNoteId)) {
+        provisionalFilenameNoteIdRef.current =
+          isDefaultPlaceholderNoteId(loadingNoteId) ||
+            isDuplicateDraftTitle(currentNote.title)
+            ? loadingNoteId
+            : null;
         if (!focusAndSelectTitle(editor)) {
           editor.commands.focus("start");
         }
         return;
       }
+
+      provisionalFilenameNoteIdRef.current = null;
 
       // For brand new empty notes, focus and select all so user can start typing
       // Skip if the note list has focus (e.g. keyboard navigation with arrow keys)

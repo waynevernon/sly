@@ -106,6 +106,64 @@ describe("notes service", () => {
     ]);
   });
 
+  it("routes rename_note with the provided id and new name", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return {
+        id: "alpha-renamed",
+        title: "Alpha Renamed",
+        content: "# Alpha Renamed\n",
+        path: "/notes/alpha-renamed.md",
+        modified: 1,
+      };
+    });
+
+    await expect(notesService.renameNote("alpha", "Alpha Renamed")).resolves.toEqual({
+      id: "alpha-renamed",
+      title: "Alpha Renamed",
+      content: "# Alpha Renamed\n",
+      path: "/notes/alpha-renamed.md",
+      modified: 1,
+    });
+
+    expect(calls).toEqual([
+      {
+        cmd: "rename_note",
+        payload: { id: "alpha", newName: "Alpha Renamed" },
+      },
+    ]);
+  });
+
+  it("routes duplicate_note with the provided id", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return {
+        id: "alpha-copy",
+        title: "Alpha (Copy)",
+        content: "# Alpha (Copy)\n",
+        path: "/notes/alpha-copy.md",
+        modified: 1,
+      };
+    });
+
+    await expect(notesService.duplicateNote("alpha")).resolves.toEqual({
+      id: "alpha-copy",
+      title: "Alpha (Copy)",
+      content: "# Alpha (Copy)\n",
+      path: "/notes/alpha-copy.md",
+      modified: 1,
+    });
+
+    expect(calls).toEqual([
+      {
+        cmd: "duplicate_note",
+        payload: { id: "alpha" },
+      },
+    ]);
+  });
+
   it("routes move_notes with the provided ids and target folder", async () => {
     const calls: Array<{ cmd: string; payload: unknown }> = [];
     mockIPC((cmd, payload) => {

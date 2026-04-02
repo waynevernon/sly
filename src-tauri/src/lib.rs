@@ -801,6 +801,78 @@ fn sanitize_filename(title: &str) -> String {
     }
 }
 
+fn note_id_dir_prefix(id: &str) -> Option<&str> {
+    id.rfind('/').map(|pos| &id[..pos])
+}
+
+#[cfg(test)]
+fn is_default_placeholder_leaf(leaf: &str) -> bool {
+    if leaf == "Untitled" {
+        return true;
+    }
+
+    leaf.strip_prefix("Untitled-")
+        .map(|suffix| !suffix.is_empty() && suffix.chars().all(|char| char.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+fn is_default_placeholder_title(title: &str) -> bool {
+    let trimmed = title.trim();
+    if trimmed == "Untitled" {
+        return true;
+    }
+
+    trimmed
+        .strip_prefix("Untitled ")
+        .map(|suffix| !suffix.is_empty() && suffix.chars().all(|char| char.is_ascii_digit()))
+        .unwrap_or(false)
+}
+
+fn build_note_id_with_leaf(id: &str, leaf: &str) -> String {
+    if let Some(prefix) = note_id_dir_prefix(id) {
+        format!("{prefix}/{leaf}")
+    } else {
+        leaf.to_string()
+    }
+}
+
+fn unique_note_id_for_leaf(
+    notes_root: &Path,
+    base_id: &str,
+    desired_leaf: &str,
+) -> Result<String, String> {
+    let dir_prefix = note_id_dir_prefix(base_id);
+    let original_id = build_note_id_with_leaf(base_id, desired_leaf);
+    let mut candidate_id = original_id.clone();
+    let mut counter = 1;
+
+    while candidate_id != base_id
+        && abs_path_from_id(notes_root, &candidate_id)
+            .map(|path| path.exists())
+            .unwrap_or(false)
+    {
+        let next_leaf = format!("{desired_leaf}-{counter}");
+        candidate_id = if let Some(prefix) = dir_prefix {
+            format!("{prefix}/{next_leaf}")
+        } else {
+            next_leaf
+        };
+        counter += 1;
+    }
+
+    Ok(candidate_id)
+}
+
+fn normalize_requested_note_leaf(new_name: &str) -> String {
+    let trimmed = new_name.trim();
+    let without_extension = trimmed
+        .strip_suffix(".md")
+        .or_else(|| trimmed.strip_suffix(".MD"))
+        .unwrap_or(trimmed);
+    sanitize_filename(without_extension)
+}
+
 /// Expands template tags in a note name template using local timezone
 fn expand_note_name_template(template: &str) -> String {
     use chrono::Local;
@@ -890,6 +962,55 @@ fn extract_title(content: &str) -> String {
         }
     }
     "Untitled".to_string()
+}
+
+fn rewrite_content_heading(content: &str, new_title: &str) -> String {
+    let new_heading = format!("# {new_title}");
+    let frontmatter_end = if content.starts_with("---\n") || content.starts_with("---\r\n") {
+        if let Some(rest) = content.strip_prefix("---") {
+            if let Some(end) = rest.find("\n---") {
+                let after_close = end + 4;
+                let after_newline = &rest[after_close..];
+                let advance = if after_newline.starts_with("\r\n") {
+                    2
+                } else if after_newline.starts_with('\n') {
+                    1
+                } else {
+                    0
+                };
+                Some(3 + after_close + advance)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+    .unwrap_or(0);
+
+    let body = &content[frontmatter_end..];
+    let mut body_lines = body.lines();
+    if let Some(first_line) = body_lines.next() {
+        if first_line.trim().starts_with("# ") {
+            let remaining = body_lines.collect::<Vec<_>>().join("\n");
+            let prefix = &content[..frontmatter_end];
+            return if remaining.is_empty() {
+                format!("{prefix}{new_heading}\n")
+            } else {
+                format!("{prefix}{new_heading}\n{remaining}")
+            };
+        }
+    }
+
+    let prefix = &content[..frontmatter_end];
+    let suffix = &content[frontmatter_end..];
+    if suffix.is_empty() {
+        format!("{prefix}{new_heading}\n\n")
+    } else {
+        format!("{prefix}{new_heading}\n\n{suffix}")
+    }
 }
 
 // Utility: Generate preview from content (strip markdown formatting)
@@ -1771,46 +1892,12 @@ async fn save_note(
     let folder_path = PathBuf::from(&folder);
 
     let title = extract_title(&content);
-    let sanitized_leaf = sanitize_filename(&title);
 
-    // Determine the file ID and path, handling renames
-    let (final_id, file_path, old_id) = if let Some(existing_id) = id {
-        // Preserve directory prefix for notes in subfolders
-        let (dir_prefix, desired_id) = if let Some(pos) = existing_id.rfind('/') {
-            let prefix = &existing_id[..pos];
-            (
-                Some(prefix.to_string()),
-                format!("{}/{}", prefix, sanitized_leaf),
-            )
-        } else {
-            (None, sanitized_leaf.clone())
-        };
-
-        let old_file_path = abs_path_from_id(&folder_path, &existing_id)?;
-
-        if existing_id != desired_id {
-            let mut new_id = desired_id.clone();
-            let mut counter = 1;
-
-            while new_id != existing_id
-                && abs_path_from_id(&folder_path, &new_id)
-                    .map(|p| p.exists())
-                    .unwrap_or(false)
-            {
-                new_id = if let Some(ref prefix) = dir_prefix {
-                    format!("{}/{}-{}", prefix, sanitized_leaf, counter)
-                } else {
-                    format!("{}-{}", sanitized_leaf, counter)
-                };
-                counter += 1;
-            }
-
-            let new_file_path = abs_path_from_id(&folder_path, &new_id)?;
-            (new_id, new_file_path, Some((existing_id, old_file_path)))
-        } else {
-            (existing_id, old_file_path, None)
-        }
+    let (final_id, file_path) = if let Some(existing_id) = id {
+        let existing_path = abs_path_from_id(&folder_path, &existing_id)?;
+        (existing_id, existing_path)
     } else {
+        let sanitized_leaf = sanitize_filename(&title);
         // New notes go in root
         let mut new_id = sanitized_leaf.clone();
         let mut counter = 1;
@@ -1824,20 +1911,13 @@ async fn save_note(
         }
 
         let new_file_path = abs_path_from_id(&folder_path, &new_id)?;
-        (new_id, new_file_path, None)
+        (new_id, new_file_path)
     };
 
-    // Write the file to the new path
+    // Write the file to the current path
     fs::write(&file_path, &content)
         .await
         .map_err(|e| e.to_string())?;
-
-    // Delete old file AFTER successful write (to prevent data loss)
-    if let Some((_, ref old_file_path)) = old_id {
-        if old_file_path.exists() && *old_file_path != file_path {
-            let _ = fs::remove_file(old_file_path).await;
-        }
-    }
 
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
     let modified = metadata
@@ -1851,17 +1931,108 @@ async fn save_note(
     {
         let index = state.search_index.lock().expect("search index mutex");
         if let Some(ref search_index) = *index {
-            if let Some((ref old_id_str, _)) = old_id {
-                let _ = search_index.delete_note(old_id_str);
-            }
             let _ = search_index.index_note(&final_id, &title, &content, modified);
         }
     }
 
-    // Update cache (remove old entry if renamed)
-    if let Some((ref old_id_str, _)) = old_id {
+    Ok(Note {
+        id: final_id,
+        title,
+        content,
+        path: file_path.to_string_lossy().into_owned(),
+        modified,
+    })
+}
+
+#[tauri::command]
+async fn rename_note(
+    id: String,
+    new_name: String,
+    state: State<'_, AppState>,
+) -> Result<Note, String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let folder_path = PathBuf::from(&folder);
+    let old_file_path = abs_path_from_id(&folder_path, &id)?;
+    if !old_file_path.exists() {
+        return Err("Note not found".to_string());
+    }
+
+    let content = fs::read_to_string(&old_file_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    let title = extract_title(&content);
+    let desired_leaf = normalize_requested_note_leaf(&new_name);
+    let final_id = unique_note_id_for_leaf(&folder_path, &id, &desired_leaf)?;
+
+    let file_path = if final_id != id {
+        let new_file_path = abs_path_from_id(&folder_path, &final_id)?;
+        tokio::fs::rename(&old_file_path, &new_file_path)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        {
+            let mut cache = state.notes_cache.write().expect("cache write lock");
+            cache.remove(&id);
+        }
+
+        {
+            let index = state.search_index.lock().expect("search index mutex");
+            if let Some(ref search_index) = *index {
+                let _ = search_index.delete_note(&id);
+            }
+        }
+
+        {
+            let mut note_windows = state.note_windows.lock().expect("note windows mutex");
+            if let Some(label) = note_windows.remove(&id) {
+                note_windows.insert(final_id.clone(), label);
+            }
+        }
+
+        new_file_path
+    } else {
+        old_file_path
+    };
+
+    let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let preview = generate_preview(&content);
+    let created = {
+        let cache = state.notes_cache.read().expect("cache read lock");
+        cache.get(&id).map(|note| note.created).unwrap_or(modified)
+    };
+
+    {
+        let index = state.search_index.lock().expect("search index mutex");
+        if let Some(ref search_index) = *index {
+            let _ = search_index.index_note(&final_id, &title, &content, modified);
+        }
+    }
+
+    {
         let mut cache = state.notes_cache.write().expect("cache write lock");
-        cache.remove(old_id_str);
+        cache.insert(
+            final_id.clone(),
+            NoteMetadata {
+                id: final_id.clone(),
+                title: title.clone(),
+                preview,
+                modified,
+                created,
+            },
+        );
     }
 
     Ok(Note {
@@ -2061,6 +2232,80 @@ async fn create_note(
         id: final_id,
         title: display_title,
         content,
+        path: file_path.to_string_lossy().into_owned(),
+        modified,
+    })
+}
+
+#[tauri::command]
+async fn duplicate_note(id: String, state: State<'_, AppState>) -> Result<Note, String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let folder_path = PathBuf::from(&folder);
+    let source_path = abs_path_from_id(&folder_path, &id)?;
+    if !source_path.exists() {
+        return Err("Note not found".to_string());
+    }
+
+    let original_content = fs::read_to_string(&source_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    let source_title = extract_title(&original_content);
+    let duplicate_title = format!("{source_title} (Copy)");
+    let duplicate_content = rewrite_content_heading(&original_content, &duplicate_title);
+    let desired_leaf = sanitize_filename(&duplicate_title);
+    let base_id = build_note_id_with_leaf(&id, &desired_leaf);
+    let final_id = unique_note_id_for_leaf(&folder_path, &base_id, &desired_leaf)?;
+    let file_path = abs_path_from_id(&folder_path, &final_id)?;
+
+    fs::write(&file_path, &duplicate_content)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let created = metadata
+        .created()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(modified);
+
+    {
+        let index = state.search_index.lock().expect("search index mutex");
+        if let Some(ref search_index) = *index {
+            let _ = search_index.index_note(&final_id, &duplicate_title, &duplicate_content, modified);
+        }
+    }
+
+    {
+        let mut cache = state.notes_cache.write().expect("cache write lock");
+        cache.insert(
+            final_id.clone(),
+            NoteMetadata {
+                id: final_id.clone(),
+                title: duplicate_title.clone(),
+                preview: generate_preview(&duplicate_content),
+                modified,
+                created,
+            },
+        );
+    }
+
+    Ok(Note {
+        id: final_id,
+        title: duplicate_title,
+        content: duplicate_content,
         path: file_path.to_string_lossy().into_owned(),
         modified,
     })
@@ -5224,9 +5469,11 @@ pub fn run() {
             list_notes,
             read_note,
             save_note,
+            rename_note,
             delete_note,
             delete_notes,
             create_note,
+            duplicate_note,
             list_folders,
             create_folder,
             delete_folder,
@@ -5925,6 +6172,56 @@ mod tests {
     fn sanitize_filename_normalizes_empty_and_invalid_characters() {
         assert_eq!(sanitize_filename("  My:/Note  "), "My--Note");
         assert_eq!(sanitize_filename(" \u{00A0}\u{FEFF} "), "Untitled");
+    }
+
+    #[test]
+    fn placeholder_detection_is_limited_to_default_untitled_names() {
+        assert!(is_default_placeholder_leaf("Untitled"));
+        assert!(is_default_placeholder_leaf("Untitled-3"));
+        assert!(!is_default_placeholder_leaf("Daily"));
+        assert!(!is_default_placeholder_leaf("Untitled-copy"));
+        assert!(is_default_placeholder_title("Untitled"));
+        assert!(is_default_placeholder_title("Untitled 4"));
+        assert!(!is_default_placeholder_title("Untitled Copy"));
+    }
+
+    #[test]
+    fn unique_note_id_for_leaf_preserves_folder_prefix_and_suffixes_collisions() {
+        let notes_root = temp_dir_path("unique-note-id");
+        std::fs::create_dir_all(notes_root.join("docs")).unwrap();
+        std::fs::write(notes_root.join("docs/Alpha.md"), "# Alpha\n").unwrap();
+
+        let unique_id =
+            unique_note_id_for_leaf(&notes_root, "docs/Untitled", "Alpha").unwrap();
+
+        assert_eq!(unique_id, "docs/Alpha-1");
+
+        let _ = std::fs::remove_dir_all(notes_root);
+    }
+
+    #[test]
+    fn normalize_requested_note_leaf_strips_markdown_extension() {
+        assert_eq!(normalize_requested_note_leaf("  Daily.md "), "Daily");
+        assert_eq!(normalize_requested_note_leaf("Report.MD"), "Report");
+    }
+
+    #[test]
+    fn rewrite_content_heading_replaces_existing_heading_after_frontmatter() {
+        let original = "---\nlayout: note\n---\n# Original\n\nBody";
+        let rewritten = rewrite_content_heading(original, "Original (Copy)");
+
+        assert_eq!(
+            rewritten,
+            "---\nlayout: note\n---\n# Original (Copy)\n\nBody"
+        );
+    }
+
+    #[test]
+    fn rewrite_content_heading_inserts_heading_when_missing() {
+        let original = "First paragraph\n\nBody";
+        let rewritten = rewrite_content_heading(original, "Inserted");
+
+        assert_eq!(rewritten, "# Inserted\n\nFirst paragraph\n\nBody");
     }
 
     #[test]

@@ -23,7 +23,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Button,
   Checkbox,
+  Input,
   ListItem,
   destructiveMenuItemClassName,
   menuItemClassName,
@@ -32,7 +34,7 @@ import {
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
-import { CopyIcon, PinIcon, TrashIcon, XIcon } from "../icons";
+import { CopyIcon, PinIcon, PencilIcon, TrashIcon, XIcon } from "../icons";
 
 export interface NoteListItem {
   id: string;
@@ -85,6 +87,10 @@ function formatDate(timestamp: number): string {
 function getNoteFilename(id: string): string {
   const baseName = id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
   return `${baseName}.md`;
+}
+
+function getNoteLeaf(id: string): string {
+  return id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
 }
 
 type SelectionState = "none" | "selected" | "active";
@@ -188,6 +194,7 @@ interface NoteItemWithMenuProps extends NoteItemProps {
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
+  onRenameFile: (id: string) => void;
   onOpenInNewWindow: (id: string) => void;
   onDelete: (ids: string[]) => void;
   onClearSelection: () => void;
@@ -208,6 +215,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onPin,
   onUnpin,
   onDuplicate,
+  onRenameFile,
   onOpenInNewWindow,
   onDelete,
   onClearSelection,
@@ -327,6 +335,13 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
               </ContextMenu.Item>
               <ContextMenu.Item
                 className={menuItemClassName}
+                onSelect={() => onRenameFile(id)}
+              >
+                <PencilIcon className="w-4 h-4 stroke-[1.6]" />
+                Rename File…
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
                 onSelect={handleCopyFilepath}
               >
                 <CopyIcon className="w-4 h-4 stroke-[1.6]" />
@@ -379,6 +394,7 @@ export function NoteList({
     deleteNote,
     deleteSelectedNotes,
     duplicateNote,
+    renameNote,
     pinNote,
     unpinNote,
     isLoading,
@@ -393,8 +409,13 @@ export function NoteList({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteIdsToDelete, setNoteIdsToDelete] = useState<string[]>([]);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [noteIdToRename, setNoteIdToRename] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const pinnedIds = useMemo(
     () => new Set(settings.pinnedNoteIds || []),
@@ -481,6 +502,54 @@ export function NoteList({
     [confirmDeletions, focusList, runDelete],
   );
 
+  const openRenameDialog = useCallback(
+    (noteId: string) => {
+      focusList();
+      const baseName = getNoteLeaf(noteId);
+      setNoteIdToRename(noteId);
+      setRenameValue(baseName);
+      setRenameDialogOpen(true);
+    },
+    [focusList],
+  );
+
+  const closeRenameDialog = useCallback(() => {
+    if (isRenaming) return;
+    setRenameDialogOpen(false);
+    setNoteIdToRename(null);
+    setRenameValue("");
+  }, [isRenaming]);
+
+  const handleRenameConfirm = useCallback(async () => {
+    if (!noteIdToRename) return;
+
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      closeRenameDialog();
+      return;
+    }
+
+    const currentLeaf = getNoteLeaf(noteIdToRename);
+    if (trimmed === currentLeaf || trimmed === `${currentLeaf}.md`) {
+      closeRenameDialog();
+      return;
+    }
+
+    try {
+      setIsRenaming(true);
+      await renameNote(noteIdToRename, trimmed);
+      setRenameDialogOpen(false);
+      setNoteIdToRename(null);
+      setRenameValue("");
+      toast.success("Filename updated");
+    } catch (error) {
+      console.error("Failed to rename note file:", error);
+      toast.error("Failed to rename file");
+    } finally {
+      setIsRenaming(false);
+    }
+  }, [closeRenameDialog, noteIdToRename, renameNote, renameValue]);
+
   useEffect(() => {
     const handleFocusNoteList = () => {
       focusList();
@@ -490,6 +559,17 @@ export function NoteList({
     return () =>
       window.removeEventListener("focus-note-list", handleFocusNoteList);
   }, [focusList]);
+
+  useEffect(() => {
+    if (!renameDialogOpen) return;
+
+    const frame = requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [renameDialogOpen]);
 
   useEffect(() => {
     const handleRequestDelete = (event: Event) => {
@@ -565,6 +645,7 @@ export function NoteList({
               onPin={pinNote}
               onUnpin={unpinNote}
               onDuplicate={duplicateNote}
+              onRenameFile={openRenameDialog}
               onOpenInNewWindow={(noteId) => {
                 void notesService
                   .openNoteWindow(noteId)
@@ -611,6 +692,45 @@ export function NoteList({
             <AlertDialogAction onClick={handleDeleteConfirm}>
               {deleteDialogCopy.actionLabel}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={renameDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rename file</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose a new file name. The `.md` extension is kept automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            placeholder="Untitled"
+            disabled={isRenaming}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void handleRenameConfirm();
+              }
+            }}
+          />
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={closeRenameDialog} disabled={isRenaming}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameConfirm} disabled={isRenaming}>
+              {isRenaming ? "Renaming..." : "Rename"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

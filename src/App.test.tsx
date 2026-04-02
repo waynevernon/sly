@@ -33,6 +33,7 @@ const notesActionsState = {
   selectAllVisibleNotes: vi.fn(),
   reloadCurrentNote: vi.fn(),
   saveNote: vi.fn(),
+  renameNote: vi.fn(),
   syncNotesFolder: vi.fn(),
   consumePendingNewNote: vi.fn(() => false),
   pinNote: vi.fn(),

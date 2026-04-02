@@ -91,6 +91,7 @@ interface NotesActionsContextValue {
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
+  renameNote: (id: string, newName: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   deleteSelectedNotes: () => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
@@ -1161,6 +1162,47 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
+  const applyUpdatedNoteState = useCallback(
+    async (previousId: string, updated: Note) => {
+      if (updated.id !== previousId) {
+        const pinnedIds = settingsRef.current.pinnedNoteIds || [];
+        const recentNoteIds = settingsRef.current.recentNoteIds || [];
+        if (pinnedIds.includes(previousId) || recentNoteIds.includes(previousId)) {
+          await persistSettings((currentSettings) => ({
+            ...currentSettings,
+            pinnedNoteIds: normalizeNoteIds(
+              (currentSettings.pinnedNoteIds || []).map((id) =>
+                id === previousId ? updated.id : id,
+              ),
+            ),
+            recentNoteIds: sanitizeRecentNoteIds(
+              (currentSettings.recentNoteIds || []).map((id) =>
+                id === previousId ? updated.id : id,
+              ),
+            ),
+          }));
+        }
+      }
+
+      setHasExternalChanges(false);
+      setCurrentNote((prevNote) =>
+        prevNote?.id === previousId || prevNote?.id === updated.id ? updated : prevNote,
+      );
+      setSelectedNoteId((prevId) => (prevId === previousId ? updated.id : prevId));
+      setSelectedNoteIds((prevIds) =>
+        prevIds.map((id) => (id === previousId ? updated.id : id)),
+      );
+
+      if (selectionAnchorIdRef.current === previousId) {
+        selectionAnchorIdRef.current = updated.id;
+      }
+      if (selectionRangeEndIdRef.current === previousId) {
+        selectionRangeEndIdRef.current = updated.id;
+      }
+    },
+    [persistSettings],
+  );
+
   const saveNote = useCallback(
     async (content: string, noteId?: string) => {
       // Use provided noteId (for flush saves) or fall back to currentNote.id
@@ -1185,56 +1227,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         }
 
         updatedId = updated.id;
-
-        // If the note was renamed (ID changed), also mark the new ID
         if (updated.id !== savingNoteId) {
           recentlySavedRef.current.add(updated.id);
-
-          const pinnedIds = settingsRef.current.pinnedNoteIds || [];
-          const recentNoteIds = settingsRef.current.recentNoteIds || [];
-          if (
-            pinnedIds.includes(savingNoteId) ||
-            recentNoteIds.includes(savingNoteId)
-          ) {
-            await persistSettings((currentSettings) => ({
-              ...currentSettings,
-              pinnedNoteIds: normalizeNoteIds(
-                (currentSettings.pinnedNoteIds || []).map((id) =>
-                  id === savingNoteId ? updated.id : id,
-                ),
-              ),
-              recentNoteIds: sanitizeRecentNoteIds(
-                (currentSettings.recentNoteIds || []).map((id) =>
-                  id === savingNoteId ? updated.id : id,
-                ),
-              ),
-            }));
-          }
         }
 
-        // Clear external changes flag - if it was set by our own save, we want to ignore it
-        setHasExternalChanges(false);
-
-        // Only update state if we're still on the same note we started saving
-        // This prevents race conditions when user switches notes during save
-        setSelectedNoteId((prevId) => {
-          if (prevId === savingNoteId) {
-            // Update to the new ID if the note was renamed
-            setCurrentNote(updated);
-            return updated.id;
-          }
-          // User switched to a different note, don't update current note
-          return prevId;
-        });
-        setSelectedNoteIds((prevIds) =>
-          prevIds.map((id) => (id === savingNoteId ? updated.id : id)),
-        );
-        if (selectionAnchorIdRef.current === savingNoteId) {
-          selectionAnchorIdRef.current = updated.id;
-        }
-        if (selectionRangeEndIdRef.current === savingNoteId) {
-          selectionRangeEndIdRef.current = updated.id;
-        }
+        await applyUpdatedNoteState(savingNoteId, updated);
 
         // Schedule refresh with debounce - avoids blocking typing during rapid saves
         scheduleRefresh();
@@ -1252,7 +1249,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         if (updatedId) recentlySavedRef.current.delete(updatedId);
       }
     },
-    [currentNote, persistSettings, scheduleRefresh]
+    [applyUpdatedNoteState, currentNote, scheduleRefresh]
   );
 
   const search = useCallback(async (query: string) => {
@@ -1343,6 +1340,37 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!activeQuery) return;
     await search(activeQuery);
   }, [search]);
+
+  const renameNote = useCallback(
+    async (id: string, newName: string) => {
+      let updatedId: string | null = null;
+
+      try {
+        recentlySavedRef.current.add(id);
+        const updated = await notesService.renameNote(id, newName);
+        updatedId = updated.id;
+
+        if (updated.id !== id) {
+          recentlySavedRef.current.add(updated.id);
+        }
+
+        await applyUpdatedNoteState(id, updated);
+        await refreshNotes();
+        await refreshActiveSearchResults();
+
+        setTimeout(() => {
+          recentlySavedRef.current.delete(id);
+          if (updatedId) recentlySavedRef.current.delete(updatedId);
+        }, 1000);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to rename note");
+        recentlySavedRef.current.delete(id);
+        if (updatedId) recentlySavedRef.current.delete(updatedId);
+        throw err;
+      }
+    },
+    [applyUpdatedNoteState, refreshActiveSearchResults, refreshNotes],
+  );
 
   const deleteNote = useCallback(
     async (id: string) => {
@@ -1450,6 +1478,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       try {
         const newNote = await notesService.duplicateNote(id);
         selectRequestIdRef.current += 1;
+        pendingNewNoteIdRef.current = newNote.id;
         // Mark as recently saved to ignore file-change events from our own creation
         recentlySavedRef.current.add(newNote.id);
         await refreshNotes();
@@ -2305,6 +2334,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createNote,
       consumePendingNewNote,
       saveNote,
+      renameNote,
       deleteNote,
       deleteSelectedNotes,
       duplicateNote,
@@ -2344,6 +2374,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createNote,
       consumePendingNewNote,
       saveNote,
+      renameNote,
       deleteNote,
       deleteSelectedNotes,
       duplicateNote,

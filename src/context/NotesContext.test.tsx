@@ -23,9 +23,11 @@ vi.mock("../services/notes", () => ({
   listNotes: vi.fn(),
   readNote: vi.fn(),
   saveNote: vi.fn(),
+  renameNote: vi.fn(),
   deleteNote: vi.fn(),
   deleteNotes: vi.fn(),
   createNote: vi.fn(),
+  duplicateNote: vi.fn(),
   listFolders: vi.fn(),
   createFolder: vi.fn(),
   deleteFolder: vi.fn(),
@@ -1662,5 +1664,63 @@ describe("NotesContext", () => {
     });
     expect(result.current.showRecentNotes).toBe(false);
     expect(result.current.selectedScope).toEqual({ type: "all" });
+  });
+
+  it("keeps selection and current note in sync after an explicit rename", async () => {
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "alpha",
+      title: "Alpha note",
+      content: "# Alpha note\n",
+      path: "/notes/alpha.md",
+      modified: 2,
+    });
+    vi.mocked(notesService.renameNote).mockResolvedValue({
+      id: "alpha-renamed",
+      title: "Alpha renamed",
+      content: "# Alpha renamed\n",
+      path: "/notes/alpha-renamed.md",
+      modified: 3,
+    });
+    vi.mocked(notesService.listNotes)
+      .mockResolvedValueOnce([
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "alpha-renamed",
+          title: "Alpha renamed",
+          preview: "planning",
+          modified: 3,
+          created: 2,
+        },
+      ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await act(async () => {
+      await result.current.renameNote("alpha", "Alpha renamed");
+    });
+
+    expect(notesService.renameNote).toHaveBeenCalledWith("alpha", "Alpha renamed");
+
+    await waitFor(() => {
+      expect(result.current.selectedNoteId).toBe("alpha-renamed");
+      expect(result.current.currentNote?.id).toBe("alpha-renamed");
+      expect(result.current.currentNote?.path).toBe("/notes/alpha-renamed.md");
+    });
   });
 });
