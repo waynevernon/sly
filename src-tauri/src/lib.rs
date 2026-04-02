@@ -426,9 +426,9 @@ pub struct Settings {
     pub collapsed_folders: Option<Vec<String>>,
     #[serde(rename = "noteListDateMode", default)]
     pub note_list_date_mode: NoteListDateMode,
-    #[serde(rename = "showNoteListFilename", default)]
+    #[serde(rename = "showNoteListFilename", default = "default_true")]
     pub show_note_list_filename: bool,
-    #[serde(rename = "showNoteListFolderPath", default = "default_true")]
+    #[serde(rename = "showNoteListFolderPath", default)]
     pub show_note_list_folder_path: bool,
     #[serde(rename = "showNoteListPreview", default = "default_true")]
     pub show_note_list_preview: bool,
@@ -461,8 +461,8 @@ impl Default for Settings {
             folder_icons: None,
             collapsed_folders: None,
             note_list_date_mode: NoteListDateMode::default(),
-            show_note_list_filename: false,
-            show_note_list_folder_path: true,
+            show_note_list_filename: true,
+            show_note_list_folder_path: false,
             show_note_list_preview: true,
             note_list_preview_lines: default_note_list_preview_lines(),
             note_sort_mode: NoteSortMode::default(),
@@ -6246,8 +6246,8 @@ mod tests {
             folder_icons: None,
             collapsed_folders: None,
             note_list_date_mode: NoteListDateMode::Modified,
-            show_note_list_filename: false,
-            show_note_list_folder_path: true,
+            show_note_list_filename: true,
+            show_note_list_folder_path: false,
             show_note_list_preview: true,
             note_list_preview_lines: 2,
             note_sort_mode: NoteSortMode::TitleAsc,
@@ -6327,8 +6327,8 @@ mod tests {
         assert_eq!(settings.folder_icons, None);
         assert_eq!(settings.collapsed_folders, None);
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Modified);
-        assert!(!settings.show_note_list_filename);
-        assert!(settings.show_note_list_folder_path);
+        assert!(settings.show_note_list_filename);
+        assert!(!settings.show_note_list_folder_path);
         assert!(settings.show_note_list_preview);
         assert_eq!(
             settings.note_list_preview_lines,

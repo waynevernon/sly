@@ -150,8 +150,8 @@ const DEFAULT_SETTINGS: Settings = {
   showNoteCounts: true,
   showNotesFromSubfolders: false,
   noteListDateMode: "modified",
-  showNoteListFilename: false,
-  showNoteListFolderPath: true,
+  showNoteListFilename: true,
+  showNoteListFolderPath: false,
   showNoteListPreview: true,
   noteListPreviewLines: 2,
   noteSortMode: DEFAULT_NOTE_SORT_MODE,
@@ -575,8 +575,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     settings.showNoteListPreview === false
       ? 0
       : settings.noteListPreviewLines ?? 2;
-  const showNoteListFilename = settings.showNoteListFilename ?? false;
-  const showNoteListFolderPath = settings.showNoteListFolderPath ?? true;
+  const showNoteListFilename = settings.showNoteListFilename ?? true;
+  const showNoteListFolderPath = settings.showNoteListFolderPath ?? false;
   const showNoteListPreview = settings.showNoteListPreview ?? true;
 
   const refreshNotes = useCallback(async () => {

@@ -86,8 +86,8 @@ function makeNotesHookValue(
     noteListPreviewLines: 2,
     showNoteCounts: true,
     showNotesFromSubfolders: false,
-    showNoteListFilename: false,
-    showNoteListFolderPath: true,
+    showNoteListFilename: true,
+    showNoteListFolderPath: false,
     showNoteListPreview: true,
     showRecentNotes: true,
     selectedScope: { type: "all" },
@@ -341,7 +341,7 @@ describe("NotesPane", () => {
       showNotesFromSubfolders: true,
     });
     expect(setNoteListViewOptions).toHaveBeenCalledWith({
-      showNoteListFolderPath: false,
+      showNoteListFolderPath: true,
     });
   });
 

@@ -97,10 +97,10 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
         settings.note_list_date_mode = note_list_date_mode;
     }
     if let Some(show_note_list_filename) = patch.show_note_list_filename {
-        settings.show_note_list_filename = show_note_list_filename.unwrap_or(false);
+        settings.show_note_list_filename = show_note_list_filename.unwrap_or(true);
     }
     if let Some(show_note_list_folder_path) = patch.show_note_list_folder_path {
-        settings.show_note_list_folder_path = show_note_list_folder_path.unwrap_or(true);
+        settings.show_note_list_folder_path = show_note_list_folder_path.unwrap_or(false);
     }
     if let Some(show_note_list_preview) = patch.show_note_list_preview {
         settings.show_note_list_preview = show_note_list_preview.unwrap_or(true);

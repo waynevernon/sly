@@ -63,8 +63,8 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     showNoteCounts: true,
     showNotesFromSubfolders: false,
     noteListDateMode: "modified",
-    showNoteListFilename: false,
-    showNoteListFolderPath: true,
+    showNoteListFilename: true,
+    showNoteListFolderPath: false,
     showNoteListPreview: true,
     noteListPreviewLines: 2,
     noteSortMode: "modifiedDesc",
@@ -243,8 +243,8 @@ describe("NotesContext", () => {
     expect(result.current.noteListPreviewLines).toBe(2);
     expect(result.current.showNoteCounts).toBe(true);
     expect(result.current.showNotesFromSubfolders).toBe(false);
-    expect(result.current.showNoteListFilename).toBe(false);
-    expect(result.current.showNoteListFolderPath).toBe(true);
+    expect(result.current.showNoteListFilename).toBe(true);
+    expect(result.current.showNoteListFolderPath).toBe(false);
     expect(result.current.showNoteListPreview).toBe(true);
 
     await act(async () => {
@@ -263,8 +263,6 @@ describe("NotesContext", () => {
       showNoteListPreview: false,
       showNoteCounts: false,
       showNotesFromSubfolders: true,
-      showNoteListFilename: true,
-      showNoteListFolderPath: false,
     });
     expect(result.current.noteListDateMode).toBe("off");
     expect(result.current.noteListPreviewLines).toBe(0);
