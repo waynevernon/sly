@@ -62,6 +62,7 @@ function AssistantSelectMenu<T extends string>({
   items,
   ariaLabel,
   onChange,
+  triggerClassName,
 }: {
   value: T;
   items: Array<{
@@ -71,6 +72,7 @@ function AssistantSelectMenu<T extends string>({
   }>;
   ariaLabel: string;
   onChange: (value: T) => void;
+  triggerClassName?: string;
 }) {
   const selectedItem = items.find((item) => item.value === value) ?? items[0];
 
@@ -83,6 +85,7 @@ function AssistantSelectMenu<T extends string>({
           className={cn(
             "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-left text-sm text-text transition-colors",
             "hover:bg-bg-muted data-[state=open]:bg-bg-muted",
+            triggerClassName,
           )}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -373,24 +376,11 @@ export function RightPanelAssistant({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border/80 px-2 py-2">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <AssistantSelectMenu<AiProvider>
-              value={thread.provider}
-              items={providerItems}
-              onChange={onProviderChange}
-              ariaLabel="Assistant provider"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <AssistantSelectMenu<AssistantThreadState["scope"]>
-              value={thread.scope}
-              items={scopeItems}
-              onChange={onScopeChange}
-              ariaLabel="Assistant scope"
-            />
-          </div>
+      <div
+        ref={transcriptRef}
+        className="ui-scrollbar-overlay min-h-0 flex-1 overflow-y-auto px-2 py-2"
+      >
+        <div className="mb-2 flex justify-end">
           <Tooltip content="Clear this note's assistant thread">
             <span>
               <IconButton
@@ -406,12 +396,6 @@ export function RightPanelAssistant({
             </span>
           </Tooltip>
         </div>
-      </div>
-
-      <div
-        ref={transcriptRef}
-        className="ui-scrollbar-overlay min-h-0 flex-1 overflow-y-auto px-2 py-2"
-      >
         {thread.turns.length === 0 ? null : (
           <div className="space-y-2.5">
             {thread.turns.map((turn) => {
@@ -463,32 +447,56 @@ export function RightPanelAssistant({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-border/80 p-2">
-        <textarea
-          value={thread.draft}
-          onChange={(event) => onDraftChange(event.target.value)}
-          onKeyDown={handleComposerKeyDown}
-          placeholder="Ask about the current note, request a rewrite, or focus on the current section or selection."
-          disabled={thread.pending}
-          className="ui-focus-ring min-h-28 w-full resize-none rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2.5 text-sm text-text outline-none placeholder:text-text-muted disabled:opacity-50"
-        />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <span>Send with</span>
-            <div className="flex items-center gap-1.5">
-              <kbd className="ui-kbd">Cmd/Ctrl</kbd>
-              <kbd className="ui-kbd">Enter</kbd>
+      <div className="shrink-0 p-2 pt-0">
+        <div
+          role="group"
+          aria-label="Assistant composer"
+          className="overflow-hidden rounded-[var(--ui-radius-lg)] border border-border bg-bg"
+        >
+          <textarea
+            value={thread.draft}
+            onChange={(event) => onDraftChange(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
+            placeholder="Ask about the current note, request a rewrite, or focus on the current section or selection."
+            disabled={thread.pending}
+            className="ui-focus-ring min-h-28 w-full resize-none border-0 bg-transparent px-3 py-3 text-sm text-text outline-none placeholder:text-text-muted disabled:opacity-50"
+          />
+          <div
+            role="group"
+            aria-label="Assistant composer footer"
+            className="flex items-center gap-2 border-t border-border/80 px-2 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <AssistantSelectMenu<AiProvider>
+                value={thread.provider}
+                items={providerItems}
+                onChange={onProviderChange}
+                ariaLabel="Assistant provider"
+                triggerClassName="border-transparent bg-transparent px-2.5 hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <AssistantSelectMenu<AssistantThreadState["scope"]>
+                value={thread.scope}
+                items={scopeItems}
+                onChange={onScopeChange}
+                ariaLabel="Assistant scope"
+                triggerClassName="border-transparent bg-transparent px-2.5 hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+              />
+            </div>
+            <div className="shrink-0">
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                disabled={thread.pending || thread.draft.trim().length === 0}
+                title="Send (Cmd/Ctrl+Enter)"
+                onClick={onSubmit}
+              >
+                {thread.pending ? "Working..." : "Send"}
+              </Button>
             </div>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="primary"
-            disabled={thread.pending || thread.draft.trim().length === 0}
-            onClick={onSubmit}
-          >
-            {thread.pending ? "Working..." : "Send"}
-          </Button>
         </div>
       </div>
     </div>
