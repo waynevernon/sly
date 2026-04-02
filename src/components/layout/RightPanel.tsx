@@ -325,15 +325,25 @@ export function RightPanel({
       if (!editor) return;
 
       const selectionPos = Math.min(item.pos + 1, editor.state.doc.content.size);
-      const transaction = editor.state.tr
-        .setSelection(TextSelection.create(editor.state.doc, selectionPos))
-        .scrollIntoView();
+      const transaction = editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, selectionPos),
+      );
 
       editor.view.dispatch(transaction);
       editor.commands.focus();
       setActiveOutlineId(item.id);
+
+      if (scrollContainer) {
+        const node = editor.view.nodeDOM(item.pos);
+        if (node instanceof HTMLElement) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const nodeRect = node.getBoundingClientRect();
+          const delta = nodeRect.top - containerRect.top;
+          scrollContainer.scrollTop += delta - 8;
+        }
+      }
     },
-    [editor],
+    [editor, scrollContainer],
   );
 
   const emptyState = useMemo(() => {
