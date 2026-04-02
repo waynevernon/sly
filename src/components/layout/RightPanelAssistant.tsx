@@ -9,6 +9,7 @@ import type {
 import type { AiProvider } from "../../services/ai";
 import { cn } from "../../lib/utils";
 import {
+  Button,
   IconButton,
   LoadingSpinner,
   Tooltip,
@@ -206,6 +207,11 @@ function AssistantTurnView({
     <div className="rounded-[var(--ui-radius-md)] bg-bg-muted px-3 py-2.5">
       <div className="text-[13px] font-medium text-text">Assistant</div>
       <div className="mt-1 whitespace-pre-wrap text-sm text-text">{turn.replyText}</div>
+      {turn.executionDir ? (
+        <div className="mt-1.5 truncate text-[11px] text-text-muted" title={turn.executionDir}>
+          cwd: {turn.executionDir}
+        </div>
+      ) : null}
       {turn.warning ? (
         <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
           {turn.warning}

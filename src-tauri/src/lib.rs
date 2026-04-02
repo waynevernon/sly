@@ -571,6 +571,8 @@ pub struct AssistantTurnResult {
     pub reply_text: String,
     pub proposals: Vec<AssistantProposal>,
     pub warning: Option<String>,
+    #[serde(skip_deserializing)]
+    pub execution_dir: Option<String>,
 }
 
 // File watcher state
@@ -2694,6 +2696,13 @@ fn set_ai_working_directory(
     app: AppHandle,
     state: State<AppState>,
 ) -> Result<Option<String>, String> {
+    if let Some(ref p) = path {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() && !PathBuf::from(trimmed).is_dir() {
+            return Err(format!("'{}' is not a valid directory", trimmed));
+        }
+    }
+
     let updated_config = {
         let mut app_config = state.app_config.write().expect("app_config write lock");
         app_config.ai_working_directory = path;
@@ -3988,7 +3997,7 @@ async fn execute_ai_cli(
     args: Vec<String>,
     stdin_input: String,
     not_found_msg: String,
-    current_dir: Option<String>,
+    current_dir: Option<PathBuf>,
     extra_env: Option<Vec<(String, String)>>,
 ) -> Result<AiExecutionResult, String> {
     use std::io::Write;
@@ -4222,8 +4231,11 @@ fn resolve_ai_working_directory(
         return Ok(notes_root.to_path_buf());
     }
 
-    PathBuf::from(trimmed).canonicalize().map_err(|_| {
-        "AI reference folder is invalid. Clear or reselect it in Settings > Extensions.".to_string()
+    PathBuf::from(trimmed).canonicalize().map_err(|e| {
+        format!(
+            "AI reference folder '{}' is not accessible: {}. Clear or reselect it in Settings > Extensions.",
+            trimmed, e
+        )
     })
 }
 
@@ -4310,6 +4322,7 @@ fn parse_assistant_result(raw_output: &str) -> AssistantTurnResult {
                 "Assistant returned non-JSON output, so Sly kept the reply as plain text."
                     .to_string(),
             ),
+            execution_dir: None,
         },
     }
 }
@@ -4377,6 +4390,12 @@ async fn ai_assistant_turn(
     let (_notes_root, execution_dir) =
         resolve_assistant_workspace(&request.note_path, &app_config)?;
 
+    let execution_dir_str = execution_dir.to_string_lossy().to_string();
+    eprintln!(
+        "[sly-ai] provider={} cwd={}",
+        request.provider, execution_dir_str
+    );
+
     let prompt = build_assistant_prompt(&request);
     let provider = request.provider.trim().to_lowercase();
 
@@ -4387,7 +4406,7 @@ async fn ai_assistant_turn(
             vec!["--print".to_string()],
             prompt,
             "Claude CLI not found. Please install it from https://claude.ai/code".to_string(),
-            Some(execution_dir.to_string_lossy().to_string()),
+            Some(execution_dir.clone()),
             None,
         )
         .await?,
@@ -4402,7 +4421,7 @@ async fn ai_assistant_turn(
             ],
             prompt,
             "Codex CLI not found. Please install it from https://github.com/openai/codex".to_string(),
-            Some(execution_dir.to_string_lossy().to_string()),
+            Some(execution_dir.clone()),
             None,
         )
         .await?,
@@ -4412,7 +4431,7 @@ async fn ai_assistant_turn(
             vec!["run".to_string(), "--".to_string(), prompt],
             String::new(),
             "OpenCode CLI not found. Please install it from https://opencode.ai".to_string(),
-            Some(execution_dir.to_string_lossy().to_string()),
+            Some(execution_dir.clone()),
             Some(vec![
                 (
                     "OPENCODE_PERMISSION".to_string(),
@@ -4460,7 +4479,7 @@ async fn ai_assistant_turn(
                 vec!["run".to_string(), model_name.clone()],
                 prompt,
                 "Ollama CLI not found. Please install it from https://ollama.com".to_string(),
-                Some(execution_dir.to_string_lossy().to_string()),
+                Some(execution_dir.clone()),
                 None,
             )
             .await?
@@ -4474,7 +4493,9 @@ async fn ai_assistant_turn(
             .unwrap_or_else(|| "Assistant request failed.".to_string()));
     }
 
-    Ok(parse_assistant_result(&result.output))
+    let mut parsed = parse_assistant_result(&result.output);
+    parsed.execution_dir = Some(execution_dir_str);
+    Ok(parsed)
 }
 
 #[tauri::command]
@@ -5508,8 +5529,10 @@ mod tests {
 
     #[test]
     fn canonicalize_app_config_trims_ai_working_directory() {
-        let mut config = AppConfig::default();
-        config.ai_working_directory = Some("  /tmp/reference  ".to_string());
+        let mut config = AppConfig {
+            ai_working_directory: Some("  /tmp/reference  ".to_string()),
+            ..Default::default()
+        };
 
         assert!(persistence::app_config::canonicalize_app_config(
             &mut config
@@ -5540,8 +5563,10 @@ mod tests {
         let note_path = notes_root.join("note.md");
         std::fs::write(&note_path, "# Note\n").unwrap();
 
-        let mut config = AppConfig::default();
-        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
+        let config = AppConfig {
+            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
 
         let (resolved_notes_root, execution_dir) =
             resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
@@ -5562,9 +5587,11 @@ mod tests {
         let note_path = notes_root.join("note.md");
         std::fs::write(&note_path, "# Note\n").unwrap();
 
-        let mut config = AppConfig::default();
-        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
-        config.ai_working_directory = Some(reference_root.to_string_lossy().into_owned());
+        let config = AppConfig {
+            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
+            ai_working_directory: Some(reference_root.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
 
         let (_resolved_notes_root, execution_dir) =
             resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
@@ -5584,15 +5611,17 @@ mod tests {
         let note_path = notes_root.join("note.md");
         std::fs::write(&note_path, "# Note\n").unwrap();
 
-        let mut config = AppConfig::default();
-        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
-        config.ai_working_directory = Some(missing_reference_root.to_string_lossy().into_owned());
+        let config = AppConfig {
+            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
+            ai_working_directory: Some(missing_reference_root.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
 
         let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
             .expect_err("invalid override should fail");
 
         assert!(
-            error.contains("AI reference folder is invalid"),
+            error.contains("AI reference folder") && error.contains("is not accessible"),
             "unexpected error: {error}"
         );
 
@@ -5611,9 +5640,11 @@ mod tests {
         let note_path = external_root.join("note.md");
         std::fs::write(&note_path, "# Note\n").unwrap();
 
-        let mut config = AppConfig::default();
-        config.notes_folder = Some(notes_root.to_string_lossy().into_owned());
-        config.ai_working_directory = Some(reference_root.to_string_lossy().into_owned());
+        let config = AppConfig {
+            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
+            ai_working_directory: Some(reference_root.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
 
         let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
             .expect_err("note outside notes folder should fail");

@@ -36,6 +36,7 @@ export interface AssistantTurnResult {
   replyText: string;
   proposals: AssistantProposal[];
   warning?: string | null;
+  executionDir?: string | null;
 }
 
 export interface AssistantUserTurn {
@@ -61,6 +62,7 @@ export interface AssistantAssistantTurn {
   scopeStartLine: number;
   scopeEndLine: number;
   warning?: string | null;
+  executionDir?: string | null;
   stale?: boolean;
   invalidReason?: string | null;
   invalidProposalIds?: string[];

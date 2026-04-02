@@ -928,6 +928,7 @@ function AppContent() {
         scopeStartLine: context.startLine,
         scopeEndLine: context.endLine,
         warning: result.warning ?? null,
+        executionDir: result.executionDir ?? null,
         invalidReason: null,
         invalidProposalIds: [],
       };
