@@ -101,7 +101,7 @@ describe("RightPanelAssistant", () => {
     expect(screen.getByRole("button", { name: "Working..." })).toBeDisabled();
   });
 
-  it("submits on Ctrl+Enter from the composer", () => {
+  it("submits on Enter and keeps Shift+Enter for newlines", () => {
     const onSubmit = vi.fn();
 
     renderAssistant(
@@ -113,7 +113,11 @@ describe("RightPanelAssistant", () => {
 
     fireEvent.keyDown(screen.getByRole("textbox"), {
       key: "Enter",
-      ctrlKey: true,
+    });
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      shiftKey: true,
     });
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
