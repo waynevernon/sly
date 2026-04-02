@@ -63,7 +63,7 @@ export function ToolbarButton({
         "ui-focus-ring h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors shrink-0",
         isActive
           ? "bg-bg-muted text-text"
-          : "hover:bg-bg-muted text-text-muted",
+          : "hover:bg-bg-muted hover:text-text text-text-muted",
         className
       )}
       aria-label={title}
