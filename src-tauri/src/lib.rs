@@ -4641,10 +4641,6 @@ async fn ai_assistant_turn(
         resolve_assistant_workspace(&request.note_path, &app_config)?;
 
     let execution_dir_str = execution_dir.to_string_lossy().to_string();
-    eprintln!(
-        "[sly-ai] provider={} cwd={}",
-        request.provider, execution_dir_str
-    );
 
     let prompt = build_assistant_prompt(&request);
     let provider = request.provider.trim().to_lowercase();
