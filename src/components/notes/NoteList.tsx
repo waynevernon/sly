@@ -307,6 +307,13 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             </>
           ) : (
             <>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onOpenInNewWindow(id)}
+              >
+                <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
+                Open in New Window
+              </ContextMenu.Item>
               <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
                 <PinIcon className="w-4 h-4 stroke-[1.6]" />
                 {isPinned ? "Unpin" : "Pin"}
@@ -317,13 +324,6 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
               >
                 <CopyIcon className="w-4 h-4 stroke-[1.6]" />
                 Duplicate
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={() => onOpenInNewWindow(id)}
-              >
-                <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
-                Open in New Window
               </ContextMenu.Item>
               <ContextMenu.Item
                 className={menuItemClassName}
