@@ -438,7 +438,7 @@ export function RightPanel({
                   {emptyState}
                 </div>
               ) : (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {outlineItems.map((item) => {
                     const isActive = item.id === activeOutlineId;
                     return (

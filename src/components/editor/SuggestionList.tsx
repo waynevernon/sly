@@ -79,7 +79,7 @@ function SuggestionListInner<T>(
     <PopoverSurface
       ref={listRef}
       className={cn(
-        "ui-scrollbar-overlay max-h-80 overflow-y-auto flex flex-col gap-0.5",
+        "ui-scrollbar-overlay max-h-80 overflow-y-auto flex flex-col gap-1",
         width,
       )}
     >

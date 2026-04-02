@@ -696,7 +696,7 @@ export function CommandPalette({
             <>
               {/* Commands section */}
               {filteredCommands.length > 0 && (
-                <div className="space-y-0.5 mb-5">
+                <div className="space-y-1 mb-5">
                   <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
                     Commands
                   </div>
@@ -718,7 +718,7 @@ export function CommandPalette({
 
               {/* Notes section */}
               {filteredNotes.length > 0 && (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
                     Notes
                   </div>

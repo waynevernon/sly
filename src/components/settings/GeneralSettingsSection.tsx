@@ -355,7 +355,7 @@ export function GeneralSettingsSection() {
                     </div>
                   ) : (
                     status.currentBranch && (
-                      <div className="pt-3 border-t border-border space-y-0.5">
+                      <div className="pt-3 border-t border-border space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-text font-medium">
                             Tracking

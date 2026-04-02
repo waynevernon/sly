@@ -320,7 +320,7 @@ const FolderItem = memo(function FolderItem({
   const hasNestedFolders = folder.children.length > 0 || isCreatingChild;
 
   const children = !isCollapsed && (isCreatingChild || folder.children.length > 0) && (
-    <div className="flex flex-col gap-0.5 pt-0.5">
+    <div className="flex flex-col gap-1 pt-0.5">
       {isCreatingChild && (
         <InlineFolderRow
           depth={depth + 1}
@@ -1102,7 +1102,7 @@ export function FolderTreeView({
           </ContextMenu.Portal>
         </ContextMenu.Root>
 
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           {isCreatingRoot && (
             <InlineFolderRow
               depth={0}
