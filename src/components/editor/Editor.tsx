@@ -7,29 +7,13 @@ import {
 } from "react";
 import { TextSearch } from "lucide-react";
 import {
-  useEditor,
   EditorContent,
   ReactRenderer,
-  ReactNodeViewRenderer,
   type Editor as TiptapEditor,
 } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import Link from "@tiptap/extension-link";
-import Image from "@tiptap/extension-image";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
-import { TableKit } from "@tiptap/extension-table";
-import { Markdown } from "@tiptap/markdown";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import { lowlight } from "./lowlight";
-import { CodeBlockView } from "./CodeBlockView";
-import { Extension } from "@tiptap/core";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import {
   NodeSelection,
-  Plugin,
-  PluginKey,
   TextSelection,
 } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
@@ -60,19 +44,19 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
-import { AdjacentListNormalizer } from "./AdjacentListNormalizer";
-import { Frontmatter } from "./Frontmatter";
 import { shouldShowPendingSelectionSpinner } from "./editorState";
-import { Emoji } from "./Emoji";
-import { EmojiSuggestion } from "./EmojiSuggestion";
 import { BlockMathEditor } from "./BlockMathEditor";
 import { LinkEditor } from "./LinkEditor";
 import { SearchToolbar } from "./SearchToolbar";
-import { SlashCommand } from "./SlashCommand";
-import { Wikilink, type WikilinkStorage } from "./Wikilink";
-import { WikilinkSuggestion } from "./WikilinkSuggestion";
+import type { WikilinkStorage } from "./Wikilink";
 import { EditorWidthHandles } from "./EditorWidthHandle";
-import { SlyBlockMath, normalizeBlockMath } from "./MathExtensions";
+import { normalizeBlockMath } from "./MathExtensions";
+import {
+  persistedSelectionHighlightPluginKey,
+  searchHighlightPluginKey,
+  type SlyEditorPasteHandler,
+  useSlyEditor,
+} from "./useSlyEditor";
 import { cn } from "../../lib/utils";
 import { plainTextFromMarkdown } from "../../lib/plainText";
 import {
@@ -184,85 +168,6 @@ const katexMacros: Record<string, string> = {
   "\\Q": "\\mathbb{Q}",
   "\\C": "\\mathbb{C}",
 };
-
-// Search highlight extension - adds yellow backgrounds to search matches
-const searchHighlightPluginKey = new PluginKey("searchHighlight");
-
-interface SearchHighlightOptions {
-  matches: Array<{ from: number; to: number }>;
-  currentIndex: number;
-}
-
-const SearchHighlight = Extension.create<SearchHighlightOptions>({
-  name: "searchHighlight",
-
-  addOptions() {
-    return {
-      matches: [],
-      currentIndex: 0,
-    };
-  },
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: searchHighlightPluginKey,
-        state: {
-          init: () => DecorationSet.empty,
-          apply: (tr, oldSet) => {
-            // Map decorations through document changes
-            const set = oldSet.map(tr.mapping, tr.doc);
-
-            // Check if we need to update decorations (from transaction meta)
-            const meta = tr.getMeta(searchHighlightPluginKey);
-            if (meta !== undefined) {
-              return meta.decorationSet;
-            }
-
-            return set;
-          },
-        },
-        props: {
-          decorations: (state) => {
-            return searchHighlightPluginKey.getState(state);
-          },
-        },
-      }),
-    ];
-  },
-});
-
-const persistedSelectionHighlightPluginKey = new PluginKey(
-  "persistedSelectionHighlight",
-);
-
-const PersistedSelectionHighlight = Extension.create({
-  name: "persistedSelectionHighlight",
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: persistedSelectionHighlightPluginKey,
-        state: {
-          init: () => DecorationSet.empty,
-          apply: (tr, oldSet) => {
-            const set = oldSet.map(tr.mapping, tr.doc);
-            const meta = tr.getMeta(persistedSelectionHighlightPluginKey);
-            if (meta !== undefined) {
-              return meta.decorationSet;
-            }
-
-            return set;
-          },
-        },
-        props: {
-          decorations: (state) =>
-            persistedSelectionHighlightPluginKey.getState(state),
-        },
-      }),
-    ];
-  },
-});
 
 // GridPicker component for table insertion
 interface GridPickerProps {
@@ -687,7 +592,7 @@ function EditorImpl({
 
   // Get markdown from editor
   const getMarkdown = useCallback(
-    (editorInstance: ReturnType<typeof useEditor>) => {
+    (editorInstance: TiptapEditor | null) => {
       if (!editorInstance) return "";
       const manager = editorInstance.storage.markdown?.manager;
       if (manager) {
@@ -1190,195 +1095,92 @@ function EditorImpl({
     });
   }, [closeBlockMathPopup, handleEditBlockMath]);
 
-  const editor = useEditor({
-    textDirection,
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3, 4, 5, 6],
-        },
-        codeBlock: false,
-        link: false,
-      }),
-      CodeBlockLowlight.extend({
-        addNodeView() {
-          return ReactNodeViewRenderer(CodeBlockView);
-        },
-      }).configure({
-        lowlight,
-        defaultLanguage: null,
-      }),
-      Placeholder.configure({
-        placeholder: "Start writing...",
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "underline cursor-pointer",
-        },
-      }),
-      Image.configure({
-        inline: false,
-        allowBase64: false,
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      TableKit.configure({
-        table: {
-          resizable: false,
-          HTMLAttributes: {
-            class: "not-prose",
-          },
-        },
-      }),
-      Frontmatter,
-      Emoji,
-      AdjacentListNormalizer,
-      Markdown.configure({}),
-      PersistedSelectionHighlight,
-      SearchHighlight.configure({
-        matches: [],
-        currentIndex: 0,
-      }),
-      EmojiSuggestion,
-      SlashCommand,
-      Wikilink,
-      WikilinkSuggestion,
-      SlyBlockMath.configure({
-        katexOptions: {
-          throwOnError: false,
-          displayMode: true,
-          macros: katexMacros,
-        },
-        onClick: (_node, pos) => {
-          handleEditBlockMath(pos);
-        },
-      }),
-    ],
-    editorProps: {
-      attributes: {
-        class:
-          "prose prose-lg dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-full px-6 pt-8 pb-24",
-      },
-      // Trap Tab key inside the editor
-      handleKeyDown: (_view, event) => {
-        if (event.key === "Tab") {
-          // Allow default tab behavior (indent in lists, etc.)
-          // but prevent focus from leaving the editor
-          return false;
-        }
-        return false;
-      },
-      // Handle markdown and image paste
-      handlePaste: (_view, event) => {
-        const clipboardData = event.clipboardData;
-        if (!clipboardData) return false;
+  const handleEditorPaste = useCallback<SlyEditorPasteHandler>(
+    (_view, event) => {
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) return false;
 
-        // Check for images first
-        const items = Array.from(clipboardData.items);
-        const imageItem = items.find((item) => item.type.startsWith("image/"));
+      const items = Array.from(clipboardData.items);
+      const imageItem = items.find((item) => item.type.startsWith("image/"));
 
-        if (imageItem) {
-          const blob = imageItem.getAsFile();
-          if (blob) {
-            // Convert blob to base64 and handle async operations
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const base64 = (reader.result as string).split(",")[1]; // Remove data:image/...;base64, prefix
+      if (imageItem) {
+        const blob = imageItem.getAsFile();
+        if (blob) {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64 = (reader.result as string).split(",")[1];
 
-              try {
-                // Save clipboard image
-                const relativePath = await invoke<string>(
-                  "save_clipboard_image",
-                  { base64Data: base64 },
-                );
+            try {
+              const relativePath = await invoke<string>(
+                "save_clipboard_image",
+                { base64Data: base64 },
+              );
 
-                // Get notes folder and construct absolute path using Tauri's join
-                const notesFolder = await invoke<string>("get_notes_folder");
-                const absolutePath = await join(notesFolder, relativePath);
+              const notesFolder = await invoke<string>("get_notes_folder");
+              const absolutePath = await join(notesFolder, relativePath);
+              const assetUrl = convertFileSrc(absolutePath);
 
-                // Convert to Tauri asset URL
-                const assetUrl = convertFileSrc(absolutePath);
-
-                // Insert image
-                editorRef.current
-                  ?.chain()
-                  .focus()
-                  .setImage({ src: assetUrl })
-                  .run();
-              } catch (error) {
-                console.error("Failed to paste image:", error);
-                toast.error("Failed to paste image");
-              }
-            };
-            reader.onerror = () => {
-              console.error("Failed to read clipboard image:", reader.error);
-              toast.error("Failed to read clipboard image");
-            };
-            reader.readAsDataURL(blob);
-            return true; // Handled
-          }
-        }
-
-        // Handle markdown text paste
-        const text = clipboardData.getData("text/plain");
-        if (!text) return false;
-
-        // Check if text looks like markdown (has common markdown patterns)
-        const markdownPatterns =
-          /^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^\s*>\s|```|^\s*\[.*\]\(.*\)|^\s*!\[|\*\*.*\*\*|__.*__|~~.*~~|^\s*[-*_]{3,}\s*$|^\|.+\||\$\$[\s\S]+?\$\$/m;
-        if (!markdownPatterns.test(text)) {
-          // Not markdown, let TipTap handle it normally
-          return false;
-        }
-
-        // Parse markdown and insert using editor ref
-        const currentEditor = editorRef.current;
-        if (!currentEditor) return false;
-
-        const manager = currentEditor.storage.markdown?.manager;
-        if (manager && typeof manager.parse === "function") {
-          try {
-            const parsed = manager.parse(text);
-            if (parsed) {
-              currentEditor.commands.insertContent(parsed);
-              return true;
+              editorRef.current
+                ?.chain()
+                .focus()
+                .setImage({ src: assetUrl })
+                .run();
+            } catch (error) {
+              console.error("Failed to paste image:", error);
+              toast.error("Failed to paste image");
             }
-          } catch {
-            // Fall back to default paste behavior
-          }
+          };
+          reader.onerror = () => {
+            console.error("Failed to read clipboard image:", reader.error);
+            toast.error("Failed to read clipboard image");
+          };
+          reader.readAsDataURL(blob);
+          return true;
         }
+      }
 
+      const text = clipboardData.getData("text/plain");
+      if (!text) return false;
+
+      const markdownPatterns =
+        /^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^\s*>\s|```|^\s*\[.*\]\(.*\)|^\s*!\[|\*\*.*\*\*|__.*__|~~.*~~|^\s*[-*_]{3,}\s*$|^\|.+\||\$\$[\s\S]+?\$\$/m;
+      if (!markdownPatterns.test(text)) {
         return false;
-      },
-    },
-    onCreate: ({ editor: editorInstance }) => {
-      editorRef.current = editorInstance;
-    },
-    onUpdate: () => {
-      if (isLoadingRef.current) return;
-      scheduleSave();
-    },
-    onSelectionUpdate: () => {
-      // Trigger re-render to update toolbar active states
-      setSelectionKey((k) => k + 1);
-      if (
-        provisionalFilenameNoteIdRef.current &&
-        editorRef.current &&
-        !selectionIsInsideH1(editorRef.current)
-      ) {
-        void finalizeProvisionalFilename();
       }
-    },
-    onBlur: () => {
-      if (provisionalFilenameNoteIdRef.current) {
-        void finalizeProvisionalFilename();
+
+      const currentEditor = editorRef.current;
+      if (!currentEditor) return false;
+
+      const manager = currentEditor.storage.markdown?.manager;
+      if (manager && typeof manager.parse === "function") {
+        try {
+          const parsed = manager.parse(text);
+          if (parsed) {
+            currentEditor.commands.insertContent(parsed);
+            return true;
+          }
+        } catch {
+          // Fall back to default paste behavior.
+        }
       }
+
+      return false;
     },
-    // Prevent flash of unstyled content during initial render
-    immediatelyRender: false,
+    [],
+  );
+
+  const editor = useSlyEditor({
+    editorRef,
+    handleEditBlockMath,
+    handlePaste: handleEditorPaste,
+    isLoadingRef,
+    katexMacros,
+    provisionalFilenameNoteIdRef,
+    scheduleSave,
+    selectionIsInsideH1,
+    setSelectionKey,
+    textDirection,
+    finalizeProvisionalFilename,
   });
 
   // Track which note's content is currently loaded in the editor
