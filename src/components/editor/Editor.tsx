@@ -79,6 +79,7 @@ import {
   Button,
   IconButton,
   LoadingSpinner,
+  PanelEmptyState,
   ToolbarButton,
   Tooltip,
   menuItemClassName,
@@ -117,6 +118,7 @@ import {
   MarkdownIcon,
   MarkdownOffIcon,
   FolderPlusIcon,
+  NoteIcon,
 } from "../icons";
 
 function formatDateTime(timestamp: number): string {
@@ -2161,35 +2163,22 @@ function EditorImpl({
       <div className="flex-1 flex flex-col bg-bg">
         <div className="ui-pane-drag-region" data-tauri-drag-region></div>
         <div className="ui-pane-header" />
-        <div className="flex-1 flex items-center justify-center pb-8">
-          <div className="text-center text-text-muted select-none -mt-3">
-            <img
-              src="/note-dark.png"
-              alt="Note"
-              className="w-80 max-w-[min(30rem,86vw)] h-auto mx-auto -mb-1"
-            />
-            <h1 className="text-2xl text-text font-sans mb-1 tracking-[-0.01em] ">
-              Start writing
-            </h1>
-            <p className="text-sm">
-              Open a note from the sidebar, or begin a new one here.
-            </p>
-            {createNote && (
-              <Button
-                onClick={createNote}
-                variant="secondary"
-                size="md"
-                className="mt-4"
-              >
+        <PanelEmptyState
+          icon={<NoteIcon />}
+          title="Start writing"
+          message="Open a note from the sidebar, or begin a new one here."
+          action={
+            createNote ? (
+              <Button onClick={createNote} variant="secondary" size="md">
                 New Note{" "}
                 <span className="text-text-muted ml-1">
                   {mod}
                   {isMac ? "" : "+"}N
                 </span>
               </Button>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+        />
       </div>
     );
   }

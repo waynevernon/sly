@@ -10,7 +10,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { SquareArrowOutUpRight } from "lucide-react";
+import { Clock3, Search, SquareArrowOutUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -27,6 +27,7 @@ import {
   Checkbox,
   Input,
   ListItem,
+  PanelEmptyState,
   destructiveMenuItemClassName,
   menuItemClassName,
   menuSeparatorClassName,
@@ -35,7 +36,7 @@ import {
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import { sanitizeNoteFilename } from "../../lib/noteIdentity";
 import * as notesService from "../../services/notes";
-import { CopyIcon, PinIcon, PencilIcon, TrashIcon, XIcon } from "../icons";
+import { CopyIcon, NoteIcon, PinIcon, PencilIcon, TrashIcon, XIcon } from "../icons";
 
 export interface NoteListItem {
   id: string;
@@ -45,9 +46,28 @@ export interface NoteListItem {
   created: number;
 }
 
+export interface NoteListEmptyState {
+  kind: "notes" | "search" | "recent" | "pinned";
+  title: string;
+  message: string;
+}
+
 interface NoteListProps {
   items: NoteListItem[];
-  emptyMessage: string;
+  emptyState: NoteListEmptyState;
+}
+
+function NoteListEmptyStateIcon({ kind }: Pick<NoteListEmptyState, "kind">) {
+  if (kind === "search") {
+    return <Search />;
+  }
+  if (kind === "recent") {
+    return <Clock3 />;
+  }
+  if (kind === "pinned") {
+    return <PinIcon />;
+  }
+  return <NoteIcon />;
 }
 
 function formatDate(timestamp: number): string {
@@ -383,7 +403,7 @@ function getDeleteDialogCopy(noteIds: string[]) {
 
 export function NoteList({
   items,
-  emptyMessage,
+  emptyState,
 }: NoteListProps) {
   const {
     selectedNoteId,
@@ -603,8 +623,12 @@ export function NoteList({
 
   if (items.length === 0) {
     return (
-      <div className="px-4 py-6 text-center text-sm text-text-muted select-none">
-        {emptyMessage}
+      <div className="flex min-h-full">
+        <PanelEmptyState
+          icon={<NoteListEmptyStateIcon kind={emptyState.kind} />}
+          title={emptyState.title}
+          message={emptyState.message}
+        />
       </div>
     );
   }

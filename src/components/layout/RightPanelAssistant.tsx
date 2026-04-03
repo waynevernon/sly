@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { TextAlignJustify, TextCursor, Trash2 } from "lucide-react";
+import { Sparkles, TextAlignJustify, TextCursor, Trash2 } from "lucide-react";
 import type {
   AssistantAssistantTurn,
   AssistantProposal,
@@ -12,6 +12,7 @@ import {
   Button,
   IconButton,
   LoadingSpinner,
+  PanelEmptyState,
   Tooltip,
   menuItemClassName,
   menuSurfaceClassName,
@@ -89,15 +90,13 @@ function AssistantSelectMenu<T extends string>({
             triggerClassName,
           )}
         >
-          <span className="min-w-0 flex-1 truncate">
-            <span className="inline-flex min-w-0 items-center gap-2 truncate leading-none">
-              {selectedItem?.leading ? (
-                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
-                  {selectedItem.leading}
-                </span>
-              ) : null}
-              <span className="truncate leading-none">{selectedItem?.label ?? value}</span>
-            </span>
+          <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            {selectedItem?.leading ? (
+              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                {selectedItem.leading}
+              </span>
+            ) : null}
+            <span className="truncate leading-none">{selectedItem?.label ?? value}</span>
           </span>
           <ChevronDownIcon className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
         </button>
@@ -154,25 +153,14 @@ function ProposalCard({
   onApply: (proposal: AssistantProposal) => void;
 }) {
   return (
-    <div className="rounded-[var(--ui-radius-md)] border border-border bg-bg p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-text">{proposal.title}</div>
-          <div className="mt-0.5 text-xs text-text-muted">
-            {proposal.summary} · Lines {proposal.startLine}-{proposal.endLine}
-          </div>
+    <div className="overflow-hidden rounded-[var(--ui-radius-md)] border border-border/60">
+      <div className="px-3 pt-2.5 pb-2">
+        <div className="text-sm font-medium text-text">{proposal.title}</div>
+        <div className="mt-0.5 text-xs text-text-muted">
+          {proposal.summary} · Lines {proposal.startLine}-{proposal.endLine}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          onClick={() => onApply(proposal)}
-        >
-          Apply
-        </Button>
       </div>
-      <div className="mt-2 grid gap-2">
+      <div className="grid gap-2 px-3 pb-2">
         <div>
           <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
             Current
@@ -189,6 +177,17 @@ function ProposalCard({
             {proposal.replacement}
           </pre>
         </div>
+      </div>
+      <div className="flex justify-end border-t border-border/60 px-3 py-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => onApply(proposal)}
+        >
+          Apply
+        </Button>
       </div>
     </div>
   );
@@ -333,9 +332,11 @@ export function RightPanelAssistant({
 
   if (!hasNote || !thread) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
-        Open a note to start a conversation.
-      </div>
+      <PanelEmptyState
+        icon={<Sparkles />}
+        title="Open a note"
+        message="Open a note to start a conversation."
+      />
     );
   }
 
@@ -350,26 +351,32 @@ export function RightPanelAssistant({
 
   if (availableProviders.length === 0) {
     return (
-      <div className="flex flex-1 flex-col gap-4 px-4 py-4">
-        <div className="rounded-[var(--ui-radius-md)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] p-3 text-sm text-orange-700 dark:text-orange-400">
-          No supported AI CLI was found. Install one of the providers below, then open Settings &gt; Assistant &amp; CLI to refresh detection.
-        </div>
-        <div className="space-y-2">
-          {emptyInstallProviders.map(({ provider, label, url }) => (
-            <a
-              key={provider}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2 text-sm text-text hover:bg-bg-muted"
-            >
-              <span className="flex items-center gap-2">
-                <ProviderIcon provider={provider} />
-                {label}
-              </span>
-              <span className="text-text-muted">Install</span>
-            </a>
-          ))}
+      <div className="flex flex-1 flex-col">
+        <PanelEmptyState
+          icon={<Sparkles />}
+          title="No AI provider detected"
+        />
+        <div className="space-y-3 px-3 pb-4">
+          <div className="rounded-[var(--ui-radius-md)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] p-3 text-sm text-orange-700 dark:text-orange-400">
+            Install one of the providers below, then open Settings &gt; Assistant &amp; CLI to refresh detection.
+          </div>
+          <div className="space-y-1.5">
+            {emptyInstallProviders.map(({ provider, label, url }) => (
+              <a
+                key={provider}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2 text-sm text-text hover:bg-bg-muted"
+              >
+                <span className="flex items-center gap-2">
+                  <ProviderIcon provider={provider} />
+                  {label}
+                </span>
+                <span className="text-text-muted">Install</span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -379,32 +386,22 @@ export function RightPanelAssistant({
     <div className="flex h-full min-h-0 flex-col">
       <div
         ref={transcriptRef}
-        className="ui-scrollbar-overlay min-h-0 flex-1 overflow-y-auto px-2 py-2"
+        className="ui-scrollbar-overlay flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-2"
       >
-        <div className="mb-2 flex justify-end">
-          <Tooltip content="Clear this note's assistant thread">
-            <span>
-              <IconButton
-                type="button"
-                size="md"
-                variant="ghost"
-                disabled={!canClear || thread.pending}
-                onClick={onClearThread}
-                title="Clear thread"
-              >
-                <Trash2 className="h-4 w-4 stroke-[1.8]" />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </div>
-        {thread.turns.length === 0 ? null : (
+        {thread.turns.length === 0 ? (
+          <PanelEmptyState
+            icon={<Sparkles />}
+            title="Start a conversation"
+            message="Ask about your note, request a rewrite, or focus on a section or selection."
+          />
+        ) : (
           <div className="space-y-2.5">
             {thread.turns.map((turn) => {
               if (turn.kind === "system") {
                 return (
                   <div
                     key={turn.id}
-                    className="rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2 text-xs text-text-muted"
+                    className="px-2 py-1 text-center text-xs text-text-muted"
                   >
                     {turn.text}
                   </div>
@@ -413,24 +410,21 @@ export function RightPanelAssistant({
 
               if (turn.kind === "user") {
                 return (
-                  <div
-                    key={turn.id}
-                    className="rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[13px] font-medium text-text">You</div>
-                      <div className="text-xs text-text-muted">
+                  <div key={turn.id} className="flex justify-end">
+                    <div className="max-w-[88%] rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2.5">
+                      <div className="sr-only">You</div>
+                      <div className="whitespace-pre-wrap text-sm text-text">
+                        {turn.text}
+                      </div>
+                      <div className="mt-1.5 text-right text-xs text-text-muted">
                         {turn.scopeLabel} · {turn.lineLabel}
                       </div>
+                      {turn.notice ? (
+                        <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
+                          {turn.notice}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-1 whitespace-pre-wrap text-sm text-text">
-                      {turn.text}
-                    </div>
-                    {turn.notice ? (
-                      <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
-                        {turn.notice}
-                      </div>
-                    ) : null}
                   </div>
                 );
               }
@@ -452,28 +446,44 @@ export function RightPanelAssistant({
         <div
           role="group"
           aria-label="Assistant composer"
-          className="overflow-hidden rounded-[var(--ui-radius-lg)] border border-border bg-bg"
+          className="overflow-hidden rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary"
         >
           <textarea
             value={thread.draft}
             onChange={(event) => onDraftChange(event.target.value)}
             onKeyDown={handleComposerKeyDown}
-            placeholder="Ask about the current note, request a rewrite, or focus on the current section or selection."
+            placeholder="Ask about this note..."
             disabled={thread.pending}
-            className="ui-focus-ring min-h-28 w-full resize-none border-0 bg-transparent px-3 py-3 text-sm text-text outline-none placeholder:text-text-muted disabled:opacity-50"
+            className="ui-focus-ring min-h-[96px] w-full resize-none border-0 bg-transparent px-3 py-3 text-sm text-text outline-none placeholder:text-text-muted disabled:opacity-50"
           />
           <div
             role="group"
             aria-label="Assistant composer footer"
-            className="flex items-center gap-2 border-t border-border/80 px-2 py-2"
+            className="flex items-center gap-1 border-t border-border/60 px-1.5 py-1.5"
           >
+            <div className="shrink-0">
+              <Tooltip content="Clear thread">
+                <span>
+                  <IconButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={!canClear || thread.pending}
+                    onClick={onClearThread}
+                    title="Clear thread"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </div>
             <div className="min-w-0 flex-1">
               <AssistantSelectMenu<AiProvider>
                 value={thread.provider}
                 items={providerItems}
                 onChange={onProviderChange}
                 ariaLabel="Assistant provider"
-                triggerClassName="border-transparent bg-transparent px-2.5 hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-bg-muted data-[state=open]:bg-bg-muted"
               />
             </div>
             <div className="min-w-0 flex-1">
@@ -482,22 +492,22 @@ export function RightPanelAssistant({
                 items={scopeItems}
                 onChange={onScopeChange}
                 ariaLabel="Assistant scope"
-                triggerClassName="border-transparent bg-transparent px-2.5 hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-bg-muted data-[state=open]:bg-bg-muted"
               />
             </div>
             <div className="shrink-0">
               <IconButton
                 type="button"
-                size="md"
+                size="sm"
                 variant="primary"
                 disabled={thread.pending || thread.draft.trim().length === 0}
                 title={thread.pending ? "Working..." : "Send"}
                 onClick={onSubmit}
               >
                 {thread.pending ? (
-                  <LoadingSpinner size="md" tone="inherit" />
+                  <LoadingSpinner size="sm" tone="inherit" />
                 ) : (
-                  <ArrowUpIcon className="h-4 w-4" />
+                  <ArrowUpIcon className="h-3.5 w-3.5" />
                 )}
               </IconButton>
             </div>

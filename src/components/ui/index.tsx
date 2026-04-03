@@ -21,6 +21,7 @@ export { LoadingSpinner } from "./LoadingSpinner";
 export { Select } from "./Select";
 export { Toaster } from "./Toaster";
 export { DialogShell } from "./DialogShell";
+export { PanelEmptyState } from "./PanelEmptyState";
 export { PopoverSurface } from "./PopoverSurface";
 export {
   MenuSurface,

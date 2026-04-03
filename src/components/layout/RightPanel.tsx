@@ -12,7 +12,7 @@ import { ListTree, Sparkles } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { finishNoteOpenTiming, markNoteOpenTiming } from "../../lib/noteOpenTiming";
 import type { RightPanelTab } from "../../types/note";
-import { Tooltip } from "../ui";
+import { PanelEmptyState, Tooltip } from "../ui";
 import {
   extractOutlineItems,
   findActiveOutlineFromHeadingTops,
@@ -348,9 +348,15 @@ export function RightPanel({
 
   const emptyState = useMemo(() => {
     if (!hasNote) {
-      return "Open a note to see its outline.";
+      return {
+        title: "Open a note",
+        message: "Open a note to see its outline.",
+      };
     }
-    return "No section headings in this note yet.";
+    return {
+      title: "No headings yet",
+      message: "No section headings in this note yet.",
+    };
   }, [hasNote]);
 
   const headerTitle = useMemo(() => {
@@ -427,16 +433,16 @@ export function RightPanel({
           {activeTab === "outline" ? (
             <div
               ref={outlineScrollRef}
-              className="ui-scrollbar-overlay flex-1 overflow-y-auto px-2 py-2"
+              className="ui-scrollbar-overlay flex flex-1 flex-col overflow-y-auto px-2 py-2"
             >
               {!panelHydrated && hasNote ? (
-                <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
-                  Loading outline...
-                </div>
+                <PanelEmptyState message="Loading outline..." />
               ) : outlineItems.length === 0 ? (
-                <div className="flex h-full min-h-full items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
-                  {emptyState}
-                </div>
+                <PanelEmptyState
+                  icon={<ListTree />}
+                  title={emptyState.title}
+                  message={emptyState.message}
+                />
               ) : (
                 <div className="space-y-1">
                   {outlineItems.map((item) => {
@@ -465,9 +471,10 @@ export function RightPanel({
           ) : panelHydrated || !hasNote ? (
             <RightPanelAssistant {...assistantProps} />
           ) : (
-            <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-sm text-text-muted">
-              Preparing assistant...
-            </div>
+            <PanelEmptyState
+              icon={<Sparkles />}
+              message="Preparing assistant..."
+            />
           )}
         </div>
       </div>

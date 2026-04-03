@@ -348,7 +348,7 @@ describe("RightPanel", () => {
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(
       await screen.findByPlaceholderText(
-        "Ask about the current note, request a rewrite, or focus on the current section or selection.",
+        "Ask about this note...",
       ),
     ).toBeInTheDocument();
   });

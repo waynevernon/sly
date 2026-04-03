@@ -64,7 +64,7 @@ describe("RightPanelAssistant", () => {
 
     expect(
       within(composer).getByPlaceholderText(
-        "Ask about the current note, request a rewrite, or focus on the current section or selection.",
+        "Ask about this note...",
       ),
     ).toBeInTheDocument();
     expect(
@@ -76,8 +76,8 @@ describe("RightPanelAssistant", () => {
     expect(within(footer).getByRole("button", { name: "Send" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear thread" })).toBeInTheDocument();
     expect(
-      within(footer).queryByRole("button", { name: "Clear thread" }),
-    ).not.toBeInTheDocument();
+      within(footer).getByRole("button", { name: "Clear thread" }),
+    ).toBeInTheDocument();
   });
 
   it("disables send for empty drafts and while pending", () => {

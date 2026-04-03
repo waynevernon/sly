@@ -23,7 +23,7 @@ import type {
   NoteListPreviewLines,
   NoteScope,
 } from "../../types/note";
-import type { NoteListItem } from "../notes/NoteList";
+import type { NoteListEmptyState, NoteListItem } from "../notes/NoteList";
 import { NoteList } from "../notes/NoteList";
 import {
   CountBadge,
@@ -627,21 +627,51 @@ export function NotesPane() {
 
         <NoteList
           items={displayItems}
-          emptyMessage={
-            searchQuery.trim()
-              ? "No results found"
-              : selectedScope.type === "pinned"
-                ? "No pinned notes yet"
-              : selectedScope.type === "recent"
-                ? "No recent notes yet"
-                : selectedFolderPath
-                ? showSubfolderNotesInCurrentView
-                  ? "No notes in this folder or its subfolders"
-                  : "No notes in this folder"
-                : showSubfolderNotesInCurrentView
-                  ? "No notes yet"
-                  : "No notes at the top level"
-          }
+          emptyState={((): NoteListEmptyState => {
+            if (searchQuery.trim()) {
+              return {
+                kind: "search",
+                title: "No results",
+                message: "No notes matched your search.",
+              };
+            }
+
+            if (selectedScope.type === "pinned") {
+              return {
+                kind: "pinned",
+                title: "No pinned notes",
+                message: "Pin notes to keep them here.",
+              };
+            }
+
+            if (selectedScope.type === "recent") {
+              return {
+                kind: "recent",
+                title: "No recent notes",
+                message: "Notes you open will appear here.",
+              };
+            }
+
+            if (selectedFolderPath) {
+              return {
+                kind: "notes",
+                title: "No notes here",
+                message: showSubfolderNotesInCurrentView
+                  ? "No notes in this folder or its subfolders."
+                  : "No notes in this folder.",
+              };
+            }
+
+            return {
+              kind: "notes",
+              title: showSubfolderNotesInCurrentView
+                ? "No notes yet"
+                : "No top-level notes",
+              message: showSubfolderNotesInCurrentView
+                ? "Create a note to get started."
+                : "Create a note at the top level to get started.",
+            };
+          })()}
         />
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchResult } from "../../services/notes";
+import type { NoteListEmptyState } from "../notes/NoteList";
 import { TooltipProvider } from "../ui";
 import { NotesPane } from "./NotesPane";
 
@@ -25,15 +26,17 @@ vi.mock("../../context/ThemeContext", () => ({
 vi.mock("../notes/NoteList", () => ({
   NoteList: ({
     items,
-    emptyMessage,
+    emptyState,
   }: {
     items: Array<{ id: string; title: string; created: number }>;
-    emptyMessage: string;
+    emptyState: NoteListEmptyState;
   }) => {
-    noteListSpy({ items, emptyMessage });
+    noteListSpy({ items, emptyState });
     return (
       <div>
-        <div data-testid="empty-message">{emptyMessage}</div>
+        <div data-testid="empty-title">{emptyState.title}</div>
+        <div data-testid="empty-message">{emptyState.message}</div>
+        <div data-testid="empty-kind">{emptyState.kind}</div>
         <div data-testid="note-items">{JSON.stringify(items)}</div>
         <ul>
           {items.map((item) => (
@@ -171,9 +174,11 @@ describe("NotesPane", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("Alpha remote")).toBeInTheDocument();
     expect(screen.getByTestId("note-items")).toHaveTextContent('"created":2');
+    expect(screen.getByTestId("empty-title")).toHaveTextContent("No results");
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
-      "No results found",
+      "No notes matched your search.",
     );
+    expect(screen.getByTestId("empty-kind")).toHaveTextContent("search");
   });
 
   it("falls back to modified time for created timestamps missing from notes cache", async () => {
@@ -275,9 +280,11 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
+    expect(screen.getByTestId("empty-title")).toHaveTextContent("No recent notes");
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
-      "No recent notes yet",
+      "Notes you open will appear here.",
     );
+    expect(screen.getByTestId("empty-kind")).toHaveTextContent("recent");
   });
 
   it("shows the pinned notes empty state", async () => {
@@ -296,9 +303,11 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
+    expect(screen.getByTestId("empty-title")).toHaveTextContent("No pinned notes");
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
-      "No pinned notes yet",
+      "Pin notes to keep them here.",
     );
+    expect(screen.getByTestId("empty-kind")).toHaveTextContent("pinned");
   });
 
   it("shows the view controls and routes note-list preference changes", async () => {
@@ -491,9 +500,11 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
+    expect(screen.getByTestId("empty-title")).toHaveTextContent("No notes here");
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
-      "No notes in this folder or its subfolders",
+      "No notes in this folder or its subfolders.",
     );
+    expect(screen.getByTestId("empty-kind")).toHaveTextContent("notes");
   });
 
   it("shows the top-level root empty state when subfolders are hidden", async () => {
@@ -513,8 +524,10 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
+    expect(screen.getByTestId("empty-title")).toHaveTextContent("No top-level notes");
     expect(screen.getByTestId("empty-message")).toHaveTextContent(
-      "No notes at the top level",
+      "Create a note at the top level to get started.",
     );
+    expect(screen.getByTestId("empty-kind")).toHaveTextContent("notes");
   });
 });

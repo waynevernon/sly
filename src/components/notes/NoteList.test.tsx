@@ -35,6 +35,12 @@ const baseItem: NoteListItem = {
   created: Math.floor(new Date("2026-03-25T12:00:00Z").getTime() / 1000),
 };
 
+const baseEmptyState = {
+  kind: "notes" as const,
+  title: "Empty",
+  message: "Nothing here.",
+};
+
 function makeNotesHookValue(
   overrides: Partial<NotesHookValue> = {},
 ): NotesHookValue {
@@ -92,7 +98,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     const row = screen.getByRole("button", { name: /Alpha note/ });
     expect(row).toHaveClass("py-1.75");
@@ -111,7 +117,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("Yesterday")).toBeInTheDocument();
   });
@@ -127,7 +133,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("alpha.md")).toBeInTheDocument();
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
@@ -143,7 +149,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("work/")).toBeInTheDocument();
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
@@ -159,7 +165,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
   });
@@ -174,14 +180,14 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("planning")).toBeInTheDocument();
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
   });
 
   it("combines date, folder path, and preview when multiple view settings are enabled", async () => {
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     const row = screen.getByRole("button", { name: /Alpha note/ });
     expect(row).toHaveClass("py-2.25");
@@ -200,7 +206,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("work/alpha.md")).toBeInTheDocument();
   });
@@ -216,7 +222,7 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     const preview = screen.getByText("planning");
     const meta = screen.getByText("3 days ago · work/alpha.md");
@@ -235,13 +241,13 @@ describe("NoteList", () => {
       }),
     );
 
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("planning")).toHaveClass("line-clamp-3");
   });
 
   it("styles preview text more prominently than the metadata line", async () => {
-    render(<NoteList items={[baseItem]} emptyMessage="Empty" />);
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("planning")).toHaveClass("text-text", "opacity-75");
     expect(screen.getByText("3 days ago · work/")).toHaveClass(
