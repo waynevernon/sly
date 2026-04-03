@@ -63,6 +63,7 @@ export function PreviewApp({
       try {
         const result = await filesService.saveFileDirect(filePath, newContent);
         recentlySavedRef.current = true;
+        setContent(result.content);
         setModified(result.modified);
         setTitle(result.title);
         setHasExternalChanges(false);
