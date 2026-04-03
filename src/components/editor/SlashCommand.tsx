@@ -25,6 +25,11 @@ import {
 } from "../icons";
 import { SlashCommandList, type SlashCommandListRef } from "./SlashCommandList";
 
+interface SlashCommandOptions {
+  onAddBlockMath?: () => void;
+  onAddImage?: () => void;
+}
+
 export interface SlashCommandItem {
   title: string;
   description: string;
@@ -33,165 +38,175 @@ export interface SlashCommandItem {
   command: (editor: TiptapEditor) => void;
 }
 
-const SLASH_COMMANDS: SlashCommandItem[] = [
-  {
-    title: "Text",
-    description: "Plain body text",
-    icon: <PilcrowIcon />,
-    aliases: ["paragraph", "body", "plain", "normal"],
-    command: (editor) => {
-      editor.chain().focus().setParagraph().run();
+function getSlashCommands(options: SlashCommandOptions): SlashCommandItem[] {
+  return [
+    {
+      title: "Text",
+      description: "Plain body text",
+      icon: <PilcrowIcon />,
+      aliases: ["paragraph", "body", "plain", "normal"],
+      command: (editor) => {
+        editor.chain().focus().setParagraph().run();
+      },
     },
-  },
-  {
-    title: "Heading 1",
-    description: "Large section heading",
-    icon: <Heading1Icon />,
-    aliases: ["h1", "heading", "title"],
-    command: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 1 }).run();
+    {
+      title: "Heading 1",
+      description: "Large section heading",
+      icon: <Heading1Icon />,
+      aliases: ["h1", "heading", "title"],
+      command: (editor) => {
+        editor.chain().focus().toggleHeading({ level: 1 }).run();
+      },
     },
-  },
-  {
-    title: "Heading 2",
-    description: "Medium section heading",
-    icon: <Heading2Icon />,
-    aliases: ["h2", "heading", "subtitle"],
-    command: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 2 }).run();
+    {
+      title: "Heading 2",
+      description: "Medium section heading",
+      icon: <Heading2Icon />,
+      aliases: ["h2", "heading", "subtitle"],
+      command: (editor) => {
+        editor.chain().focus().toggleHeading({ level: 2 }).run();
+      },
     },
-  },
-  {
-    title: "Heading 3",
-    description: "Small section heading",
-    icon: <Heading3Icon />,
-    aliases: ["h3", "heading"],
-    command: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 3 }).run();
+    {
+      title: "Heading 3",
+      description: "Small section heading",
+      icon: <Heading3Icon />,
+      aliases: ["h3", "heading"],
+      command: (editor) => {
+        editor.chain().focus().toggleHeading({ level: 3 }).run();
+      },
     },
-  },
-  {
-    title: "Heading 4",
-    description: "Smallest section heading",
-    icon: <Heading4Icon />,
-    aliases: ["h4", "heading"],
-    command: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 4 }).run();
+    {
+      title: "Heading 4",
+      description: "Smallest section heading",
+      icon: <Heading4Icon />,
+      aliases: ["h4", "heading"],
+      command: (editor) => {
+        editor.chain().focus().toggleHeading({ level: 4 }).run();
+      },
     },
-  },
-  {
-    title: "Bullet List",
-    description: "Unordered list",
-    icon: <ListIcon />,
-    aliases: ["ul", "unordered", "list"],
-    command: (editor) => {
-      editor.chain().focus().toggleBulletList().run();
+    {
+      title: "Bullet List",
+      description: "Unordered list",
+      icon: <ListIcon />,
+      aliases: ["ul", "unordered", "list"],
+      command: (editor) => {
+        editor.chain().focus().toggleBulletList().run();
+      },
     },
-  },
-  {
-    title: "Numbered List",
-    description: "Ordered list",
-    icon: <ListOrderedIcon />,
-    aliases: ["ol", "ordered", "list", "numbered"],
-    command: (editor) => {
-      editor.chain().focus().toggleOrderedList().run();
+    {
+      title: "Numbered List",
+      description: "Ordered list",
+      icon: <ListOrderedIcon />,
+      aliases: ["ol", "ordered", "list", "numbered"],
+      command: (editor) => {
+        editor.chain().focus().toggleOrderedList().run();
+      },
     },
-  },
-  {
-    title: "Task List",
-    description: "List with checkboxes",
-    icon: <CheckSquareIcon />,
-    aliases: ["todo", "checklist", "checkbox"],
-    command: (editor) => {
-      editor.chain().focus().toggleTaskList().run();
+    {
+      title: "Task List",
+      description: "List with checkboxes",
+      icon: <CheckSquareIcon />,
+      aliases: ["todo", "checklist", "checkbox"],
+      command: (editor) => {
+        editor.chain().focus().toggleTaskList().run();
+      },
     },
-  },
-  {
-    title: "Blockquote",
-    description: "Block quotation",
-    icon: <QuoteIcon />,
-    aliases: ["quote"],
-    command: (editor) => {
-      editor.chain().focus().toggleBlockquote().run();
+    {
+      title: "Blockquote",
+      description: "Block quotation",
+      icon: <QuoteIcon />,
+      aliases: ["quote"],
+      command: (editor) => {
+        editor.chain().focus().toggleBlockquote().run();
+      },
     },
-  },
-  {
-    title: "Code Block",
-    description: "Fenced code block",
-    icon: <CodeIcon />,
-    aliases: ["code", "fenced", "pre"],
-    command: (editor) => {
-      editor.chain().focus().toggleCodeBlock().run();
+    {
+      title: "Code Block",
+      description: "Fenced code block",
+      icon: <CodeIcon />,
+      aliases: ["code", "fenced", "pre"],
+      command: (editor) => {
+        editor.chain().focus().toggleCodeBlock().run();
+      },
     },
-  },
-  {
-    title: "Mermaid Diagram",
-    description: "Mermaid diagram block",
-    icon: <WorkflowIcon />,
-    aliases: ["mermaid", "diagram", "flowchart", "chart"],
-    command: (editor) => {
-      editor.chain().focus().setCodeBlock({ language: "mermaid" }).run();
+    {
+      title: "Mermaid Diagram",
+      description: "Mermaid diagram block",
+      icon: <WorkflowIcon />,
+      aliases: ["mermaid", "diagram", "flowchart", "chart"],
+      command: (editor) => {
+        editor.chain().focus().setCodeBlock({ language: "mermaid" }).run();
+      },
     },
-  },
-  {
-    title: "Block Math",
-    description: "Display math block",
-    icon: <BlockMathIcon />,
-    aliases: ["math", "equation"],
-    command: (editor) => {
-      editor.chain().focus().run();
-      window.dispatchEvent(new CustomEvent("slash-command-block-math"));
+    {
+      title: "Block Math",
+      description: "Display math block",
+      icon: <BlockMathIcon />,
+      aliases: ["math", "equation"],
+      command: (editor) => {
+        editor.chain().focus().run();
+        options.onAddBlockMath?.();
+      },
     },
-  },
-  {
-    title: "Horizontal Rule",
-    description: "Visual divider",
-    icon: <SeparatorIcon />,
-    aliases: ["divider", "separator", "hr", "line"],
-    command: (editor) => {
-      editor.chain().focus().setHorizontalRule().run();
+    {
+      title: "Horizontal Rule",
+      description: "Visual divider",
+      icon: <SeparatorIcon />,
+      aliases: ["divider", "separator", "hr", "line"],
+      command: (editor) => {
+        editor.chain().focus().setHorizontalRule().run();
+      },
     },
-  },
-  {
-    title: "Image",
-    description: "Insert from file",
-    icon: <ImageIcon />,
-    aliases: ["picture", "photo", "img"],
-    command: (editor) => {
-      editor.chain().focus().run();
-      window.dispatchEvent(new CustomEvent("slash-command-image"));
+    {
+      title: "Image",
+      description: "Insert from file",
+      icon: <ImageIcon />,
+      aliases: ["picture", "photo", "img"],
+      command: (editor) => {
+        editor.chain().focus().run();
+        options.onAddImage?.();
+      },
     },
-  },
-  {
-    title: "Table",
-    description: "Insert a 3×3 table",
-    icon: <TableIcon />,
-    aliases: ["grid"],
-    command: (editor) => {
-      editor
-        .chain()
-        .focus()
-        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-        .run();
+    {
+      title: "Table",
+      description: "Insert a 3×3 table",
+      icon: <TableIcon />,
+      aliases: ["grid"],
+      command: (editor) => {
+        editor
+          .chain()
+          .focus()
+          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+          .run();
+      },
     },
-  },
-  {
-    title: "Wikilink",
-    description: "Link to another note",
-    icon: <BracketsIcon />,
-    aliases: ["link", "note", "wikilink", "[["],
-    command: (editor) => {
-      editor.chain().focus().insertContent("[[").run();
+    {
+      title: "Wikilink",
+      description: "Link to another note",
+      icon: <BracketsIcon />,
+      aliases: ["link", "note", "wikilink", "[["],
+      command: (editor) => {
+        editor.chain().focus().insertContent("[[").run();
+      },
     },
-  },
-];
+  ];
+}
 
 const slashCommandPluginKey = new PluginKey("slashCommand");
 
-export const SlashCommand = Extension.create({
+export const SlashCommand = Extension.create<SlashCommandOptions>({
   name: "slashCommand",
 
+  addOptions() {
+    return {
+      onAddBlockMath: undefined,
+      onAddImage: undefined,
+    };
+  },
+
   addProseMirrorPlugins() {
+    const slashCommands = getSlashCommands(this.options);
     return [
       Suggestion<SlashCommandItem>({
         editor: this.editor,
@@ -208,7 +223,7 @@ export const SlashCommand = Extension.create({
 
         items: ({ query }) => {
           const q = query.toLowerCase();
-          return SLASH_COMMANDS.filter(
+          return slashCommands.filter(
             (item) =>
               item.title.toLowerCase().includes(q) ||
               item.description.toLowerCase().includes(q) ||

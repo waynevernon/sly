@@ -1047,8 +1047,39 @@ function EditorImpl({
     [],
   );
 
+  const handleAddImage = useCallback(async () => {
+    const currentEditor = editorRef.current;
+    if (!currentEditor) return;
+    const selected = await openDialog({
+      multiple: false,
+      filters: [
+        {
+          name: "Images",
+          extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
+        },
+      ],
+    });
+    if (selected) {
+      try {
+        const relativePath = await invoke<string>("copy_image_to_assets", {
+          sourcePath: selected as string,
+        });
+
+        const notesFolder = await invoke<string>("get_notes_folder");
+        const absolutePath = await join(notesFolder, relativePath);
+        const assetUrl = convertFileSrc(absolutePath);
+
+        currentEditor.chain().focus().setImage({ src: assetUrl }).run();
+      } catch (error) {
+        console.error("Failed to add image:", error);
+      }
+    }
+  }, []);
+
   const editor = useSlyEditor({
     editorRef,
+    handleAddBlockMath,
+    handleAddImage,
     handleEditBlockMath,
     handlePaste: handleEditorPaste,
     isLoadingRef,
@@ -1346,55 +1377,6 @@ function EditorImpl({
       },
     });
   }, [editor, closeBlockMathPopup]);
-
-  // Image handler
-  const handleAddImage = useCallback(async () => {
-    if (!editor) return;
-    const selected = await openDialog({
-      multiple: false,
-      filters: [
-        {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
-        },
-      ],
-    });
-    if (selected) {
-      try {
-        // Copy image to assets folder and get relative path (assets/filename.ext)
-        const relativePath = await invoke<string>("copy_image_to_assets", {
-          sourcePath: selected as string,
-        });
-
-        // Get notes folder and construct absolute path using Tauri's join
-        const notesFolder = await invoke<string>("get_notes_folder");
-        const absolutePath = await join(notesFolder, relativePath);
-
-        // Convert to Tauri asset URL
-        const assetUrl = convertFileSrc(absolutePath);
-
-        // Insert image with asset URL
-        editor.chain().focus().setImage({ src: assetUrl }).run();
-      } catch (error) {
-        console.error("Failed to add image:", error);
-      }
-    }
-  }, [editor]);
-
-  // Listen for slash command image insertion
-  useEffect(() => {
-    const handler = () => handleAddImage();
-    window.addEventListener("slash-command-image", handler);
-    return () => window.removeEventListener("slash-command-image", handler);
-  }, [handleAddImage]);
-
-  // Listen for slash command block math insertion
-  useEffect(() => {
-    const handler = () => handleAddBlockMath();
-    window.addEventListener("slash-command-block-math", handler);
-    return () =>
-      window.removeEventListener("slash-command-block-math", handler);
-  }, [handleAddBlockMath]);
 
   // Keyboard shortcut for Cmd+K to add link (only when editor is focused)
   useEffect(() => {

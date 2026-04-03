@@ -104,6 +104,8 @@ const PersistedSelectionHighlight = Extension.create({
 
 export interface UseSlyEditorOptions {
   editorRef: MutableRefObject<TiptapEditor | null>;
+  handleAddBlockMath: () => void;
+  handleAddImage: () => void;
   handleEditBlockMath: (pos: number) => void;
   handlePaste: SlyEditorPasteHandler;
   isLoadingRef: MutableRefObject<boolean>;
@@ -119,6 +121,8 @@ export interface UseSlyEditorOptions {
 
 export function useSlyEditor({
   editorRef,
+  handleAddBlockMath,
+  handleAddImage,
   handleEditBlockMath,
   handlePaste,
   isLoadingRef,
@@ -184,7 +188,10 @@ export function useSlyEditor({
         currentIndex: 0,
       }),
       EmojiSuggestion,
-      SlashCommand,
+      SlashCommand.configure({
+        onAddBlockMath: handleAddBlockMath,
+        onAddImage: handleAddImage,
+      }),
       Wikilink,
       WikilinkSuggestion,
       SlyBlockMath.configure({
