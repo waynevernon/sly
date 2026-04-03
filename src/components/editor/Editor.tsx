@@ -20,6 +20,7 @@ import { mod, alt, shift, isMac } from "../../lib/platform";
 import type { AssistantSelectionSnapshot } from "../../lib/assistant";
 import { useBlockMathPopover } from "./useBlockMathPopover";
 import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
+import { useEditorSearch } from "./useEditorSearch";
 import { useLinkPopover } from "./useLinkPopover";
 
 // Validate URL scheme for safe opening
@@ -41,7 +42,6 @@ import type { WikilinkStorage } from "./Wikilink";
 import { EditorWidthHandles } from "./EditorWidthHandle";
 import {
   persistedSelectionHighlightPluginKey,
-  searchHighlightPluginKey,
   type SlyEditorPasteHandler,
   useSlyEditor,
 } from "./useSlyEditor";
@@ -541,14 +541,6 @@ function EditorImpl({
   const needsPaneDelay = focusMode && paneMode > 1;
 
   const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
-  // Search state
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchMatches, setSearchMatches] = useState<
-    Array<{ from: number; to: number }>
-  >([]);
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<TiptapEditor | null>(null);
   const currentNoteIdRef = useRef<string | null>(null);
@@ -578,100 +570,6 @@ function EditorImpl({
   // Calculate if current note is pinned
   const isPinned =
     settings?.pinnedNoteIds?.includes(currentNote?.id || "") || false;
-  // Find all matches for search query (case-insensitive)
-  const findMatches = useCallback(
-    (query: string, editorInstance: TiptapEditor | null) => {
-      if (!editorInstance || !query.trim()) return [];
-
-      const doc = editorInstance.state.doc;
-      const lowerQuery = query.toLowerCase();
-      const matches: Array<{ from: number; to: number }> = [];
-
-      // Search through each text node
-      doc.descendants((node, nodePos) => {
-        if (node.isText && node.text) {
-          const text = node.text;
-          const lowerText = text.toLowerCase();
-
-          let searchPos = 0;
-          while (searchPos < lowerText.length && matches.length < 500) {
-            const index = lowerText.indexOf(lowerQuery, searchPos);
-            if (index === -1) break;
-
-            const matchFrom = nodePos + index;
-            const matchTo = matchFrom + query.length;
-
-            // Make sure the match doesn't extend beyond valid document bounds
-            if (matchTo <= doc.content.size) {
-              matches.push({
-                from: matchFrom,
-                to: matchTo,
-              });
-            }
-
-            searchPos = index + 1;
-          }
-        }
-      });
-
-      return matches;
-    },
-    [],
-  );
-
-  // Update search decorations - applies yellow backgrounds to all matches
-  const updateSearchDecorations = useCallback(
-    (
-      matches: Array<{ from: number; to: number }>,
-      currentIndex: number,
-      editorInstance: TiptapEditor | null,
-    ) => {
-      if (!editorInstance) return;
-
-      try {
-        const { state } = editorInstance;
-        const decorations: Decoration[] = [];
-
-        // Add decorations for all matches
-        matches.forEach((match, index) => {
-          const isActive = index === currentIndex;
-          decorations.push(
-            Decoration.inline(match.from, match.to, {
-              class: isActive
-                ? "bg-yellow-300/50 dark:bg-yellow-400/40" // Brighter yellow for active match
-                : "bg-yellow-300/25 dark:bg-yellow-400/20", // Lighter yellow for inactive matches
-            }),
-          );
-        });
-
-        const decorationSet = DecorationSet.create(state.doc, decorations);
-
-        // Update decorations via transaction
-        const tr = state.tr.setMeta(searchHighlightPluginKey, {
-          decorationSet,
-        });
-
-        editorInstance.view.dispatch(tr);
-
-        // Scroll to current match
-        if (matches[currentIndex]) {
-          const match = matches[currentIndex];
-          const { node } = editorInstance.view.domAtPos(match.from);
-          const element =
-            node.nodeType === Node.ELEMENT_NODE
-              ? (node as HTMLElement)
-              : node.parentElement;
-
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }
-      } catch (error) {
-        console.error("Failed to update search decorations:", error);
-      }
-    },
-    [],
-  );
 
   const {
     effectiveSourceMode,
@@ -889,50 +787,21 @@ function EditorImpl({
     if (storage) storage.notes = notes;
   }, [editor, notes]);
 
-  // Search navigation functions (defined after editor is created)
-  const goToNextMatch = useCallback(() => {
-    if (searchMatches.length === 0 || !editor) return;
-    const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
-    setCurrentMatchIndex(nextIndex);
-    updateSearchDecorations(searchMatches, nextIndex, editor);
-  }, [searchMatches, currentMatchIndex, editor, updateSearchDecorations]);
-
-  const goToPreviousMatch = useCallback(() => {
-    if (searchMatches.length === 0 || !editor) return;
-    const prevIndex =
-      (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
-    setCurrentMatchIndex(prevIndex);
-    updateSearchDecorations(searchMatches, prevIndex, editor);
-  }, [searchMatches, currentMatchIndex, editor, updateSearchDecorations]);
-
-  // Handle search query change
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
-
-  // Debounced search effect
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchMatches([]);
-      setCurrentMatchIndex(0);
-      // Clear decorations when search is empty
-      if (editor) {
-        updateSearchDecorations([], 0, editor);
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      if (!editor) return;
-      const matches = findMatches(searchQuery, editor);
-      setSearchMatches(matches);
-      setCurrentMatchIndex(0);
-      // Always update decorations (clears old highlights when no matches)
-      updateSearchDecorations(matches, 0, editor);
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, editor, findMatches, updateSearchDecorations]);
+  const {
+    clearSearch,
+    currentMatchIndex,
+    goToNextMatch,
+    goToPreviousMatch,
+    handleSearchChange,
+    openEditorSearch,
+    searchInputRef,
+    searchMatches,
+    searchOpen,
+    searchQuery,
+  } = useEditorSearch({
+    currentNoteId: currentNote?.id ?? null,
+    editor,
+  });
 
   // Handle clicks on wikilinks and external links
   useEffect(() => {
@@ -1013,14 +882,6 @@ function EditorImpl({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Open and focus editor search (supports repeated Cmd/Ctrl+F)
-  const openEditorSearch = useCallback(() => {
-    setSearchOpen(true);
-    requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-    });
-  }, []);
-
   // Cmd+F to open search (works when document/editor area is focused)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1055,20 +916,6 @@ function EditorImpl({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [editor, currentNote, openEditorSearch]);
-
-  // Clear search on note switch
-  useEffect(() => {
-    if (currentNote?.id) {
-      setSearchOpen(false);
-      setSearchQuery("");
-      setSearchMatches([]);
-      setCurrentMatchIndex(0);
-      // Clear decorations
-      if (editor) {
-        updateSearchDecorations([], 0, editor);
-      }
-    }
-  }, [currentNote?.id, editor, updateSearchDecorations]);
 
   // Copy handlers
   const handleCopyMarkdown = useCallback(async () => {
@@ -1453,17 +1300,7 @@ function EditorImpl({
                       onChange={handleSearchChange}
                       onNext={goToNextMatch}
                       onPrevious={goToPreviousMatch}
-                      onClose={() => {
-                        setSearchOpen(false);
-                        setSearchQuery("");
-                        setSearchMatches([]);
-                        setCurrentMatchIndex(0);
-                        // Clear decorations and refocus editor
-                        if (editor) {
-                          updateSearchDecorations([], 0, editor);
-                          editor.commands.focus();
-                        }
-                      }}
+                      onClose={clearSearch}
                       currentMatch={
                         searchMatches.length === 0 ? 0 : currentMatchIndex + 1
                       }
