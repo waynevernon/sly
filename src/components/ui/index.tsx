@@ -138,7 +138,6 @@ interface ListItemProps {
   secondaryOrder?: "meta-first" | "subtitle-first";
   selectionState?: "none" | "selected" | "active";
   isPinned?: boolean;
-  onClick?: React.MouseEventHandler<HTMLDivElement>;
   className?: string;
   /** Optional status icon to display next to meta */
 }
@@ -152,10 +151,8 @@ export function ListItem({
   secondaryOrder = "meta-first",
   selectionState = "none",
   isPinned = false,
-  onClick,
   className,
-  onContextMenu,
-}: ListItemProps & { onContextMenu?: (e: React.MouseEvent) => void }) {
+}: ListItemProps) {
   const cleanSubtitlePrefix = subtitlePrefix
     ?.replace(/&nbsp;/g, " ")
     .replace(/\u00A0/g, " ")
@@ -186,10 +183,6 @@ export function ListItem({
 
   return (
     <div
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      role="button"
-      tabIndex={-1}
       className={cn(
         "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-md",
         "focus:outline-none focus-visible:outline-none",

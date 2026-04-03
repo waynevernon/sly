@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoteList, type NoteListItem } from "./NoteList";
 
@@ -41,6 +41,14 @@ const baseEmptyState = {
   message: "Nothing here.",
 };
 
+const secondItem: NoteListItem = {
+  id: "work/bravo",
+  title: "Bravo note",
+  preview: "draft",
+  modified: Math.floor(new Date("2026-03-24T12:00:00Z").getTime() / 1000),
+  created: Math.floor(new Date("2026-03-24T12:00:00Z").getTime() / 1000),
+};
+
 function makeNotesHookValue(
   overrides: Partial<NotesHookValue> = {},
 ): NotesHookValue {
@@ -72,6 +80,7 @@ describe("NoteList", () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-26T12:00:00Z"));
+    Element.prototype.scrollIntoView = vi.fn();
 
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
@@ -100,8 +109,8 @@ describe("NoteList", () => {
 
     render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
-    const row = screen.getByRole("button", { name: /Alpha note/ });
-    expect(row).toHaveClass("py-1.75");
+    const row = screen.getByRole("option", { name: /Alpha note/ });
+    expect(row.firstElementChild).toHaveClass("py-1.75");
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
     expect(screen.queryByText("Yesterday")).not.toBeInTheDocument();
@@ -189,8 +198,8 @@ describe("NoteList", () => {
   it("combines date, folder path, and preview when multiple view settings are enabled", async () => {
     render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
-    const row = screen.getByRole("button", { name: /Alpha note/ });
-    expect(row).toHaveClass("py-2.25");
+    const row = screen.getByRole("option", { name: /Alpha note/ });
+    expect(row.firstElementChild).toHaveClass("py-2.25");
     expect(screen.getByText("planning")).toBeInTheDocument();
     expect(screen.getByText("3 days ago · work/")).toBeInTheDocument();
   });
@@ -254,5 +263,59 @@ describe("NoteList", () => {
       "text-text-muted",
       "opacity-60",
     );
+  });
+
+  it("exposes note rows as listbox options", async () => {
+    render(
+      <NoteList items={[baseItem, secondItem]} emptyState={baseEmptyState} />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Notes" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Alpha note/ })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+  });
+
+  it("moves selection with arrow keys from the note list container", async () => {
+    const selectNote = vi.fn();
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedNoteId: baseItem.id,
+        selectNote,
+      }),
+    );
+
+    render(
+      <NoteList items={[baseItem, secondItem]} emptyState={baseEmptyState} />,
+    );
+
+    const listbox = screen.getByRole("listbox", { name: "Notes" });
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+
+    expect(selectNote).toHaveBeenCalledTimes(1);
+    expect(selectNote).toHaveBeenCalledWith(secondItem.id);
+  });
+
+  it("activates the current note with Enter from the note list container", async () => {
+    const selectNote = vi.fn();
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        selectedNoteId: baseItem.id,
+        selectNote,
+      }),
+    );
+
+    render(
+      <NoteList items={[baseItem, secondItem]} emptyState={baseEmptyState} />,
+    );
+
+    const listbox = screen.getByRole("listbox", { name: "Notes" });
+    fireEvent.keyDown(listbox, { key: "Enter" });
+
+    expect(selectNote).toHaveBeenCalledTimes(1);
+    expect(selectNote).toHaveBeenCalledWith(baseItem.id);
   });
 });

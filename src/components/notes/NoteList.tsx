@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent,
   memo,
   useCallback,
   useEffect,
@@ -114,9 +115,14 @@ function getNoteLeaf(id: string): string {
   return id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
 }
 
+function getNoteOptionId(id: string): string {
+  return `note-option-${encodeURIComponent(id)}`;
+}
+
 type SelectionState = "none" | "selected" | "active";
 
 interface NoteItemProps {
+  optionId: string;
   id: string;
   title: string;
   preview?: string;
@@ -139,6 +145,7 @@ interface NoteItemProps {
 }
 
 const NoteItem = memo(function NoteItem({
+  optionId,
   id,
   title,
   preview,
@@ -187,6 +194,10 @@ const NoteItem = memo(function NoteItem({
   return (
     <div
       ref={ref}
+      id={optionId}
+      role="option"
+      aria-selected={selectionState !== "none"}
+      tabIndex={-1}
       onClick={(event) =>
         onSelect(id, {
           shiftKey: event.shiftKey,
@@ -298,6 +309,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
           }}
         >
           <NoteItem
+            optionId={getNoteOptionId(id)}
             id={id}
             title={title}
             preview={preview}
@@ -448,6 +460,10 @@ export function NoteList({
     () => new Set(selectedNoteIds),
     [selectedNoteIds],
   );
+  const activeOptionId = useMemo(() => {
+    const activeId = selectedNoteId ?? selectedNoteIds[0];
+    return activeId ? getNoteOptionId(activeId) : undefined;
+  }, [selectedNoteId, selectedNoteIds]);
 
   const focusList = useCallback(() => {
     containerRef.current?.focus();
@@ -470,6 +486,62 @@ export function NoteList({
       void selectNote(id);
     },
     [focusList, selectNote, selectNoteRange, toggleNoteSelection],
+  );
+
+  const handleListKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (items.length === 0) return;
+
+      const currentId = selectedNoteId ?? selectedNoteIds[0] ?? null;
+      const currentIndex = currentId
+        ? items.findIndex((item) => item.id === currentId)
+        : -1;
+
+      const moveSelectionToIndex = (targetIndex: number) => {
+        const targetId = items[targetIndex]?.id;
+        if (!targetId) return;
+        handleSelect(targetId, {
+          shiftKey: event.shiftKey,
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey,
+        });
+      };
+
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          moveSelectionToIndex(
+            currentIndex < items.length - 1 ? currentIndex + 1 : items.length - 1,
+          );
+          return;
+        case "ArrowUp":
+          event.preventDefault();
+          moveSelectionToIndex(currentIndex > 0 ? currentIndex - 1 : 0);
+          return;
+        case "Home":
+          event.preventDefault();
+          moveSelectionToIndex(0);
+          return;
+        case "End":
+          event.preventDefault();
+          moveSelectionToIndex(items.length - 1);
+          return;
+        case "Enter":
+        case " ":
+          event.preventDefault();
+          {
+            const targetId =
+              items[currentIndex === -1 ? 0 : currentIndex]?.id;
+            if (targetId) {
+              void selectNote(targetId);
+            }
+          }
+          return;
+        default:
+          return;
+      }
+    },
+    [handleSelect, items, selectNote, selectedNoteId, selectedNoteIds],
   );
 
   const runDelete = useCallback(
@@ -640,8 +712,13 @@ export function NoteList({
       <div
         ref={containerRef}
         tabIndex={0}
+        role="listbox"
+        aria-label="Notes"
+        aria-multiselectable={true}
+        aria-activedescendant={activeOptionId}
         data-note-list
         className="group/notelist flex flex-col gap-1 p-1.5 outline-none"
+        onKeyDown={handleListKeyDown}
         onMouseDown={(event) => {
           if (event.button === 0 || event.button === 2) {
             focusList();
