@@ -1,0 +1,47 @@
+{
+  "version": "1.3.0-beta.4",
+  "notes": "https://github.com/waynevernon/sly/releases/tag/v1.3.0-beta.4",
+  "pub_date": "2026-04-03T02:46:38.934Z",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk5Xc29VdWc4QWVjNEZ4RTlEdzZKcXVmb0lKMkxNMEp0L0kxbE1CTFloTzMybHM3aXUyMUNadWRBSkFsckZQWHVqVXE5ZVhmTHV2VDU3SEFmcGFLaGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0MzQzCWZpbGU6U2x5XzEuMy4wLWJldGEuNF9hbWQ2NC5BcHBJbWFnZQp5M0UwUnI1K2hEOVljazA4YUFWNURNdWZJY2ZTTXgrTEI1T25POUZoM2hOd2lkYUFXQ2g4Yzk4L25rc1E0UjJvWGxNTWNaNXZmZEJiVm9xMVdGam5BUT09Cg==",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_1.3.0-beta.4_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk5Xc29VdWc4QWVjNEZ4RTlEdzZKcXVmb0lKMkxNMEp0L0kxbE1CTFloTzMybHM3aXUyMUNadWRBSkFsckZQWHVqVXE5ZVhmTHV2VDU3SEFmcGFLaGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0MzQzCWZpbGU6U2x5XzEuMy4wLWJldGEuNF9hbWQ2NC5BcHBJbWFnZQp5M0UwUnI1K2hEOVljazA4YUFWNURNdWZJY2ZTTXgrTEI1T25POUZoM2hOd2lkYUFXQ2g4Yzk4L25rc1E0UjJvWGxNTWNaNXZmZEJiVm9xMVdGam5BUT09Cg==",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_1.3.0-beta.4_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vkc2S2VmVStmNXY0a085U1FodzRINUpBQ3NGWFd2Tzd6bGhDMGtVdUwxUjMrTGVEM3c0TW15bkg3N21seVJFUVd0VHhCNjYvZG4wVW4yVTV1Z1prTlFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0MzQzCWZpbGU6U2x5XzEuMy4wLWJldGEuNF9hbWQ2NC5kZWIKV1gvSHg0VjlpTnFSSzAwTUhEOHp4dTN0a3EraVVyeHErT2ltZCtPYmpZRkloN0xSWllEM2x2ci95TExyWC96cThua0trWHZ6TnJXdDRLdjJqczZVQmc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_1.3.0-beta.4_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5VkNZakpnVnQzT25WdFBXQ1VFN25DUUwzTW53MWRZWVlZeXA2bVh6V2RlZFNkMW5RRE1GbXZLdlhqTXptbGg2Q2c0SWxyNFpvSC9melVuZGxva2RlZVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0MzQzCWZpbGU6U2x5LTEuMy4wLWJldGEuNC0xLng4Nl82NC5ycG0KbWd6L3BnMGswcEpaVEIvRGpjMXNQSUNjMFpsMXd1aXlBcjdtK1J3cVhHSjRjZnVSblIzR1NHQnRObldNeFBzb0ZqN24zazVkbXlZazN0Z1hIOXhOQkE9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly-1.3.0-beta.4-1.x86_64.rpm"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk95ZmlnTFBBYzBBQzhaOGtQUGFXV2pVWXVmMmhNUWNPV3BmQkFuOU9ML1FENWVhS0xJbncySXdQenQxWnoxYWxBSitqQTY1c3pFU2llQUFXT3prT0FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzg0CWZpbGU6U2x5LmFwcC50YXIuZ3oKRFpGYnJOc1ArS2l3RmhnTDNYM0dOaW5RZVJFTURadnAzNVRKY2RLb3ZSKytxWWdZQWxIeUU1SDV1bnRiRFdCckxPaEJtWlFTUGg4MzJvYnFuZ0xxRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_universal.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk95ZmlnTFBBYzBBQzhaOGtQUGFXV2pVWXVmMmhNUWNPV3BmQkFuOU9ML1FENWVhS0xJbncySXdQenQxWnoxYWxBSitqQTY1c3pFU2llQUFXT3prT0FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzg0CWZpbGU6U2x5LmFwcC50YXIuZ3oKRFpGYnJOc1ArS2l3RmhnTDNYM0dOaW5RZVJFTURadnAzNVRKY2RLb3ZSKytxWWdZQWxIeUU1SDV1bnRiRFdCckxPaEJtWlFTUGg4MzJvYnFuZ0xxRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_universal.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk95ZmlnTFBBYzBBQzhaOGtQUGFXV2pVWXVmMmhNUWNPV3BmQkFuOU9ML1FENWVhS0xJbncySXdQenQxWnoxYWxBSitqQTY1c3pFU2llQUFXT3prT0FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzg0CWZpbGU6U2x5LmFwcC50YXIuZ3oKRFpGYnJOc1ArS2l3RmhnTDNYM0dOaW5RZVJFTURadnAzNVRKY2RLb3ZSKytxWWdZQWxIeUU1SDV1bnRiRFdCckxPaEJtWlFTUGg4MzJvYnFuZ0xxRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_universal.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk95ZmlnTFBBYzBBQzhaOGtQUGFXV2pVWXVmMmhNUWNPV3BmQkFuOU9ML1FENWVhS0xJbncySXdQenQxWnoxYWxBSitqQTY1c3pFU2llQUFXT3prT0FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzg0CWZpbGU6U2x5LmFwcC50YXIuZ3oKRFpGYnJOc1ArS2l3RmhnTDNYM0dOaW5RZVJFTURadnAzNVRKY2RLb3ZSKytxWWdZQWxIeUU1SDV1bnRiRFdCckxPaEJtWlFTUGg4MzJvYnFuZ0xxRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_universal.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk10YmhHSXUrOSswUWtGaGZCejR5OVBIUTJ5RFJyRjQ2Z01NTjlJSG03VUxPRGJBK1Z1YWgwVk5CSmNmNDJvVDhtSDR1NVlMVGFaYnMvMFRXS2RIS0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzk2CWZpbGU6U2x5XzEuMy4wLWJldGEuNF94NjQtc2V0dXAuZXhlCjFKdWNIenB1Nk05Rnl4eW1iVTdXekxoaElEY0JVYWhBVHFucExiNjdSdjRkRUJ1MHZqSWw3UWxkcU9jQzhwRzFqRHBKVUp1eVc3L0dNSWYxYUJ2WkF3PT0K",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_1.3.0-beta.4_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5Vk10YmhHSXUrOSswUWtGaGZCejR5OVBIUTJ5RFJyRjQ2Z01NTjlJSG03VUxPRGJBK1Z1YWgwVk5CSmNmNDJvVDhtSDR1NVlMVGFaYnMvMFRXS2RIS0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTg0Mzk2CWZpbGU6U2x5XzEuMy4wLWJldGEuNF94NjQtc2V0dXAuZXhlCjFKdWNIenB1Nk05Rnl4eW1iVTdXekxoaElEY0JVYWhBVHFucExiNjdSdjRkRUJ1MHZqSWw3UWxkcU9jQzhwRzFqRHBKVUp1eVc3L0dNSWYxYUJ2WkF3PT0K",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.3.0-beta.4/Sly_1.3.0-beta.4_x64-setup.exe"
+    }
+  }
+}
