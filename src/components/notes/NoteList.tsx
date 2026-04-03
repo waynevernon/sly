@@ -219,7 +219,7 @@ const NoteItem = memo(function NoteItem({
   );
 });
 
-interface NoteItemWithMenuProps extends NoteItemProps {
+interface NoteItemWithMenuProps extends Omit<NoteItemProps, "optionId"> {
   selectedNoteIds: string[];
   dragIds: string[];
   onPin: (id: string) => Promise<void>;
