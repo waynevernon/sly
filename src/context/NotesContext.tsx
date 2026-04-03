@@ -191,6 +191,26 @@ function areNoteIdListsEqual(left: string[], right: string[]) {
   );
 }
 
+function areNoteMetadataListsEqual(
+  left: NoteMetadata[],
+  right: NoteMetadata[],
+) {
+  return (
+    left.length === right.length &&
+    left.every((note, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        note.id === other.id &&
+        note.title === other.title &&
+        note.preview === other.preview &&
+        note.modified === other.modified &&
+        note.created === other.created
+      );
+    })
+  );
+}
+
 function haveSameNoteIdMembers(
   left: string[] | null | undefined,
   right: string[] | null | undefined,
@@ -583,8 +603,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!notesFolder) return;
     try {
       const notesList = await notesService.listNotes();
-      notesRef.current = notesList;
-      setNotes(notesList);
+      if (!areNoteMetadataListsEqual(notesRef.current, notesList)) {
+        notesRef.current = notesList;
+        setNotes(notesList);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load notes");
     }
@@ -2054,7 +2076,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
       // Only refresh if there are external changes
       if (externalChanges.length > 0) {
-        refreshNotes();
+        scheduleRefresh();
 
         // If the currently selected note was changed externally, set flag (don't auto-reload)
         const currentId = selectedNoteIdRef.current;
@@ -2081,7 +2103,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         unlisten();
       }
     };
-  }, [refreshKnownFolders, refreshNotes]);
+  }, [refreshKnownFolders, scheduleRefresh]);
 
   useEffect(() => {
     const scheduleRefresh = () => {

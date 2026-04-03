@@ -762,6 +762,7 @@ pub struct AppState {
     pub app_config: RwLock<AppConfig>, // notes_folder path (stored in app data)
     pub settings: RwLock<Settings>,    // per-folder settings (stored in .sly/)
     pub notes_cache: RwLock<HashMap<String, NoteMetadata>>,
+    pub notes_cache_root: RwLock<Option<String>>,
     pub file_watcher: Mutex<Option<FileWatcherState>>,
     pub note_windows: Mutex<HashMap<String, String>>,
     pub search_index: Mutex<Option<SearchIndex>>,
@@ -774,6 +775,7 @@ impl Default for AppState {
             app_config: RwLock::new(AppConfig::default()),
             settings: RwLock::new(Settings::default()),
             notes_cache: RwLock::new(HashMap::new()),
+            notes_cache_root: RwLock::new(None),
             file_watcher: Mutex::new(None),
             note_windows: Mutex::new(HashMap::new()),
             search_index: Mutex::new(None),
@@ -1632,6 +1634,92 @@ fn resolve_created_timestamp(created: Option<i64>, modified: i64) -> i64 {
     created.unwrap_or(modified)
 }
 
+fn build_note_metadata(id: String, content: &str, modified: i64, created: i64) -> NoteMetadata {
+    NoteMetadata {
+        id,
+        title: extract_title(content),
+        preview: generate_preview(content),
+        modified,
+        created,
+    }
+}
+
+fn refresh_note_metadata_from_path(
+    notes_root: &Path,
+    file_path: &Path,
+    preserved_created: Option<i64>,
+) -> Option<NoteMetadata> {
+    let id = id_from_abs_path(notes_root, file_path)?;
+    let metadata = std::fs::metadata(file_path).ok()?;
+    let modified = metadata_time_secs(metadata.modified()).unwrap_or(0);
+    let created = resolve_created_timestamp(
+        preserved_created.or_else(|| metadata_time_secs(metadata.created())),
+        modified,
+    );
+    let content = std::fs::read_to_string(file_path).ok()?;
+    Some(build_note_metadata(id, &content, modified, created))
+}
+
+fn rebuild_notes_cache_incrementally(
+    notes_root: &Path,
+    existing_cache: &HashMap<String, NoteMetadata>,
+) -> HashMap<String, NoteMetadata> {
+    use walkdir::WalkDir;
+
+    let mut next_cache = HashMap::with_capacity(existing_cache.len());
+
+    for entry in WalkDir::new(notes_root)
+        .max_depth(10)
+        .into_iter()
+        .filter_entry(is_visible_notes_entry)
+        .flatten()
+    {
+        let file_path = entry.path();
+        if !file_path.is_file() {
+            continue;
+        }
+
+        let Some(id) = id_from_abs_path(notes_root, file_path) else {
+            continue;
+        };
+
+        let metadata = entry.metadata().ok();
+        let modified = metadata
+            .as_ref()
+            .and_then(|metadata| metadata_time_secs(metadata.modified()))
+            .unwrap_or(0);
+        let created_from_disk = resolve_created_timestamp(
+            metadata
+                .as_ref()
+                .and_then(|metadata| metadata_time_secs(metadata.created())),
+            modified,
+        );
+
+        if let Some(cached) = existing_cache.get(&id) {
+            if cached.modified == modified {
+                let mut cached_metadata = cached.clone();
+                if cached_metadata.created == 0 {
+                    cached_metadata.created = created_from_disk;
+                }
+                next_cache.insert(id, cached_metadata);
+                continue;
+            }
+        }
+
+        let created = existing_cache
+            .get(&id)
+            .map(|metadata| metadata.created)
+            .filter(|created| *created > 0)
+            .unwrap_or(created_from_disk);
+
+        if let Ok(content) = std::fs::read_to_string(file_path) {
+            next_cache.insert(id.clone(), build_note_metadata(id, &content, modified, created));
+        }
+    }
+
+    next_cache
+}
+
 fn sort_notes(
     notes: &mut [NoteMetadata],
     pinned_ids: &HashSet<String>,
@@ -1723,6 +1811,18 @@ fn initialize_notes_folder(
         }
     }
 
+    {
+        let mut cache = state.notes_cache.write().expect("cache write lock");
+        cache.clear();
+    }
+    {
+        let mut cache_root = state
+            .notes_cache_root
+            .write()
+            .expect("cache root write lock");
+        *cache_root = None;
+    }
+
     Ok(normalized_path)
 }
 
@@ -1757,55 +1857,45 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
 
     let path = PathBuf::from(&folder);
     if !path.exists() {
+        {
+            let mut cache = state.notes_cache.write().expect("cache write lock");
+            cache.clear();
+        }
+        {
+            let mut cache_root = state
+                .notes_cache_root
+                .write()
+                .expect("cache root write lock");
+            *cache_root = Some(folder);
+        }
         return Ok(vec![]);
     }
 
     let path_clone = path.clone();
-    let discovered = tokio::task::spawn_blocking(move || {
-        use walkdir::WalkDir;
-        let mut results: Vec<(String, String, String, i64, i64)> = Vec::new();
-        for entry in WalkDir::new(&path_clone)
-            .max_depth(10)
-            .into_iter()
-            .filter_entry(is_visible_notes_entry)
-            .flatten()
-        {
-            let file_path = entry.path();
-            if !file_path.is_file() {
-                continue;
-            }
-            if let Some(id) = id_from_abs_path(&path_clone, file_path) {
-                if let Ok(content) = std::fs::read_to_string(file_path) {
-                    let metadata = entry.metadata().ok();
-                    let modified = metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata_time_secs(metadata.modified()))
-                        .unwrap_or(0);
-                    let created = metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata_time_secs(metadata.created()));
-                    let created = resolve_created_timestamp(created, modified);
-                    let title = extract_title(&content);
-                    let preview = generate_preview(&content);
-                    results.push((id, title, preview, modified, created));
-                }
-            }
+    let existing_cache = {
+        let cache_root = state
+            .notes_cache_root
+            .read()
+            .expect("cache root read lock")
+            .clone();
+        if cache_root.as_deref() == Some(folder.as_str()) {
+            state
+                .notes_cache
+                .read()
+                .expect("cache read lock")
+                .clone()
+        } else {
+            HashMap::new()
         }
-        results
+    };
+
+    let refreshed_cache = tokio::task::spawn_blocking(move || {
+        rebuild_notes_cache_incrementally(&path_clone, &existing_cache)
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    let mut notes: Vec<NoteMetadata> = discovered
-        .into_iter()
-        .map(|(id, title, preview, modified, created)| NoteMetadata {
-            id,
-            title,
-            preview,
-            modified,
-            created,
-        })
-        .collect();
+    let mut notes: Vec<NoteMetadata> = refreshed_cache.values().cloned().collect();
 
     // Load note sort settings
     let (pinned_ids, note_sort_mode): (HashSet<String>, NoteSortMode) = {
@@ -1826,10 +1916,14 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
     // Update cache efficiently
     {
         let mut cache = state.notes_cache.write().expect("cache write lock");
-        cache.clear();
-        for note in &notes {
-            cache.insert(note.id.clone(), note.clone());
-        }
+        *cache = refreshed_cache;
+    }
+    {
+        let mut cache_root = state
+            .notes_cache_root
+            .write()
+            .expect("cache root write lock");
+        *cache_root = Some(folder);
     }
 
     Ok(notes)
@@ -3447,6 +3541,12 @@ fn setup_file_watcher(
 
                     // Update search index for external file changes
                     if let Some(state) = app_handle.try_state::<AppState>() {
+                        let cache_root_matches = state
+                            .notes_cache_root
+                            .read()
+                            .expect("cache root read lock")
+                            .as_deref()
+                            == Some(notes_root.to_string_lossy().as_ref());
                         let index = state.search_index.lock().expect("search index mutex");
                         if let Some(ref search_index) = *index {
                             match kind {
@@ -3475,6 +3575,26 @@ fn setup_file_watcher(
                                     let _ = search_index.delete_note(&note_id);
                                 }
                                 _ => {}
+                            }
+                        }
+
+                        if cache_root_matches {
+                            let preserved_created = {
+                                let cache = state.notes_cache.read().expect("cache read lock");
+                                cache.get(&note_id).map(|note| note.created)
+                            };
+
+                            let updated =
+                                refresh_note_metadata_from_path(&notes_root, path, preserved_created);
+
+                            let mut cache = state.notes_cache.write().expect("cache write lock");
+                            match updated {
+                                Some(metadata) => {
+                                    cache.insert(note_id.clone(), metadata);
+                                }
+                                None => {
+                                    cache.remove(&note_id);
+                                }
                             }
                         }
                     }
@@ -5368,6 +5488,7 @@ pub fn run() {
                 app_config: RwLock::new(app_config),
                 settings: RwLock::new(settings),
                 notes_cache: RwLock::new(HashMap::new()),
+                notes_cache_root: RwLock::new(None),
                 file_watcher: Mutex::new(None),
                 note_windows: Mutex::new(HashMap::new()),
                 search_index: Mutex::new(search_index),
@@ -6600,5 +6721,47 @@ mod tests {
             Some("work/alpha")
         );
         assert!(notes_cache.contains_key("archive/beta"));
+    }
+
+    #[test]
+    fn rebuild_notes_cache_incrementally_tracks_changed_added_and_deleted_notes() {
+        let notes_root = temp_dir_path("notes-cache");
+        std::fs::create_dir_all(notes_root.join("docs")).unwrap();
+
+        let alpha_path = notes_root.join("alpha.md");
+        let beta_path = notes_root.join("docs/beta.md");
+        std::fs::write(&alpha_path, "# Alpha\nOriginal body").unwrap();
+        std::fs::write(&beta_path, "# Beta\nBeta body").unwrap();
+
+        let initial_cache = rebuild_notes_cache_incrementally(&notes_root, &HashMap::new());
+        assert_eq!(initial_cache.len(), 2);
+        assert_eq!(
+            initial_cache.get("alpha").map(|note| note.preview.as_str()),
+            Some("Original body")
+        );
+
+        std::thread::sleep(Duration::from_millis(1100));
+        std::fs::write(&alpha_path, "# Alpha updated\nNew preview text").unwrap();
+        std::fs::remove_file(&beta_path).unwrap();
+        std::fs::write(notes_root.join("gamma.md"), "# Gamma\nGamma body").unwrap();
+
+        let refreshed_cache = rebuild_notes_cache_incrementally(&notes_root, &initial_cache);
+
+        assert_eq!(refreshed_cache.len(), 2);
+        assert_eq!(
+            refreshed_cache.get("alpha").map(|note| note.title.as_str()),
+            Some("Alpha updated")
+        );
+        assert_eq!(
+            refreshed_cache.get("alpha").map(|note| note.preview.as_str()),
+            Some("New preview text")
+        );
+        assert!(!refreshed_cache.contains_key("docs/beta"));
+        assert_eq!(
+            refreshed_cache.get("gamma").map(|note| note.title.as_str()),
+            Some("Gamma")
+        );
+
+        let _ = std::fs::remove_dir_all(notes_root);
     }
 }
