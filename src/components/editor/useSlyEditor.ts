@@ -108,6 +108,7 @@ export interface UseSlyEditorOptions {
   handlePaste: SlyEditorPasteHandler;
   isLoadingRef: MutableRefObject<boolean>;
   katexMacros: Record<string, string>;
+  onCreate?: (editor: TiptapEditor) => void;
   provisionalFilenameNoteIdRef: MutableRefObject<string | null>;
   scheduleSave: () => void;
   selectionIsInsideH1: (editor: TiptapEditor) => boolean;
@@ -122,6 +123,7 @@ export function useSlyEditor({
   handlePaste,
   isLoadingRef,
   katexMacros,
+  onCreate,
   provisionalFilenameNoteIdRef,
   scheduleSave,
   selectionIsInsideH1,
@@ -211,6 +213,7 @@ export function useSlyEditor({
     },
     onCreate: ({ editor: editorInstance }) => {
       editorRef.current = editorInstance;
+      onCreate?.(editorInstance);
     },
     onUpdate: () => {
       if (isLoadingRef.current) return;
