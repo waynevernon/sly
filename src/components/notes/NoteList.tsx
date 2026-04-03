@@ -1,5 +1,4 @@
 import {
-  type KeyboardEvent,
   memo,
   useCallback,
   useEffect,
@@ -488,62 +487,6 @@ export function NoteList({
     [focusList, selectNote, selectNoteRange, toggleNoteSelection],
   );
 
-  const handleListKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (items.length === 0) return;
-
-      const currentId = selectedNoteId ?? selectedNoteIds[0] ?? null;
-      const currentIndex = currentId
-        ? items.findIndex((item) => item.id === currentId)
-        : -1;
-
-      const moveSelectionToIndex = (targetIndex: number) => {
-        const targetId = items[targetIndex]?.id;
-        if (!targetId) return;
-        handleSelect(targetId, {
-          shiftKey: event.shiftKey,
-          metaKey: event.metaKey,
-          ctrlKey: event.ctrlKey,
-        });
-      };
-
-      switch (event.key) {
-        case "ArrowDown":
-          event.preventDefault();
-          moveSelectionToIndex(
-            currentIndex < items.length - 1 ? currentIndex + 1 : items.length - 1,
-          );
-          return;
-        case "ArrowUp":
-          event.preventDefault();
-          moveSelectionToIndex(currentIndex > 0 ? currentIndex - 1 : 0);
-          return;
-        case "Home":
-          event.preventDefault();
-          moveSelectionToIndex(0);
-          return;
-        case "End":
-          event.preventDefault();
-          moveSelectionToIndex(items.length - 1);
-          return;
-        case "Enter":
-        case " ":
-          event.preventDefault();
-          {
-            const targetId =
-              items[currentIndex === -1 ? 0 : currentIndex]?.id;
-            if (targetId) {
-              void selectNote(targetId);
-            }
-          }
-          return;
-        default:
-          return;
-      }
-    },
-    [handleSelect, items, selectNote, selectedNoteId, selectedNoteIds],
-  );
-
   const runDelete = useCallback(
     async (noteIds: string[]) => {
       if (noteIds.length <= 1) {
@@ -718,7 +661,6 @@ export function NoteList({
         aria-activedescendant={activeOptionId}
         data-note-list
         className="group/notelist flex flex-col gap-1 p-1.5 outline-none"
-        onKeyDown={handleListKeyDown}
         onMouseDown={(event) => {
           if (event.button === 0 || event.button === 2) {
             focusList();

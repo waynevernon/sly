@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoteList, type NoteListItem } from "./NoteList";
 
@@ -277,13 +277,12 @@ describe("NoteList", () => {
     );
   });
 
-  it("moves selection with arrow keys from the note list container", async () => {
-    const selectNote = vi.fn();
+  it("tracks the active note with aria-activedescendant", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
-        selectedNoteId: baseItem.id,
-        selectNote,
+        selectedNoteId: secondItem.id,
+        selectedNoteIds: [secondItem.id],
       }),
     );
 
@@ -292,30 +291,9 @@ describe("NoteList", () => {
     );
 
     const listbox = screen.getByRole("listbox", { name: "Notes" });
-    fireEvent.keyDown(listbox, { key: "ArrowDown" });
-
-    expect(selectNote).toHaveBeenCalledTimes(1);
-    expect(selectNote).toHaveBeenCalledWith(secondItem.id);
-  });
-
-  it("activates the current note with Enter from the note list container", async () => {
-    const selectNote = vi.fn();
-    const notesContext = await import("../../context/NotesContext");
-    vi.mocked(notesContext.useNotes).mockReturnValue(
-      makeNotesHookValue({
-        selectedNoteId: baseItem.id,
-        selectNote,
-      }),
+    expect(listbox).toHaveAttribute(
+      "aria-activedescendant",
+      "note-option-work%2Fbravo",
     );
-
-    render(
-      <NoteList items={[baseItem, secondItem]} emptyState={baseEmptyState} />,
-    );
-
-    const listbox = screen.getByRole("listbox", { name: "Notes" });
-    fireEvent.keyDown(listbox, { key: "Enter" });
-
-    expect(selectNote).toHaveBeenCalledTimes(1);
-    expect(selectNote).toHaveBeenCalledWith(baseItem.id);
   });
 });
