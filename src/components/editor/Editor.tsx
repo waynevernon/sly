@@ -8,15 +8,9 @@ import {
 import { TextSearch } from "lucide-react";
 import {
   EditorContent,
-  ReactRenderer,
   type Editor as TiptapEditor,
 } from "@tiptap/react";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import {
-  NodeSelection,
-  TextSelection,
-} from "@tiptap/pm/state";
-import tippy, { type Instance as TippyInstance } from "tippy.js";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
@@ -24,7 +18,9 @@ import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { mod, alt, shift, isMac } from "../../lib/platform";
 import type { AssistantSelectionSnapshot } from "../../lib/assistant";
+import { useBlockMathPopover } from "./useBlockMathPopover";
 import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
+import { useLinkPopover } from "./useLinkPopover";
 
 // Validate URL scheme for safe opening
 function isAllowedUrlScheme(url: string): boolean {
@@ -40,12 +36,9 @@ import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import { shouldShowPendingSelectionSpinner } from "./editorState";
-import { BlockMathEditor } from "./BlockMathEditor";
-import { LinkEditor } from "./LinkEditor";
 import { SearchToolbar } from "./SearchToolbar";
 import type { WikilinkStorage } from "./Wikilink";
 import { EditorWidthHandles } from "./EditorWidthHandle";
-import { normalizeBlockMath } from "./MathExtensions";
 import {
   persistedSelectionHighlightPluginKey,
   searchHighlightPluginKey,
@@ -556,11 +549,11 @@ function EditorImpl({
   >([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const linkPopupRef = useRef<TippyInstance | null>(null);
-  const blockMathPopupRef = useRef<TippyInstance | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<TiptapEditor | null>(null);
   const currentNoteIdRef = useRef<string | null>(null);
+  const closeBlockMathPopoverRef = useRef<() => void>(() => {});
+  const closeLinkPopoverRef = useRef<() => void>(() => {});
   // Stable refs for wikilink click handler (avoids re-registering listener on every notes change)
   const notesRef = useRef(notes);
   notesRef.current = notes;
@@ -709,269 +702,18 @@ function EditorImpl({
     sourceTextareaRef,
   });
 
-  const closeBlockMathPopup = useCallback(() => {
-    if (blockMathPopupRef.current) {
-      blockMathPopupRef.current.destroy();
-      blockMathPopupRef.current = null;
-    }
-  }, []);
+  const { closeLinkPopover, handleAddLink } = useLinkPopover({
+    closeBlockMathPopover: () => closeBlockMathPopoverRef.current(),
+    editorRef,
+  });
 
-  const handleEditBlockMath = useCallback(
-    (pos: number) => {
-      const currentEditor = editorRef.current;
-      if (!currentEditor) return;
-
-      if (linkPopupRef.current) {
-        linkPopupRef.current.destroy();
-        linkPopupRef.current = null;
-      }
-      closeBlockMathPopup();
-
-      const node = currentEditor.state.doc.nodeAt(pos);
-      if (!node || node.type.name !== "blockMath") {
-        return;
-      }
-
-      const virtualElement = {
-        getBoundingClientRect: () => {
-          const nodeDom = currentEditor.view.nodeDOM(pos);
-          if (nodeDom instanceof HTMLElement) {
-            return nodeDom.getBoundingClientRect();
-          }
-
-          const start = currentEditor.view.coordsAtPos(pos);
-          const end = currentEditor.view.coordsAtPos(pos + node.nodeSize);
-          const left = Math.min(start.left, end.left);
-          const top = Math.min(start.top, end.top);
-          const right = Math.max(start.right, end.right);
-          const bottom = Math.max(start.bottom, end.bottom);
-
-          return {
-            width: Math.max(2, right - left),
-            height: Math.max(20, bottom - top),
-            top,
-            left,
-            right,
-            bottom,
-            x: left,
-            y: top,
-            toJSON: () => ({}),
-          } as DOMRect;
-        },
-      };
-
-      const component = new ReactRenderer(BlockMathEditor, {
-        props: {
-          initialLatex: String(node.attrs.latex ?? ""),
-          onSubmit: (latex: string) => {
-            const trimmed = latex.trim();
-            if (!trimmed) {
-              toast.error("Please enter a formula.");
-              return;
-            }
-            currentEditor
-              .chain()
-              .focus()
-              .updateBlockMath({ pos, latex: trimmed })
-              .setTextSelection(pos + node.nodeSize)
-              .run();
-            closeBlockMathPopup();
-          },
-          onCancel: () => {
-            // Move cursor after the node instead of restoring the NodeSelection,
-            // which would re-trigger native DOM selection highlight bleed
-            currentEditor
-              .chain()
-              .focus()
-              .setTextSelection(pos + node.nodeSize)
-              .run();
-            closeBlockMathPopup();
-          },
-        },
-        editor: currentEditor,
-      });
-
-      blockMathPopupRef.current = tippy(document.body, {
-        getReferenceClientRect: () =>
-          virtualElement.getBoundingClientRect() as DOMRect,
-        appendTo: () => document.body,
-        content: component.element,
-        showOnCreate: true,
-        interactive: true,
-        trigger: "manual",
-        placement: "bottom-start",
-        offset: [0, 8],
-        onDestroy: () => {
-          component.destroy();
-        },
-      });
-    },
-    [closeBlockMathPopup],
-  );
-
-  const handleAddBlockMath = useCallback(() => {
-    const currentEditor = editorRef.current;
-    if (!currentEditor) return;
-
-    closeBlockMathPopup();
-    if (linkPopupRef.current) {
-      linkPopupRef.current.destroy();
-      linkPopupRef.current = null;
-    }
-    const { selection, doc } = currentEditor.state;
-    const { from, to, empty, $from } = selection;
-
-    if (
-      selection instanceof NodeSelection &&
-      selection.node.type.name === "blockMath"
-    ) {
-      handleEditBlockMath(from);
-      return;
-    }
-
-    if (!empty) {
-      const selectedNode = doc.nodeAt(from);
-      if (
-        selectedNode?.type.name === "blockMath" &&
-        from + selectedNode.nodeSize === to
-      ) {
-        handleEditBlockMath(from);
-        return;
-      }
-    }
-
-    if (empty) {
-      const nodeBefore = $from.nodeBefore;
-      if (nodeBefore?.type.name === "blockMath") {
-        handleEditBlockMath(from - nodeBefore.nodeSize);
-        return;
-      }
-      const nodeAfter = $from.nodeAfter;
-      if (nodeAfter?.type.name === "blockMath") {
-        handleEditBlockMath(from);
-        return;
-      }
-    }
-
-    const selectedText = empty ? "" : doc.textBetween(from, to, "\n");
-    const initialLatex = normalizeBlockMath(selectedText);
-    const targetRange = { from, to };
-    const hasSelection = from !== to;
-
-    const virtualElement = {
-      getBoundingClientRect: () => {
-        if (hasSelection) {
-          const startPos = currentEditor.view.domAtPos(from);
-          const endPos = currentEditor.view.domAtPos(to);
-
-          if (startPos && endPos) {
-            try {
-              const range = document.createRange();
-              range.setStart(startPos.node, startPos.offset);
-              range.setEnd(endPos.node, endPos.offset);
-              return range.getBoundingClientRect();
-            } catch (error) {
-              console.error("Block math range creation failed:", error);
-            }
-          }
-        }
-
-        const coords = currentEditor.view.coordsAtPos(from);
-        return {
-          width: 2,
-          height: 20,
-          top: coords.top,
-          left: coords.left,
-          right: coords.right,
-          bottom: coords.bottom,
-          x: coords.left,
-          y: coords.top,
-          toJSON: () => ({}),
-        } as DOMRect;
-      },
-    };
-
-    const component = new ReactRenderer(BlockMathEditor, {
-      props: {
-        initialLatex,
-        onSubmit: (latex: string) => {
-          const normalizedLatex = latex.trim();
-          if (!normalizedLatex) {
-            toast.error("Please enter a formula.");
-            return;
-          }
-
-          const inserted = currentEditor
-            .chain()
-            .focus()
-            .insertContentAt(targetRange, {
-              type: "blockMath",
-              attrs: { latex: normalizedLatex },
-            })
-            .command(({ state, tr, dispatch }) => {
-              if (!dispatch) return true;
-
-              const { $to } = tr.selection;
-              if ($to.nodeAfter?.isTextblock) {
-                tr.setSelection(TextSelection.create(tr.doc, $to.pos + 1));
-                tr.scrollIntoView();
-                return true;
-              }
-
-              const paragraphType =
-                state.schema.nodes.paragraph ??
-                $to.parent.type.contentMatch.defaultType;
-              const paragraphNode = paragraphType?.create();
-              const insertPos = $to.nodeAfter ? $to.pos : $to.end();
-
-              if (paragraphNode) {
-                const $insertPos = tr.doc.resolve(insertPos);
-                if (
-                  $insertPos.parent.canReplaceWith(
-                    $insertPos.index(),
-                    $insertPos.index(),
-                    paragraphNode.type,
-                  )
-                ) {
-                  tr.insert(insertPos, paragraphNode);
-                  tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
-                  tr.scrollIntoView();
-                  return true;
-                }
-              }
-
-              tr.scrollIntoView();
-              return true;
-            })
-            .run();
-
-          if (inserted) {
-            closeBlockMathPopup();
-          }
-        },
-        onCancel: () => {
-          currentEditor.commands.focus();
-          closeBlockMathPopup();
-        },
-      },
-      editor: currentEditor,
+  const { closeBlockMathPopover, handleAddBlockMath, handleEditBlockMath } =
+    useBlockMathPopover({
+      closeLinkPopover: () => closeLinkPopoverRef.current(),
+      editorRef,
     });
-
-    blockMathPopupRef.current = tippy(document.body, {
-      getReferenceClientRect: () =>
-        virtualElement.getBoundingClientRect() as DOMRect,
-      appendTo: () => document.body,
-      content: component.element,
-      showOnCreate: true,
-      interactive: true,
-      trigger: "manual",
-      placement: "bottom-start",
-      offset: [0, 8],
-      onDestroy: () => {
-        component.destroy();
-      },
-    });
-  }, [closeBlockMathPopup, handleEditBlockMath]);
+  closeLinkPopoverRef.current = closeLinkPopover;
+  closeBlockMathPopoverRef.current = closeBlockMathPopover;
 
   const handleEditorPaste = useCallback<SlyEditorPasteHandler>(
     (_view, event) => {
@@ -1241,142 +983,6 @@ function EditorImpl({
       editorElement.removeEventListener("click", handleEditorClick);
     };
   }, [editor]);
-  useEffect(() => {
-    return () => {
-      if (linkPopupRef.current) {
-        linkPopupRef.current.destroy();
-      }
-      if (blockMathPopupRef.current) {
-        blockMathPopupRef.current.destroy();
-      }
-    };
-  }, []);
-
-  // Link handlers - show inline popup at cursor position
-  const handleAddLink = useCallback(() => {
-    if (!editor) return;
-
-    // Close block math popup if open (popups are mutually exclusive)
-    closeBlockMathPopup();
-
-    // Destroy existing popup if any
-    if (linkPopupRef.current) {
-      linkPopupRef.current.destroy();
-      linkPopupRef.current = null;
-    }
-
-    // Get existing link URL if cursor is on a link
-    const existingUrl = editor.getAttributes("link").href || "";
-
-    // Get selection bounds for popup placement using DOM Range for accurate multi-line support
-    const { from, to } = editor.state.selection;
-    const hasSelection = from !== to;
-
-    // Create a virtual element at the selection for tippy to anchor to
-    const virtualElement = {
-      getBoundingClientRect: () => {
-        // For selections with text, use DOM Range for accurate bounds
-        if (hasSelection) {
-          const startPos = editor.view.domAtPos(from);
-          const endPos = editor.view.domAtPos(to);
-
-          if (startPos && endPos) {
-            try {
-              const range = document.createRange();
-              range.setStart(startPos.node, startPos.offset);
-              range.setEnd(endPos.node, endPos.offset);
-              return range.getBoundingClientRect();
-            } catch (e) {
-              // Fallback if range creation fails
-              console.error("Range creation failed:", e);
-            }
-          }
-        }
-
-        // For collapsed cursor, use coordsAtPos with proper viewport positioning
-        const coords = editor.view.coordsAtPos(from);
-
-        // Create a DOMRect-like object with proper positioning
-        return {
-          width: 2,
-          height: 20,
-          top: coords.top,
-          left: coords.left,
-          right: coords.right,
-          bottom: coords.bottom,
-          x: coords.left,
-          y: coords.top,
-          toJSON: () => ({}),
-        } as DOMRect;
-      },
-    };
-
-    // Create the link editor component
-    const component = new ReactRenderer(LinkEditor, {
-      props: {
-        initialUrl: existingUrl,
-        // Only show text input if there's no selection AND not editing an existing link
-        initialText: hasSelection || existingUrl ? undefined : "",
-        onSubmit: (url: string, text?: string) => {
-          if (url.trim()) {
-            if (text !== undefined) {
-              // No selection case - insert new link with text
-              if (text.trim()) {
-                editor
-                  .chain()
-                  .focus()
-                  .insertContent({
-                    type: "text",
-                    text: text.trim(),
-                    marks: [{ type: "link", attrs: { href: url.trim() } }],
-                  })
-                  .run();
-              }
-            } else {
-              // Has selection - apply link to selection
-              editor
-                .chain()
-                .focus()
-                .extendMarkRange("link")
-                .setLink({ href: url.trim() })
-                .run();
-            }
-          } else {
-            editor.chain().focus().extendMarkRange("link").unsetLink().run();
-          }
-          linkPopupRef.current?.destroy();
-          linkPopupRef.current = null;
-        },
-        onRemove: () => {
-          editor.chain().focus().extendMarkRange("link").unsetLink().run();
-          linkPopupRef.current?.destroy();
-          linkPopupRef.current = null;
-        },
-        onCancel: () => {
-          editor.commands.focus();
-          linkPopupRef.current?.destroy();
-          linkPopupRef.current = null;
-        },
-      },
-      editor,
-    });
-
-    // Create tippy popup
-    linkPopupRef.current = tippy(document.body, {
-      getReferenceClientRect: () =>
-        virtualElement.getBoundingClientRect() as DOMRect,
-      appendTo: () => document.body,
-      content: component.element,
-      showOnCreate: true,
-      interactive: true,
-      trigger: "manual",
-      placement: "bottom-start",
-      offset: [0, 8],
-      onDestroy: () => {
-        component.destroy();
-      },
-    });
-  }, [editor, closeBlockMathPopup]);
 
   // Keyboard shortcut for Cmd+K to add link (only when editor is focused)
   useEffect(() => {
