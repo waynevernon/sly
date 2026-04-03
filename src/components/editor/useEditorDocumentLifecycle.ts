@@ -418,13 +418,11 @@ export function useEditorDocumentLifecycle({
       if (sourceTimeoutRef.current) {
         clearTimeout(sourceTimeoutRef.current);
       }
-      if (needsSaveRef.current && editorRef.current) {
-        needsSaveRef.current = false;
-        const markdown = getMarkdown(editorRef.current);
-        void saveNote(markdown);
+      if (needsSaveRef.current) {
+        void flushPendingSave();
       }
     };
-  }, [editorRef, getMarkdown, saveNote]);
+  }, [flushPendingSave]);
 
   return {
     effectiveSourceMode,
