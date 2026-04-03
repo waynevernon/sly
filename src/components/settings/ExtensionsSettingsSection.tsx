@@ -107,8 +107,10 @@ export function ExtensionsSettingsSection({
   const [aiWorkingDirectory, setAiWorkingDirectory] = useState<string | null>(
     null,
   );
-  const [aiWorkingDirectoryLoaded, setAiWorkingDirectoryLoaded] = useState(false);
-  const [aiWorkingDirectorySaving, setAiWorkingDirectorySaving] = useState(false);
+  const [aiWorkingDirectoryLoaded, setAiWorkingDirectoryLoaded] =
+    useState(false);
+  const [aiWorkingDirectorySaving, setAiWorkingDirectorySaving] =
+    useState(false);
 
   useEffect(() => {
     cliService
@@ -168,7 +170,9 @@ export function ExtensionsSettingsSection({
     } catch (err) {
       console.error("Failed to update AI reference folder:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to update AI reference folder",
+        err instanceof Error
+          ? err.message
+          : "Failed to update AI reference folder",
       );
     }
   };
@@ -180,7 +184,9 @@ export function ExtensionsSettingsSection({
     } catch (err) {
       console.error("Failed to reset AI reference folder:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to reset AI reference folder",
+        err instanceof Error
+          ? err.message
+          : "Failed to reset AI reference folder",
       );
     }
   };
@@ -223,8 +229,7 @@ export function ExtensionsSettingsSection({
       <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">AI Providers</h2>
         <p className="text-sm text-text-muted mb-4">
-          Use AI from the Assistant tab in the right panel while editing a
-          note
+          Use AI from the Assistant tab in the right panel while editing a note
         </p>
 
         {aiProvidersLoading ? (
@@ -277,9 +282,9 @@ export function ExtensionsSettingsSection({
       <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">AI Reference Folder</h2>
         <p className="text-sm text-text-muted mb-4">
-          Sly runs AI CLIs from this folder. Custom folders can affect files
-          like <code className="ui-kbd font-mono">CLAUDE.md</code> and other
-          repo-local instructions.
+          Choose a folder to run your AI CLIs from so they can pick up custom
+          context like <code className="ui-kbd font-mono">AGENTS.md</code> and
+          other local instructions.
         </p>
 
         {!aiWorkingDirectoryLoaded ? (
@@ -343,10 +348,7 @@ export function ExtensionsSettingsSection({
             <h2 className="text-xl font-medium mb-0.5">CLI Tool</h2>
             <p className="text-sm text-text-muted mb-4">
               Open notes from the terminal with the{" "}
-              <code className="ui-kbd font-mono">
-                sly
-              </code>{" "}
-              command
+              <code className="ui-kbd font-mono">sly</code> command
             </p>
 
             {cli.error ? (
@@ -379,7 +381,9 @@ export function ExtensionsSettingsSection({
                         title="Click to copy path"
                         onClick={async () => {
                           try {
-                            await invoke("copy_to_clipboard", { text: cli.status!.path! });
+                            await invoke("copy_to_clipboard", {
+                              text: cli.status!.path!,
+                            });
                             toast.success("Path copied to clipboard");
                           } catch {
                             toast.error("Failed to copy path");
@@ -402,7 +406,11 @@ export function ExtensionsSettingsSection({
                 >
                   {cli.operating ? (
                     <>
-                      <LoadingSpinner size="sm" tone="inherit" className="mr-2" />
+                      <LoadingSpinner
+                        size="sm"
+                        tone="inherit"
+                        className="mr-2"
+                      />
                       Uninstalling...
                     </>
                   ) : (
@@ -423,7 +431,11 @@ export function ExtensionsSettingsSection({
                 >
                   {cli.operating ? (
                     <>
-                      <LoadingSpinner size="sm" tone="inherit" className="mr-2" />
+                      <LoadingSpinner
+                        size="sm"
+                        tone="inherit"
+                        className="mr-2"
+                      />
                       Installing...
                     </>
                   ) : (
