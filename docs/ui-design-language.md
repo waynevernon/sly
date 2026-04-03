@@ -181,7 +181,7 @@ All transient surfaces should derive from one of three shells:
 
 - Note rows, folder rows, and other primary navigation collections must define keyboard behavior alongside pointer behavior.
 - Use real buttons where possible. If custom row semantics are required, implement a documented roving-tabindex or listbox/tree pattern with arrow-key movement and Enter/Space activation.
-- Do not ship primary collection rows as non-tabbable `div`s with `role="button"`.
+- Do not ship core interactions or primary collection rows as non-tabbable `div`s with `role="button"`.
 
 ### Editor Modes
 

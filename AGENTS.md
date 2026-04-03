@@ -185,6 +185,7 @@ Prefer service wrappers in `src/services/` over calling `invoke()` directly from
 - `NotesContext` manages note state, CRUD, search, file watching, and folder operations
 - `GitContext` manages Git availability, status, commit, and sync flows
 - `ThemeContext` manages theme mode, theme presets, fonts, typography, text direction, editor width, interface zoom, and pane mode
+- Async loads tied to folder, note, or workspace identity must use stale-request guards so older responses cannot overwrite newer state.
 
 ### Settings Storage
 
@@ -294,6 +295,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Keep the codebase clean and direct
 - Prefer shared primitives and shared patterns over local one-offs
 - Maintain type safety throughout the frontend and backend
+- Core interactions must not be implemented as non-tabbable `div`s with `role="button"`. Use native interactive elements when possible, or a documented composite pattern with keyboard semantics when custom rows are required.
 - Keep persistence changes centralized: schema, migration, and canonicalization belong in Tauri, while React should consume canonical data rather than re-normalizing persisted payloads
 - Avoid commented-out code and TODO-driven dead branches in production code
 - Prefer idiomatic, clean solutions over workarounds; if a workaround is the only viable path, flag it explicitly before proceeding
@@ -324,7 +326,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
   - `cargo check`
   - `cargo clippy --all-targets --all-features -- -D warnings`
 - GitHub Actions runs the automated suite on push and pull request. Keep that path green and treat CI as the default gate.
-- If lint produces warnings from older code, do not expand scope into a repo-wide cleanup unless the task is specifically about that. Fix nearby warnings opportunistically.
+- The expected standard before merge is zero lint warnings. If a warning is intentionally left in place, document the reason in the PR or task summary rather than silently accepting it.
 
 ### Performance
 
@@ -333,6 +335,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - File watcher events are debounced
 - Git status refresh is debounced
 - Expensive list rendering should stay memoized where it matters
+- Single-note changes should not trigger full-vault rescans when incremental metadata or index updates are possible.
 
 ### UX
 
