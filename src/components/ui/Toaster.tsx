@@ -14,7 +14,7 @@ export function Toaster() {
           toast:
             "group toast ui-surface-toast w-full max-w-80 px-3 py-2 text-text",
           description: "text-text-muted",
-          actionButton: "bg-accent text-white",
+          actionButton: "bg-accent text-text-inverse",
           cancelButton: "bg-bg-muted text-text",
           error: "!bg-bg !text-text !border-border",
           success: "!bg-bg !text-text !border-border",

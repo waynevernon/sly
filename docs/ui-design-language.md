@@ -132,6 +132,7 @@ Permanent layout should stay flat and restrained. Elevated surfaces are for tran
 - Standard inputs and routine buttons are `32px`.
 - Primary CTAs are `40px`.
 - Use a shared destructive tone instead of ad hoc red text styling.
+- Shared control primitives own size and variant recipes. Do not maintain separate local style maps for buttons, icon buttons, or similar controls when they are meant to be one family.
 - Composite widgets may use roving tabindex, but isolated buttons and icon buttons should not be removed from the tab order.
 
 ### Badges and Counts
@@ -174,6 +175,13 @@ All transient surfaces should derive from one of three shells:
 - Prefer spacing and section rhythm before adding more cards.
 - Use boxed containers only when grouping materially improves scanning.
 - Avoid stacked segmented controls and repeated dashed separators.
+- Settings widths and padding should follow shared panel and layout conventions. Introduce one-off spacing or max-width values only when a surface has a documented reason to diverge.
+
+### Navigation Collections
+
+- Note rows, folder rows, and other primary navigation collections must define keyboard behavior alongside pointer behavior.
+- Use real buttons where possible. If custom row semantics are required, implement a documented roving-tabindex or listbox/tree pattern with arrow-key movement and Enter/Space activation.
+- Do not ship primary collection rows as non-tabbable `div`s with `role="button"`.
 
 ### Editor Modes
 
@@ -191,6 +199,10 @@ All transient surfaces should derive from one of three shells:
 - `destructive`: tinted emphasis, not plain red text alone
 
 Use the same state grammar across editor save state, Git state, AI state, settings errors, and toasts.
+
+All warning, error, and success messaging should use shared status-panel primitives. Do not hand-build tinted message boxes with raw palette utilities.
+
+When semantic tokens exist, use them. Avoid raw palette classes such as `text-orange-700`, `text-white`, or one-off surface colors in product UI.
 
 ## Empty, Loading, Error, and Success States
 

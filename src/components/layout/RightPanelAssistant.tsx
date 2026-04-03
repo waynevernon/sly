@@ -13,6 +13,7 @@ import {
   IconButton,
   LoadingSpinner,
   PanelEmptyState,
+  StatusPanel,
   Tooltip,
   menuItemClassName,
   menuSurfaceClassName,
@@ -193,6 +194,23 @@ function ProposalCard({
   );
 }
 
+function AssistantWarning({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <StatusPanel
+      tone="warning"
+      className={cn("mt-2 px-2.5 py-2 text-xs", className)}
+    >
+      {children}
+    </StatusPanel>
+  );
+}
+
 function AssistantTurnView({
   turn,
   disabled,
@@ -207,19 +225,19 @@ function AssistantTurnView({
       <div className="text-[13px] font-medium text-text">Assistant</div>
       <div className="mt-1 whitespace-pre-wrap text-sm text-text">{turn.replyText}</div>
       {turn.warning ? (
-        <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
+        <AssistantWarning>
           {turn.warning}
-        </div>
+        </AssistantWarning>
       ) : null}
       {turn.stale ? (
-        <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
+        <AssistantWarning>
           This proposal is stale because the note changed. Send a new request before applying edits.
-        </div>
+        </AssistantWarning>
       ) : null}
       {turn.invalidReason ? (
-        <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/20 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
+        <AssistantWarning>
           {turn.invalidReason}
-        </div>
+        </AssistantWarning>
       ) : null}
       {turn.proposals.length > 0 ? (
         <div className="mt-3 space-y-2">
@@ -357,9 +375,9 @@ export function RightPanelAssistant({
           title="No AI provider detected"
         />
         <div className="space-y-3 px-3 pb-4">
-          <div className="rounded-[var(--ui-radius-md)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] p-3 text-sm text-orange-700 dark:text-orange-400">
+          <StatusPanel tone="warning">
             Install one of the providers below, then open Settings &gt; Assistant &amp; CLI to refresh detection.
-          </div>
+          </StatusPanel>
           <div className="space-y-1.5">
             {emptyInstallProviders.map(({ provider, label, url }) => (
               <a
@@ -420,9 +438,9 @@ export function RightPanelAssistant({
                         {turn.scopeLabel} · {turn.lineLabel}
                       </div>
                       {turn.notice ? (
-                        <div className="mt-2 rounded-[var(--ui-radius-sm)] border border-[var(--color-warning)]/15 bg-[var(--color-warning-muted)] px-2.5 py-2 text-xs text-orange-700 dark:text-orange-400">
+                        <AssistantWarning>
                           {turn.notice}
-                        </div>
+                        </AssistantWarning>
                       ) : null}
                     </div>
                   </div>

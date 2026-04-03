@@ -3,6 +3,12 @@ import { type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Tooltip } from "./Tooltip";
 import { PinIcon } from "../icons";
+import {
+  buttonVariantClasses,
+  iconButtonSizeClasses,
+  type ButtonSize,
+  type ButtonVariant,
+} from "./buttonStyles";
 
 // Re-export components
 export {
@@ -23,6 +29,7 @@ export { Toaster } from "./Toaster";
 export { DialogShell } from "./DialogShell";
 export { PanelEmptyState } from "./PanelEmptyState";
 export { PopoverSurface } from "./PopoverSurface";
+export { StatusPanel } from "./StatusPanel";
 export {
   MenuSurface,
   menuSurfaceClassName,
@@ -85,35 +92,10 @@ export function ToolbarButton({
 export interface IconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
-  variant?:
-    | "primary"
-    | "default"
-    | "secondary"
-    | "ghost"
-    | "outline"
-    | "destructive";
+  size?: ButtonSize;
+  variant?: Exclude<ButtonVariant, "link">;
   title?: string;
 }
-
-const iconButtonSizes = {
-  xs: "w-[var(--ui-control-height-compact)] h-[var(--ui-control-height-compact)]",
-  sm: "w-[var(--ui-control-height-compact)] h-[var(--ui-control-height-compact)]",
-  md: "w-[var(--ui-control-height-standard)] h-[var(--ui-control-height-standard)]",
-  lg: "w-9 h-9", // 36px
-  xl: "w-[var(--ui-control-height-prominent)] h-[var(--ui-control-height-prominent)]",
-};
-
-const iconButtonVariants = {
-  primary: "bg-accent text-white hover:bg-accent/90",
-  default: "bg-bg-emphasis text-text hover:bg-bg-muted",
-  secondary: "bg-bg-muted text-text hover:bg-bg-emphasis",
-  ghost: "hover:bg-bg-muted text-text-muted hover:text-text",
-  outline:
-    "border border-border text-text-muted hover:bg-bg-muted hover:text-text",
-  destructive:
-    "bg-[var(--color-danger-muted)] text-[var(--color-danger)] hover:bg-[var(--color-danger-muted)]/90",
-};
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
@@ -126,8 +108,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         className={cn(
           "ui-focus-ring flex items-center justify-center rounded-[var(--ui-radius-md)] transition-colors",
           "disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
-          iconButtonSizes[size],
-          iconButtonVariants[variant],
+          iconButtonSizeClasses[size],
+          buttonVariantClasses[variant],
           className
         )}
         aria-label={title}
