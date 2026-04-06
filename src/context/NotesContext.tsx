@@ -579,6 +579,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const searchRequestIdRef = useRef(0);
   // Tracks the ID of a newly created note so Editor can focus its title.
   const pendingNewNoteIdRef = useRef<string | null>(null);
+  const noteIdRedirectsRef = useRef<Map<string, string>>(new Map());
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
   const windowRefreshTimeoutRef = useRef<number | null>(null);
@@ -1184,9 +1185,26 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
+  const resolveLiveNoteId = useCallback((id: string) => {
+    let resolvedId = id;
+    const seen = new Set<string>();
+
+    while (!seen.has(resolvedId)) {
+      seen.add(resolvedId);
+      const redirectedId = noteIdRedirectsRef.current.get(resolvedId);
+      if (!redirectedId) {
+        break;
+      }
+      resolvedId = redirectedId;
+    }
+
+    return resolvedId;
+  }, []);
+
   const applyUpdatedNoteState = useCallback(
     async (previousId: string, updated: Note) => {
       if (updated.id !== previousId) {
+        noteIdRedirectsRef.current.set(previousId, updated.id);
         const pinnedIds = settingsRef.current.pinnedNoteIds || [];
         const recentNoteIds = settingsRef.current.recentNoteIds || [];
         if (pinnedIds.includes(previousId) || recentNoteIds.includes(previousId)) {
@@ -1228,8 +1246,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const saveNote = useCallback(
     async (content: string, noteId?: string) => {
       // Use provided noteId (for flush saves) or fall back to currentNote.id
-      const savingNoteId = noteId || currentNote?.id;
-      if (!savingNoteId) return;
+      const requestedNoteId = noteId || currentNote?.id;
+      if (!requestedNoteId) return;
+      const savingNoteId = resolveLiveNoteId(requestedNoteId);
       let updatedId: string | null = null;
 
       // Stamp this save so we can discard completions from older concurrent saves
@@ -1265,13 +1284,24 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           if (updatedId) recentlySavedRef.current.delete(updatedId);
         }, 1000);
       } catch (err) {
+        const latestKnownId = resolveLiveNoteId(requestedNoteId);
+        if (
+          latestKnownId !== requestedNoteId &&
+          err instanceof Error &&
+          err.message === "Note not found"
+        ) {
+          recentlySavedRef.current.delete(savingNoteId);
+          if (updatedId) recentlySavedRef.current.delete(updatedId);
+          return;
+        }
+
         setError(err instanceof Error ? err.message : "Failed to save note");
         // Clean up immediately on error to avoid leaving stale entries
         recentlySavedRef.current.delete(savingNoteId);
         if (updatedId) recentlySavedRef.current.delete(updatedId);
       }
     },
-    [applyUpdatedNoteState, currentNote, scheduleRefresh]
+    [applyUpdatedNoteState, currentNote, resolveLiveNoteId, scheduleRefresh]
   );
 
   const search = useCallback(async (query: string) => {

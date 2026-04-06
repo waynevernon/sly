@@ -1989,6 +1989,9 @@ async fn save_note(
 
     let (final_id, file_path) = if let Some(existing_id) = id {
         let existing_path = abs_path_from_id(&folder_path, &existing_id)?;
+        if !existing_path.exists() {
+            return Err("Note not found".to_string());
+        }
         (existing_id, existing_path)
     } else {
         let sanitized_leaf = sanitize_filename(&title);
