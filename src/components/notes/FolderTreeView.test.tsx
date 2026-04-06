@@ -224,6 +224,25 @@ describe("FolderTreeView", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides the pinned count badge when there are no pinned notes", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        pinnedNotes: [],
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Pinned/i })).toBeInTheDocument();
+    });
+
+    const pinnedButton = screen.getByRole("button", { name: /Pinned/i });
+    expect(pinnedButton.querySelector(".ui-count-badge")).toBeNull();
+  });
+
   it("hides the recent notes row when the setting is disabled", async () => {
     const notesContext = await import("../../context/NotesContext");
 

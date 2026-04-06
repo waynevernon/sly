@@ -1003,7 +1003,7 @@ export function FolderTreeView({
                 Pinned
               </span>
             </span>
-            {showNoteCounts && (
+            {showNoteCounts && pinnedNotes.length > 0 && (
               <FolderRowTrailing
                 count={pinnedNotes.length}
                 isActive={selectedScope.type === "pinned"}
