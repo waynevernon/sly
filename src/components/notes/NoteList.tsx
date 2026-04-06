@@ -667,7 +667,7 @@ export function NoteList({
         aria-multiselectable={true}
         aria-activedescendant={activeOptionId}
         data-note-list
-        className="group/notelist flex flex-col gap-1 p-1.5 outline-none"
+        className="group/notelist flex flex-col gap-1 px-1.5 pt-2.5 pb-1.5 outline-none"
         onMouseDown={(event) => {
           if (event.button === 0 || event.button === 2) {
             focusList();

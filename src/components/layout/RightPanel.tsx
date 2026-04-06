@@ -433,7 +433,7 @@ export function RightPanel({
           {activeTab === "outline" ? (
             <div
               ref={outlineScrollRef}
-              className="ui-scrollbar-overlay flex flex-1 flex-col overflow-y-auto px-2 py-2"
+              className="ui-scrollbar-overlay flex flex-1 flex-col overflow-y-auto px-2 pt-2.5 pb-2"
             >
               {!panelHydrated && hasNote ? (
                 <PanelEmptyState message="Loading outline..." />
