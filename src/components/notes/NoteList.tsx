@@ -36,7 +36,15 @@ import {
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import { sanitizeNoteFilename } from "../../lib/noteIdentity";
 import * as notesService from "../../services/notes";
-import { CopyIcon, NoteIcon, PinIcon, PencilIcon, TrashIcon, XIcon } from "../icons";
+import {
+  AddNoteIcon,
+  CopyIcon,
+  NoteIcon,
+  PinIcon,
+  PencilIcon,
+  TrashIcon,
+  XIcon,
+} from "../icons";
 
 export interface NoteListItem {
   id: string;
@@ -67,7 +75,7 @@ function NoteListEmptyStateIcon({ kind }: Pick<NoteListEmptyState, "kind">) {
   if (kind === "pinned") {
     return <PinIcon />;
   }
-  return <NoteIcon />;
+  return <AddNoteIcon />;
 }
 
 function formatDate(timestamp: number): string {
