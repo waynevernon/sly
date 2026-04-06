@@ -382,6 +382,7 @@ export interface PreviewModeData {
   content: string | null;
   title: string;
   filePath: string;
+  notesFolder: string | null;
   modified: number;
   hasExternalChanges: boolean;
   reloadVersion: number;
@@ -397,6 +398,7 @@ export interface WorkspaceEditorData {
     path: string;
     modified: number;
   } | null;
+  notesFolder: string | null;
   selectedNoteId: string | null;
   notes: NoteMetadata[];
   hasExternalChanges: boolean;
@@ -493,6 +495,11 @@ function EditorImpl({
     [previewMode, workspaceMode, notesCtx]
   );
   const renameNote = workspaceMode?.renameNote ?? notesCtx?.renameNote;
+  const notesFolder =
+    previewMode?.notesFolder ??
+    workspaceMode?.notesFolder ??
+    notesCtx?.notesFolder ??
+    null;
 
   const createNote = workspaceMode?.createNote ?? notesCtx?.createNote;
   const consumePendingNewNote =
@@ -590,6 +597,7 @@ function EditorImpl({
     editorReady,
     editorRef,
     focusAndSelectTitle,
+    notesFolder,
     onRegisterFlushPendingSave,
     onSourceModeChange,
     printMode,

@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { Editor, type PreviewModeData } from "../editor/Editor";
 import * as filesService from "../../services/files";
+import * as notesService from "../../services/notes";
 import { DetachedEditorWindow } from "./DetachedEditorWindow";
 
 interface PreviewAppProps {
@@ -16,6 +17,7 @@ export function PreviewApp({
   presentation = "interactive",
 }: PreviewAppProps) {
   const [content, setContent] = useState<string | null>(null);
+  const [notesFolder, setNotesFolder] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [modified, setModified] = useState(0);
   const [hasExternalChanges, setHasExternalChanges] = useState(false);
@@ -24,12 +26,15 @@ export function PreviewApp({
 
   // Load file on mount
   useEffect(() => {
-    filesService
-      .readFileDirect(filePath)
-      .then((result) => {
+    Promise.all([
+      filesService.readFileDirect(filePath),
+      notesService.getNotesFolder().catch(() => null),
+    ])
+      .then(([result, activeNotesFolder]) => {
         setContent(result.content);
         setTitle(result.title);
         setModified(result.modified);
+        setNotesFolder(activeNotesFolder);
       })
       .catch((error) => {
         console.error("Failed to load file:", error);
@@ -123,6 +128,7 @@ export function PreviewApp({
     content,
     title,
     filePath,
+    notesFolder,
     modified,
     hasExternalChanges,
     reloadVersion,

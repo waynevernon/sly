@@ -13,6 +13,10 @@ import {
   isDefaultPlaceholderNoteId,
   isDefaultPlaceholderTitle,
 } from "../../lib/noteIdentity";
+import {
+  toDisplayDocumentAssetPaths,
+  toStoredDocumentAssetPaths,
+} from "../../lib/assetPaths";
 
 interface DocumentNote {
   id: string;
@@ -36,6 +40,7 @@ interface UseEditorDocumentLifecycleOptions {
   reloadVersion: number;
   renameNote?: (noteId: string, newName: string) => Promise<void>;
   saveNote: (content: string, noteId?: string) => Promise<void>;
+  notesFolder: string | null;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
   sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
 }
@@ -57,6 +62,7 @@ export function useEditorDocumentLifecycle({
   reloadVersion,
   renameNote,
   saveNote,
+  notesFolder,
   scrollContainerRef,
   sourceTextareaRef,
 }: UseEditorDocumentLifecycleOptions) {
@@ -79,13 +85,30 @@ export function useEditorDocumentLifecycle({
     if (!editorInstance) return "";
     const manager = editorInstance.storage.markdown?.manager;
     if (manager) {
-      let markdown = manager.serialize(editorInstance.getJSON());
+      const storedDocument = toStoredDocumentAssetPaths(
+        editorInstance.getJSON(),
+        notesFolder,
+      );
+      let markdown = manager.serialize(storedDocument);
       markdown = markdown.replace(/&nbsp;|&#160;/g, " ");
       return markdown;
     }
 
     return editorInstance.getText();
-  }, []);
+  }, [notesFolder]);
+
+  const parseEditorContent = useCallback(
+    (editorInstance: TiptapEditor, markdown: string) => {
+      const manager = editorInstance.storage.markdown?.manager;
+      if (manager) {
+        const parsed = manager.parse(markdown);
+        return toDisplayDocumentAssetPaths(parsed, notesFolder);
+      }
+
+      return markdown;
+    },
+    [notesFolder],
+  );
 
   const syncSourceTextareaHeight = useCallback(() => {
     const textarea = sourceTextareaRef.current;
@@ -199,7 +222,7 @@ export function useEditorDocumentLifecycle({
     const manager = currentEditor.storage.markdown?.manager;
     if (manager) {
       try {
-        const parsed = manager.parse(sourceContent);
+        const parsed = parseEditorContent(currentEditor, sourceContent);
         currentEditor.commands.setContent(parsed);
       } catch {
         currentEditor.commands.setContent(sourceContent);
@@ -208,7 +231,7 @@ export function useEditorDocumentLifecycle({
       currentEditor.commands.setContent(sourceContent);
     }
     setSourceMode(false);
-  }, [editorRef, effectiveSourceMode, getMarkdown, sourceContent]);
+  }, [editorRef, effectiveSourceMode, getMarkdown, parseEditorContent, sourceContent]);
 
   const handleSourceChange = useCallback(
     (value: string) => {
@@ -317,15 +340,10 @@ export function useEditorDocumentLifecycle({
         lastReloadVersionRef.current = reloadVersion;
         loadedModifiedRef.current = currentNote.modified;
         isLoadingRef.current = true;
-        const manager = currentEditor.storage.markdown?.manager;
-        if (manager) {
-          try {
-            const parsed = manager.parse(currentNote.content);
-            currentEditor.commands.setContent(parsed);
-          } catch {
-            currentEditor.commands.setContent(currentNote.content);
-          }
-        } else {
+        try {
+          const parsed = parseEditorContent(currentEditor, currentNote.content);
+          currentEditor.commands.setContent(parsed);
+        } catch {
           currentEditor.commands.setContent(currentNote.content);
         }
         markNoteOpenTiming(currentNote.id, "editor content set");
@@ -347,15 +365,10 @@ export function useEditorDocumentLifecycle({
 
     currentEditor.commands.blur();
 
-    const manager = currentEditor.storage.markdown?.manager;
-    if (manager) {
-      try {
-        const parsed = manager.parse(currentNote.content);
-        currentEditor.commands.setContent(parsed);
-      } catch {
-        currentEditor.commands.setContent(currentNote.content);
-      }
-    } else {
+    try {
+      const parsed = parseEditorContent(currentEditor, currentNote.content);
+      currentEditor.commands.setContent(parsed);
+    } catch {
       currentEditor.commands.setContent(currentNote.content);
     }
     markNoteOpenTiming(currentNote.id, "editor content set");
@@ -402,6 +415,7 @@ export function useEditorDocumentLifecycle({
     editorRef,
     flushPendingSave,
     focusAndSelectTitle,
+    parseEditorContent,
     reloadVersion,
     scrollContainerRef,
   ]);

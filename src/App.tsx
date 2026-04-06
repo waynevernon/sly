@@ -1432,6 +1432,7 @@ function AppContent() {
   const workspaceEditorData = useMemo<WorkspaceEditorData>(
     () => ({
       currentNote,
+      notesFolder,
       selectedNoteId,
       notes,
       hasExternalChanges,
@@ -1451,6 +1452,7 @@ function AppContent() {
       currentNote,
       hasExternalChanges,
       notes,
+      notesFolder,
       pinNote,
       renameNote,
       reloadVersion,

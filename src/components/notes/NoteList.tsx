@@ -39,7 +39,6 @@ import * as notesService from "../../services/notes";
 import {
   AddNoteIcon,
   CopyIcon,
-  NoteIcon,
   PinIcon,
   PencilIcon,
   TrashIcon,
