@@ -1151,11 +1151,13 @@ function AppContent() {
         return;
       }
 
-      // Cmd/Ctrl+? - Open shortcuts settings
+      // Cmd/Ctrl+/ or Cmd/Ctrl+? - Open shortcuts settings
       if (
         (e.metaKey || e.ctrlKey) &&
-        e.shiftKey &&
-        (e.key === "?" || e.code === "Slash")
+        (e.key === "?" ||
+          e.key === "/" ||
+          e.code === "Slash" ||
+          e.code === "IntlRo")
       ) {
         e.preventDefault();
         openSettings("shortcuts");

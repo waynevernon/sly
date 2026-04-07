@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { alt, mod, shift } from "../../lib/platform";
+import { Button } from "../ui";
 
 interface Shortcut {
   keys: string[];
@@ -23,7 +25,7 @@ const shortcuts: Shortcut[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, shift, "/"],
+    keys: [mod, "/"],
     description: "Open shortcuts & markdown guide",
     category: "Navigation",
   },
@@ -228,11 +230,11 @@ function ShortcutKeys({ keys }: { keys: string[] }) {
   );
 }
 
-export function ShortcutsSettingsSection() {
+function ShortcutsReference() {
   const categoryOrder = ["Navigation", "Notes", "Editor", "Settings"];
 
   return (
-    <div className="space-y-10 pt-8 pb-10">
+    <div className="space-y-10">
       {categoryOrder.map((category, idx) => {
         const categoryShortcuts = groupedShortcuts[category];
         if (!categoryShortcuts) return null;
@@ -241,7 +243,9 @@ export function ShortcutsSettingsSection() {
           <div key={category}>
             {idx > 0 && <div className="ui-settings-separator" />}
             <section>
-              <h2 className="text-xl font-medium pt-10 mb-4">{category}</h2>
+              <h2 className={idx > 0 ? "text-xl font-medium pt-10 mb-4" : "text-xl font-medium mb-4"}>
+                {category}
+              </h2>
               <div className="space-y-3">
                 {categoryShortcuts.map((shortcut, index) => (
                   <div
@@ -259,40 +263,79 @@ export function ShortcutsSettingsSection() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function MarkdownGuide() {
+  return (
+    <section>
+      <h2 className="text-xl font-medium mb-2">Markdown Guide</h2>
+      <p className="text-sm text-text-muted mb-4">
+        Common syntax supported in Sly&apos;s editor.
+      </p>
+      <div className="ui-settings-panel overflow-hidden">
+        <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(12rem,0.8fr)]">
+          <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted border-b border-border">
+            Syntax
+          </div>
+          <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted border-b border-border">
+            Result
+          </div>
+          {markdownExamples.map((example) => (
+            <div
+              key={example.syntax}
+              className="col-span-2 grid grid-cols-[minmax(0,1.2fr)_minmax(12rem,0.8fr)] border-b border-border last:border-b-0"
+            >
+              <div className="px-4 py-3">
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words text-sm text-text">
+                  <code>{example.syntax}</code>
+                </pre>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-sm font-medium text-text">{example.result}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function ShortcutsSettingsSection() {
+  const [activeTab, setActiveTab] = useState<"shortcuts" | "markdown">(
+    "shortcuts",
+  );
+
+  return (
+    <div className="space-y-6 pt-8 pb-10">
+      <section>
+        <h1 className="text-xl font-medium mb-2">Reference</h1>
+        <p className="text-sm text-text-muted mb-4">
+          Browse keyboard shortcuts or switch to the markdown guide.
+        </p>
+        <div className="flex gap-2 p-1 rounded-[10px] border border-border w-fit">
+          <Button
+            onClick={() => setActiveTab("shortcuts")}
+            variant={activeTab === "shortcuts" ? "primary" : "ghost"}
+            size="md"
+          >
+            Keyboard Shortcuts
+          </Button>
+          <Button
+            onClick={() => setActiveTab("markdown")}
+            variant={activeTab === "markdown" ? "primary" : "ghost"}
+            size="md"
+          >
+            Markdown Guide
+          </Button>
+        </div>
+      </section>
 
       <div className="ui-settings-separator" />
 
-      <section>
-        <h2 className="text-xl font-medium pt-10 mb-2">Markdown Guide</h2>
-        <p className="text-sm text-text-muted mb-4">
-          Common syntax supported in Sly&apos;s editor.
-        </p>
-        <div className="ui-settings-panel overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(12rem,0.8fr)]">
-            <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted border-b border-border">
-              Syntax
-            </div>
-            <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted border-b border-border">
-              Result
-            </div>
-            {markdownExamples.map((example) => (
-              <div
-                key={example.syntax}
-                className="col-span-2 grid grid-cols-[minmax(0,1.2fr)_minmax(12rem,0.8fr)] border-b border-border last:border-b-0"
-              >
-                <div className="px-4 py-3">
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-words text-sm text-text">
-                    <code>{example.syntax}</code>
-                  </pre>
-                </div>
-                <div className="px-4 py-3">
-                  <p className="text-sm font-medium text-text">{example.result}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {activeTab === "shortcuts" ? <ShortcutsReference /> : <MarkdownGuide />}
     </div>
   );
 }

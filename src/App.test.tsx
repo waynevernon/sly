@@ -343,10 +343,9 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.keyDown(window, {
-      key: "?",
+      key: "/",
       code: "Slash",
       metaKey: true,
-      shiftKey: true,
     });
 
     expect(await screen.findByText("settings-page")).toBeInTheDocument();
