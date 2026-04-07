@@ -1,7 +1,11 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Editor as TiptapEditor } from "@tiptap/react";
-import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
+import {
+  blockIndexToPos,
+  getMarkdownBlockOffsets,
+  useEditorDocumentLifecycle,
+} from "./useEditorDocumentLifecycle";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -184,5 +188,30 @@ describe("useEditorDocumentLifecycle", () => {
       resolveRename?.({ id: "Renamed" });
       await renameTask;
     });
+  });
+
+  it("tracks headings and fenced code blocks when mapping markdown blocks", () => {
+    const markdown = "Intro\n# Heading\n\n```ts\nconst answer = 42;\n```\n\nTail\n";
+
+    expect(getMarkdownBlockOffsets(markdown)).toEqual([
+      0,
+      markdown.indexOf("# Heading"),
+      markdown.indexOf("```ts"),
+      markdown.indexOf("Tail"),
+    ]);
+  });
+
+  it("clamps block lookups when converting block indexes back to ProseMirror positions", () => {
+    const nodeSizes = [4, 6, 8];
+    const doc = {
+      childCount: nodeSizes.length,
+      child: (index: number) => ({ nodeSize: nodeSizes[index] }),
+    };
+
+    expect(blockIndexToPos(doc, -1)).toBe(1);
+    expect(blockIndexToPos(doc, 0)).toBe(1);
+    expect(blockIndexToPos(doc, 1)).toBe(5);
+    expect(blockIndexToPos(doc, 2)).toBe(11);
+    expect(blockIndexToPos(doc, 99)).toBe(11);
   });
 });

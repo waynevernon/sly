@@ -1277,6 +1277,7 @@ function EditorImpl({
                 value={sourceContent}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 dir={textDirection}
+                wrap="off"
                 className="block w-full resize-none overflow-hidden bg-transparent px-6 pt-8 pb-24 text-text outline-none"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MutableRefObject,
@@ -49,6 +50,52 @@ function isDuplicateDraftTitle(title: string): boolean {
   return title.trimEnd().endsWith(" (Copy)");
 }
 
+export function getMarkdownBlockOffsets(md: string): number[] {
+  const offsets: number[] = [];
+  const lines = md.split("\n");
+  let pos = 0;
+  let prevBlank = true;
+  let inCodeFence = false;
+
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    if (inCodeFence) {
+      if (trimmed.startsWith("```")) {
+        inCodeFence = false;
+      }
+    } else if (trimmed.startsWith("```")) {
+      offsets.push(pos);
+      inCodeFence = true;
+      prevBlank = false;
+    } else {
+      const isBlank = trimmed === "";
+      if (!isBlank && (prevBlank || trimmed.startsWith("#"))) {
+        offsets.push(pos);
+      }
+      prevBlank = isBlank;
+    }
+
+    pos += line.length + 1;
+  }
+
+  return offsets;
+}
+
+export function blockIndexToPos(
+  doc: { childCount: number; child: (i: number) => { nodeSize: number } },
+  blockIndex: number,
+): number {
+  const idx = Math.max(0, Math.min(blockIndex, doc.childCount - 1));
+  let pos = 1;
+
+  for (let i = 0; i < idx; i++) {
+    pos += doc.child(i).nodeSize;
+  }
+
+  return pos;
+}
+
 export function useEditorDocumentLifecycle({
   consumePendingNewNote,
   currentNote,
@@ -80,6 +127,11 @@ export function useEditorDocumentLifecycle({
   const loadedModifiedRef = useRef<number | null>(null);
   const lastSaveRef = useRef<{ noteId: string; content: string } | null>(null);
   const lastReloadVersionRef = useRef(0);
+  const sourceModeTransitionRef = useRef<{
+    topBlockIndex: number;
+    cursorBlockIndex: number;
+    md?: string;
+  } | null>(null);
 
   const getMarkdown = useCallback((editorInstance: TiptapEditor | null) => {
     if (!editorInstance) return "";
@@ -222,12 +274,71 @@ export function useEditorDocumentLifecycle({
   const toggleSourceMode = useCallback(() => {
     const currentEditor = editorRef.current;
     if (!currentEditor) return;
+    const container = scrollContainerRef.current;
 
     if (!effectiveSourceMode) {
-      setSourceContent(getMarkdown(currentEditor));
+      const md = getMarkdown(currentEditor);
+
+      let topBlockIndex = 0;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        try {
+          const topPos = currentEditor.view.posAtCoords({
+            left: rect.left + rect.width / 2,
+            top: rect.top + 10,
+          });
+          if (topPos) {
+            const resolved = currentEditor.state.doc.resolve(
+              Math.min(topPos.pos, currentEditor.state.doc.content.size),
+            );
+            topBlockIndex = resolved.index(0);
+          }
+        } catch {
+          // posAtCoords can fail near the viewport edge.
+        }
+      }
+
+      let cursorBlockIndex = 0;
+      try {
+        const { from } = currentEditor.state.selection;
+        const resolved = currentEditor.state.doc.resolve(
+          Math.min(from, currentEditor.state.doc.content.size),
+        );
+        cursorBlockIndex = resolved.index(0);
+      } catch {
+        // resolve can fail near the viewport edge.
+      }
+
+      sourceModeTransitionRef.current = { topBlockIndex, cursorBlockIndex, md };
+      setSourceContent(md);
       setSourceMode(true);
       return;
     }
+
+    const textarea = sourceTextareaRef.current ??
+      (container?.querySelector("textarea") as HTMLTextAreaElement | null);
+    let topBlockIndex = 0;
+    let cursorBlockIndex = 0;
+
+    if (textarea) {
+      const blockOffsets = getMarkdownBlockOffsets(sourceContent);
+      const lineHeight =
+        Number.parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+      const topLine = Math.floor(textarea.scrollTop / lineHeight);
+      const lines = sourceContent.split("\n");
+      let charOffset = 0;
+
+      for (let i = 0; i < Math.min(topLine, lines.length); i++) {
+        charOffset += lines[i].length + 1;
+      }
+
+      for (let i = 0; i < blockOffsets.length; i++) {
+        if (blockOffsets[i] <= charOffset) topBlockIndex = i;
+        if (blockOffsets[i] <= textarea.selectionStart) cursorBlockIndex = i;
+      }
+    }
+
+    sourceModeTransitionRef.current = { topBlockIndex, cursorBlockIndex };
 
     const manager = currentEditor.storage.markdown?.manager;
     if (manager) {
@@ -241,7 +352,15 @@ export function useEditorDocumentLifecycle({
       currentEditor.commands.setContent(sourceContent);
     }
     setSourceMode(false);
-  }, [editorRef, effectiveSourceMode, getMarkdown, parseEditorContent, sourceContent]);
+  }, [
+    editorRef,
+    effectiveSourceMode,
+    getMarkdown,
+    parseEditorContent,
+    scrollContainerRef,
+    sourceContent,
+    sourceTextareaRef,
+  ]);
 
   const handleSourceChange = useCallback(
     (value: string) => {
@@ -279,11 +398,83 @@ export function useEditorDocumentLifecycle({
     onSourceModeChange?.(effectiveSourceMode);
   }, [effectiveSourceMode, onSourceModeChange]);
 
+  useLayoutEffect(() => {
+    let rafId: number | undefined;
+    const transition = sourceModeTransitionRef.current;
+    if (!transition) {
+      return () => {};
+    }
+    sourceModeTransitionRef.current = null;
+
+    const currentEditor = editorRef.current;
+    const container = scrollContainerRef.current;
+
+    if (sourceMode) {
+      const textarea = sourceTextareaRef.current ??
+        (container?.querySelector("textarea") as HTMLTextAreaElement | null);
+      if (!textarea) return () => {};
+
+      syncSourceTextareaHeight();
+
+      const md = transition.md ?? "";
+      const blockOffsets = getMarkdownBlockOffsets(md);
+      const cursorPos =
+        transition.cursorBlockIndex < blockOffsets.length
+          ? blockOffsets[transition.cursorBlockIndex]
+          : md.length;
+
+      textarea.setSelectionRange(cursorPos, cursorPos);
+      textarea.focus();
+
+      if (transition.topBlockIndex < blockOffsets.length) {
+        const charOffset = blockOffsets[transition.topBlockIndex];
+        const linesBefore = md.slice(0, charOffset).split("\n").length - 1;
+        const lineHeight =
+          Number.parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+        textarea.scrollTop = linesBefore * lineHeight;
+      }
+    } else if (currentEditor) {
+      rafId = requestAnimationFrame(() => {
+        if (!currentEditor.view?.dom?.isConnected) return;
+
+        const doc = currentEditor.state.doc;
+        currentEditor.commands.focus(
+          blockIndexToPos(doc, transition.cursorBlockIndex),
+        );
+
+        const scrollElement = scrollContainerRef.current;
+        if (scrollElement) {
+          try {
+            scrollElement.scrollTop = 0;
+            const coords = currentEditor.view.coordsAtPos(
+              blockIndexToPos(doc, transition.topBlockIndex),
+            );
+            const containerRect = scrollElement.getBoundingClientRect();
+            scrollElement.scrollTop = coords.top - containerRect.top;
+          } catch {
+            // coordsAtPos can fail while the view is still settling.
+          }
+        }
+      });
+    }
+
+    return () => {
+      if (rafId !== undefined) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [
+    editorRef,
+    scrollContainerRef,
+    sourceMode,
+    sourceTextareaRef,
+    syncSourceTextareaHeight,
+  ]);
+
   useEffect(() => {
     if (!sourceMode) return;
 
     syncSourceTextareaHeight();
-    sourceTextareaRef.current?.focus();
 
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -297,7 +488,7 @@ export function useEditorDocumentLifecycle({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [scrollContainerRef, sourceMode, sourceTextareaRef, syncSourceTextareaHeight]);
+  }, [scrollContainerRef, sourceMode, syncSourceTextareaHeight]);
 
   useEffect(() => {
     if (!sourceMode) return;
