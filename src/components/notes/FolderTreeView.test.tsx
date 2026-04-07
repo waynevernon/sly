@@ -566,6 +566,32 @@ describe("FolderTreeView", () => {
     expect(selectFolder).toHaveBeenCalledWith("docs");
   });
 
+  it("selects a folder when opening its context menu", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const selectFolder = vi.fn();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs"],
+        selectFolder,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    const row = document.querySelector('[data-folder-row-select="docs"]');
+
+    expect(row).not.toBeNull();
+
+    fireEvent.contextMenu(row as HTMLElement);
+
+    expect(selectFolder).toHaveBeenCalledWith("docs");
+  });
+
   it("shows recursive folder note counts when enabled and still hides zero-count badges", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();

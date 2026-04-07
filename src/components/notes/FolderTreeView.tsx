@@ -394,6 +394,7 @@ const FolderItem = memo(function FolderItem({
           className={`${rowClassName} cursor-default`}
           data-folder-row-select={folder.path}
           onClick={() => onSelectFolder(folder.path)}
+          onContextMenu={() => onSelectFolder(folder.path)}
         >
           <div
             className="flex items-center gap-1.5 pr-2 py-2"
@@ -1046,6 +1047,7 @@ export function FolderTreeView({
                     ? "bg-bg-muted"
                     : "hover:bg-bg-muted/80"
               }`}
+              onContextMenu={() => selectFolder(null)}
             >
               <button
                 type="button"
