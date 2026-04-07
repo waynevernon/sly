@@ -763,6 +763,7 @@ pub struct AppState {
     pub settings: RwLock<Settings>,    // per-folder settings (stored in .sly/)
     pub notes_cache: RwLock<HashMap<String, NoteMetadata>>,
     pub notes_cache_root: RwLock<Option<String>>,
+    pub note_mutation_lock: tokio::sync::Mutex<()>,
     pub file_watcher: Mutex<Option<FileWatcherState>>,
     pub note_windows: Mutex<HashMap<String, String>>,
     pub search_index: Mutex<Option<SearchIndex>>,
@@ -776,6 +777,7 @@ impl Default for AppState {
             settings: RwLock::new(Settings::default()),
             notes_cache: RwLock::new(HashMap::new()),
             notes_cache_root: RwLock::new(None),
+            note_mutation_lock: tokio::sync::Mutex::new(()),
             file_watcher: Mutex::new(None),
             note_windows: Mutex::new(HashMap::new()),
             search_index: Mutex::new(None),
@@ -839,6 +841,7 @@ fn build_note_id_with_leaf(id: &str, leaf: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn unique_note_id_for_leaf(
     notes_root: &Path,
     base_id: &str,
@@ -873,6 +876,58 @@ fn normalize_requested_note_leaf(new_name: &str) -> String {
         .or_else(|| trimmed.strip_suffix(".MD"))
         .unwrap_or(trimmed);
     sanitize_filename(without_extension)
+}
+
+async fn write_new_note_file(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).await?;
+    }
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .await?;
+
+    if let Err(error) = file.write_all(content).await {
+        let _ = fs::remove_file(path).await;
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+async fn create_unique_note_file(
+    notes_root: &Path,
+    base_id: &str,
+    content: &[u8],
+) -> Result<(String, PathBuf), String> {
+    let mut candidate_id = base_id.to_string();
+    let mut counter = 1;
+
+    loop {
+        let candidate_path = abs_path_from_id(notes_root, &candidate_id)?;
+        match write_new_note_file(&candidate_path, content).await {
+            Ok(()) => return Ok((candidate_id, candidate_path)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                candidate_id = format!("{base_id}-{counter}");
+                counter += 1;
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+}
+
+async fn move_note_file_without_clobber(source: &Path, dest: &Path) -> std::io::Result<()> {
+    let content = fs::read(source).await?;
+    write_new_note_file(dest, &content).await?;
+
+    if let Err(error) = fs::remove_file(source).await {
+        let _ = fs::remove_file(dest).await;
+        return Err(error);
+    }
+
+    Ok(())
 }
 
 /// Expands template tags in a note name template using local timezone
@@ -1984,8 +2039,10 @@ async fn save_note(
             .ok_or("Notes folder not set")?
     };
     let folder_path = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
 
     let title = extract_title(&content);
+    let has_existing_id = id.is_some();
 
     let (final_id, file_path) = if let Some(existing_id) = id {
         let existing_path = abs_path_from_id(&folder_path, &existing_id)?;
@@ -1995,26 +2052,15 @@ async fn save_note(
         (existing_id, existing_path)
     } else {
         let sanitized_leaf = sanitize_filename(&title);
-        // New notes go in root
-        let mut new_id = sanitized_leaf.clone();
-        let mut counter = 1;
-
-        while abs_path_from_id(&folder_path, &new_id)
-            .map(|p| p.exists())
-            .unwrap_or(false)
-        {
-            new_id = format!("{}-{}", sanitized_leaf, counter);
-            counter += 1;
-        }
-
-        let new_file_path = abs_path_from_id(&folder_path, &new_id)?;
-        (new_id, new_file_path)
+        create_unique_note_file(&folder_path, &sanitized_leaf, content.as_bytes()).await?
     };
 
-    // Write the file to the current path
-    fs::write(&file_path, &content)
-        .await
-        .map_err(|e| e.to_string())?;
+    if has_existing_id {
+        // Existing notes keep their current path and are overwritten in place.
+        fs::write(&file_path, &content)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
 
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
     let modified = metadata
@@ -2055,6 +2101,7 @@ async fn rename_note(
             .ok_or("Notes folder not set")?
     };
     let folder_path = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
     let old_file_path = abs_path_from_id(&folder_path, &id)?;
     if !old_file_path.exists() {
         return Err("Note not found".to_string());
@@ -2065,13 +2112,24 @@ async fn rename_note(
         .map_err(|e| e.to_string())?;
     let title = extract_title(&content);
     let desired_leaf = normalize_requested_note_leaf(&new_name);
-    let final_id = unique_note_id_for_leaf(&folder_path, &id, &desired_leaf)?;
+    let desired_id = build_note_id_with_leaf(&id, &desired_leaf);
 
-    let file_path = if final_id != id {
-        let new_file_path = abs_path_from_id(&folder_path, &final_id)?;
-        tokio::fs::rename(&old_file_path, &new_file_path)
-            .await
-            .map_err(|e| e.to_string())?;
+    let (final_id, file_path) = if desired_id != id {
+        let mut candidate_id = desired_id;
+        let mut counter = 1;
+
+        let new_file_path = loop {
+            let candidate_path = abs_path_from_id(&folder_path, &candidate_id)?;
+            match move_note_file_without_clobber(&old_file_path, &candidate_path).await {
+                Ok(()) => break candidate_path,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    candidate_id =
+                        build_note_id_with_leaf(&id, &format!("{desired_leaf}-{counter}"));
+                    counter += 1;
+                }
+                Err(error) => return Err(error.to_string()),
+            }
+        };
 
         {
             let mut cache = state.notes_cache.write().expect("cache write lock");
@@ -2088,13 +2146,13 @@ async fn rename_note(
         {
             let mut note_windows = state.note_windows.lock().expect("note windows mutex");
             if let Some(label) = note_windows.remove(&id) {
-                note_windows.insert(final_id.clone(), label);
+                note_windows.insert(candidate_id.clone(), label);
             }
         }
 
-        new_file_path
+        (candidate_id, new_file_path)
     } else {
-        old_file_path
+        (id.clone(), old_file_path)
     };
 
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
@@ -2244,6 +2302,7 @@ async fn create_note(
             .ok_or("Notes folder not set")?
     };
     let folder_path = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
 
     // Get template from settings (default "Untitled")
     let template = {
@@ -2281,36 +2340,24 @@ async fn create_note(
 
     let mut final_id = base_id.clone();
     let mut counter = if has_counter { 2 } else { 1 };
+    let (final_id, file_path, content, display_title) = loop {
+        let display_title = extract_title_from_id(&final_id);
+        let content = format!("# {}\n\n", display_title);
+        let candidate_path = abs_path_from_id(&folder_path, &final_id)?;
 
-    // Ensure filename uniqueness
-    while abs_path_from_id(&folder_path, &final_id)
-        .map(|p| p.exists())
-        .unwrap_or(false)
-    {
-        if has_counter {
-            final_id = sanitized.replace("{counter}", &counter.to_string());
-        } else {
-            final_id = format!("{}-{}", base_id, counter);
+        match write_new_note_file(&candidate_path, content.as_bytes()).await {
+            Ok(()) => break (final_id, candidate_path, content, display_title),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                if has_counter {
+                    final_id = sanitized.replace("{counter}", &counter.to_string());
+                } else {
+                    final_id = format!("{}-{}", base_id, counter);
+                }
+                counter += 1;
+            }
+            Err(error) => return Err(error.to_string()),
         }
-        counter += 1;
-    }
-
-    // Extract display title from filename
-    let display_title = extract_title_from_id(&final_id);
-
-    let content = format!("# {}\n\n", display_title);
-    let file_path = abs_path_from_id(&folder_path, &final_id)?;
-
-    // Create parent directories (for templates like {year}/{month}/{day})
-    if let Some(parent) = file_path.parent() {
-        fs::create_dir_all(parent)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    fs::write(&file_path, &content)
-        .await
-        .map_err(|e| e.to_string())?;
+    };
 
     let modified = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2344,6 +2391,7 @@ async fn duplicate_note(id: String, state: State<'_, AppState>) -> Result<Note, 
             .ok_or("Notes folder not set")?
     };
     let folder_path = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
     let source_path = abs_path_from_id(&folder_path, &id)?;
     if !source_path.exists() {
         return Err("Note not found".to_string());
@@ -2357,12 +2405,8 @@ async fn duplicate_note(id: String, state: State<'_, AppState>) -> Result<Note, 
     let duplicate_content = rewrite_content_heading(&original_content, &duplicate_title);
     let desired_leaf = sanitize_filename(&duplicate_title);
     let base_id = build_note_id_with_leaf(&id, &desired_leaf);
-    let final_id = unique_note_id_for_leaf(&folder_path, &base_id, &desired_leaf)?;
-    let file_path = abs_path_from_id(&folder_path, &final_id)?;
-
-    fs::write(&file_path, &duplicate_content)
-        .await
-        .map_err(|e| e.to_string())?;
+    let (final_id, file_path) =
+        create_unique_note_file(&folder_path, &base_id, duplicate_content.as_bytes()).await?;
 
     let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
     let modified = metadata
@@ -2738,6 +2782,7 @@ async fn move_note(
             .ok_or("Notes folder not set")?
     };
     let folder_root = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
     let source_path = abs_path_from_id(&folder_root, &id)?;
 
     if !source_path.exists() {
@@ -2773,9 +2818,15 @@ async fn move_note(
         return Err("A note with that name already exists in the target folder".to_string());
     }
 
-    tokio::fs::rename(&source_path, &dest_path)
+    move_note_file_without_clobber(&source_path, &dest_path)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                "A note with that name already exists in the target folder".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
 
     // Update pinned note IDs
     {
@@ -2824,6 +2875,7 @@ async fn move_notes(
             .ok_or("Notes folder not set")?
     };
     let folder_root = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
     let move_results = build_note_move_results(&ids, &target_folder)?;
 
     if move_results.is_empty() {
@@ -2859,9 +2911,15 @@ async fn move_notes(
                 .map_err(|e| e.to_string())?;
         }
 
-        tokio::fs::rename(&source_path, &dest_path)
+        move_note_file_without_clobber(&source_path, &dest_path)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    "A note with that name already exists in the target folder".to_string()
+                } else {
+                    e.to_string()
+                }
+            })?;
     }
 
     {
@@ -5492,6 +5550,7 @@ pub fn run() {
                 settings: RwLock::new(settings),
                 notes_cache: RwLock::new(HashMap::new()),
                 notes_cache_root: RwLock::new(None),
+                note_mutation_lock: tokio::sync::Mutex::new(()),
                 file_watcher: Mutex::new(None),
                 note_windows: Mutex::new(HashMap::new()),
                 search_index: Mutex::new(search_index),
@@ -6327,6 +6386,51 @@ mod tests {
     fn normalize_requested_note_leaf_strips_markdown_extension() {
         assert_eq!(normalize_requested_note_leaf("  Daily.md "), "Daily");
         assert_eq!(normalize_requested_note_leaf("Report.MD"), "Report");
+    }
+
+    #[test]
+    fn create_unique_note_file_suffixes_collisions_without_overwriting() {
+        let notes_root = temp_dir_path("create-unique-note-file");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        std::fs::write(notes_root.join("Alpha.md"), "# Existing\n").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let (final_id, final_path) = runtime
+            .block_on(create_unique_note_file(&notes_root, "Alpha", b"# New\n"))
+            .unwrap();
+
+        assert_eq!(final_id, "Alpha-1");
+        assert_eq!(std::fs::read_to_string(final_path).unwrap(), "# New\n");
+        assert_eq!(
+            std::fs::read_to_string(notes_root.join("Alpha.md")).unwrap(),
+            "# Existing\n"
+        );
+
+        let _ = std::fs::remove_dir_all(notes_root);
+    }
+
+    #[test]
+    fn move_note_file_without_clobber_keeps_existing_destination() {
+        let notes_root = temp_dir_path("move-note-file-without-clobber");
+        std::fs::create_dir_all(&notes_root).unwrap();
+        let source = notes_root.join("Source.md");
+        let destination = notes_root.join("Destination.md");
+        std::fs::write(&source, "# Source\n").unwrap();
+        std::fs::write(&destination, "# Destination\n").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let error = runtime
+            .block_on(move_note_file_without_clobber(&source, &destination))
+            .unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read_to_string(&source).unwrap(), "# Source\n");
+        assert_eq!(
+            std::fs::read_to_string(&destination).unwrap(),
+            "# Destination\n"
+        );
+
+        let _ = std::fs::remove_dir_all(notes_root);
     }
 
     #[test]
