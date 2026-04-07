@@ -18,5 +18,6 @@ describe("PanelEmptyState", () => {
     expect(iconWrapper).not.toBeNull();
     expect(iconWrapper).toHaveClass("text-text-muted");
     expect(iconWrapper).not.toHaveClass("text-text-muted/40");
+    expect(iconWrapper).toHaveClass("[&_svg]:stroke-[1.6]", "[&_svg_*]:stroke-[1.6]");
   });
 });
