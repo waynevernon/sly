@@ -315,6 +315,24 @@ export function useEditorDocumentLifecycle({
     }
 
     const isSameNote = currentNote.id === loadedNoteIdRef.current;
+    const isRenameTransition =
+      !isSameNote &&
+      committingFilenameNoteIdRef.current !== null &&
+      loadedNoteIdRef.current === committingFilenameNoteIdRef.current;
+
+    if (isRenameTransition) {
+      const previousId = loadedNoteIdRef.current;
+      loadedNoteIdRef.current = currentNote.id;
+      currentNoteIdRef.current = currentNote.id;
+      loadedModifiedRef.current = currentNote.modified;
+      if (lastSaveRef.current?.noteId === previousId) {
+        lastSaveRef.current = {
+          ...lastSaveRef.current,
+          noteId: currentNote.id,
+        };
+      }
+      return;
+    }
 
     if (!isSameNote) {
       const lastSave = lastSaveRef.current;
@@ -422,6 +440,7 @@ export function useEditorDocumentLifecycle({
   }, [
     consumePendingNewNote,
     currentNote,
+    currentNoteIdRef,
     editorReady,
     editorRef,
     flushPendingSave,

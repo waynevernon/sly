@@ -16,6 +16,11 @@ vi.mock("../../lib/noteOpenTiming", () => ({
 describe("useEditorDocumentLifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
   });
 
   it("uses the renamed note id for source-mode saves before the next render", async () => {
@@ -82,5 +87,102 @@ describe("useEditorDocumentLifecycle", () => {
     });
 
     expect(saveNote).toHaveBeenCalledWith("# Renamed\nBody", "Renamed");
+  });
+
+  it("does not reload or blur the editor during an in-flight provisional rename", async () => {
+    let resolveRename: ((value: { id: string }) => void) | null = null;
+    const renamePromise = new Promise<{ id: string }>((resolve) => {
+      resolveRename = resolve;
+    });
+
+    const editor = {
+      storage: {
+        markdown: {
+          manager: {
+            serialize: vi.fn(() => "# Renamed\nBody"),
+            parse: vi.fn((value: string) => value),
+          },
+        },
+      },
+      getJSON: vi.fn(() => ({})),
+      getText: vi.fn(() => "# Renamed\nBody"),
+      commands: {
+        setContent: vi.fn(),
+        blur: vi.fn(),
+        focus: vi.fn(),
+        selectAll: vi.fn(),
+      },
+    } as unknown as TiptapEditor;
+
+    const currentNoteIdRef = { current: "Untitled" };
+    const editorRef = { current: editor };
+    const saveNote = vi.fn().mockResolvedValue(undefined);
+    const renameNote = vi.fn(() => renamePromise);
+    const focusAndSelectTitle = vi.fn(() => true);
+
+    const { result, rerender } = renderHook(
+      ({
+        currentNote,
+      }: {
+        currentNote: {
+          id: string;
+          title: string;
+          content: string;
+          modified: number;
+        };
+      }) =>
+        useEditorDocumentLifecycle({
+          consumePendingNewNote: vi.fn(() => true),
+          currentNote,
+          currentNoteIdRef,
+          editorReady: true,
+          editorRef,
+          focusAndSelectTitle,
+          printMode: false,
+          reloadVersion: 0,
+          renameNote,
+          saveNote,
+          notesFolder: null,
+          scrollContainerRef: { current: null },
+          sourceTextareaRef: { current: null },
+        }),
+      {
+        initialProps: {
+          currentNote: {
+            id: "Untitled",
+            title: "Untitled",
+            content: "# Untitled\n\n",
+            modified: 1,
+          },
+        },
+      },
+    );
+
+    expect((editor.commands.setContent as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect((editor.commands.blur as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect(result.current.provisionalFilenameNoteIdRef.current).toBe("Untitled");
+
+    let renameTask: Promise<void> | null = null;
+    await act(async () => {
+      renameTask = result.current.finalizeProvisionalFilename();
+    });
+
+    rerender({
+      currentNote: {
+        id: "Renamed",
+        title: "Renamed",
+        content: "# Renamed\n\n",
+        modified: 2,
+      },
+    });
+
+    expect((editor.commands.setContent as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect((editor.commands.blur as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect(currentNoteIdRef.current).toBe("Renamed");
+
+    await act(async () => {
+      resolveRename?.({ id: "Renamed" });
+      await renameTask;
+    });
   });
 });
