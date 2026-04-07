@@ -604,6 +604,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!notesFolder) return;
     try {
       const notesList = await notesService.listNotes();
+      if (noteIdRedirectsRef.current.size > 0) {
+        const liveIds = new Set(notesList.map((note) => note.id));
+        for (const redirectedFromId of noteIdRedirectsRef.current.keys()) {
+          if (liveIds.has(redirectedFromId)) {
+            noteIdRedirectsRef.current.delete(redirectedFromId);
+          }
+        }
+      }
       if (!areNoteMetadataListsEqual(notesRef.current, notesList)) {
         notesRef.current = notesList;
         setNotes(notesList);
@@ -2018,6 +2026,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setKnownFolders([]);
       setHasLoadedFolders(false);
       applySettings(DEFAULT_SETTINGS);
+      noteIdRedirectsRef.current.clear();
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
@@ -2041,6 +2050,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setKnownFolders([]);
       setHasLoadedFolders(false);
       applySettings(DEFAULT_SETTINGS);
+      noteIdRedirectsRef.current.clear();
       setSelectedScope({ type: "all" });
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
