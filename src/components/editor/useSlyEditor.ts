@@ -9,7 +9,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import { TableKit } from "@tiptap/extension-table";
 import { Markdown } from "@tiptap/markdown";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import { Extension } from "@tiptap/core";
+import { Extension, InputRule } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { lowlight } from "./lowlight";
@@ -21,6 +21,7 @@ import { EmojiSuggestion } from "./EmojiSuggestion";
 import { SlashCommand } from "./SlashCommand";
 import { Wikilink } from "./Wikilink";
 import { WikilinkSuggestion } from "./WikilinkSuggestion";
+import { normalizeUrl } from "./linkUtils";
 import { SlyBlockMath } from "./MathExtensions";
 
 export const searchHighlightPluginKey = new PluginKey("searchHighlight");
@@ -160,6 +161,28 @@ export function useSlyEditor({
         openOnClick: false,
         HTMLAttributes: {
           class: "underline cursor-pointer",
+        },
+      }),
+      Extension.create({
+        name: "markdownLinkInputRule",
+        addInputRules() {
+          return [
+            new InputRule({
+              find: /\[([^\]]+)\]\(([^)]+)\)$/,
+              handler: ({ state, range, match, commands }) => {
+                const [, text, rawUrl] = match;
+                const linkMark = state.schema.marks.link.create({
+                  href: normalizeUrl(rawUrl),
+                });
+
+                commands.command(({ tr }) => {
+                  const textNode = state.schema.text(text, [linkMark]);
+                  tr.replaceWith(range.from, range.to, textNode);
+                  return true;
+                });
+              },
+            }),
+          ];
         },
       }),
       Image.configure({

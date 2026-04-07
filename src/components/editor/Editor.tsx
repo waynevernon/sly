@@ -21,18 +21,9 @@ import type { AssistantSelectionSnapshot } from "../../lib/assistant";
 import { useBlockMathPopover } from "./useBlockMathPopover";
 import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
 import { useEditorSearch } from "./useEditorSearch";
+import { isAllowedUrlScheme, normalizeUrl } from "./linkUtils";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
-
-// Validate URL scheme for safe opening
-function isAllowedUrlScheme(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return ["http:", "https:", "mailto:"].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
-}
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -842,9 +833,11 @@ function EditorImpl({
       const link = target.closest("a");
       if (link) {
         e.preventDefault();
-        if ((e.metaKey || e.ctrlKey) && link.href) {
-          if (isAllowedUrlScheme(link.href)) {
-            openUrl(link.href).catch((error) =>
+        const rawHref = link.getAttribute("href") ?? "";
+        const normalizedHref = normalizeUrl(rawHref);
+        if ((e.metaKey || e.ctrlKey) && normalizedHref) {
+          if (isAllowedUrlScheme(normalizedHref)) {
+            openUrl(normalizedHref).catch((error) =>
               console.error("Failed to open link:", error),
             );
           } else {

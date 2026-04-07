@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import { ReactRenderer, type Editor as TiptapEditor } from "@tiptap/react";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
+import { normalizeUrl } from "./linkUtils";
 import { LinkEditor } from "./LinkEditor";
 
 interface UseLinkPopoverOptions {
@@ -76,7 +77,8 @@ export function useLinkPopover({
         initialUrl: existingUrl,
         initialText: hasSelection || existingUrl ? undefined : "",
         onSubmit: (url: string, text?: string) => {
-          if (url.trim()) {
+          const normalizedUrl = normalizeUrl(url);
+          if (normalizedUrl) {
             if (text !== undefined) {
               if (text.trim()) {
                 editor
@@ -85,7 +87,7 @@ export function useLinkPopover({
                   .insertContent({
                     type: "text",
                     text: text.trim(),
-                    marks: [{ type: "link", attrs: { href: url.trim() } }],
+                    marks: [{ type: "link", attrs: { href: normalizedUrl } }],
                   })
                   .run();
               }
@@ -94,7 +96,7 @@ export function useLinkPopover({
                 .chain()
                 .focus()
                 .extendMarkRange("link")
-                .setLink({ href: url.trim() })
+                .setLink({ href: normalizedUrl })
                 .run();
             }
           } else {
