@@ -1884,4 +1884,148 @@ describe("NotesContext", () => {
       "# Alpha recycled\nBody",
     );
   });
+
+  it("routes stale rename requests through the latest note id", async () => {
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "alpha",
+      title: "Alpha note",
+      content: "# Alpha note\n",
+      path: "/notes/alpha.md",
+      modified: 2,
+    });
+    vi.mocked(notesService.renameNote)
+      .mockResolvedValueOnce({
+        id: "alpha-renamed",
+        title: "Alpha renamed",
+        content: "# Alpha renamed\n",
+        path: "/notes/alpha-renamed.md",
+        modified: 3,
+      })
+      .mockResolvedValueOnce({
+        id: "alpha-final",
+        title: "Alpha final",
+        content: "# Alpha final\n",
+        path: "/notes/alpha-final.md",
+        modified: 4,
+      });
+    vi.mocked(notesService.listNotes)
+      .mockResolvedValueOnce([
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "alpha-renamed",
+          title: "Alpha renamed",
+          preview: "planning",
+          modified: 3,
+          created: 2,
+        },
+      ])
+      .mockResolvedValue([
+        {
+          id: "alpha-final",
+          title: "Alpha final",
+          preview: "planning",
+          modified: 4,
+          created: 2,
+        },
+      ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await act(async () => {
+      await result.current.renameNote("alpha", "Alpha renamed");
+    });
+
+    vi.mocked(notesService.renameNote).mockClear();
+
+    await act(async () => {
+      await result.current.renameNote("alpha", "Alpha final");
+    });
+
+    expect(notesService.renameNote).toHaveBeenCalledOnce();
+    expect(notesService.renameNote).toHaveBeenCalledWith(
+      "alpha-renamed",
+      "Alpha final",
+    );
+  });
+
+  it("routes stale selects through the latest note id", async () => {
+    vi.mocked(notesService.readNote)
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha note\n",
+        path: "/notes/alpha.md",
+        modified: 2,
+      })
+      .mockResolvedValueOnce({
+        id: "alpha-renamed",
+        title: "Alpha renamed",
+        content: "# Alpha renamed\n",
+        path: "/notes/alpha-renamed.md",
+        modified: 3,
+      });
+    vi.mocked(notesService.renameNote).mockResolvedValue({
+      id: "alpha-renamed",
+      title: "Alpha renamed",
+      content: "# Alpha renamed\n",
+      path: "/notes/alpha-renamed.md",
+      modified: 3,
+    });
+    vi.mocked(notesService.listNotes)
+      .mockResolvedValueOnce([
+        {
+          id: "alpha",
+          title: "Alpha note",
+          preview: "planning",
+          modified: 2,
+          created: 2,
+        },
+      ])
+      .mockResolvedValue([
+        {
+          id: "alpha-renamed",
+          title: "Alpha renamed",
+          preview: "planning",
+          modified: 3,
+          created: 2,
+        },
+      ]);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await act(async () => {
+      await result.current.renameNote("alpha", "Alpha renamed");
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    expect(notesService.readNote).toHaveBeenLastCalledWith("alpha-renamed");
+    expect(result.current.selectedNoteId).toBe("alpha-renamed");
+  });
 });

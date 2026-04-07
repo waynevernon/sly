@@ -1018,27 +1018,44 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [updateRecentNoteIds],
   );
 
+  const resolveLiveNoteId = useCallback((id: string) => {
+    let resolvedId = id;
+    const seen = new Set<string>();
+
+    while (!seen.has(resolvedId)) {
+      seen.add(resolvedId);
+      const redirectedId = noteIdRedirectsRef.current.get(resolvedId);
+      if (!redirectedId) {
+        break;
+      }
+      resolvedId = redirectedId;
+    }
+
+    return resolvedId;
+  }, []);
+
   const selectNote = useCallback(async (id: string) => {
+    const resolvedId = resolveLiveNoteId(id);
     const requestId = ++selectRequestIdRef.current;
     try {
-      startNoteOpenTiming(id);
-      if (pendingNewNoteIdRef.current !== id) {
+      startNoteOpenTiming(resolvedId);
+      if (pendingNewNoteIdRef.current !== resolvedId) {
         pendingNewNoteIdRef.current = null;
       }
       // Set selected ID immediately for responsive UI
-      setSelectedNoteId(id);
+      setSelectedNoteId(resolvedId);
       const visibleNoteIds = getVisibleNoteIds();
-      setSelectionState(visibleNoteIds.includes(id) ? [id] : [], {
-        anchorId: id,
-        rangeEndId: id,
+      setSelectionState(visibleNoteIds.includes(resolvedId) ? [resolvedId] : [], {
+        anchorId: resolvedId,
+        rangeEndId: resolvedId,
       });
       setHasExternalChanges(false);
-      const parentFolder = getParentFolderPath(id);
+      const parentFolder = getParentFolderPath(resolvedId);
       const noteIsInCurrentScope =
         selectedScopeRef.current.type !== "folder"
           ? false
           : isNoteInFolderScope(
-              id,
+              resolvedId,
               selectedScopeRef.current.path,
               settingsRef.current.showNotesFromSubfolders ?? false,
             );
@@ -1059,16 +1076,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       ) {
         revealFolder(parentFolder);
       }
-      const note = await notesService.readNote(id);
+      const note = await notesService.readNote(resolvedId);
       if (requestId !== selectRequestIdRef.current) return;
-      markNoteOpenTiming(id, "read_note resolved");
+      markNoteOpenTiming(resolvedId, "read_note resolved");
       setCurrentNote(note);
       void recordRecentNoteView(note.id);
     } catch (err) {
       if (requestId !== selectRequestIdRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to load note");
     }
-  }, [getVisibleNoteIds, recordRecentNoteView, revealFolder, setSelectionState]);
+  }, [getVisibleNoteIds, recordRecentNoteView, resolveLiveNoteId, revealFolder, setSelectionState]);
 
   const toggleNoteSelection = useCallback(
     (id: string) => {
@@ -1191,22 +1208,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
     pendingNewNoteIdRef.current = null;
     return true;
-  }, []);
-
-  const resolveLiveNoteId = useCallback((id: string) => {
-    let resolvedId = id;
-    const seen = new Set<string>();
-
-    while (!seen.has(resolvedId)) {
-      seen.add(resolvedId);
-      const redirectedId = noteIdRedirectsRef.current.get(resolvedId);
-      if (!redirectedId) {
-        break;
-      }
-      resolvedId = redirectedId;
-    }
-
-    return resolvedId;
   }, []);
 
   const applyUpdatedNoteState = useCallback(
@@ -1403,52 +1404,54 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const renameNote = useCallback(
     async (id: string, newName: string) => {
+      const resolvedId = resolveLiveNoteId(id);
       let updatedId: string | null = null;
 
       try {
-        recentlySavedRef.current.add(id);
-        const updated = await notesService.renameNote(id, newName);
+        recentlySavedRef.current.add(resolvedId);
+        const updated = await notesService.renameNote(resolvedId, newName);
         updatedId = updated.id;
 
-        if (updated.id !== id) {
+        if (updated.id !== resolvedId) {
           recentlySavedRef.current.add(updated.id);
         }
 
-        await applyUpdatedNoteState(id, updated);
+        await applyUpdatedNoteState(resolvedId, updated);
         await refreshNotes();
         await refreshActiveSearchResults();
 
         setTimeout(() => {
-          recentlySavedRef.current.delete(id);
+          recentlySavedRef.current.delete(resolvedId);
           if (updatedId) recentlySavedRef.current.delete(updatedId);
         }, 1000);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to rename note");
-        recentlySavedRef.current.delete(id);
+        recentlySavedRef.current.delete(resolvedId);
         if (updatedId) recentlySavedRef.current.delete(updatedId);
         throw err;
       }
     },
-    [applyUpdatedNoteState, refreshActiveSearchResults, refreshNotes],
+    [applyUpdatedNoteState, refreshActiveSearchResults, refreshNotes, resolveLiveNoteId],
   );
 
   const deleteNote = useCallback(
     async (id: string) => {
+      const resolvedId = resolveLiveNoteId(id);
       try {
-        await notesService.deleteNote(id);
+        await notesService.deleteNote(resolvedId);
 
         // Clean up pinned status for deleted note
         const pinnedIds = settingsRef.current.pinnedNoteIds || [];
         const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (pinnedIds.includes(id) || recentNoteIds.includes(id)) {
+        if (pinnedIds.includes(resolvedId) || recentNoteIds.includes(resolvedId)) {
           await persistSettings((currentSettings) => ({
             ...currentSettings,
             pinnedNoteIds: normalizeNoteIds(
-              (currentSettings.pinnedNoteIds || []).filter((pinId) => pinId !== id),
+              (currentSettings.pinnedNoteIds || []).filter((pinId) => pinId !== resolvedId),
             ),
             recentNoteIds: sanitizeRecentNoteIds(
               (currentSettings.recentNoteIds || []).filter(
-                (recentId) => recentId !== id,
+                (recentId) => recentId !== resolvedId,
               ),
             ),
           }));
@@ -1456,17 +1459,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
         // Only clear selection if we're deleting the currently selected note
         setSelectedNoteId((prevId) => {
-          if (prevId === id) {
+          if (prevId === resolvedId) {
             setCurrentNote(null);
             return null;
           }
           return prevId;
         });
-        setSelectedNoteIds((prevIds) => prevIds.filter((noteId) => noteId !== id));
-        if (selectionAnchorIdRef.current === id) {
-          selectionAnchorIdRef.current = selectedNoteIdRef.current === id ? null : selectedNoteIdRef.current;
+        setSelectedNoteIds((prevIds) => prevIds.filter((noteId) => noteId !== resolvedId));
+        if (selectionAnchorIdRef.current === resolvedId) {
+          selectionAnchorIdRef.current = selectedNoteIdRef.current === resolvedId ? null : selectedNoteIdRef.current;
         }
-        if (selectionRangeEndIdRef.current === id) {
+        if (selectionRangeEndIdRef.current === resolvedId) {
           selectionRangeEndIdRef.current = selectionAnchorIdRef.current;
         }
         await refreshNotes();
@@ -1475,7 +1478,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : "Failed to delete note");
       }
     },
-    [persistSettings, refreshActiveSearchResults, refreshNotes]
+    [persistSettings, refreshActiveSearchResults, refreshNotes, resolveLiveNoteId]
   );
 
   const deleteSelectedNotes = useCallback(async () => {
@@ -1535,8 +1538,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const duplicateNote = useCallback(
     async (id: string) => {
+      const resolvedId = resolveLiveNoteId(id);
       try {
-        const newNote = await notesService.duplicateNote(id);
+        const newNote = await notesService.duplicateNote(resolvedId);
         selectRequestIdRef.current += 1;
         pendingNewNoteIdRef.current = newNote.id;
         // Mark as recently saved to ignore file-change events from our own creation
@@ -1562,7 +1566,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : "Failed to duplicate note");
       }
     },
-    [recordRecentNoteView, refreshNotes, setSelectionState]
+    [recordRecentNoteView, refreshNotes, resolveLiveNoteId, setSelectionState]
   );
 
   const pinNote = useCallback(
@@ -1810,15 +1814,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const moveNoteAction = useCallback(
     async (id: string, targetFolder: string) => {
+      const resolvedId = resolveLiveNoteId(id);
       try {
-        const newId = await notesService.moveNote(id, targetFolder);
+        const newId = await notesService.moveNote(resolvedId, targetFolder);
         const pinnedNoteIds = settingsRef.current.pinnedNoteIds || [];
         const recentNoteIds = settingsRef.current.recentNoteIds || [];
-        if (pinnedNoteIds.includes(id) || recentNoteIds.includes(id)) {
-          const moveMap = new Map([[id, newId]] as const);
+        if (pinnedNoteIds.includes(resolvedId) || recentNoteIds.includes(resolvedId)) {
+          const moveMap = new Map([[resolvedId, newId]] as const);
           await persistSettings((currentSettings) => ({
             ...currentSettings,
-            pinnedNoteIds: pinnedNoteIds.includes(id)
+            pinnedNoteIds: pinnedNoteIds.includes(resolvedId)
               ? replaceNoteIds(currentSettings.pinnedNoteIds, moveMap)
               : currentSettings.pinnedNoteIds,
             recentNoteIds: sanitizeRecentNoteIds(
@@ -1831,7 +1836,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         }
         // Update selection if we moved the selected note
         setSelectedNoteId((prevId) => {
-          if (prevId === id) {
+          if (prevId === resolvedId) {
             notesService.readNote(newId).then((note) => {
               setCurrentNote(note);
             }).catch((err) => {
@@ -1842,18 +1847,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           return prevId;
         });
         setSelectedNoteIds((prevIds) =>
-          prevIds.map((noteId) => (noteId === id ? newId : noteId)),
+          prevIds.map((noteId) => (noteId === resolvedId ? newId : noteId)),
         );
-        if (selectionAnchorIdRef.current === id) {
+        if (selectionAnchorIdRef.current === resolvedId) {
           selectionAnchorIdRef.current = newId;
         }
-        if (selectionRangeEndIdRef.current === id) {
+        if (selectionRangeEndIdRef.current === resolvedId) {
           selectionRangeEndIdRef.current = newId;
         }
         setSelectedScope((prevScope) => {
           if (
             prevScope.type === "folder" &&
-            getParentFolderPath(id) === prevScope.path
+            getParentFolderPath(resolvedId) === prevScope.path
           ) {
             return targetFolder
               ? { type: "folder", path: targetFolder }
@@ -1867,7 +1872,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : "Failed to move note");
       }
     },
-    [persistSettings, refreshActiveSearchResults, refreshNotes]
+    [persistSettings, refreshActiveSearchResults, refreshNotes, resolveLiveNoteId]
   );
 
   const moveSelectedNotes = useCallback(
