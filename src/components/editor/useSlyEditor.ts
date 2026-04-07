@@ -233,6 +233,19 @@ export function useSlyEditor({
         class:
           "prose prose-lg dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-full px-6 pt-8 pb-24",
       },
+      clipboardTextSerializer: (slice) => {
+        const fallback = slice.content.textBetween(0, slice.content.size, "\n\n");
+        const currentEditor = editorRef.current;
+        const manager = currentEditor?.storage.markdown?.manager;
+        if (!currentEditor || !manager) return fallback;
+
+        try {
+          const doc = currentEditor.schema.topNodeType.create(null, slice.content);
+          return manager.serialize(doc.toJSON());
+        } catch {
+          return fallback;
+        }
+      },
       handleKeyDown: (_view, event) => {
         if (event.key === "Tab") {
           return false;
