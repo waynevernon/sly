@@ -1422,6 +1422,7 @@ function AppContent() {
 
   const handleClosePalette = useCallback(() => {
     setPaletteOpen(false);
+    editorRef.current?.commands.focus();
   }, []);
 
   const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
