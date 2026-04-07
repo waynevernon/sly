@@ -404,7 +404,7 @@ export interface WorkspaceEditorData {
   hasExternalChanges: boolean;
   reloadVersion: number;
   saveNote: (content: string, noteId?: string) => Promise<void>;
-  renameNote: (noteId: string, newName: string) => Promise<void>;
+  renameNote: (noteId: string, newName: string) => Promise<{ id: string }>;
   reloadCurrentNote: () => Promise<void>;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;

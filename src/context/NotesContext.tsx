@@ -91,7 +91,7 @@ interface NotesActionsContextValue {
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
-  renameNote: (id: string, newName: string) => Promise<void>;
+  renameNote: (id: string, newName: string) => Promise<Note>;
   deleteNote: (id: string) => Promise<void>;
   deleteSelectedNotes: () => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
@@ -1424,6 +1424,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           recentlySavedRef.current.delete(resolvedId);
           if (updatedId) recentlySavedRef.current.delete(updatedId);
         }, 1000);
+        return updated;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to rename note");
         recentlySavedRef.current.delete(resolvedId);

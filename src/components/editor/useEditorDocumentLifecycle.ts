@@ -38,7 +38,7 @@ interface UseEditorDocumentLifecycleOptions {
   onSourceModeChange?: (sourceMode: boolean) => void;
   printMode: boolean;
   reloadVersion: number;
-  renameNote?: (noteId: string, newName: string) => Promise<void>;
+  renameNote?: (noteId: string, newName: string) => Promise<{ id: string }>;
   saveNote: (content: string, noteId?: string) => Promise<void>;
   notesFolder: string | null;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
@@ -172,7 +172,17 @@ export function useEditorDocumentLifecycle({
       }
 
       await flushPendingSave();
-      await renameNote(noteId, derivedTitle);
+      const renamedNote = await renameNote(noteId, derivedTitle);
+      if (renamedNote.id !== noteId) {
+        currentNoteIdRef.current = renamedNote.id;
+        loadedNoteIdRef.current = renamedNote.id;
+        if (lastSaveRef.current?.noteId === noteId) {
+          lastSaveRef.current = {
+            ...lastSaveRef.current,
+            noteId: renamedNote.id,
+          };
+        }
+      }
     } catch (error) {
       console.error("Failed to commit provisional filename:", error);
       toast.error("Failed to rename file");
@@ -191,7 +201,7 @@ export function useEditorDocumentLifecycle({
       clearTimeout(saveTimeoutRef.current);
     }
 
-    const savingNoteId = currentNote?.id;
+    const savingNoteId = currentNoteIdRef.current ?? currentNote?.id;
     if (!savingNoteId) return;
 
     needsSaveRef.current = true;
@@ -240,11 +250,12 @@ export function useEditorDocumentLifecycle({
         clearTimeout(sourceTimeoutRef.current);
       }
       sourceTimeoutRef.current = window.setTimeout(async () => {
-        if (currentNote) {
+        const savingNoteId = currentNoteIdRef.current ?? currentNote?.id;
+        if (savingNoteId) {
           setIsSaving(true);
           try {
-            lastSaveRef.current = { noteId: currentNote.id, content: value };
-            await saveNote(value, currentNote.id);
+            lastSaveRef.current = { noteId: savingNoteId, content: value };
+            await saveNote(value, savingNoteId);
           } catch (error) {
             console.error("Failed to save note:", error);
             toast.error("Failed to save note");
@@ -254,7 +265,7 @@ export function useEditorDocumentLifecycle({
         }
       }, 300);
     },
-    [currentNote, saveNote],
+    [currentNote, currentNoteIdRef, saveNote],
   );
 
   useEffect(() => {
