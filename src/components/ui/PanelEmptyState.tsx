@@ -25,7 +25,7 @@ export function PanelEmptyState({
     >
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 text-center">
         {icon ? (
-          <div className="mb-3 text-text-muted/40 [&_svg]:h-7 [&_svg]:w-7">
+          <div className="mb-3 text-text-muted [&_svg]:h-7 [&_svg]:w-7">
             {icon}
           </div>
         ) : null}
