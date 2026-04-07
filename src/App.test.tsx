@@ -148,9 +148,16 @@ vi.mock("./components/layout/FolderPicker", () => ({
 }));
 
 vi.mock("./components/settings", () => ({
-  SettingsPage: ({ onBack }: { onBack: () => void }) => (
+  SettingsPage: ({
+    onBack,
+    initialTab,
+  }: {
+    onBack: () => void;
+    initialTab?: "general" | "editor" | "extensions" | "shortcuts" | "about";
+  }) => (
     <div>
       <div>settings-page</div>
+      <div>settings-tab:{initialTab ?? "general"}</div>
       <button onClick={onBack}>back</button>
     </div>
   ),
@@ -330,5 +337,19 @@ describe("App", () => {
     expect(screen.getByTestId("flush-pending-save-type")).toHaveTextContent(
       "function",
     );
+  });
+
+  it("opens the shortcuts settings tab with Cmd/Ctrl+?", async () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, {
+      key: "?",
+      code: "Slash",
+      metaKey: true,
+      shiftKey: true,
+    });
+
+    expect(await screen.findByText("settings-page")).toBeInTheDocument();
+    expect(screen.getByText("settings-tab:shortcuts")).toBeInTheDocument();
   });
 });

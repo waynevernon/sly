@@ -1151,6 +1151,17 @@ function AppContent() {
         return;
       }
 
+      // Cmd/Ctrl+? - Open shortcuts settings
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        (e.key === "?" || e.code === "Slash")
+      ) {
+        e.preventDefault();
+        openSettings("shortcuts");
+        return;
+      }
+
       // Cmd+= or Cmd++ - Zoom in (works everywhere, including settings)
       if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
