@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { alt, mod, shift } from "../../lib/platform";
+import { alt, mod } from "../../lib/platform";
 import { Button } from "../ui";
 
 interface Shortcut {
