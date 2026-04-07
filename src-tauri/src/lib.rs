@@ -894,6 +894,11 @@ async fn write_new_note_file(path: &Path, content: &[u8]) -> std::io::Result<()>
         return Err(error);
     }
 
+    if let Err(error) = file.flush().await {
+        let _ = fs::remove_file(path).await;
+        return Err(error);
+    }
+
     Ok(())
 }
 
