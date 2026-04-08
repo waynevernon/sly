@@ -178,13 +178,13 @@ describe("RightPanel", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Title" })).toHaveStyle({
-      paddingLeft: "10px",
+      paddingLeft: "8px",
     });
     expect(await screen.findByRole("button", { name: "Section" })).toHaveStyle({
       paddingLeft: "20px",
     });
     expect(screen.getByRole("button", { name: "Detail" })).toHaveStyle({
-      paddingLeft: "30px",
+      paddingLeft: "32px",
     });
   });
 
