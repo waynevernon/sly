@@ -598,7 +598,7 @@ export function NotesPane() {
         className="ui-scrollbar-overlay flex-1 overflow-y-auto"
       >
         {searchOpen && (
-          <div className="sticky top-0 z-10 px-3 pt-2 bg-bg">
+          <div className="sticky top-0 z-10 px-4 pt-2 bg-bg">
             <div className="relative">
               <Input
                 ref={searchInputRef}

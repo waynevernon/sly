@@ -452,7 +452,7 @@ export function RightPanel({
                             ? "bg-bg-muted text-text"
                             : "text-text-muted hover:bg-bg-muted hover:text-text",
                         )}
-                        style={{ paddingLeft: `${item.level * 10}px` }}
+                        style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
                       >
                         <span className="line-clamp-2 break-words">{item.text}</span>
                       </button>
