@@ -57,11 +57,21 @@ jobs:
             prerelease="false"
           fi
 
+          updater_notes_path=".github/updater-notes/${tag}.md"
+          if [[ -f "${updater_notes_path}" ]]; then
+            release_body="$(<"${updater_notes_path}")"
+          else
+            release_body="A new version is ready to install."
+          fi
+
           {
             echo "tag=${tag}"
             echo "version=${version}"
             echo "channel=${channel}"
             echo "prerelease=${prerelease}"
+            echo "release_body<<__SLY_RELEASE_BODY__"
+            printf '%s\n' "${release_body}"
+            echo "__SLY_RELEASE_BODY__"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Install system dependencies (Ubuntu only)
@@ -109,7 +119,7 @@ jobs:
         with:
           tagName: ${{ steps.release_meta.outputs.tag }}
           releaseName: "Sly v${{ steps.release_meta.outputs.version }}"
-          releaseBody: "https://github.com/waynevernon/sly/releases/tag/${{ steps.release_meta.outputs.tag }}"
+          releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: true
           prerelease: ${{ steps.release_meta.outputs.prerelease }}
           updaterJsonPreferNsis: true

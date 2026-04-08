@@ -44,7 +44,22 @@ Runs on `v*` tag push or manual `workflow_dispatch`. Builds in parallel for:
 - **Windows**: NSIS installer (`x64`)
 - **Linux**: AppImage and `.deb`
 
-Creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
+Release behavior:
+
+- Tags must exactly match `package.json` version prefixed with `v` or the workflow fails.
+- Tags containing `-` are treated as **beta** prereleases. Tags without `-` are treated as **stable** releases.
+- The workflow reads `.github/updater-notes/<tag>.md` when it exists and uses that file as the updater `notes` field inside `latest.json`.
+- Because `tauri-action` uses the same text to seed the initial draft GitHub release body, the draft release starts with the updater note and must be replaced or expanded before publishing.
+- If no matching updater-notes file exists, the updater falls back to `A new version is ready to install.`
+- The workflow sets the updater channel at build time:
+  - **stable builds** point to `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
+  - **beta builds** point to `https://raw.githubusercontent.com/waynevernon/sly/updater-beta/latest.json`
+- The workflow creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
+
+Publishing behavior after the draft release exists:
+
+- Publishing **any** release triggers `update-homebrew-tap.yml`
+- Publishing a **beta prerelease** also triggers `update-beta-updater.yml`, which copies that release's `latest.json` to the `updater-beta` branch so beta installs can see it
 
 Current release posture before 1.0:
 
@@ -59,46 +74,67 @@ Current release posture before 1.0:
    - `src-tauri/Cargo.toml`
    - `src-tauri/Cargo.lock`
    - `src-tauri/tauri.conf.json`
-2. Run the expected local confidence checks before tagging:
+2. Add the updater-note seed file for the exact tag you plan to publish:
+   - stable example: `.github/updater-notes/v1.3.0.md`
+   - beta example: `.github/updater-notes/v1.4.0-beta.1.md`
+   - start from `.github/updater-notes/TEMPLATE.md`
+   - keep it short and user-facing because the same text appears in the in-app updater prompt
+   - two to four lines is the target; avoid long changelog-style notes here
+3. Run the expected local confidence checks before tagging:
    ```bash
    npm run verify
    cargo test
    cargo check
    cargo clippy --all-targets --all-features -- -D warnings
    ```
-3. Commit the release bump to `main`.
-4. Create and push the version tag:
+4. Review `README.md` and update it for any meaningful product changes in the release:
+   - keep the most important user-facing capabilities near the top
+   - use concise UX writing rather than internal implementation language
+   - avoid long feature inventories; roll closely related features into a single bullet when possible
+   - preserve a clear hierarchy so the README reflects the app as it exists now, not as an accumulated changelog
+5. Commit the release bump, updater-notes file, and any README updates to `main`.
+6. Create and push the version tag:
    ```bash
    git push origin main
    git tag v1.0.0
    git push origin v1.0.0
    ```
-5. Monitor both GitHub Actions workflows and do not publish until both are green:
+7. Monitor both GitHub Actions workflows and do not publish until both are green:
    ```bash
    gh run list --limit 6
    gh run watch <ci-run-id> --exit-status
    gh run watch <release-run-id> --exit-status
    ```
-6. If either workflow fails, inspect the failing job, fix the issue on `main`, push the fix, and retag only when the release path is clean again. Do not publish a failed or partial draft release.
-7. After the release workflow succeeds, open the draft GitHub release and replace the placeholder body with release notes written in the same format as recent releases:
-   - use `### Improvements` and `### Bug Fixes` headings
-   - write only user-relevant changes
-   - group related polish into a single bullet when that reads better than listing tiny commits
-   - use the commits since the previous tag as the source of truth, with scratch notes as supporting input
-   - keep the tone concise and release-focused rather than implementation-focused
-8. Before publishing, review `README.md` and update it for any meaningful product changes in the release:
-   - keep the most important user-facing capabilities near the top
-   - use concise UX writing rather than internal implementation language
-   - avoid long feature inventories; roll closely related features into a single bullet when possible
-   - preserve a clear hierarchy so the README reflects the app as it exists now, not as an accumulated changelog
-9. Publish the release so the updater can serve the new `latest.json`.
+8. If either workflow fails, inspect the failing job, fix the issue on `main`, push the fix, and retag only when the release path is clean again. Do not publish a failed or partial draft release.
+9. Generate the full GitHub release notes from commits and update the draft release body before publishing. The short updater note from `.github/updater-notes/<tag>.md` is only seed text for the draft and does **not** replace proper GitHub release notes. Editing the GitHub draft body later does **not** rewrite the already-generated updater `latest.json`.
+10. Publish the release from the CLI:
+   - stable:
+     ```bash
+     gh release edit v1.0.0 --draft=false --latest --verify-tag
+     ```
+   - beta prerelease:
+     ```bash
+     gh release edit v1.4.0-beta.1 --draft=false --verify-tag
+     ```
+11. After publishing, monitor the follow-on publish workflows and wait for them to finish:
+   - all releases: `update-homebrew-tap.yml`
+   - beta prereleases only: `update-beta-updater.yml`
+   ```bash
+   gh run list --limit 10
+   gh run watch <publish-run-id> --exit-status
+   ```
+12. Do not consider the release complete until those follow-on workflows are green:
+   - stable releases need the GitHub release published successfully and the Homebrew tap updated
+   - beta prereleases need the GitHub release published successfully, the Homebrew tap updated, and the `updater-beta` manifest refreshed
 
 Helpful commands while drafting release notes:
 
 ```bash
 git log --oneline --reverse v0.9.0..HEAD
 gh release view v0.9.0 --json name,body
-gh release edit v1.0.0 --title "Sly v1.0.0" --notes-file <file> --draft=false --latest --verify-tag
+gh release edit v1.0.0 --title "Sly v1.0.0" --notes-file /tmp/release-notes.md
+gh release edit v1.0.0 --draft=false --latest --verify-tag
+gh release edit v1.4.0-beta.1 --draft=false --verify-tag
 ```
 
 ### GitHub Secrets Required
@@ -120,9 +156,10 @@ These must be configured in the repo settings under `Settings > Secrets and vari
 
 The app checks for updates through the Tauri updater plugin:
 
-- Endpoint: `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
+- Stable endpoint: `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
+- Beta endpoint: `https://raw.githubusercontent.com/waynevernon/sly/updater-beta/latest.json`
 - Check timing: on startup (after a short delay) and manually from Settings > About
-- UX: if a newer version is found, the app shows an "Update Now" toast
+- UX: if a newer version is found, the app shows an "Update Now" toast with short release notes from `latest.json.notes`
 - Config location: `src-tauri/tauri.conf.json` under `plugins.updater`
 
 ### Local Build

@@ -16,6 +16,7 @@ export function UpdateToast({
   const [installing, setInstalling] = useState(false);
   const { body, releaseNotesUrl } = getUpdateToastContent(
     update.rawJson,
+    update.version,
     update.body,
   );
 
@@ -51,7 +52,7 @@ export function UpdateToast({
       <div className="font-medium text-sm">
         Update Available: v{update.version}
       </div>
-      <div className="text-xs text-text-muted">{body}</div>
+      <div className="text-xs text-text-muted whitespace-pre-line">{body}</div>
       <div className="mt-1 flex items-center gap-2">
         <Button
           onClick={handleUpdate}
