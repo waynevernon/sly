@@ -107,6 +107,9 @@ Current release posture before 1.0:
    ```
 8. If either workflow fails, inspect the failing job, fix the issue on `main`, push the fix, and retag only when the release path is clean again. Do not publish a failed or partial draft release.
 9. Generate the full GitHub release notes from commits and update the draft release body before publishing. The short updater note from `.github/updater-notes/<tag>.md` is only seed text for the draft and does **not** replace proper GitHub release notes. Editing the GitHub draft body later does **not** rewrite the already-generated updater `latest.json`.
+   - stable releases: write notes from the previous stable tag to `HEAD`
+   - beta prereleases: write notes from the last stable tag to `HEAD`, not from the previous beta tag
+   - treat beta notes as a running draft of the next stable release, so each new beta rewrites the full accumulated beta notes instead of only appending the latest beta delta
 10. Publish the release from the CLI:
    - stable:
      ```bash
@@ -126,11 +129,17 @@ Current release posture before 1.0:
 12. Do not consider the release complete until those follow-on workflows are green:
    - stable releases need the GitHub release published successfully and the Homebrew tap updated
    - beta prereleases need the GitHub release published successfully, the Homebrew tap updated, and the `updater-beta` manifest refreshed
+13. After a beta prerelease is fully green and published, unpublish older beta releases to keep the releases page clean without deleting history:
+   - move previous beta releases back to draft with `gh release edit <old-beta-tag> --draft`
+   - keep the historical tags by default
+   - only use `gh release delete <old-beta-tag> --yes` if you explicitly want to remove the old release object entirely
+   - do **not** pass `--cleanup-tag` unless you explicitly intend to remove the historical tag too
 
 Helpful commands while drafting release notes:
 
 ```bash
 git log --oneline --reverse v0.9.0..HEAD
+git tag --list 'v*' --sort=-version:refname
 gh release view v0.9.0 --json name,body
 gh release edit v1.0.0 --title "Sly v1.0.0" --notes-file /tmp/release-notes.md
 gh release edit v1.0.0 --draft=false --latest --verify-tag

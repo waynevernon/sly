@@ -327,6 +327,110 @@ describe("RightPanel", () => {
     });
   });
 
+  it("keeps the current section active after typing shifts heading positions", async () => {
+    const doc = makeDoc();
+    const positions = extractOutlineItems(doc);
+    const nodeMap = new Map<number, HTMLElement>();
+
+    positions.forEach((item, index) => {
+      const element = document.createElement("h2");
+      element.getBoundingClientRect = () =>
+        ({
+          top: index * 120,
+          bottom: index * 120 + 20,
+          left: 0,
+          right: 100,
+          width: 100,
+          height: 20,
+          x: 0,
+          y: index * 120,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      nodeMap.set(item.pos, element);
+    });
+
+    const editor = new FakeEditor(doc, nodeMap);
+    const scrollContainer = document.createElement("div");
+    scrollContainer.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        bottom: 400,
+        left: 0,
+        right: 300,
+        width: 300,
+        height: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    renderRightPanel(
+      <RightPanel
+        editor={editor as never}
+        scrollContainer={scrollContainer}
+        noteId="alpha"
+        hasNote
+        visible
+        width={260}
+        activeTab="outline"
+        onTabChange={vi.fn()}
+        onWidthChange={vi.fn()}
+        assistantProps={makeAssistantProps()}
+      />,
+    );
+
+    const detailButton = await screen.findByRole("button", { name: "Detail" });
+
+    editor.state.selection.from = positions[2].pos + 1;
+    editor.emit("selectionUpdate");
+
+    await waitFor(() => {
+      expect(detailButton.className).toMatch(/bg-bg-muted/);
+    });
+
+    const updatedDoc = schema.node("doc", null, [
+      schema.node("heading", { level: 1 }, [schema.text("Title")]),
+      schema.node("paragraph", null, [schema.text("Inserted text")]),
+      schema.node("heading", { level: 2 }, [schema.text("Section")]),
+      schema.node("paragraph", null, [schema.text("Body")]),
+      schema.node("heading", { level: 3 }, [schema.text("Detail")]),
+    ]);
+    const updatedPositions = extractOutlineItems(updatedDoc);
+
+    nodeMap.clear();
+    const topByText = new Map<string, number>([
+      ["Title", -180],
+      ["Section", -120],
+      ["Detail", 40],
+    ]);
+    updatedPositions.forEach((item) => {
+      const element = document.createElement("h2");
+      element.getBoundingClientRect = () =>
+        ({
+          top: topByText.get(item.text) ?? 0,
+          bottom: (topByText.get(item.text) ?? 0) + 20,
+          left: 0,
+          right: 100,
+          width: 100,
+          height: 20,
+          x: 0,
+          y: topByText.get(item.text) ?? 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
+      nodeMap.set(item.pos, element);
+    });
+    editor.state.doc = updatedDoc;
+    editor.state.selection.from = updatedPositions[2].pos + 1;
+
+    editor.emit("update");
+
+    await waitFor(() => {
+      expect(detailButton.className).toMatch(/bg-bg-muted/);
+    }, {
+      timeout: 1000,
+    });
+  });
+
   it("renders assistant tab content inside the same panel shell", async () => {
     renderRightPanel(
       <RightPanel

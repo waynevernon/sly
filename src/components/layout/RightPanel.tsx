@@ -113,16 +113,14 @@ export function RightPanel({
     }
   }, []);
 
-  const updateOutline = useCallback(() => {
+  const updateOutline = useCallback((): OutlineItem[] => {
     if (!editor || !hasNote || !noteId) {
       setOutlineItems([]);
       setActiveOutlineId(null);
-      return;
+      return [];
     }
 
     const nextItems = extractOutlineItems(editor.state.doc);
-    setOutlineItems(nextItems);
-
     const activeFromSelection = findActiveOutlineFromSelection(
       nextItems,
       editor.state.selection.from,
@@ -131,6 +129,7 @@ export function RightPanel({
       setOutlineItems(nextItems);
       setActiveOutlineId(activeFromSelection?.id ?? null);
     });
+    return nextItems;
   }, [editor, hasNote, noteId]);
 
   const updateActiveFromSelection = useCallback(() => {
@@ -212,9 +211,9 @@ export function RightPanel({
     }
 
     const hydrateOutline = (stage: "initial" | "update") => {
-      updateOutline();
+      const nextItems = updateOutline();
       outlineViewportFrameRef.current = requestAnimationFrame(() => {
-        updateActiveFromViewport();
+        updateActiveFromViewport(nextItems);
         if (stage === "initial") {
           markNoteOpenTiming(noteId, "outline hydrated");
           finishNoteOpenTiming(noteId, "right panel hydrated");
