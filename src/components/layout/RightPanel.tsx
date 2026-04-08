@@ -19,6 +19,7 @@ import {
   findActiveOutlineFromSelection,
   type OutlineItem,
 } from "./rightPanelOutline";
+import { PaneResizeHandle } from "./PaneResizeHandle";
 import {
   RightPanelAssistant,
   type RightPanelAssistantProps,
@@ -375,30 +376,22 @@ export function RightPanel({
   }, [activeTab]);
 
   return (
-    <div className={cn("h-full shrink-0 flex", isResizing && "select-none")}>
+    <div className={cn("relative h-full shrink-0", isResizing && "select-none")}>
       {visible && (
-        <div
-          className="relative w-1 shrink-0 cursor-col-resize group z-10"
+        <PaneResizeHandle
+          ariaLabel="Resize right panel"
+          align="left"
           onMouseDown={startResize}
-        >
-          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
-          <div
-            className="absolute left-0 right-0 h-px bg-border/80"
-            style={{
-              top: "calc(var(--ui-drag-region-height) + var(--ui-pane-header-height) - 1px)",
-            }}
-          />
-        </div>
+        />
       )}
-
       <div
         className={cn(
-          "h-full shrink-0 overflow-hidden border-l border-border/80 bg-bg",
+          "h-full shrink-0 overflow-hidden bg-bg",
           !isResizing &&
             "transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
           visible
             ? "opacity-100 translate-x-0"
-            : "w-0 opacity-0 translate-x-3 pointer-events-none border-l-0",
+            : "w-0 opacity-0 translate-x-3 pointer-events-none",
         )}
         style={visible ? { width: liveWidth } : undefined}
       >

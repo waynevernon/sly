@@ -1265,7 +1265,7 @@ function EditorImpl({
             "ui-scrollbar-overlay",
             printMode
               ? "print-note-scroll overflow-visible"
-              : "absolute inset-0 right-px overflow-y-auto overflow-x-hidden",
+              : "absolute inset-0 overflow-y-auto overflow-x-hidden",
           )}
           dir={textDirection}
         >

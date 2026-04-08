@@ -53,7 +53,7 @@ export function FoldersPane({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="h-full bg-bg-secondary border-r border-border/80 flex flex-col select-none">
+    <div className="h-full bg-bg-secondary flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="font-medium text-base text-text">Folders</div>

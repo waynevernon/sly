@@ -21,6 +21,7 @@ import {
   resolveFolderAppearanceIconColor,
   resolveFolderAppearanceTextColor,
 } from "../../lib/folderIcons";
+import { PaneResizeHandle } from "./PaneResizeHandle";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
 
@@ -322,52 +323,62 @@ export function WorkspaceNavigation({
       <div className={cn("h-full flex shrink-0", isResizing && "select-none")}>
         <div
           className={cn(
-            "h-full shrink-0 overflow-hidden",
-            !isResizing && "transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-            foldersVisible
-              ? "opacity-100 translate-x-0"
-              : "w-0 opacity-0 -translate-x-3 pointer-events-none",
+            "relative h-full shrink-0",
+            !isResizing && "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            !foldersVisible && "w-0 pointer-events-none",
           )}
           style={foldersVisible ? { width: liveWidths.folders } : undefined}
         >
-          <FoldersPane
-            onOpenSettings={onOpenSettings}
-            pendingFolderPath={pendingFolderPath}
-          />
-        </div>
-
-        {foldersVisible && notesVisible && (
           <div
-            className="relative w-1 shrink-0 cursor-col-resize group z-10"
-            onMouseDown={(e) => startResize(e, "folders")}
+            className={cn(
+              "h-full overflow-hidden",
+              !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              foldersVisible
+                ? "opacity-100 translate-x-0"
+                : "opacity-0 -translate-x-3",
+            )}
           >
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
-            <div className="absolute left-0 right-0 h-px bg-border/80" style={{ top: "calc(var(--ui-drag-region-height) + var(--ui-pane-header-height) - 1px)" }} />
+            <FoldersPane
+              onOpenSettings={onOpenSettings}
+              pendingFolderPath={pendingFolderPath}
+            />
           </div>
-        )}
+          {foldersVisible && notesVisible && (
+            <PaneResizeHandle
+              ariaLabel="Resize folders pane"
+              align="right"
+              onMouseDown={(e) => startResize(e, "folders")}
+            />
+          )}
+        </div>
 
         <div
           className={cn(
-            "h-full shrink-0 overflow-hidden",
-            !isResizing && "transition-[width,opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-            notesVisible
-              ? "opacity-100 translate-x-0"
-              : "w-0 opacity-0 -translate-x-3 pointer-events-none",
+            "relative h-full shrink-0",
+            !isResizing && "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            !notesVisible && "w-0 pointer-events-none",
           )}
           style={notesVisible ? { width: liveWidths.notes } : undefined}
         >
-          <NotesPane />
-        </div>
-
-        {notesVisible && (
           <div
-            className="relative w-1 shrink-0 cursor-col-resize group z-10"
-            onMouseDown={(e) => startResize(e, "notes")}
+            className={cn(
+              "h-full overflow-hidden",
+              !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              notesVisible
+                ? "opacity-100 translate-x-0"
+                : "opacity-0 -translate-x-3",
+            )}
           >
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent group-hover:bg-border transition-colors duration-150" />
-            <div className="absolute left-0 right-0 h-px bg-border/80" style={{ top: "calc(var(--ui-drag-region-height) + var(--ui-pane-header-height) - 1px)" }} />
+            <NotesPane />
           </div>
-        )}
+          {notesVisible && (
+            <PaneResizeHandle
+              ariaLabel="Resize notes pane"
+              align="right"
+              onMouseDown={(e) => startResize(e, "notes")}
+            />
+          )}
+        </div>
       </div>
 
       <DragOverlay

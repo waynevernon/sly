@@ -298,7 +298,7 @@ export function NotesPane() {
   }, []);
 
   return (
-    <div className="h-full bg-bg border-r border-border/80 flex flex-col select-none">
+    <div className="h-full bg-bg flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="min-w-0 flex items-center gap-1.5">

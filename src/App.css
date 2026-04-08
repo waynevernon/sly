@@ -223,6 +223,7 @@
 
   /* Border colors */
   --color-border: var(--color-border);
+  --color-border-solid: var(--color-border-solid);
 
   /* Accent colors */
   --color-accent: var(--color-accent);
