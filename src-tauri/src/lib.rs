@@ -24,8 +24,10 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
+mod frontmatter;
 mod git;
 mod persistence;
+mod tasks;
 
 use persistence::app_config::{load_app_config, save_app_config};
 use persistence::workspace_settings::{apply_settings_patch, load_settings, save_settings};
@@ -446,6 +448,8 @@ pub struct Settings {
     pub folder_note_sort_modes: Option<HashMap<String, NoteSortMode>>,
     #[serde(rename = "folderSortMode", default)]
     pub folder_sort_mode: FolderSortMode,
+    #[serde(rename = "tasksEnabled", skip_serializing_if = "Option::is_none", default)]
+    pub tasks_enabled: Option<bool>,
 }
 
 impl Default for Settings {
@@ -471,6 +475,7 @@ impl Default for Settings {
             note_sort_mode: NoteSortMode::default(),
             folder_note_sort_modes: None,
             folder_sort_mode: FolderSortMode::default(),
+            tasks_enabled: None,
         }
     }
 }
@@ -516,6 +521,8 @@ pub struct SettingsPatch {
     pub folder_note_sort_modes: Option<Option<HashMap<String, NoteSortMode>>>,
     #[serde(default)]
     pub folder_sort_mode: Option<FolderSortMode>,
+    #[serde(default)]
+    pub tasks_enabled: Option<Option<bool>>,
 }
 
 // Search result
@@ -1269,7 +1276,7 @@ fn strip_markdown(text: &str) -> String {
 }
 
 /// Directories to exclude from note discovery and ID resolution.
-const EXCLUDED_DIRS: &[&str] = &[".git", ".sly", ".obsidian", ".trash", "assets"];
+const EXCLUDED_DIRS: &[&str] = &[".git", ".sly", ".obsidian", ".trash", "assets", ".tasks"];
 
 /// Filter for WalkDir: skips excluded directories.
 fn is_visible_notes_entry(entry: &walkdir::DirEntry) -> bool {
@@ -3586,9 +3593,16 @@ fn setup_file_watcher(
                 let mut folder_structure_changed = false;
                 let mut emitted_path: Option<String> = None;
 
+                let mut task_changed = false;
+
                 for path in event.paths.iter() {
                     if !debounce_path(path, &debounce_map) {
                         continue;
+                    }
+
+                    // Detect changes inside .tasks/ and emit a separate event.
+                    if tasks::is_task_path(&notes_root, path) {
+                        task_changed = true;
                     }
 
                     if emitted_path.is_none() {
@@ -3670,6 +3684,10 @@ fn setup_file_watcher(
                             }
                         }
                     }
+                }
+
+                if task_changed {
+                    let _ = app_handle.emit("tasks-changed", ());
                 }
 
                 if folder_structure_changed || !changed_ids.is_empty() {
@@ -5228,6 +5246,61 @@ fn open_print_preview(app: AppHandle, path: String) -> Result<(), String> {
     create_print_window(&app, &path)
 }
 
+// ── Task commands ─────────────────────────────────────────────────────────────
+
+fn notes_root_for_tasks(state: &AppState) -> Result<PathBuf, String> {
+    let app_config = state.app_config.read().expect("app_config read lock");
+    let folder = app_config
+        .notes_folder
+        .clone()
+        .ok_or("Notes folder not set")?;
+    Ok(PathBuf::from(folder))
+}
+
+#[tauri::command]
+fn list_tasks(state: State<'_, AppState>) -> Result<Vec<tasks::TaskMetadata>, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::list_tasks(&root).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_task(id: String, state: State<'_, AppState>) -> Result<tasks::Task, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::read_task(&root, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_task(title: String, state: State<'_, AppState>) -> Result<tasks::Task, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::create_task(&root, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn update_task(
+    id: String,
+    patch: tasks::TaskPatch,
+    state: State<'_, AppState>,
+) -> Result<tasks::Task, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::update_task(&root, &id, patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_task_completed(
+    id: String,
+    completed: bool,
+    state: State<'_, AppState>,
+) -> Result<tasks::Task, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::set_task_completed(&root, &id, completed).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_task(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::delete_task(&root, &id).map_err(|e| e.to_string())
+}
+
 // Handle CLI arguments: open .md files in preview mode.
 // Returns true if a standalone preview window was created (file outside notes folder).
 fn handle_cli_args(app: &AppHandle, args: &[String], cwd: &str) -> bool {
@@ -5713,6 +5786,12 @@ pub fn run() {
             install_cli,
             uninstall_cli,
             get_cli_status,
+            list_tasks,
+            read_task,
+            create_task,
+            update_task,
+            set_task_completed,
+            delete_task,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -6494,6 +6573,7 @@ mod tests {
                 NoteSortMode::CreatedAsc,
             )])),
             folder_sort_mode: FolderSortMode::NameDesc,
+            tasks_enabled: None,
         };
 
         apply_settings_patch(
