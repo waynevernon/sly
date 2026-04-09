@@ -328,7 +328,7 @@ export function NotesPane() {
           >
             {hasBatchSelection ? `${selectionCount} selected` : heading}
           </div>
-          {!hasBatchSelection && showNoteCounts && (
+          {!hasBatchSelection && showNoteCounts && noteCount > 0 && (
             <CountBadge
               count={noteCount}
               layout="inline"

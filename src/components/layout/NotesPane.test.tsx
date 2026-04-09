@@ -483,6 +483,26 @@ describe("NotesPane", () => {
     expect(badge?.className).toMatch(/ui-count-badge--active/);
   });
 
+  it("hides the header note count when the scoped note count is zero", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        scopedNotes: [],
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
+        showNoteCounts: true,
+      }),
+    );
+
+    const { container } = render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(container.querySelector(".ui-count-badge")).toBeNull();
+  });
+
   it("shows the recursive folder empty state when enabled", async () => {
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(
