@@ -26,8 +26,8 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Derive cask metadata
-        id: release_meta
+      - name: Derive event release metadata
+        id: event_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.event.inputs.tag_name || github.event.release.tag_name }}
@@ -59,13 +59,43 @@ jobs:
             process.exit(1);
           }
 
-          const channel = release.isPrerelease ? "beta" : "stable";
-          const caskToken = release.isPrerelease ? "sly@beta" : "sly";
-
-          console.log(`channel=${channel}`);
+          console.log(`is_prerelease=${release.isPrerelease ? "true" : "false"}`);
           console.log(`version=${version}`);
           console.log(`sha256=${asset.digest.slice("sha256:".length)}`);
-          console.log(`cask_token=${caskToken}`);
+          NODE
+
+      - name: Derive effective beta release metadata
+        id: beta_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node scripts/select-beta-channel-release.mjs \
+            --repo "${{ github.repository }}" >> "${GITHUB_OUTPUT}"
+
+          release_json="$(gh release view "${{ steps.beta_release.outputs.tag }}" --repo "${{ github.repository }}" --json assets)"
+          export RELEASE_JSON="${release_json}"
+          export RELEASE_VERSION="${{ steps.beta_release.outputs.version }}"
+
+          node <<'NODE' >> "${GITHUB_OUTPUT}"
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          const version = process.env.RELEASE_VERSION;
+          const assetName = `Sly_${version}_universal.dmg`;
+          const asset = release.assets.find((candidate) => candidate.name === assetName);
+
+          if (!asset) {
+            console.error(`Missing release asset ${assetName}`);
+            process.exit(1);
+          }
+
+          if (!asset.digest || !asset.digest.startsWith("sha256:")) {
+            console.error(`Missing SHA-256 digest for ${assetName}`);
+            process.exit(1);
+          }
+
+          console.log(`sha256=${asset.digest.slice("sha256:".length)}`);
           NODE
 
       - name: Clone tap repository
@@ -75,14 +105,24 @@ jobs:
           set -euo pipefail
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/waynevernon/homebrew-sly.git" "${RUNNER_TEMP}/homebrew-sly"
 
-      - name: Update cask file
+      - name: Update stable cask file
+        if: steps.event_release.outputs.is_prerelease != 'true'
         run: |
           set -euo pipefail
           node scripts/update-homebrew-cask.mjs \
             --tap-dir "${RUNNER_TEMP}/homebrew-sly" \
-            --channel "${{ steps.release_meta.outputs.channel }}" \
-            --version "${{ steps.release_meta.outputs.version }}" \
-            --sha256 "${{ steps.release_meta.outputs.sha256 }}"
+            --channel "stable" \
+            --version "${{ steps.event_release.outputs.version }}" \
+            --sha256 "${{ steps.event_release.outputs.sha256 }}"
+
+      - name: Update beta cask file
+        run: |
+          set -euo pipefail
+          node scripts/update-homebrew-cask.mjs \
+            --tap-dir "${RUNNER_TEMP}/homebrew-sly" \
+            --channel "beta" \
+            --version "${{ steps.beta_release.outputs.version }}" \
+            --sha256 "${{ steps.beta_release.outputs.sha256 }}"
 
       - name: Commit and push cask bump
         working-directory: ${{ runner.temp }}/homebrew-sly
@@ -96,6 +136,6 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Casks/${{ steps.release_meta.outputs.cask_token }}.rb"
-          git commit -m "Update ${{ steps.release_meta.outputs.cask_token }} to v${{ steps.release_meta.outputs.version }}"
+          git add Casks/sly.rb Casks/sly@beta.rb
+          git commit -m "Update Homebrew casks for ${{ github.event.inputs.tag_name || github.event.release.tag_name }}"
           git push origin HEAD

@@ -55,11 +55,12 @@ Release behavior:
   - **stable builds** point to `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
   - **beta builds** point to `https://raw.githubusercontent.com/waynevernon/sly/updater-beta/latest.json`
 - The workflow creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
+- The **beta update track** should always point to whichever published release is newer between the latest stable release and the latest published beta release.
 
 Publishing behavior after the draft release exists:
 
 - Publishing **any** release triggers `update-homebrew-tap.yml`
-- Publishing a **beta prerelease** also triggers `update-beta-updater.yml`, which copies that release's `latest.json` to the `updater-beta` branch so beta installs can see it
+- Publishing **any** release also refreshes the beta updater manifest so the beta track can follow the newer of the latest stable and latest published beta release
 
 Current release posture before 1.0:
 
@@ -121,13 +122,14 @@ Current release posture before 1.0:
      ```
 11. After publishing, monitor the follow-on publish workflows and wait for them to finish:
    - all releases: `update-homebrew-tap.yml`
-   - beta prereleases only: `update-beta-updater.yml`
+   - all releases: `update-beta-updater.yml`
    ```bash
    gh run list --limit 10
    gh run watch <publish-run-id> --exit-status
    ```
 12. Do not consider the release complete until those follow-on workflows are green:
    - stable releases need the GitHub release published successfully and the Homebrew tap updated
+   - stable releases also need the beta track refreshed so beta installs can pick up the new stable if it is newer than the last beta
    - beta prereleases need the GitHub release published successfully, the Homebrew tap updated, and the `updater-beta` manifest refreshed
 13. After a beta prerelease is fully green and published, unpublish older beta releases to keep the releases page clean without deleting history:
    - move previous beta releases back to draft with `gh release edit <old-beta-tag> --draft`

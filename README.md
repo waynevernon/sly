@@ -49,7 +49,7 @@ brew tap waynevernon/sly
 brew install --cask waynevernon/sly/sly@beta
 ```
 
-Homebrew stable and beta installs conflict by design, so install one channel or the other.
+The beta channel follows whichever published release is newer between the latest stable and latest beta, so stable promotions flow through automatically. Homebrew stable and beta installs conflict by design, so install one channel or the other.
 
 If you prefer a direct install, download the latest DMG from the [Releases](https://github.com/waynevernon/sly/releases) page, open it, and drag Sly to Applications.
 
