@@ -72,12 +72,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          node scripts/select-beta-channel-release.mjs \
-            --repo "${{ github.repository }}" >> "${GITHUB_OUTPUT}"
+          beta_release_output="$(
+            node scripts/select-beta-channel-release.mjs \
+              --repo "${{ github.repository }}"
+          )"
+          printf '%s\n' "${beta_release_output}" >> "${GITHUB_OUTPUT}"
 
-          release_json="$(gh release view "${{ steps.beta_release.outputs.tag }}" --repo "${{ github.repository }}" --json assets)"
+          beta_tag="$(printf '%s\n' "${beta_release_output}" | sed -n 's/^tag=//p')"
+          beta_version="$(printf '%s\n' "${beta_release_output}" | sed -n 's/^version=//p')"
+
+          release_json="$(gh release view "${beta_tag}" --repo "${{ github.repository }}" --json assets)"
           export RELEASE_JSON="${release_json}"
-          export RELEASE_VERSION="${{ steps.beta_release.outputs.version }}"
+          export RELEASE_VERSION="${beta_version}"
 
           node <<'NODE' >> "${GITHUB_OUTPUT}"
           const release = JSON.parse(process.env.RELEASE_JSON);
