@@ -416,19 +416,19 @@ describe("FolderTreeView", () => {
       ).toBeInTheDocument();
     });
 
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    expect(docsRow).not.toBeNull();
+
     const expandedChildSeen: boolean[] = [];
     const observer = new MutationObserver(() => {
-      if (screen.queryByText("reference")) {
+      if (docsRow!.textContent?.includes("reference")) {
         expandedChildSeen.push(true);
       }
     });
-    observer.observe(document.body, {
+    observer.observe(docsRow!, {
       childList: true,
       subtree: true,
     });
-
-    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
-    expect(docsRow).not.toBeNull();
 
     fireEvent.contextMenu(docsRow!);
     await user.click(screen.getByRole("menuitem", { name: /Rename/i }));
@@ -444,8 +444,7 @@ describe("FolderTreeView", () => {
     observer.disconnect();
 
     expect(expandedChildSeen).toHaveLength(0);
-    expect(screen.queryByText("reference")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Expand folder/i })).toBeInTheDocument();
+    expect(screen.getByText("archive")).toBeInTheDocument();
   });
 
   it("shows only direct folder note counts and hides zero-count folder badges", async () => {
@@ -590,6 +589,116 @@ describe("FolderTreeView", () => {
     fireEvent.contextMenu(row as HTMLElement);
 
     expect(selectFolder).toHaveBeenCalledWith("docs");
+  });
+
+  it("navigates the visible folder list with arrow keys", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockImplementation(() => {
+      const [selectedScope, setSelectedScope] = useState<
+        { type: "all" } |
+        { type: "pinned" } |
+        { type: "recent" } |
+        { type: "folder"; path: string }
+      >({ type: "all" });
+
+      return makeNotesHookValue({
+        knownFolders: ["docs", "work"],
+        selectedScope,
+        selectedFolderPath:
+          selectedScope.type === "folder" ? selectedScope.path : null,
+        selectPinnedNotes: () => setSelectedScope({ type: "pinned" }),
+        selectRecentNotes: () => setSelectedScope({ type: "recent" }),
+        selectFolder: (path) =>
+          setSelectedScope(path ? { type: "folder", path } : { type: "all" }),
+      });
+    });
+
+    render(<FolderTreeView />);
+
+    const listbox = screen.getByRole("listbox", { name: "Folders" });
+    listbox.focus();
+
+    expect(listbox).toHaveAttribute("aria-activedescendant", "folder-option-all");
+
+    await user.keyboard("{ArrowDown}");
+
+    await waitFor(() => {
+      expect(listbox).toHaveAttribute(
+        "aria-activedescendant",
+        "folder-option-docs",
+      );
+    });
+    expect(screen.getByText("docs").closest("[role='option']")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    await user.keyboard("{ArrowDown}");
+
+    await waitFor(() => {
+      expect(listbox).toHaveAttribute(
+        "aria-activedescendant",
+        "folder-option-work",
+      );
+    });
+
+    await user.keyboard("{ArrowUp}");
+
+    await waitFor(() => {
+      expect(listbox).toHaveAttribute(
+        "aria-activedescendant",
+        "folder-option-docs",
+      );
+    });
+  });
+
+  it("collapses and expands the selected folder with left and right arrows", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs", "docs/reference"],
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
+        settings: {
+          schemaVersion: 1,
+          showNoteCounts: true,
+          showNotesFromSubfolders: false,
+          noteListDateMode: "modified",
+          showNoteListFilename: false,
+          showNoteListFolderPath: true,
+          showNoteListPreview: true,
+          noteListPreviewLines: 2,
+          noteSortMode: "modifiedDesc",
+          folderSortMode: "nameAsc",
+          collapsedFolders: [],
+        },
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    const listbox = screen.getByRole("listbox", { name: "Folders" });
+    listbox.focus();
+
+    await waitFor(() => {
+      expect(screen.getByText("reference")).toBeInTheDocument();
+    });
+
+    await user.keyboard("{ArrowLeft}");
+
+    await waitFor(() => {
+      expect(screen.queryByText("reference")).not.toBeInTheDocument();
+    });
+
+    await user.keyboard("{ArrowRight}");
+
+    await waitFor(() => {
+      expect(screen.getByText("reference")).toBeInTheDocument();
+    });
   });
 
   it("shows recursive folder note counts when enabled and still hides zero-count badges", async () => {

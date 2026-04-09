@@ -3,6 +3,7 @@ import {
   lazy,
   memo,
   type CSSProperties,
+  type KeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -71,6 +72,7 @@ type InlineFolderEditState =
       path: string;
       initialValue: string;
       appearance: FolderAppearance | null;
+      wasCollapsed: boolean;
     };
 
 type FolderIconPickerTarget =
@@ -86,6 +88,14 @@ function sanitizeFolderName(name: string): string {
 
 function getFolderLeaf(path: string): string {
   return path.split("/").pop() || path;
+}
+
+function getFolderOptionId(path: string): string {
+  return `folder-option-${encodeURIComponent(path)}`;
+}
+
+function getVirtualFolderOptionId(kind: "pinned" | "recent" | "all"): string {
+  return `folder-option-${kind}`;
 }
 
 function getFolderParentPath(path: string): string {
@@ -238,6 +248,7 @@ interface FolderItemProps {
   resolvedTheme: "light" | "dark";
   onToggleCollapse: (path: string) => void;
   onSelectFolder: (path: string) => void;
+  onContextSelectFolder: (path: string) => void;
   onCreateNoteHere: (path: string) => void;
   onStartCreateFolder: (parentPath: string) => void;
   onCreateFolder: (name: string) => Promise<void>;
@@ -263,6 +274,7 @@ const FolderItem = memo(function FolderItem({
   resolvedTheme,
   onToggleCollapse,
   onSelectFolder,
+  onContextSelectFolder,
   onCreateNoteHere,
   onStartCreateFolder,
   onCreateFolder,
@@ -319,7 +331,13 @@ const FolderItem = memo(function FolderItem({
   }`;
   const hasNestedFolders = folder.children.length > 0 || isCreatingChild;
 
-  const children = !isCollapsed && (isCreatingChild || folder.children.length > 0) && (
+  const shouldHideChildrenForRename =
+    inlineEditState?.mode === "rename" &&
+    inlineEditState.path === folder.path &&
+    inlineEditState.wasCollapsed;
+  const children = !isCollapsed &&
+    !shouldHideChildrenForRename &&
+    (isCreatingChild || folder.children.length > 0) && (
     <div className="flex flex-col gap-1 pt-0.5">
       {isCreatingChild && (
         <InlineFolderRow
@@ -350,6 +368,7 @@ const FolderItem = memo(function FolderItem({
           resolvedTheme={resolvedTheme}
           onToggleCollapse={onToggleCollapse}
           onSelectFolder={onSelectFolder}
+          onContextSelectFolder={onContextSelectFolder}
           onCreateNoteHere={onCreateNoteHere}
           onStartCreateFolder={onStartCreateFolder}
           onCreateFolder={onCreateFolder}
@@ -391,10 +410,13 @@ const FolderItem = memo(function FolderItem({
       <div className={`relative ${isDragging || isPendingMove ? "opacity-40" : ""}`}>
         <div
           ref={setDropRef}
+          id={getFolderOptionId(folder.path)}
+          role="option"
+          aria-selected={selectedFolderPath === folder.path}
           className={`${rowClassName} cursor-default`}
           data-folder-row-select={folder.path}
           onClick={() => onSelectFolder(folder.path)}
-          onContextMenu={() => onSelectFolder(folder.path)}
+          onContextMenu={() => onContextSelectFolder(folder.path)}
         >
           <div
             className="flex items-center gap-1.5 pr-2 py-2"
@@ -593,7 +615,32 @@ export function FolderTreeView({
   const treeRef = useRef<HTMLDivElement>(null);
   const suppressRootMenuCloseAutoFocusRef = useRef(false);
   const collapsedFoldersRef = useRef<Set<string>>(new Set());
+  const locallyToggledCollapsedPathsRef = useRef<Set<string>>(new Set());
   collapsedFoldersRef.current = collapsedFolders;
+  const [pendingFolderSelectionPath, setPendingFolderSelectionPath] =
+    useState<string | null>(null);
+  const [forcedCollapsedFolderPath, setForcedCollapsedFolderPath] =
+    useState<string | null>(null);
+  const renderedCollapsedFolders = useMemo(() => {
+    if (!forcedCollapsedFolderPath) {
+      const next = new Set(collapsedFolders);
+      settings.collapsedFolders?.forEach((path) => {
+        if (!locallyToggledCollapsedPathsRef.current.has(path)) {
+          next.add(path);
+        }
+      });
+      return next;
+    }
+
+    const next = new Set(collapsedFolders);
+    settings.collapsedFolders?.forEach((path) => {
+      if (!locallyToggledCollapsedPathsRef.current.has(path)) {
+        next.add(path);
+      }
+    });
+    next.add(forcedCollapsedFolderPath);
+    return next;
+  }, [collapsedFolders, forcedCollapsedFolderPath, settings.collapsedFolders]);
 
   useEffect(() => {
     const preloadPicker = () => {
@@ -636,9 +683,84 @@ export function FolderTreeView({
     [showNotesFromSubfolders],
   );
   const rootNoteCount = showNotesFromSubfolders ? notes.length : tree.rootNotes.length;
+  const visibleNavigationItems = useMemo(() => {
+    const items: Array<
+      | { kind: "pinned" | "recent" | "all" }
+      | { kind: "folder"; path: string; hasChildren: boolean; isCollapsed: boolean }
+    > = [];
+
+    if (showPinnedNotes) items.push({ kind: "pinned" });
+    if (showRecentNotes) items.push({ kind: "recent" });
+    items.push({ kind: "all" });
+
+    const visit = (folder: FolderNode) => {
+      const hasChildren = folder.children.length > 0;
+      const isCollapsed = renderedCollapsedFolders.has(folder.path);
+      items.push({
+        kind: "folder",
+        path: folder.path,
+        hasChildren,
+        isCollapsed,
+      });
+
+      if (!isCollapsed) {
+        folder.children.forEach(visit);
+      }
+    };
+
+    tree.folders.forEach(visit);
+    return items;
+  }, [renderedCollapsedFolders, showPinnedNotes, showRecentNotes, tree.folders]);
+  const activeOptionId = useMemo(() => {
+    if (selectedScope.type === "pinned" && showPinnedNotes) {
+      return getVirtualFolderOptionId("pinned");
+    }
+    if (selectedScope.type === "recent" && showRecentNotes) {
+      return getVirtualFolderOptionId("recent");
+    }
+    if (selectedScope.type === "all") {
+      return getVirtualFolderOptionId("all");
+    }
+    if (selectedFolderPath) {
+      return getFolderOptionId(selectedFolderPath);
+    }
+    return undefined;
+  }, [
+    selectedFolderPath,
+    selectedScope.type,
+    showPinnedNotes,
+    showRecentNotes,
+  ]);
+
+  useEffect(() => {
+    if (!pendingFolderSelectionPath) {
+      return;
+    }
+
+    if (selectedFolderPath === pendingFolderSelectionPath) {
+      setPendingFolderSelectionPath(null);
+      return;
+    }
+
+    if (knownFolders.includes(pendingFolderSelectionPath)) {
+      selectFolder(pendingFolderSelectionPath);
+    }
+  }, [
+    knownFolders,
+    pendingFolderSelectionPath,
+    selectFolder,
+    selectedFolderPath,
+  ]);
 
   useEffect(() => {
     if (!hasLoadedFolders || !selectedFolderPath) {
+      return;
+    }
+
+    if (
+      pendingFolderSelectionPath &&
+      selectedFolderPath !== pendingFolderSelectionPath
+    ) {
       return;
     }
 
@@ -657,7 +779,13 @@ export function FolderTreeView({
     }
 
     selectFolder(null);
-  }, [hasLoadedFolders, knownFolders, selectFolder, selectedFolderPath]);
+  }, [
+    hasLoadedFolders,
+    knownFolders,
+    pendingFolderSelectionPath,
+    selectFolder,
+    selectedFolderPath,
+  ]);
 
   useEffect(() => {
     setCollapsedFoldersState(new Set());
@@ -706,6 +834,16 @@ export function FolderTreeView({
     });
   }, []);
 
+  useEffect(() => {
+    const handleFocusFolderTree = () => {
+      focusTree();
+    };
+
+    window.addEventListener("focus-folder-tree", handleFocusFolderTree);
+    return () =>
+      window.removeEventListener("focus-folder-tree", handleFocusFolderTree);
+  }, [focusTree]);
+
   const commitCollapsedFolders = useCallback(
     (updater: (prev: Set<string>) => Set<string>) => {
       const next = updater(new Set(collapsedFoldersRef.current));
@@ -718,15 +856,29 @@ export function FolderTreeView({
   const expandFolder = useCallback((folderPath: string) => {
     if (!folderPath) return;
 
+    const parts = folderPath.split("/");
+    for (let index = 1; index <= parts.length; index += 1) {
+      locallyToggledCollapsedPathsRef.current.add(parts.slice(0, index).join("/"));
+    }
+
+    if (
+      forcedCollapsedFolderPath &&
+      parts.some(
+        (_, index) =>
+          parts.slice(0, index + 1).join("/") === forcedCollapsedFolderPath,
+      )
+    ) {
+      setForcedCollapsedFolderPath(null);
+    }
+
     commitCollapsedFolders((prev) => {
       const next = new Set(prev);
-      const parts = folderPath.split("/");
       for (let index = 1; index <= parts.length; index += 1) {
         next.delete(parts.slice(0, index).join("/"));
       }
       return next;
     });
-  }, [commitCollapsedFolders]);
+  }, [commitCollapsedFolders, forcedCollapsedFolderPath]);
 
   const startCreateFolder = useCallback((parentPath: string) => {
     if (parentPath) {
@@ -741,8 +893,11 @@ export function FolderTreeView({
       path,
       initialValue: currentName,
       appearance: getFolderAppearance(folderAppearances, path),
+      wasCollapsed:
+        collapsedFoldersRef.current.has(path) ||
+        settings.collapsedFolders?.includes(path) === true,
     });
-  }, [folderAppearances]);
+  }, [folderAppearances, settings.collapsedFolders]);
 
   useEffect(() => {
     if (!folderRevealRequest) {
@@ -763,11 +918,23 @@ export function FolderTreeView({
   }, [selectedFolderPath, startCreateFolder]);
 
   const handleSelectFolder = useCallback((path: string) => {
+    focusTree();
     expandFolder(path);
     selectFolder(path);
-  }, [expandFolder, selectFolder]);
+  }, [expandFolder, focusTree, selectFolder]);
+
+  const handleContextSelectFolder = useCallback((path: string) => {
+    focusTree();
+    selectFolder(path);
+  }, [focusTree, selectFolder]);
 
   const handleToggleCollapse = useCallback((path: string) => {
+    locallyToggledCollapsedPathsRef.current.add(path);
+
+    if (forcedCollapsedFolderPath === path) {
+      setForcedCollapsedFolderPath(null);
+    }
+
     commitCollapsedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(path)) {
@@ -777,7 +944,136 @@ export function FolderTreeView({
       }
       return next;
     });
-  }, [commitCollapsedFolders]);
+  }, [commitCollapsedFolders, forcedCollapsedFolderPath]);
+
+  const selectNavigationItem = useCallback(
+    (item: (typeof visibleNavigationItems)[number]) => {
+      focusTree();
+
+      switch (item.kind) {
+        case "pinned":
+          selectPinnedNotes();
+          break;
+        case "recent":
+          selectRecentNotes();
+          break;
+        case "all":
+          selectFolder(null);
+          break;
+        case "folder":
+          handleSelectFolder(item.path);
+          break;
+      }
+    },
+    [
+      focusTree,
+      handleSelectFolder,
+      selectFolder,
+      selectPinnedNotes,
+      selectRecentNotes,
+    ],
+  );
+
+  const getCurrentNavigationIndex = useCallback(() => {
+    const selectedIndex = visibleNavigationItems.findIndex((item) => {
+      if (item.kind === "folder") {
+        return selectedScope.type === "folder" && item.path === selectedFolderPath;
+      }
+      return selectedScope.type === item.kind;
+    });
+
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  }, [selectedFolderPath, selectedScope.type, visibleNavigationItems]);
+
+  const handleTreeKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (inlineEditState) return;
+      if (visibleNavigationItems.length === 0) return;
+
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const currentIndex = getCurrentNavigationIndex();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        const nextIndex =
+          (currentIndex + direction + visibleNavigationItems.length) %
+          visibleNavigationItems.length;
+        selectNavigationItem(visibleNavigationItems[nextIndex]);
+        return;
+      }
+
+      if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        selectNavigationItem(
+          visibleNavigationItems[
+            event.key === "Home" ? 0 : visibleNavigationItems.length - 1
+          ],
+        );
+        return;
+      }
+
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectNavigationItem(visibleNavigationItems[getCurrentNavigationIndex()]);
+        return;
+      }
+
+      if (
+        event.key === "ArrowLeft" &&
+        selectedScope.type === "folder" &&
+        selectedFolderPath
+      ) {
+        const current = visibleNavigationItems.find(
+          (item) => item.kind === "folder" && item.path === selectedFolderPath,
+        );
+        if (current?.kind !== "folder") return;
+
+        event.preventDefault();
+        if (current.hasChildren && !current.isCollapsed) {
+          handleToggleCollapse(current.path);
+          return;
+        }
+
+        const parentPath = getFolderParentPath(current.path);
+        if (parentPath) {
+          handleSelectFolder(parentPath);
+        } else {
+          focusTree();
+          selectFolder(null);
+        }
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        selectedScope.type === "folder" &&
+        selectedFolderPath
+      ) {
+        const current = visibleNavigationItems.find(
+          (item) => item.kind === "folder" && item.path === selectedFolderPath,
+        );
+        if (
+          current?.kind === "folder" &&
+          current.hasChildren &&
+          current.isCollapsed
+        ) {
+          event.preventDefault();
+          handleToggleCollapse(current.path);
+        }
+      }
+    },
+    [
+      focusTree,
+      getCurrentNavigationIndex,
+      handleSelectFolder,
+      handleToggleCollapse,
+      inlineEditState,
+      selectFolder,
+      selectNavigationItem,
+      selectedFolderPath,
+      selectedScope.type,
+      visibleNavigationItems,
+    ],
+  );
 
   const handleCancelInlineEdit = useCallback(() => {
     setInlineEditState(null);
@@ -849,22 +1145,47 @@ export function FolderTreeView({
       return;
     }
 
+    const newPath = getRenamedFolderPath(oldPath, sanitizedName);
+    let collapsedFoldersBeforeRename: Set<string> | null = null;
+
     try {
-      const newPath = getRenamedFolderPath(oldPath, sanitizedName);
+      setPendingFolderSelectionPath(newPath);
+
       if (sanitizedName === currentName) {
         if (!appearanceChanged) {
+          setPendingFolderSelectionPath(null);
           handleCancelInlineEdit();
           return;
         }
 
         await setFolderAppearance(oldPath, folderAppearance);
+        setPendingFolderSelectionPath(null);
         setInlineEditState(null);
         setIconPickerTarget(null);
         focusTree();
         return;
       }
 
+      const wasCollapsed =
+        inlineEditState.wasCollapsed ||
+        collapsedFoldersRef.current.has(oldPath) ||
+        settings.collapsedFolders?.includes(oldPath) === true;
+      const collapsedFoldersAfterRename = new Set(collapsedFoldersRef.current);
+      if (wasCollapsed) {
+        collapsedFoldersBeforeRename = new Set(collapsedFoldersRef.current);
+        setForcedCollapsedFolderPath(newPath);
+        collapsedFoldersAfterRename.delete(oldPath);
+        collapsedFoldersAfterRename.add(newPath);
+        setCollapsedFoldersState(collapsedFoldersAfterRename);
+      }
+
       await renameFolder(oldPath, sanitizedName);
+      selectFolder(newPath);
+      if (wasCollapsed) {
+        setForcedCollapsedFolderPath(newPath);
+        setCollapsedFoldersState(new Set(collapsedFoldersAfterRename));
+        void persistCollapsedFolders([...collapsedFoldersAfterRename]);
+      }
       if (appearanceChanged) {
         try {
           await setFolderAppearance(newPath, folderAppearance);
@@ -877,6 +1198,11 @@ export function FolderTreeView({
       setIconPickerTarget(null);
       focusTree();
     } catch (error) {
+      setPendingFolderSelectionPath(null);
+      if (collapsedFoldersBeforeRename) {
+        setCollapsedFoldersState(collapsedFoldersBeforeRename);
+      }
+      setForcedCollapsedFolderPath(null);
       console.error("Failed to rename folder:", error);
       toast.error("Failed to rename folder");
       throw error;
@@ -886,8 +1212,11 @@ export function FolderTreeView({
     handleCancelInlineEdit,
     folderAppearances,
     inlineEditState,
+    persistCollapsedFolders,
     renameFolder,
+    selectFolder,
     setFolderAppearance,
+    settings.collapsedFolders,
   ]);
 
   const pickerValue = useMemo<FolderAppearance | null>(() => {
@@ -985,61 +1314,93 @@ export function FolderTreeView({
       <div
         ref={treeRef}
         tabIndex={0}
+        role="listbox"
+        aria-label="Folders"
+        aria-activedescendant={activeOptionId}
         data-folder-tree
         className="flex flex-col gap-1 px-1.5 pb-1.5 outline-none"
+        onKeyDown={handleTreeKeyDown}
+        onMouseDown={(event) => {
+          if (event.button === 0 || event.button === 2) {
+            focusTree();
+          }
+        }}
       >
         {showPinnedNotes && (
-          <button
-            type="button"
-            onClick={selectPinnedNotes}
-            className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
-              selectedScope.type === "pinned"
-                ? "bg-bg-muted"
-                : "hover:bg-bg-muted/80"
-            }`}
+          <div
+            id={getVirtualFolderOptionId("pinned")}
+            role="option"
+            aria-selected={selectedScope.type === "pinned"}
           >
-            <span className="flex items-center gap-2 min-w-0 flex-1">
-              <PinIcon className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
-              <span className="text-sm font-medium text-text truncate">
-                Pinned
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => {
+                focusTree();
+                selectPinnedNotes();
+              }}
+              className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+                selectedScope.type === "pinned"
+                  ? "bg-bg-muted"
+                  : "hover:bg-bg-muted/80"
+              }`}
+            >
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <PinIcon className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
+                <span className="text-sm font-medium text-text truncate">
+                  Pinned
+                </span>
               </span>
-            </span>
-            {showNoteCounts && pinnedNotes.length > 0 && (
-              <FolderRowTrailing
-                count={pinnedNotes.length}
-                isActive={selectedScope.type === "pinned"}
-              />
-            )}
-          </button>
+              {showNoteCounts && pinnedNotes.length > 0 && (
+                <FolderRowTrailing
+                  count={pinnedNotes.length}
+                  isActive={selectedScope.type === "pinned"}
+                />
+              )}
+            </button>
+          </div>
         )}
         {showRecentNotes && (
-          <button
-            type="button"
-            onClick={selectRecentNotes}
-            className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
-              selectedScope.type === "recent"
-                ? "bg-bg-muted"
-                : "hover:bg-bg-muted/80"
-            }`}
+          <div
+            id={getVirtualFolderOptionId("recent")}
+            role="option"
+            aria-selected={selectedScope.type === "recent"}
           >
-            <span className="flex items-center gap-2 min-w-0 flex-1">
-              <History className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
-              <span className="text-sm font-medium text-text truncate">
-                Recent
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => {
+                focusTree();
+                selectRecentNotes();
+              }}
+              className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+                selectedScope.type === "recent"
+                  ? "bg-bg-muted"
+                  : "hover:bg-bg-muted/80"
+              }`}
+            >
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <History className="w-4.25 h-4.25 text-text-muted/80 shrink-0 stroke-[1.7]" />
+                <span className="text-sm font-medium text-text truncate">
+                  Recent
+                </span>
               </span>
-            </span>
-            {showNoteCounts && (
-              <FolderRowTrailing
-                count={recentNotes.length}
-                isActive={selectedScope.type === "recent"}
-              />
-            )}
-          </button>
+              {showNoteCounts && (
+                <FolderRowTrailing
+                  count={recentNotes.length}
+                  isActive={selectedScope.type === "recent"}
+                />
+              )}
+            </button>
+          </div>
         )}
         <ContextMenu.Root>
           <ContextMenu.Trigger asChild>
             <div
               ref={setRootDropRef}
+              id={getVirtualFolderOptionId("all")}
+              role="option"
+              aria-selected={selectedScope.type === "all"}
               className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
                 isOverRoot && isContainerDropActive
                   ? "bg-accent/12 ring-1 ring-accent/60"
@@ -1051,7 +1412,11 @@ export function FolderTreeView({
             >
               <button
                 type="button"
-                onClick={() => selectFolder(null)}
+                tabIndex={-1}
+                onClick={() => {
+                  focusTree();
+                  selectFolder(null);
+                }}
                 className="w-full flex items-center gap-3 pl-3 pr-2 py-2 text-left"
               >
                 <span className="flex items-center gap-2 min-w-0 flex-1">
@@ -1133,11 +1498,12 @@ export function FolderTreeView({
               noteCount={noteCountForFolder(folder)}
               getNoteCount={noteCountForFolder}
               selectedFolderPath={selectedFolderPath}
-              collapsedFolders={collapsedFolders}
+              collapsedFolders={renderedCollapsedFolders}
               inlineEditState={inlineEditState}
               resolvedTheme={resolvedTheme}
               onToggleCollapse={handleToggleCollapse}
               onSelectFolder={handleSelectFolder}
+              onContextSelectFolder={handleContextSelectFolder}
               onCreateNoteHere={createNoteInFolder}
               onStartCreateFolder={startCreateFolder}
               onCreateFolder={handleCreateFolder}
