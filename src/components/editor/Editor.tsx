@@ -5,7 +5,7 @@ import {
   useState,
   useMemo,
 } from "react";
-import { TextSearch } from "lucide-react";
+import { TextSearch, WrapText } from "lucide-react";
 import {
   EditorContent,
   type Editor as TiptapEditor,
@@ -519,7 +519,11 @@ function EditorImpl({
     selectedNoteId,
     notes,
   );
-  const { textDirection } = useTheme();
+  const {
+    sourceModeWordWrap,
+    setSourceModeWordWrap,
+    textDirection,
+  } = useTheme();
   const [editorReady, setEditorReady] = useState(false);
   // Force re-render when selection changes to update toolbar active states
   const [, setSelectionKey] = useState(0);
@@ -596,6 +600,7 @@ function EditorImpl({
     renameNote,
     saveNote,
     scrollContainerRef,
+    sourceTextareaLayoutKey: sourceModeWordWrap,
     sourceTextareaRef,
   });
 
@@ -1241,14 +1246,30 @@ function EditorImpl({
           {/* Header with format bar – border aligns with FoldersPane / NotesPane */}
           <div className={`ui-pane-header px-0 border-border/80 ${focusMode ? "border-transparent" : ""} ${hasTransitioned ? `transition-[border-color] duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}>
             <div
-              className={`flex-1 ${focusMode || effectiveSourceMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
+              className={`flex-1 ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
             >
-              <FormatBar
-                editor={editor}
-                onAddLink={handleAddLink}
-                onAddBlockMath={handleAddBlockMath}
-                onAddImage={handleAddImage}
-              />
+              {effectiveSourceMode ? (
+                <div className="ui-scrollbar-overlay flex items-center gap-1 px-4 overflow-x-auto">
+                  <ToolbarButton
+                    onClick={() => setSourceModeWordWrap(!sourceModeWordWrap)}
+                    isActive={sourceModeWordWrap}
+                    title={
+                      sourceModeWordWrap
+                        ? "Turn Word Wrap Off"
+                        : "Turn Word Wrap On"
+                    }
+                  >
+                    <WrapText className="w-4.5 h-4.5 stroke-[1.5]" />
+                  </ToolbarButton>
+                </div>
+              ) : (
+                <FormatBar
+                  editor={editor}
+                  onAddLink={handleAddLink}
+                  onAddBlockMath={handleAddBlockMath}
+                  onAddImage={handleAddImage}
+                />
+              )}
             </div>
           </div>
         </>
@@ -1277,7 +1298,7 @@ function EditorImpl({
                 value={sourceContent}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 dir={textDirection}
-                wrap="off"
+                wrap={sourceModeWordWrap ? "soft" : "off"}
                 className="block w-full resize-none overflow-hidden bg-transparent px-6 pt-8 pb-24 text-text outline-none"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",

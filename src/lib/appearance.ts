@@ -45,6 +45,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   rightPanelWidth: 260,
   rightPanelTab: "outline",
   confirmDeletions: true,
+  sourceModeWordWrap: false,
 };
 
 export const FONT_PRESETS: Record<FontPresetId, FontPreset> = {

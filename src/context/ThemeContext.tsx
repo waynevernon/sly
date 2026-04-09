@@ -84,6 +84,8 @@ interface ThemeContextType {
   setRightPanelTab: (tab: RightPanelTab) => void;
   confirmDeletions: boolean;
   setConfirmDeletions: (v: boolean) => void;
+  sourceModeWordWrap: boolean;
+  setSourceModeWordWrap: (v: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -403,6 +405,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [updateAppearance],
   );
 
+  const setSourceModeWordWrap = useCallback(
+    (v: boolean) => {
+      updateAppearance((prev) => ({ ...prev, sourceModeWordWrap: v }));
+    },
+    [updateAppearance],
+  );
+
   if (!isInitialized) {
     return null;
   }
@@ -452,6 +461,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setRightPanelTab,
         confirmDeletions: appearanceSettings.confirmDeletions,
         setConfirmDeletions,
+        sourceModeWordWrap: appearanceSettings.sourceModeWordWrap,
+        setSourceModeWordWrap,
       }}
     >
       {children}

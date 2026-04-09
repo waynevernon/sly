@@ -156,6 +156,7 @@ pub(crate) fn old_default_appearance() -> AppearanceSettings {
         custom_light_colors: None,
         custom_dark_colors: None,
         confirm_deletions: crate::default_true(),
+        source_mode_word_wrap: false,
     }
 }
 
@@ -252,6 +253,7 @@ fn normalize_appearance_value(root: &mut Map<String, Value>) {
         Some(default_right_panel_tab()),
     );
     normalize_bool_field(appearance, "confirmDeletions");
+    normalize_bool_field(appearance, "sourceModeWordWrap");
 }
 
 fn normalize_note_typography_value(appearance: &mut Map<String, Value>) {

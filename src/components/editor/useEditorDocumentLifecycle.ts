@@ -43,6 +43,7 @@ interface UseEditorDocumentLifecycleOptions {
   saveNote: (content: string, noteId?: string) => Promise<void>;
   notesFolder: string | null;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
+  sourceTextareaLayoutKey?: unknown;
   sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
 }
 
@@ -111,6 +112,7 @@ export function useEditorDocumentLifecycle({
   saveNote,
   notesFolder,
   scrollContainerRef,
+  sourceTextareaLayoutKey,
   sourceTextareaRef,
 }: UseEditorDocumentLifecycleOptions) {
   const [isSaving, setIsSaving] = useState(false);
@@ -493,7 +495,12 @@ export function useEditorDocumentLifecycle({
   useEffect(() => {
     if (!sourceMode) return;
     syncSourceTextareaHeight();
-  }, [sourceContent, sourceMode, syncSourceTextareaHeight]);
+  }, [
+    sourceContent,
+    sourceMode,
+    sourceTextareaLayoutKey,
+    syncSourceTextareaHeight,
+  ]);
 
   useEffect(() => {
     if (!editorReady || !currentNote) {

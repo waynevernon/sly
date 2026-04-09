@@ -280,6 +280,8 @@ pub struct AppearanceSettings {
     pub custom_dark_colors: Option<ThemeColors>,
     #[serde(default = "default_true")]
     pub confirm_deletions: bool,
+    #[serde(default)]
+    pub source_mode_word_wrap: bool,
 }
 
 impl Default for AppearanceSettings {
@@ -305,6 +307,7 @@ impl Default for AppearanceSettings {
             custom_light_colors: None,
             custom_dark_colors: None,
             confirm_deletions: true,
+            source_mode_word_wrap: false,
         }
     }
 }
@@ -1773,7 +1776,10 @@ fn rebuild_notes_cache_incrementally(
             .unwrap_or(created_from_disk);
 
         if let Ok(content) = std::fs::read_to_string(file_path) {
-            next_cache.insert(id.clone(), build_note_metadata(id, &content, modified, created));
+            next_cache.insert(
+                id.clone(),
+                build_note_metadata(id, &content, modified, created),
+            );
         }
     }
 
@@ -1939,11 +1945,7 @@ async fn list_notes(state: State<'_, AppState>) -> Result<Vec<NoteMetadata>, Str
             .expect("cache root read lock")
             .clone();
         if cache_root.as_deref() == Some(folder.as_str()) {
-            state
-                .notes_cache
-                .read()
-                .expect("cache read lock")
-                .clone()
+            state.notes_cache.read().expect("cache read lock").clone()
         } else {
             HashMap::new()
         }
@@ -2430,7 +2432,8 @@ async fn duplicate_note(id: String, state: State<'_, AppState>) -> Result<Note, 
     {
         let index = state.search_index.lock().expect("search index mutex");
         if let Some(ref search_index) = *index {
-            let _ = search_index.index_note(&final_id, &duplicate_title, &duplicate_content, modified);
+            let _ =
+                search_index.index_note(&final_id, &duplicate_title, &duplicate_content, modified);
         }
     }
 
@@ -3650,8 +3653,11 @@ fn setup_file_watcher(
                                 cache.get(&note_id).map(|note| note.created)
                             };
 
-                            let updated =
-                                refresh_note_metadata_from_path(&notes_root, path, preserved_created);
+                            let updated = refresh_note_metadata_from_path(
+                                &notes_root,
+                                path,
+                                preserved_created,
+                            );
 
                             let mut cache = state.notes_cache.write().expect("cache write lock");
                             match updated {
@@ -6379,8 +6385,7 @@ mod tests {
         std::fs::create_dir_all(notes_root.join("docs")).unwrap();
         std::fs::write(notes_root.join("docs/Alpha.md"), "# Alpha\n").unwrap();
 
-        let unique_id =
-            unique_note_id_for_leaf(&notes_root, "docs/Untitled", "Alpha").unwrap();
+        let unique_id = unique_note_id_for_leaf(&notes_root, "docs/Untitled", "Alpha").unwrap();
 
         assert_eq!(unique_id, "docs/Alpha-1");
 
@@ -6865,7 +6870,9 @@ mod tests {
             Some("Alpha updated")
         );
         assert_eq!(
-            refreshed_cache.get("alpha").map(|note| note.preview.as_str()),
+            refreshed_cache
+                .get("alpha")
+                .map(|note| note.preview.as_str()),
             Some("New preview text")
         );
         assert!(!refreshed_cache.contains_key("docs/beta"));

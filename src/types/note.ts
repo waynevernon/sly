@@ -186,6 +186,7 @@ export interface AppearanceSettings {
   customLightColors?: ThemeColors | null;
   customDarkColors?: ThemeColors | null;
   confirmDeletions: boolean;
+  sourceModeWordWrap: boolean;
 }
 
 // Per-folder settings (stored in .sly/settings.json)

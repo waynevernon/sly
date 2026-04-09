@@ -33,6 +33,7 @@ describe("ThemeContext", () => {
       rightPanelWidth: 260,
       rightPanelTab: "outline",
       confirmDeletions: true,
+      sourceModeWordWrap: false,
     });
     vi.mocked(notesService.updateAppearanceSettings).mockResolvedValue();
   });
@@ -56,6 +57,7 @@ describe("ThemeContext", () => {
       rightPanelWidth: 300,
       rightPanelTab: "assistant",
       confirmDeletions: false,
+      sourceModeWordWrap: true,
     });
 
     const { result } = renderHook(() => useTheme(), { wrapper: Wrapper });
@@ -73,6 +75,7 @@ describe("ThemeContext", () => {
     expect(result.current.rightPanelWidth).toBe(300);
     expect(result.current.rightPanelTab).toBe("assistant");
     expect(result.current.confirmDeletions).toBe(false);
+    expect(result.current.sourceModeWordWrap).toBe(true);
   });
 
   it("clamps interface zoom before persisting", async () => {
@@ -139,5 +142,26 @@ describe("ThemeContext", () => {
     const lastUpdate = updateCalls[updateCalls.length - 1]?.[0];
 
     expect(lastUpdate?.paneMode).toBe(1);
+  });
+
+  it("persists the source mode word wrap preference", async () => {
+    const { result } = renderHook(() => useTheme(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.sourceModeWordWrap).toBe(false);
+    });
+
+    act(() => {
+      result.current.setSourceModeWordWrap(true);
+    });
+
+    await waitFor(() => {
+      expect(notesService.updateAppearanceSettings).toHaveBeenCalled();
+    });
+
+    const updateCalls = vi.mocked(notesService.updateAppearanceSettings).mock.calls;
+    const lastUpdate = updateCalls[updateCalls.length - 1]?.[0];
+
+    expect(lastUpdate?.sourceModeWordWrap).toBe(true);
   });
 });
