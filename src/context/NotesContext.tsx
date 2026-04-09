@@ -129,6 +129,7 @@ interface NotesActionsContextValue {
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
   setShowPinnedNotes: (showPinnedNotes: boolean) => Promise<void>;
   setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
+  setTasksEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
@@ -517,6 +518,7 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   );
   assignField("noteSortMode", current.noteSortMode, next.noteSortMode);
   assignField("folderSortMode", current.folderSortMode, next.folderSortMode);
+  assignField("tasksEnabled", current.tasksEnabled, next.tasksEnabled);
 
   return patch;
 }
@@ -873,6 +875,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await persistSettings((currentSettings) => ({
         ...currentSettings,
         folderSortMode: mode,
+      }));
+    },
+    [persistSettings],
+  );
+
+  const setTasksEnabled = useCallback(
+    async (enabled: boolean) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        tasksEnabled: enabled,
       }));
     },
     [persistSettings],
@@ -2429,6 +2441,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderSortMode,
       setShowPinnedNotes,
       setShowRecentNotes,
+      setTasksEnabled,
     }),
     [
       selectNote,
@@ -2469,6 +2482,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderSortMode,
       setShowPinnedNotes,
       setShowRecentNotes,
+      setTasksEnabled,
     ]
   );
 

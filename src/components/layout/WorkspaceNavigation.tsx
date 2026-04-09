@@ -24,6 +24,8 @@ import {
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
+import { TaskListPane } from "../tasks/TaskListPane";
+import { useTasks } from "../../context/TasksContext";
 
 interface WorkspaceNavigationProps {
   paneMode: PaneMode;
@@ -87,6 +89,7 @@ export function WorkspaceNavigation({
     revealFolder,
     folderAppearances,
   } = useNotes();
+  const { isTasksModeActive } = useTasks();
   const { foldersPaneWidth, notesPaneWidth, resolvedTheme, setPaneWidths } =
     useTheme();
 
@@ -369,7 +372,7 @@ export function WorkspaceNavigation({
                 : "opacity-0 -translate-x-3",
             )}
           >
-            <NotesPane />
+            {isTasksModeActive ? <TaskListPane /> : <NotesPane />}
           </div>
           {notesVisible && (
             <PaneResizeHandle

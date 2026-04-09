@@ -117,6 +117,9 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(folder_sort_mode) = patch.folder_sort_mode {
         settings.folder_sort_mode = folder_sort_mode;
     }
+    if let Some(tasks_enabled) = patch.tasks_enabled {
+        settings.tasks_enabled = tasks_enabled;
+    }
     canonicalize_settings(settings);
 }
 
@@ -267,6 +270,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     );
     normalize_folder_note_sort_modes_field(object, "folderNoteSortModes");
     normalize_string_enum_field(object, "folderSortMode", &["nameAsc", "nameDesc"]);
+    normalize_optional_bool_field(object, "tasksEnabled");
 }
 
 fn ensure_object_value(value: Value) -> Value {

@@ -33,3 +33,6 @@ regex = "1"
 walkdir = "2"
 tauri-plugin-single-instance = "2"
 chrono = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

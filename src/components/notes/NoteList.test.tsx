@@ -295,5 +295,9 @@ describe("NoteList", () => {
       "aria-activedescendant",
       "note-option-work%2Fbravo",
     );
+    expect(screen.getByText("Bravo note").closest(".bg-bg-muted")).not.toHaveClass(
+      "group-focus-visible/notelist:ring-1",
+      "group-focus-visible/notelist:ring-text-muted",
+    );
   });
 });
