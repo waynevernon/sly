@@ -25,15 +25,20 @@ function makeTasksHookValue(
       inbox: [],
       today: [],
       upcoming: [],
+      waiting: [],
       anytime: [],
       someday: [],
       completed: [],
     },
     selectedView: "inbox",
     selectedTaskId: null,
+    selectedTaskIds: [],
     today: "2026-04-09",
     isLoading: false,
     selectTask: vi.fn(),
+    toggleTaskSelection: vi.fn(),
+    selectTaskRange: vi.fn(),
+    clearTaskSelection: vi.fn(),
     setCompleted: vi.fn(),
     updateTask: vi.fn(),
     createTask: vi.fn().mockResolvedValue({
@@ -300,5 +305,226 @@ describe("TaskListPane", () => {
       expect(createTask).toHaveBeenCalledWith("Pay rent tomorrow");
     });
     expect(updateTask).not.toHaveBeenCalled();
+  });
+
+  it("groups the today view into overdue and today sections", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "today",
+        buckets: {
+          inbox: [],
+          today: [
+            {
+              id: "task-overdue",
+              title: "Missed follow-up",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-08"),
+              scheduleBucket: null,
+              completedAt: null,
+            },
+            {
+              id: "task-today",
+              title: "Ship beta",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-09"),
+              scheduleBucket: null,
+              completedAt: null,
+            },
+          ],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getAllByText("Today")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Reschedule" })).toBeInTheDocument();
+  });
+
+  it("groups completed tasks into recency sections", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "completed",
+        buckets: {
+          inbox: [],
+          today: [],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [
+            {
+              id: "task-today",
+              title: "Closed today",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: "2026-04-09T13:00:00Z",
+            },
+            {
+              id: "task-yesterday",
+              title: "Closed yesterday",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: "2026-04-08T13:00:00Z",
+            },
+            {
+              id: "task-earlier",
+              title: "Closed earlier",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-01T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: "2026-04-01T13:00:00Z",
+            },
+          ],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText("Yesterday")).toBeInTheDocument();
+    expect(screen.getByText("Earlier")).toBeInTheDocument();
+  });
+
+  it("shows batch actions when multiple tasks are selected", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedTaskIds: ["task-1", "task-2"],
+        selectedTaskId: "task-1",
+        buckets: {
+          inbox: [
+            {
+              id: "task-1",
+              title: "First",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: null,
+            },
+            {
+              id: "task-2",
+              title: "Second",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: null,
+            },
+          ],
+          today: [],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reschedule" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Selected Tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear Selection" })).toBeInTheDocument();
+  });
+
+  it("shows waiting tasks in a dedicated waiting view with grouped sections", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "waiting",
+        buckets: {
+          inbox: [],
+          today: [],
+          upcoming: [],
+          waiting: [
+            {
+              id: "task-overdue",
+              title: "Need finance reply",
+              description: "",
+              link: "",
+              waitingFor: "Finance",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-08"),
+              scheduleBucket: null,
+              completedAt: null,
+            },
+            {
+              id: "task-anytime",
+              title: "Need design input",
+              description: "",
+              link: "",
+              waitingFor: "Design",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: "anytime",
+              completedAt: null,
+            },
+          ],
+          anytime: [],
+          someday: [],
+          completed: [],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getByText("Anytime")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New Task" })).not.toBeInTheDocument();
   });
 });

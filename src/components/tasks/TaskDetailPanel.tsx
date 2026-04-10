@@ -39,7 +39,7 @@ export function TaskDetailPanel() {
   const [scheduleBucket, setScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
-  const [waitingForEnabled, setWaitingForEnabled] = useState(false);
+  const [waitingForEditing, setWaitingForEditing] = useState(false);
   const [waitingForFocused, setWaitingForFocused] = useState(false);
   const [description, setDescription] = useState("");
 
@@ -47,20 +47,7 @@ export function TaskDetailPanel() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<TaskPatch>({});
   const waitingForInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!selectedTask) return;
-    taskIdRef.current = selectedTask.id;
-    setTitle(selectedTask.title);
-    setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
-    setScheduleBucket(selectedTask.scheduleBucket);
-    setLink(selectedTask.link);
-    setWaitingFor(selectedTask.waitingFor);
-    setWaitingForEnabled(selectedTask.waitingFor.trim().length > 0);
-    setWaitingForFocused(false);
-    setDescription(selectedTask.description);
-    pendingPatchRef.current = {};
-  }, [selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const waitingForPendingBlurValueRef = useRef<string | null>(null);
 
   const scheduleSave = useCallback(
     (patch: TaskPatch) => {
@@ -96,6 +83,22 @@ export function TaskDetailPanel() {
     };
   }, [flushSave]);
 
+  useEffect(() => {
+    flushSave();
+
+    if (!selectedTask) return;
+    taskIdRef.current = selectedTask.id;
+    setTitle(selectedTask.title);
+    setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
+    setScheduleBucket(selectedTask.scheduleBucket);
+    setLink(selectedTask.link);
+    setWaitingFor(selectedTask.waitingFor);
+    setWaitingForEditing(false);
+    setWaitingForFocused(false);
+    setDescription(selectedTask.description);
+    pendingPatchRef.current = {};
+  }, [flushSave, selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(event.target.value);
     scheduleSave({ title: event.target.value });
@@ -115,6 +118,25 @@ export function TaskDetailPanel() {
     setWaitingFor(nextValue);
     scheduleSave({ waitingFor: nextValue });
   };
+
+  const commitWaitingFor = useCallback(
+    (nextValue?: string, options?: { blur?: boolean }) => {
+      const resolvedValue = nextValue ?? waitingFor;
+      const normalizedValue = resolvedValue.trim();
+      const shouldBlur = options?.blur ?? false;
+
+      setWaitingFor(normalizedValue);
+      setWaitingForEditing(false);
+      setWaitingForFocused(false);
+      scheduleSave({ waitingFor: normalizedValue });
+      flushSave();
+      if (shouldBlur) {
+        waitingForPendingBlurValueRef.current = normalizedValue;
+        waitingForInputRef.current?.blur();
+      }
+    },
+    [flushSave, scheduleSave, waitingFor],
+  );
 
   const commitSchedule = useCallback(
     (next: { actionDate: string | null; scheduleBucket: TaskScheduleBucket | null }) => {
@@ -174,8 +196,9 @@ export function TaskDetailPanel() {
       })
       .slice(0, 6);
   }, [waitingFor, waitingForSuggestions]);
+  const hasWaitingFor = waitingFor.trim().length > 0;
   const showWaitingForSuggestions =
-    waitingForEnabled && waitingForFocused && filteredWaitingForSuggestions.length > 0;
+    waitingForEditing && waitingForFocused && filteredWaitingForSuggestions.length > 0;
   const isCompleted = Boolean(selectedTask?.completedAt);
   const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
 
@@ -252,7 +275,7 @@ export function TaskDetailPanel() {
               today={today}
               onChange={commitSchedule}
             />
-            {waitingForEnabled ? (
+            {waitingForEditing ? (
               <div className="relative min-w-[220px] max-w-[320px] flex-1">
                 <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
                   <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
@@ -263,9 +286,23 @@ export function TaskDetailPanel() {
                     placeholder="Waiting for…"
                     onChange={(event) => handleWaitingForChange(event.target.value)}
                     onFocus={() => setWaitingForFocused(true)}
-                    onBlur={() => {
+                    onBlur={(event) => {
                       setWaitingForFocused(false);
-                      flushSave();
+                      const pendingValue = waitingForPendingBlurValueRef.current;
+                      waitingForPendingBlurValueRef.current = null;
+                      commitWaitingFor(pendingValue ?? event.currentTarget.value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitWaitingFor(event.currentTarget.value, { blur: true });
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setWaitingFor(selectedTask?.waitingFor ?? "");
+                        setWaitingForEditing(false);
+                        setWaitingForFocused(false);
+                        waitingForInputRef.current?.blur();
+                      }
                     }}
                     className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
                   />
@@ -274,7 +311,7 @@ export function TaskDetailPanel() {
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       setWaitingFor("");
-                      setWaitingForEnabled(false);
+                      setWaitingForEditing(false);
                       setWaitingForFocused(false);
                       scheduleSave({ waitingFor: "" });
                       flushSave();
@@ -295,11 +332,7 @@ export function TaskDetailPanel() {
                           type="button"
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => {
-                            setWaitingFor(value);
-                            setWaitingForFocused(false);
-                            scheduleSave({ waitingFor: value });
-                            flushSave();
-                            waitingForInputRef.current?.focus();
+                            commitWaitingFor(value, { blur: true });
                           }}
                           className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
                         >
@@ -311,13 +344,25 @@ export function TaskDetailPanel() {
                   </PopoverSurface>
                 ) : null}
               </div>
+            ) : hasWaitingFor ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setWaitingForEditing(true);
+                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
+                }}
+                className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
+              >
+                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                <span className="truncate text-left">Waiting for {waitingFor}</span>
+              </button>
             ) : (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setWaitingForEnabled(true);
+                  setWaitingForEditing(true);
                   requestAnimationFrame(() => waitingForInputRef.current?.focus());
                 }}
                 className="gap-2"

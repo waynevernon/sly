@@ -70,9 +70,26 @@ describe("groupByView", () => {
     expect(buckets.inbox.map(t => t.id)).toEqual(["1"]);
     expect(buckets.today.map(t => t.id)).toEqual(["2"]);
     expect(buckets.upcoming.map(t => t.id)).toEqual(["3"]);
+    expect(buckets.waiting.map(t => t.id)).toEqual([]);
     expect(buckets.anytime.map(t => t.id)).toEqual(["4"]);
     expect(buckets.someday.map(t => t.id)).toEqual(["5"]);
     expect(buckets.completed.map(t => t.id)).toEqual(["6"]);
+  });
+
+  it("adds waiting tasks to the waiting bucket without removing them from their horizon", () => {
+    const tasks: TaskMetadata[] = [
+      meta({ id: "1", waitingFor: "Jordan" }),
+      meta({ id: "2", waitingFor: "Jordan", actionAt: "2026-04-10T18:00:00Z" }),
+      meta({ id: "3", waitingFor: "Jordan", scheduleBucket: "anytime" }),
+      meta({ id: "4", waitingFor: "Jordan", completedAt: "2026-04-09T10:00:00Z" }),
+    ];
+
+    const buckets = groupByView(tasks, TODAY);
+    expect(buckets.inbox.map((task) => task.id)).toEqual(["1"]);
+    expect(buckets.upcoming.map((task) => task.id)).toEqual(["2"]);
+    expect(buckets.anytime.map((task) => task.id)).toEqual(["3"]);
+    expect(buckets.completed.map((task) => task.id)).toEqual(["4"]);
+    expect(buckets.waiting.map((task) => task.id)).toEqual(["1", "2", "3"]);
   });
 });
 
@@ -94,6 +111,12 @@ describe("compareTasks", () => {
     const a = meta({ id: "a", createdAt: "2026-04-09T08:00:00Z" });
     const b = meta({ id: "b", createdAt: "2026-04-09T09:00:00Z" });
     expect(compareTasks(a, b, "inbox")).toBeLessThan(0);
+  });
+
+  it("sorts waiting by action date before unscheduled waiting items", () => {
+    const dated = meta({ id: "dated", waitingFor: "Jordan", actionAt: "2026-04-10T18:00:00Z" });
+    const unscheduled = meta({ id: "unscheduled", waitingFor: "Jordan" });
+    expect(compareTasks(dated, unscheduled, "waiting")).toBeLessThan(0);
   });
 });
 

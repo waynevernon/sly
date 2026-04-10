@@ -1,6 +1,6 @@
 export type TaskScheduleBucket = 'anytime' | 'someday';
 
-export type TaskView = 'inbox' | 'today' | 'upcoming' | 'anytime' | 'someday' | 'completed';
+export type TaskView = 'inbox' | 'today' | 'upcoming' | 'waiting' | 'anytime' | 'someday' | 'completed';
 
 export interface TaskMetadata {
   id: string;

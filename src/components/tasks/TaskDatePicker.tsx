@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  Archive,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  RotateCcw,
+  Sun,
+  Sunrise,
+} from "lucide-react";
 import {
   formatTaskDate,
   localDateString,
@@ -45,7 +55,9 @@ export function TaskDatePicker({
 }: TaskDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(actionDate || today));
+  const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,8 +67,32 @@ export function TaskDatePicker({
   useEffect(() => {
     if (!isOpen) return;
 
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = 320;
+      const margin = 8;
+      const left = Math.min(
+        Math.max(margin, rect.left),
+        Math.max(margin, window.innerWidth - width - margin),
+      );
+      const preferredTop = rect.bottom + 8;
+      const aboveTop = rect.top - 8;
+      const estimatedHeight = 360;
+      const top =
+        preferredTop + estimatedHeight <= window.innerHeight || aboveTop < estimatedHeight
+          ? preferredTop
+          : Math.max(margin, rect.top - estimatedHeight - 8);
+      setPopoverPosition({ left, top });
+    };
+
     const handlePointerDown = (event: PointerEvent) => {
-      if (!popoverRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !popoverRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -69,9 +105,14 @@ export function TaskDatePicker({
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    updatePosition();
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [isOpen]);
 
@@ -83,11 +124,13 @@ export function TaskDatePicker({
   const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
   const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
   const tomorrow = offsetDate(today, 1);
+  const nextWeek = nextMonday(today);
   const hasSelection = Boolean(actionDate || scheduleBucket);
 
   return (
-    <div ref={popoverRef} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
@@ -101,8 +144,13 @@ export function TaskDatePicker({
         <span>{formattedValue}</span>
       </button>
 
-      {isOpen && (
-        <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-30 w-80 p-2.5">
+      {isOpen && popoverPosition
+        ? createPortal(
+            <PopoverSurface
+              ref={popoverRef}
+              className="fixed z-[100] w-80 p-2.5"
+              style={{ left: popoverPosition.left, top: popoverPosition.top }}
+            >
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium text-text">{monthLabel}</div>
@@ -126,50 +174,6 @@ export function TaskDatePicker({
                   <ChevronRight className="h-4 w-4 stroke-[1.8]" />
                 </IconButton>
               </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <QuickDateButton
-                label="Today"
-                isActive={actionDate === today}
-                onClick={() => {
-                  onChange({ actionDate: today, scheduleBucket: null });
-                  setIsOpen(false);
-                }}
-              />
-              <QuickDateButton
-                label="Tomorrow"
-                isActive={actionDate === tomorrow}
-                onClick={() => {
-                  onChange({ actionDate: tomorrow, scheduleBucket: null });
-                  setIsOpen(false);
-                }}
-              />
-              <QuickDateButton
-                label="Anytime"
-                isActive={scheduleBucket === "anytime"}
-                onClick={() => {
-                  onChange({ actionDate: null, scheduleBucket: "anytime" });
-                  setIsOpen(false);
-                }}
-              />
-              <QuickDateButton
-                label="Someday"
-                isActive={scheduleBucket === "someday"}
-                onClick={() => {
-                  onChange({ actionDate: null, scheduleBucket: "someday" });
-                  setIsOpen(false);
-                }}
-              />
-              {hasSelection ? (
-                <QuickDateButton
-                  label="Clear"
-                  onClick={() => {
-                    onChange({ actionDate: null, scheduleBucket: null });
-                    setIsOpen(false);
-                  }}
-                />
-              ) : null}
             </div>
 
             <div className="grid grid-cols-7 gap-1">
@@ -209,19 +213,83 @@ export function TaskDatePicker({
                 );
               })}
             </div>
+
+            <div className="border-t border-border/60 pt-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                <QuickDateButton
+                  label="Today"
+                  icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  isActive={actionDate === today}
+                  onClick={() => {
+                    onChange({ actionDate: today, scheduleBucket: null });
+                    setIsOpen(false);
+                  }}
+                />
+                <QuickDateButton
+                  label="Tomorrow"
+                  icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  isActive={actionDate === tomorrow}
+                  onClick={() => {
+                    onChange({ actionDate: tomorrow, scheduleBucket: null });
+                    setIsOpen(false);
+                  }}
+                />
+                <QuickDateButton
+                  label="Next week"
+                  icon={<CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  isActive={actionDate === nextWeek}
+                  onClick={() => {
+                    onChange({ actionDate: nextWeek, scheduleBucket: null });
+                    setIsOpen(false);
+                  }}
+                />
+                <QuickDateButton
+                  label="Anytime"
+                  icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  isActive={scheduleBucket === "anytime"}
+                  onClick={() => {
+                    onChange({ actionDate: null, scheduleBucket: "anytime" });
+                    setIsOpen(false);
+                  }}
+                />
+                <QuickDateButton
+                  label="Someday"
+                  icon={<Archive className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  isActive={scheduleBucket === "someday"}
+                  onClick={() => {
+                    onChange({ actionDate: null, scheduleBucket: "someday" });
+                    setIsOpen(false);
+                  }}
+                />
+                {hasSelection ? (
+                  <QuickDateButton
+                    label="Clear"
+                    icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
+                    onClick={() => {
+                      onChange({ actionDate: null, scheduleBucket: null });
+                      setIsOpen(false);
+                    }}
+                  />
+                ) : null}
+              </div>
+            </div>
           </div>
-        </PopoverSurface>
-      )}
+            </PopoverSurface>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
 
 function QuickDateButton({
   label,
+  icon,
   isActive = false,
   onClick,
 }: {
   label: string;
+  icon: ReactNode;
   isActive?: boolean;
   onClick: () => void;
 }) {
@@ -230,12 +298,13 @@ function QuickDateButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] px-2.5 text-xs font-medium transition-colors",
+        "ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 text-xs font-medium transition-colors",
         isActive
           ? "bg-bg-muted text-text"
           : "text-text-muted hover:bg-bg-muted hover:text-text",
       )}
     >
+      <span className="shrink-0 text-current">{icon}</span>
       {label}
     </button>
   );
@@ -281,4 +350,12 @@ function offsetDate(date: string, days: number): string {
   const d = parseLocalDate(date);
   d.setDate(d.getDate() + days);
   return localDateString(d);
+}
+
+function nextMonday(date: string): string {
+  const current = parseLocalDate(date);
+  const day = current.getDay();
+  const daysUntilMonday = ((8 - day) % 7) || 7;
+  current.setDate(current.getDate() + daysUntilMonday);
+  return localDateString(current);
 }

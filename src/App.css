@@ -376,7 +376,7 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 20;
+  z-index: 30;
   display: flex;
   height: var(--ui-drag-region-height);
   width: fit-content;

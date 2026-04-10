@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox } from "lucide-react";
+import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, UserRound } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
@@ -9,6 +9,7 @@ const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: ({ className }) => <Inbox className={className} />,
   today: ({ className }) => <CheckSquare className={className} />,
   upcoming: ({ className }) => <CalendarClock className={className} />,
+  waiting: ({ className }) => <UserRound className={className} />,
   anytime: ({ className }) => <Clock3 className={className} />,
   someday: ({ className }) => <Archive className={className} />,
   completed: ({ className }) => <CheckCheck className={className} />,
@@ -55,8 +56,11 @@ function TasksSectionInner({
           const count = buckets[view].length;
 
           return (
+            <div key={view}>
+              {view === "waiting" && (
+                <div className="mx-3 my-1.5 border-t border-border/50" />
+              )}
             <button
-              key={view}
               type="button"
               aria-pressed={isSelected}
               onClick={() => selectView(view)}
@@ -88,6 +92,7 @@ function TasksSectionInner({
                 </span>
               )}
             </button>
+            </div>
           );
         })}
       </nav>

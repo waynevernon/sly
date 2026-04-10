@@ -9,8 +9,9 @@ import {
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
 import { mod } from "../../lib/platform";
+import { cn } from "../../lib/utils";
 import type { TaskScheduleBucket } from "../../types/tasks";
-import { Button, DialogShell, Input } from "../ui";
+import { Button, DialogShell } from "../ui";
 import { TaskDatePicker } from "./TaskDatePicker";
 
 interface GlobalTaskCaptureDialogProps {
@@ -191,102 +192,124 @@ export function GlobalTaskCaptureDialog({
   return (
     <DialogShell
       onBackdropClick={handleClose}
-      panelClassName="max-w-lg"
+      panelClassName="max-w-2xl"
     >
-      <div className="space-y-3 px-4 py-4">
-        <div className="flex items-center gap-2">
-          <Input
-            ref={titleInputRef}
-            value={title}
-            placeholder="What needs doing?"
-            onChange={(event) => setTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void handleSubmit();
-              }
-            }}
-            className="h-[var(--ui-control-height-prominent)] flex-1 text-[15px]"
-          />
-          <button
-            type="button"
-            onClick={handleClose}
-            className="ui-focus-ring inline-flex h-7 w-7 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-            aria-label="Close task capture"
-          >
-            <X className="h-4 w-4 stroke-[1.9]" />
-          </button>
-        </div>
+      <div className="px-6 py-6 sm:px-7">
+        <div
+          className="grid gap-x-4 gap-y-4"
+          style={{ gridTemplateColumns: "20px minmax(0, 1fr)" }}
+        >
+          <div />
+          <div className="flex items-start gap-3">
+            <input
+              ref={titleInputRef}
+              value={title}
+              placeholder="What needs doing?"
+              onChange={(event) => setTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleSubmit();
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+            />
+            <button
+              type="button"
+              onClick={handleClose}
+              className="ui-focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+              aria-label="Close task capture"
+            >
+              <X className="h-4 w-4 stroke-[1.9]" />
+            </button>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <TaskDatePicker
-            actionDate={effectiveActionDate}
-            scheduleBucket={manualScheduleBucket}
-            today={today}
-            onChange={({ actionDate, scheduleBucket }) => {
-              setManualActionDate(actionDate ?? "");
-              setManualScheduleBucket(scheduleBucket);
-            }}
-          />
-          {showDetectedDateChip ? (
-            <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted px-2.5 text-xs font-medium text-text-muted">
-              <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-              <span>Date: {detectedDate?.label}</span>
-              <button
-                type="button"
-                aria-label="Dismiss detected date"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (!detectedDate) return;
-                  setIgnoredDetectionSignature(detectedDate.signature);
-                  setDetectedDate(null);
-                  titleInputRef.current?.focus();
-                }}
-                className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
-              >
-                <X className="h-3 w-3 stroke-[2]" />
-              </button>
+          <div />
+          <div className="flex flex-wrap items-center gap-2">
+            <TaskDatePicker
+              actionDate={effectiveActionDate}
+              scheduleBucket={manualScheduleBucket}
+              today={today}
+              onChange={({ actionDate, scheduleBucket }) => {
+                setManualActionDate(actionDate ?? "");
+                setManualScheduleBucket(scheduleBucket);
+              }}
+            />
+            {showDetectedDateChip ? (
+              <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-2.5 text-xs font-medium text-text-muted">
+                <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>Date: {detectedDate?.label}</span>
+                <button
+                  type="button"
+                  aria-label="Dismiss detected date"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (!detectedDate) return;
+                    setIgnoredDetectionSignature(detectedDate.signature);
+                    setDetectedDate(null);
+                    titleInputRef.current?.focus();
+                  }}
+                  className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                >
+                  <X className="h-3 w-3 stroke-[2]" />
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div />
+          <div className="space-y-2">
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+              Link
             </div>
-          ) : null}
-        </div>
+            <input
+              value={link}
+              placeholder="Add link…"
+              onChange={(event) => setLink(event.target.value)}
+              className="w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+            />
+          </div>
 
-        <div>
-          <Input
-            value={link}
-            placeholder="Optional link"
-            onChange={(event) => setLink(event.target.value)}
-            className="w-full"
-          />
-        </div>
+          <div />
+          <div className="border-t border-border/40" />
 
-        <textarea
-          value={description}
-          placeholder="Optional details…"
-          onChange={(event) => setDescription(event.target.value)}
-          rows={3}
-          className="ui-focus-ring min-h-[88px] w-full resize-none rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 py-2.5 text-sm leading-relaxed text-text outline-none placeholder:text-text-muted"
-        />
+          <div />
+          <div className="space-y-2">
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+              Description
+            </div>
+            <textarea
+              value={description}
+              placeholder="Add description…"
+              onChange={(event) => setDescription(event.target.value)}
+              rows={5}
+              className="min-h-[140px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+            />
+          </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border/70 pt-3">
-          <div className="text-xs text-text-muted">{submitShortcutLabel}</div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="md"
-            onClick={handleClose}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="md"
-            onClick={() => void handleSubmit()}
-            disabled={!canSubmit}
-          >
-            {isSaving ? "Creating..." : "Create Task"}
-          </Button>
+          <div />
+          <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
+            <div className="mr-auto text-xs text-text-muted">{submitShortcutLabel}</div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              onClick={handleClose}
+              disabled={isSaving}
+              className={cn("text-text-muted hover:text-text")}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="md"
+              onClick={() => void handleSubmit()}
+              disabled={!canSubmit}
+            >
+              {isSaving ? "Creating..." : "Create Task"}
+            </Button>
+          </div>
         </div>
       </div>
     </DialogShell>

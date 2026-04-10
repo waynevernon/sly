@@ -22,6 +22,7 @@ function makeTasksHookValue(
       inbox: [],
       today: [],
       upcoming: [],
+      waiting: [],
       anytime: [],
       someday: [],
       completed: [],
@@ -31,10 +32,14 @@ function makeTasksHookValue(
     lastError: null,
     selectedView: "inbox",
     selectedTaskId: null,
+    selectedTaskIds: [],
     selectedTask: null,
     isLoadingTask: false,
     selectView: vi.fn(),
     selectTask: vi.fn(),
+    toggleTaskSelection: vi.fn(),
+    selectTaskRange: vi.fn(),
+    clearTaskSelection: vi.fn(),
     createTask: vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Pay rent",
@@ -118,8 +123,8 @@ describe("GlobalTaskCaptureDialog", () => {
       "Pay rent tomorrow",
     );
     await screen.findByText("Date: Tomorrow");
-    await user.type(screen.getByPlaceholderText("Optional link"), "example.com");
-    await user.type(screen.getByPlaceholderText("Optional details…"), "Before noon");
+    await user.type(screen.getByPlaceholderText("Add link…"), "example.com");
+    await user.type(screen.getByPlaceholderText("Add description…"), "Before noon");
     await user.click(screen.getByRole("button", { name: "Create Task" }));
 
     await waitFor(() => {

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -44,8 +44,19 @@ pub struct TaskPatch {
     pub description: Option<String>,
     pub link: Option<String>,
     pub waiting_for: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub action_at: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub schedule_bucket: Option<Option<String>>,
+}
+
+fn deserialize_optional_nullable_string<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::<String>::deserialize(deserializer)?))
 }
 
 #[derive(Debug)]
@@ -585,6 +596,15 @@ mod tests {
         )
         .unwrap();
         assert!(cleared.action_at.is_none());
+    }
+
+    #[test]
+    fn task_patch_deserializes_explicit_null_as_clear() {
+        let patch: TaskPatch =
+            serde_json::from_str(r#"{"actionAt":null,"scheduleBucket":null}"#).unwrap();
+
+        assert_eq!(patch.action_at, Some(None));
+        assert_eq!(patch.schedule_bucket, Some(None));
     }
 
     #[test]

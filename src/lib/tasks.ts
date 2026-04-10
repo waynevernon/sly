@@ -11,6 +11,7 @@ export const TASK_VIEW_LABELS: Record<TaskView, string> = {
   inbox: "Inbox",
   today: "Today",
   upcoming: "Upcoming",
+  waiting: "Waiting",
   anytime: "Anytime",
   someday: "Someday",
   completed: "Completed",
@@ -28,6 +29,7 @@ export const TASK_VIEW_ORDER: TaskView[] = [
   "anytime",
   "someday",
   "completed",
+  "waiting",
 ];
 
 export interface DetectedTaskDate {
@@ -40,7 +42,7 @@ export interface DetectedTaskDate {
 }
 
 /**
- * Derive which horizon view a task belongs to.
+ * Derive which primary horizon view a task belongs to.
  * Priority (first match wins):
  *  1. completed_at set              → completed
  *  2. action_at local-date <= today → today (includes overdue)
@@ -48,6 +50,10 @@ export interface DetectedTaskDate {
  *  4. schedule_bucket = anytime     → anytime
  *  5. schedule_bucket = someday     → someday
  *  6. otherwise                     → inbox
+ *
+ * Waiting is intentionally separate from the primary-horizon derivation.
+ * Waiting tasks keep their underlying horizon and are added to a dedicated
+ * waiting bucket in `groupByView`.
  */
 export function deriveView(
   task: Pick<TaskMetadata, "completedAt" | "actionAt" | "scheduleBucket">,
@@ -82,6 +88,7 @@ export function groupByView(
     inbox: [],
     today: [],
     upcoming: [],
+    waiting: [],
     anytime: [],
     someday: [],
     completed: [],
@@ -90,6 +97,9 @@ export function groupByView(
   for (const task of tasks) {
     const view = deriveView(task, today);
     buckets[view].push(task);
+    if (!task.completedAt && task.waitingFor.trim()) {
+      buckets.waiting.push(task);
+    }
   }
 
   return buckets;
@@ -101,7 +111,7 @@ export function groupByView(
  * All other views: sort by created_at ASC (most recently created last = natural append order).
  */
 export function compareTasks(a: TaskMetadata, b: TaskMetadata, view: TaskView): number {
-  if (view === "today" || view === "upcoming") {
+  if (view === "today" || view === "upcoming" || view === "waiting") {
     const aDate = actionAtToLocalDate(a.actionAt);
     const bDate = actionAtToLocalDate(b.actionAt);
     if (aDate && bDate) {
@@ -114,6 +124,13 @@ export function compareTasks(a: TaskMetadata, b: TaskMetadata, view: TaskView): 
     } else if (bDate) {
       return 1;
     }
+
+    if (view === "waiting") {
+      const bucketCmp =
+        scheduleBucketSortOrder(a.scheduleBucket) -
+        scheduleBucketSortOrder(b.scheduleBucket);
+      if (bucketCmp !== 0) return bucketCmp;
+    }
   }
   if (view === "completed") {
     const aTs = a.completedAt ?? "";
@@ -122,6 +139,12 @@ export function compareTasks(a: TaskMetadata, b: TaskMetadata, view: TaskView): 
   }
   // Default: most recently created last (natural capture order).
   return a.createdAt.localeCompare(b.createdAt);
+}
+
+function scheduleBucketSortOrder(bucket: TaskScheduleBucket | null): number {
+  if (bucket === "anytime") return 0;
+  if (bucket === "someday") return 1;
+  return 2;
 }
 
 /** Today's date as a YYYY-MM-DD string in local time. */

@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TaskRow } from "./TaskRow";
@@ -28,8 +29,9 @@ describe("TaskRow", () => {
         })}
         view="inbox"
         today="2026-04-10"
-        isSelected={false}
+        selectionState="none"
         onSelect={vi.fn()}
+        onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
       />,
     );
@@ -44,8 +46,9 @@ describe("TaskRow", () => {
         task={makeTask({ waitingFor: "Jordan" })}
         view="inbox"
         today="2026-04-10"
-        isSelected={false}
+        selectionState="none"
         onSelect={vi.fn()}
+        onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
       />,
     );
@@ -59,13 +62,40 @@ describe("TaskRow", () => {
         task={makeTask()}
         view="inbox"
         today="2026-04-10"
-        isSelected={false}
+        selectionState="none"
         onSelect={vi.fn()}
+        onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
       />,
     );
 
     expect(screen.queryByTestId("task-row-link-indicator")).toBeNull();
     expect(screen.queryByTestId("task-row-description-indicator")).toBeNull();
+  });
+
+  it("selects the task when clicking the row body, not just the title text", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <TaskRow
+        task={makeTask()}
+        view="inbox"
+        today="2026-04-10"
+        selectionState="none"
+        onSelect={onSelect}
+        onContextMenuOpen={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    );
+
+    const rowBody = screen.getByRole("option").firstElementChild as HTMLElement;
+    await user.click(rowBody);
+
+    expect(onSelect).toHaveBeenCalledWith({
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+    });
   });
 });

@@ -33,7 +33,7 @@ export function PaneResizeHandle({
       aria-label={ariaLabel}
       onMouseDown={onMouseDown}
       className={cn(
-        "group absolute inset-y-0 z-20 w-2 cursor-col-resize",
+        "group absolute inset-y-0 z-10 w-2 cursor-col-resize",
         align === "right" ? "left-full" : "left-0",
         className,
       )}

@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "../ui";
 import { TaskDetailPanel } from "./TaskDetailPanel";
@@ -70,6 +70,7 @@ function makeTasksHookValue(
       inbox: [],
       today: [],
       upcoming: [],
+      waiting: [],
       anytime: [],
       someday: [],
       completed: [],
@@ -79,6 +80,7 @@ function makeTasksHookValue(
     lastError: null,
     selectedView: "inbox",
     selectedTaskId: "task-1",
+    selectedTaskIds: ["task-1"],
     selectedTask: {
       id: "task-1",
       title: "Follow up",
@@ -93,6 +95,9 @@ function makeTasksHookValue(
     isLoadingTask: false,
     selectView: vi.fn(),
     selectTask: vi.fn(),
+    toggleTaskSelection: vi.fn(),
+    selectTaskRange: vi.fn(),
+    clearTaskSelection: vi.fn(),
     createTask: vi.fn(),
     updateTask: vi.fn().mockResolvedValue(null),
     setCompleted: vi.fn(),
@@ -134,6 +139,102 @@ describe("TaskDetailPanel", () => {
 
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
+    });
+    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+  });
+
+  it("commits and collapses the waiting-for field on Enter", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const updateTask = vi.fn().mockResolvedValue(null);
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Waiting for" }));
+    const input = await screen.findByPlaceholderText("Waiting for…");
+    await user.type(input, "Jordan{enter}");
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
+    });
+    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+  });
+
+  it("collapses back to the idle button when blurred empty", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Waiting for" }));
+    const input = await screen.findByPlaceholderText("Waiting for…");
+    await user.click(input);
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Waiting for" })).toBeInTheDocument();
+    });
+    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+  });
+
+  it("flushes a pending edit before switching to a different task", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    const updateTask = vi.fn().mockResolvedValue(null);
+    let currentValue = makeTasksHookValue({ updateTask });
+
+    vi.mocked(tasksContext.useTasks).mockImplementation(() => currentValue);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    const titleInput = screen.getByPlaceholderText("Task name");
+    fireEvent.change(titleInput, {
+      target: { value: "Follow up with vendor" },
+    });
+
+    currentValue = makeTasksHookValue({
+      updateTask,
+      selectedTaskId: "task-2",
+      selectedTaskIds: ["task-2"],
+      selectedTask: {
+        id: "task-2",
+        title: "Review docs",
+        description: "",
+        link: "",
+        waitingFor: "Jordan",
+        createdAt: "2026-04-10T11:00:00Z",
+        actionAt: null,
+        scheduleBucket: null,
+        completedAt: null,
+      },
+    });
+
+    rerender(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        title: "Follow up with vendor",
+      });
     });
   });
 });

@@ -336,7 +336,7 @@ export function WorkspaceNavigation({
         >
           <div
             className={cn(
-              "h-full overflow-hidden",
+              "h-full overflow-visible",
               !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
               foldersVisible
                 ? "opacity-100 translate-x-0"
@@ -371,7 +371,7 @@ export function WorkspaceNavigation({
         >
           <div
             className={cn(
-              "h-full overflow-hidden",
+              "h-full overflow-visible",
               !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
               notesVisible
                 ? "opacity-100 translate-x-0"

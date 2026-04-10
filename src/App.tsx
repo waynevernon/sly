@@ -367,7 +367,7 @@ function TitlebarPaneSwitch({
   return (
     <>
       <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
-        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-2">
           <IconButton
             onClick={onCyclePaneMode}
             title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(nextPaneMode)} (${mod}${isMac ? "" : "+"}\\)`}
@@ -375,36 +375,34 @@ function TitlebarPaneSwitch({
           >
             <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
+          {tasksEnabled && onShowNotes && onShowTasks && (
+            <div className="ui-mode-toggle">
+              <button
+                type="button"
+                aria-pressed={!isTasksModeActive}
+                onClick={onShowNotes}
+                className={`ui-focus-ring ui-mode-toggle-item ${
+                  isTasksModeActive ? "" : "ui-mode-toggle-item-active"
+                }`}
+              >
+                <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span>Notes</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={isTasksModeActive}
+                onClick={onShowTasks}
+                className={`ui-focus-ring ui-mode-toggle-item ${
+                  isTasksModeActive ? "ui-mode-toggle-item-active" : ""
+                }`}
+              >
+                <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span>Tasks</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      {tasksEnabled && onShowNotes && onShowTasks && (
-        <div className="ui-titlebar-mode-switch" data-tauri-drag-region>
-          <div className="ui-mode-toggle titlebar-no-drag">
-            <button
-              type="button"
-              aria-pressed={!isTasksModeActive}
-              onClick={onShowNotes}
-              className={`ui-focus-ring ui-mode-toggle-item ${
-                isTasksModeActive ? "" : "ui-mode-toggle-item-active"
-              }`}
-            >
-              <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
-              <span>Notes</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={isTasksModeActive}
-              onClick={onShowTasks}
-              className={`ui-focus-ring ui-mode-toggle-item ${
-                isTasksModeActive ? "ui-mode-toggle-item-active" : ""
-              }`}
-            >
-              <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
-              <span>Tasks</span>
-            </button>
-          </div>
-        </div>
-      )}
       {showRightPanelToggle && (
         <div
           className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
