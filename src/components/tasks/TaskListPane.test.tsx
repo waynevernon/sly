@@ -1,6 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt } from "../../lib/tasks";
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
@@ -50,6 +50,10 @@ describe("TaskListPane", () => {
   beforeEach(async () => {
     const tasksContext = await import("../../context/TasksContext");
     vi.mocked(tasksContext.useTasks).mockReturnValue(makeTasksHookValue());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("keeps inline capture open after pressing Enter so another task can be added", async () => {
@@ -132,5 +136,103 @@ describe("TaskListPane", () => {
         actionAt: localDateToNormalizedActionAt("2026-04-09"),
       });
     });
+  });
+
+  it("shows a detected date chip while typing a task title", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
+
+    await waitFor(() => {
+      expect(screen.getByText("Date: Tomorrow")).toBeInTheDocument();
+    });
+  });
+
+  it("creates a task with the detected date removed from the title and assigned to actionAt", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Pay rent",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      completedAt: null,
+      description: "",
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Pay rent",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: localDateToNormalizedActionAt("2026-04-10"),
+      completedAt: null,
+      description: "",
+    });
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ createTask, updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow{enter}");
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledWith("Pay rent");
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        actionAt: localDateToNormalizedActionAt("2026-04-10"),
+      });
+    });
+  });
+
+  it("lets the user dismiss a detected date before submit", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Pay rent tomorrow",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      completedAt: null,
+      description: "",
+    });
+    const updateTask = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ createTask, updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
+    await waitFor(() => {
+      expect(screen.getByText("Date: Tomorrow")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Dismiss detected date" }));
+    expect(screen.queryByText("Date: Tomorrow")).not.toBeInTheDocument();
+
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledWith("Pay rent tomorrow");
+    });
+    expect(updateTask).not.toHaveBeenCalled();
   });
 });

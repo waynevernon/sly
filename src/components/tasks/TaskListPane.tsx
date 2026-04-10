@@ -1,8 +1,9 @@
-import { useRef, useState, useCallback } from "react";
-import { CalendarClock, CheckCheck, CheckSquare, Inbox, Plus } from "lucide-react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { CalendarClock, CheckCheck, CheckSquare, Inbox, Plus, X } from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
 import {
   compareTasks,
+  detectTaskDateFromTitle,
   localDateToNormalizedActionAt,
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
@@ -36,6 +37,7 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   upcoming: CalendarClock,
   completed: CheckCheck,
 };
+const CREATE_DATE_DEBOUNCE_MS = 350;
 
 export function TaskListPane() {
   const {
@@ -52,6 +54,8 @@ export function TaskListPane() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
+  const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
@@ -71,14 +75,44 @@ export function TaskListPane() {
   const handleStartCreate = useCallback(() => {
     setIsCreating(true);
     setNewTitle("");
+    setDetectedDate(null);
+    setIgnoredDetectionSignature(null);
     focusCreateInput();
   }, [focusCreateInput]);
+
+  useEffect(() => {
+    if (!isCreating) {
+      setDetectedDate(null);
+      return;
+    }
+
+    if (!newTitle.trim()) {
+      setDetectedDate(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const nextDetection = detectTaskDateFromTitle(newTitle, today);
+      if (!nextDetection || nextDetection.signature === ignoredDetectionSignature) {
+        setDetectedDate(null);
+        return;
+      }
+      setDetectedDate(nextDetection);
+    }, CREATE_DATE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [ignoredDetectionSignature, isCreating, newTitle, today]);
 
   const handleCommitCreate = useCallback(async (options?: {
     continueCapturing?: boolean;
   }) => {
     const continueCapturing = options?.continueCapturing ?? false;
-    const title = newTitle.trim();
+    const nextDetection = detectTaskDateFromTitle(newTitle, today);
+    const activeDetection =
+      nextDetection && nextDetection.signature !== ignoredDetectionSignature
+        ? nextDetection
+        : null;
+    const title = (activeDetection?.cleanedTitle ?? newTitle).trim();
     if (!title) {
       if (continueCapturing) {
         focusCreateInput();
@@ -90,8 +124,14 @@ export function TaskListPane() {
 
     const task = await createTask(title);
     setNewTitle("");
+    setDetectedDate(null);
+    setIgnoredDetectionSignature(null);
 
-    if (task && selectedView === "today" && !task.actionAt) {
+    if (task && activeDetection && !task.actionAt) {
+      await updateTask(task.id, {
+        actionAt: activeDetection.actionAt,
+      });
+    } else if (task && selectedView === "today" && !task.actionAt) {
       await updateTask(task.id, {
         actionAt: localDateToNormalizedActionAt(today),
       });
@@ -107,7 +147,16 @@ export function TaskListPane() {
     if (task) {
       selectTask(task.id);
     }
-  }, [createTask, focusCreateInput, newTitle, selectTask, selectedView, today, updateTask]);
+  }, [
+    createTask,
+    focusCreateInput,
+    ignoredDetectionSignature,
+    newTitle,
+    selectTask,
+    selectedView,
+    today,
+    updateTask,
+  ]);
 
   const handleCreateKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -117,6 +166,8 @@ export function TaskListPane() {
       } else if (event.key === "Escape") {
         setIsCreating(false);
         setNewTitle("");
+        setDetectedDate(null);
+        setIgnoredDetectionSignature(null);
       }
     },
     [handleCommitCreate],
@@ -193,20 +244,44 @@ export function TaskListPane() {
             ))}
 
             {isCreating && (
-              <div className="flex items-center gap-2.5 rounded-md bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">
-                <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={newTitle}
-                  placeholder="Task name"
-                  onChange={(event) => setNewTitle(event.target.value)}
-                  onBlur={() => void handleCommitCreate()}
-                  onKeyDown={handleCreateKeyDown}
-                  className={cn(
-                    "min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50",
-                  )}
-                />
+              <div className="rounded-md bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">
+                <div className="flex items-center gap-2.5">
+                  <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={newTitle}
+                    placeholder="Task name"
+                    onChange={(event) => setNewTitle(event.target.value)}
+                    onBlur={() => void handleCommitCreate()}
+                    onKeyDown={handleCreateKeyDown}
+                    className={cn(
+                      "min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50",
+                    )}
+                  />
+                </div>
+
+                {detectedDate ? (
+                  <div className="mt-2 flex items-center pl-6.5">
+                    <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                      <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                      <span>Date: {detectedDate.label}</span>
+                      <button
+                        type="button"
+                        aria-label="Dismiss detected date"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setIgnoredDetectionSignature(detectedDate.signature);
+                          setDetectedDate(null);
+                          inputRef.current?.focus();
+                        }}
+                        className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                      >
+                        <X className="h-3 w-3 stroke-[2]" />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

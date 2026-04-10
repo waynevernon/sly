@@ -1,3 +1,5 @@
+import * as chrono from "chrono-node";
+import type { ParsedResult } from "chrono-node";
 import type { Task, TaskMetadata, TaskView } from "../types/tasks";
 
 export const TASK_VIEW_LABELS: Record<TaskView, string> = {
@@ -13,6 +15,15 @@ export const TASK_VIEW_ORDER: TaskView[] = [
   "upcoming",
   "completed",
 ];
+
+export interface DetectedTaskDate {
+  actionAt: string;
+  cleanedTitle: string;
+  label: string;
+  localDate: string;
+  matchedText: string;
+  signature: string;
+}
 
 /**
  * Derive which horizon view a task belongs to.
@@ -118,6 +129,46 @@ export function localDateToNormalizedActionAt(date: string | null): string | nul
   return localNoon.toISOString();
 }
 
+export function formatTaskDate(date: string, today: string): string {
+  if (!date) return "";
+  if (date === today) return "Today";
+  const tomorrow = offsetLocalDate(today, 1);
+  if (date === tomorrow) return "Tomorrow";
+  const [y, m, d] = date.split("-").map(Number);
+  const todayYear = Number(today.split("-")[0]);
+  const month = new Date(y, m - 1, d).toLocaleString("en-US", { month: "short" });
+  return `${month} ${d}${y !== todayYear ? `, ${y}` : ""}`;
+}
+
+export function detectTaskDateFromTitle(title: string, today: string): DetectedTaskDate | null {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) return null;
+
+  const referenceDate = localDateToReference(today);
+  const matches = chrono.casual.parse(trimmedTitle, referenceDate, { forwardDate: true });
+
+  for (const match of matches) {
+    const localDate = localDateString(match.start.date());
+    const cleanedTitle = stripMatchedDateText(trimmedTitle, match);
+    const actionAt = localDateToNormalizedActionAt(localDate);
+
+    if (!cleanedTitle || !actionAt) {
+      continue;
+    }
+
+    return {
+      actionAt,
+      cleanedTitle,
+      label: formatTaskDate(localDate, today),
+      localDate,
+      matchedText: match.text,
+      signature: `${match.index}:${match.text.toLowerCase()}:${localDate}:${cleanedTitle.toLowerCase()}`,
+    };
+  }
+
+  return null;
+}
+
 export function activeCountForView(
   buckets: Record<TaskView, TaskMetadata[]>,
   view: TaskView
@@ -127,4 +178,35 @@ export function activeCountForView(
 
 export function taskIsFullTask(task: TaskMetadata | Task): task is Task {
   return "description" in task;
+}
+
+function localDateToReference(date: string): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
+function offsetLocalDate(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const nextDate = new Date(year, month - 1, day);
+  nextDate.setDate(nextDate.getDate() + days);
+  return localDateString(nextDate);
+}
+
+function stripMatchedDateText(title: string, match: ParsedResult): string {
+  const before = title.slice(0, match.index).trimEnd();
+  const after = title.slice(match.index + match.text.length).trimStart();
+
+  let merged = before && after ? `${before} ${after}` : before || after;
+  merged = merged
+    .replace(/\(\s*\)|\[\s*\]|\{\s*\}/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*[-,:|]\s*$/g, "")
+    .replace(/^\s*[-,:|]\s*/g, "")
+    .trim();
+
+  return merged;
 }
