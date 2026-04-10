@@ -618,8 +618,8 @@ export function GeneralSettingsSection() {
           <div className="flex flex-col gap-0.75">
             <h2 className="text-xl font-medium">Tasks (beta)</h2>
             <p className="text-sm text-text-muted max-w-lg">
-              Enable a lightweight markdown-based task list. Tasks are stored in{" "}
-              <code className="font-mono text-xs">.tasks/</code> inside this vault.
+              Enable a lightweight SQLite-backed task list. Tasks are stored in{" "}
+              <code className="font-mono text-xs">.sly/tasks.db</code> inside this vault.
             </p>
           </div>
           <div className="ui-settings-toggle-group">

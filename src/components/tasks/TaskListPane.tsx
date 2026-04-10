@@ -1,7 +1,11 @@
 import { useRef, useState, useCallback } from "react";
-import { BookOpen, CalendarClock, CheckSquare, Clock, HelpCircle, Inbox, Plus } from "lucide-react";
+import { CalendarClock, CheckCheck, CheckSquare, Inbox, Plus } from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
-import { compareTasks, TASK_VIEW_LABELS } from "../../lib/tasks";
+import {
+  compareTasks,
+  localDateToNormalizedActionAt,
+  TASK_VIEW_LABELS,
+} from "../../lib/tasks";
 import { Button, IconButton, PanelEmptyState } from "../ui";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
@@ -20,15 +24,7 @@ const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
     title: "Nothing scheduled",
     message: "Set an action date on a task to plan ahead.",
   },
-  someday: {
-    title: "Nothing in Someday",
-    message: "Tasks you want to revisit eventually but not now.",
-  },
-  waiting: {
-    title: "Nothing waiting",
-    message: "Tasks blocked on someone or something else.",
-  },
-  logbook: {
+  completed: {
     title: "No completed tasks",
     message: "Finished tasks appear here.",
   },
@@ -38,9 +34,7 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: Inbox,
   today: CheckSquare,
   upcoming: CalendarClock,
-  someday: HelpCircle,
-  waiting: Clock,
-  logbook: BookOpen,
+  completed: CheckCheck,
 };
 
 export function TaskListPane() {
@@ -53,6 +47,7 @@ export function TaskListPane() {
     selectTask,
     setCompleted,
     createTask,
+    updateTask,
   } = useTasks();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -96,6 +91,12 @@ export function TaskListPane() {
     const task = await createTask(title);
     setNewTitle("");
 
+    if (task && selectedView === "today" && !task.actionAt) {
+      await updateTask(task.id, {
+        actionAt: localDateToNormalizedActionAt(today),
+      });
+    }
+
     if (continueCapturing) {
       setIsCreating(true);
       focusCreateInput();
@@ -106,7 +107,7 @@ export function TaskListPane() {
     if (task) {
       selectTask(task.id);
     }
-  }, [createTask, focusCreateInput, newTitle, selectTask]);
+  }, [createTask, focusCreateInput, newTitle, selectTask, selectedView, today, updateTask]);
 
   const handleCreateKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -128,7 +129,7 @@ export function TaskListPane() {
         <div className="font-medium text-base text-text">
           {TASK_VIEW_LABELS[selectedView]}
         </div>
-        {selectedView !== "logbook" && (
+        {selectedView !== "completed" && (
           <div className="ui-pane-header-actions ml-auto">
             <IconButton
               type="button"
@@ -145,7 +146,7 @@ export function TaskListPane() {
       <div
         className={cn(
           "ui-scrollbar-overlay flex-1 overflow-y-auto",
-          showEmptyState ? "" : "px-1.5 py-2",
+          showEmptyState ? "" : "",
         )}
       >
         {isLoading ? (
@@ -161,7 +162,7 @@ export function TaskListPane() {
               icon={<EmptyStateIcon />}
               title={empty.title}
               message={empty.message}
-              action={selectedView !== "logbook" ? (
+              action={selectedView !== "completed" ? (
                 <Button
                   type="button"
                   variant="secondary"
@@ -174,7 +175,11 @@ export function TaskListPane() {
             />
           </div>
         ) : (
-          <div role="listbox" aria-label={TASK_VIEW_LABELS[selectedView]}>
+          <div
+            role="listbox"
+            aria-label={TASK_VIEW_LABELS[selectedView]}
+            className="flex flex-col gap-1 px-1.5 pt-2.5 pb-1.5 outline-none"
+          >
             {tasks.map((task) => (
               <TaskRow
                 key={task.id}
@@ -188,7 +193,7 @@ export function TaskListPane() {
             ))}
 
             {isCreating && (
-              <div className="flex items-center gap-2.5 rounded-md bg-bg-muted/50 px-2.5 py-2">
+              <div className="flex items-center gap-2.5 rounded-md bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">
                 <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
                 <input
                   ref={inputRef}

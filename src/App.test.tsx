@@ -393,6 +393,34 @@ describe("App", () => {
     expect(themeState.setRightPanelVisible).not.toHaveBeenCalled();
   });
 
+  it("reopens the task left nav from the pane button when task mode is active", () => {
+    notesDataState.settings.tasksEnabled = true;
+    themeState.paneMode = 2;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Workspace layout: 2 Panes\. Next: 3 Panes/,
+      }),
+    );
+
+    expect(themeState.setPaneMode).toHaveBeenCalledWith(3);
+  });
+
+  it("reopens the task left nav from the keyboard pane shortcut in task mode", () => {
+    notesDataState.settings.tasksEnabled = true;
+    themeState.paneMode = 2;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    fireEvent.keyDown(window, { key: "\\", metaKey: true });
+
+    expect(themeState.setPaneMode).toHaveBeenCalledWith(3);
+  });
+
   it("stores the registered flush callback as a function", () => {
     render(<App />);
 

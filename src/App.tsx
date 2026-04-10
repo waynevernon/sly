@@ -9,7 +9,7 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { PanelLeft, PanelRight } from "lucide-react";
+import { CheckSquare, FileText, PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   NotesProvider,
@@ -21,7 +21,6 @@ import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
 import {
-  Button,
   IconButton,
   LoadingSpinner,
   TooltipProvider,
@@ -166,6 +165,10 @@ function formatPaneModeLabel(mode: PaneMode): string {
 
 function getNextPaneMode(mode: PaneMode): PaneMode {
   return mode === 1 ? 3 : ((mode - 1) as PaneMode);
+}
+
+function getNextTaskPaneMode(mode: PaneMode): PaneMode {
+  return mode === 3 ? 2 : 3;
 }
 
 function getDefaultAssistantProvider(
@@ -340,6 +343,7 @@ const WorkspaceMain = memo(function WorkspaceMain({
 function TitlebarPaneSwitch({
   paneMode,
   onCyclePaneMode,
+  nextPaneMode,
   rightPanelVisible,
   onToggleRightPanel,
   tasksEnabled = false,
@@ -350,6 +354,7 @@ function TitlebarPaneSwitch({
 }: {
   paneMode: PaneMode;
   onCyclePaneMode: () => void;
+  nextPaneMode: PaneMode;
   rightPanelVisible: boolean;
   onToggleRightPanel: () => void;
   tasksEnabled?: boolean;
@@ -364,7 +369,7 @@ function TitlebarPaneSwitch({
         <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
           <IconButton
             onClick={onCyclePaneMode}
-            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
+            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(nextPaneMode)} (${mod}${isMac ? "" : "+"}\\)`}
             className="shrink-0"
           >
             <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -373,25 +378,29 @@ function TitlebarPaneSwitch({
       </div>
       {tasksEnabled && onShowNotes && onShowTasks && (
         <div className="ui-titlebar-mode-switch" data-tauri-drag-region>
-          <div className="titlebar-no-drag flex items-center rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary/92 p-1 backdrop-blur-sm">
-            <Button
+          <div className="ui-mode-toggle titlebar-no-drag">
+            <button
               type="button"
-              size="xs"
-              variant={isTasksModeActive ? "ghost" : "default"}
+              aria-pressed={!isTasksModeActive}
               onClick={onShowNotes}
-              className="min-w-16"
+              className={`ui-focus-ring ui-mode-toggle-item ${
+                isTasksModeActive ? "" : "ui-mode-toggle-item-active"
+              }`}
             >
-              Notes
-            </Button>
-            <Button
+              <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+              <span>Notes</span>
+            </button>
+            <button
               type="button"
-              size="xs"
-              variant={isTasksModeActive ? "default" : "ghost"}
+              aria-pressed={isTasksModeActive}
               onClick={onShowTasks}
-              className="min-w-16"
+              className={`ui-focus-ring ui-mode-toggle-item ${
+                isTasksModeActive ? "ui-mode-toggle-item-active" : ""
+              }`}
             >
-              Tasks
-            </Button>
+              <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+              <span>Tasks</span>
+            </button>
           </div>
         </div>
       )}
@@ -452,7 +461,6 @@ function AppContent() {
     setInterfaceZoom,
     paneMode,
     setPaneMode,
-    cyclePaneMode,
     rightPanelVisible,
     rightPanelWidth,
     rightPanelTab,
@@ -831,6 +839,14 @@ function AppContent() {
     },
     [setPaneMode],
   );
+
+  const cycleWorkspacePaneMode = useCallback(() => {
+    const currentMode = paneModeRef.current;
+    const nextMode = isTasksModeActiveRef.current
+      ? getNextTaskPaneMode(currentMode)
+      : getNextPaneMode(currentMode);
+    applyPaneModeSelection(nextMode);
+  }, [applyPaneModeSelection]);
 
   const toggleRightPanel = useCallback(() => {
     if (isTasksModeActiveRef.current) {
@@ -1367,7 +1383,7 @@ function AppContent() {
       // Cmd+\ - Cycle pane layout
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
-        cyclePaneMode();
+        cycleWorkspacePaneMode();
         return;
       }
 
@@ -1525,7 +1541,7 @@ function AppContent() {
     };
   }, [
     createNote,
-    cyclePaneMode,
+    cycleWorkspacePaneMode,
     duplicateNote,
     reloadCurrentNote,
     selectNote,
@@ -1632,7 +1648,12 @@ function AppContent() {
         {view === "notes" && !focusMode && (
           <TitlebarPaneSwitch
             paneMode={paneMode}
-            onCyclePaneMode={cyclePaneMode}
+            onCyclePaneMode={cycleWorkspacePaneMode}
+            nextPaneMode={
+              isTasksModeActive
+                ? getNextTaskPaneMode(paneMode)
+                : getNextPaneMode(paneMode)
+            }
             rightPanelVisible={rightPanelVisible}
             onToggleRightPanel={toggleRightPanel}
             tasksEnabled={tasksEnabled}

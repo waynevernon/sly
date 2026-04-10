@@ -12,8 +12,6 @@ function meta(
     title: "Test Task",
     createdAt: "2026-04-09T10:00:00Z",
     actionAt: null,
-    waiting: false,
-    someday: false,
     completedAt: null,
     ...overrides,
   };
@@ -21,13 +19,11 @@ function meta(
 
 describe("deriveView", () => {
   it.each([
-    ["logbook",  meta({ completedAt: "2026-04-09T12:00:00Z" })],
-    ["waiting",  meta({ waiting: true, actionAt: TODAY })],       // waiting wins over date
-    ["someday",  meta({ someday: true })],
-    ["today",    meta({ actionAt: TODAY })],
-    ["today",    meta({ actionAt: "2026-04-08" })],               // overdue → today
-    ["upcoming", meta({ actionAt: "2026-04-10" })],
-    ["inbox",    meta()],
+    ["completed", meta({ completedAt: "2026-04-09T12:00:00Z" })],
+    ["today",     meta({ actionAt: "2026-04-09T18:00:00Z" })],
+    ["today",     meta({ actionAt: "2026-04-08T18:00:00Z" })],
+    ["upcoming",  meta({ actionAt: "2026-04-10T18:00:00Z" })],
+    ["inbox",     meta()],
   ] as [string, TaskMetadata][])(
     "→ %s",
     (expected, task) => {
@@ -38,15 +34,15 @@ describe("deriveView", () => {
 
 describe("isOverdue", () => {
   it("returns true for past action_at not completed", () => {
-    expect(isOverdue(meta({ actionAt: "2026-04-08" }), TODAY)).toBe(true);
+    expect(isOverdue(meta({ actionAt: "2026-04-08T18:00:00Z" }), TODAY)).toBe(true);
   });
 
   it("returns false for today", () => {
-    expect(isOverdue(meta({ actionAt: TODAY }), TODAY)).toBe(false);
+    expect(isOverdue(meta({ actionAt: "2026-04-09T18:00:00Z" }), TODAY)).toBe(false);
   });
 
   it("returns false when completed", () => {
-    expect(isOverdue(meta({ actionAt: "2026-04-08", completedAt: "2026-04-09T10:00:00Z" }), TODAY)).toBe(false);
+    expect(isOverdue(meta({ actionAt: "2026-04-08T18:00:00Z", completedAt: "2026-04-09T10:00:00Z" }), TODAY)).toBe(false);
   });
 
   it("returns false with no action_at", () => {
@@ -58,34 +54,30 @@ describe("groupByView", () => {
   it("puts each task in the right bucket", () => {
     const tasks: TaskMetadata[] = [
       meta({ id: "1" }),
-      meta({ id: "2", actionAt: TODAY }),
-      meta({ id: "3", actionAt: "2026-04-10" }),
-      meta({ id: "4", someday: true }),
-      meta({ id: "5", waiting: true }),
-      meta({ id: "6", completedAt: "2026-04-09T10:00:00Z" }),
+      meta({ id: "2", actionAt: "2026-04-09T18:00:00Z" }),
+      meta({ id: "3", actionAt: "2026-04-10T18:00:00Z" }),
+      meta({ id: "4", completedAt: "2026-04-09T10:00:00Z" }),
     ];
     const buckets = groupByView(tasks, TODAY);
     expect(buckets.inbox.map(t => t.id)).toEqual(["1"]);
     expect(buckets.today.map(t => t.id)).toEqual(["2"]);
     expect(buckets.upcoming.map(t => t.id)).toEqual(["3"]);
-    expect(buckets.someday.map(t => t.id)).toEqual(["4"]);
-    expect(buckets.waiting.map(t => t.id)).toEqual(["5"]);
-    expect(buckets.logbook.map(t => t.id)).toEqual(["6"]);
+    expect(buckets.completed.map(t => t.id)).toEqual(["4"]);
   });
 });
 
 describe("compareTasks", () => {
   it("sorts upcoming by action_at ASC", () => {
-    const a = meta({ id: "a", actionAt: "2026-04-10" });
-    const b = meta({ id: "b", actionAt: "2026-04-12" });
+    const a = meta({ id: "a", actionAt: "2026-04-10T18:00:00Z" });
+    const b = meta({ id: "b", actionAt: "2026-04-12T18:00:00Z" });
     expect(compareTasks(a, b, "upcoming")).toBeLessThan(0);
     expect(compareTasks(b, a, "upcoming")).toBeGreaterThan(0);
   });
 
-  it("sorts logbook by completedAt DESC (most recent first)", () => {
+  it("sorts completed by completedAt DESC (most recent first)", () => {
     const a = meta({ id: "a", completedAt: "2026-04-09T10:00:00Z" });
     const b = meta({ id: "b", completedAt: "2026-04-08T10:00:00Z" });
-    expect(compareTasks(a, b, "logbook")).toBeLessThan(0);
+    expect(compareTasks(a, b, "completed")).toBeLessThan(0);
   });
 
   it("sorts inbox by createdAt ASC", () => {

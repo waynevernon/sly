@@ -1,6 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { localDateToNormalizedActionAt } from "../../lib/tasks";
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
 
@@ -24,9 +25,7 @@ function makeTasksHookValue(
       inbox: [],
       today: [],
       upcoming: [],
-      someday: [],
-      waiting: [],
-      logbook: [],
+      completed: [],
     },
     selectedView: "inbox",
     selectedTaskId: null,
@@ -34,15 +33,14 @@ function makeTasksHookValue(
     isLoading: false,
     selectTask: vi.fn(),
     setCompleted: vi.fn(),
+    updateTask: vi.fn(),
     createTask: vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Draft task",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
-      waiting: false,
-      someday: false,
       completedAt: null,
-      notes: "",
+      description: "",
     }),
     ...overrides,
   } as never;
@@ -62,10 +60,8 @@ describe("TaskListPane", () => {
       title: "First task",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
-      waiting: false,
-      someday: false,
       completedAt: null,
-      notes: "",
+      description: "",
     });
     const selectTask = vi.fn();
 
@@ -92,5 +88,49 @@ describe("TaskListPane", () => {
     expect(refreshedInput).toHaveValue("");
     expect(refreshedInput).toHaveFocus();
     expect(selectTask).not.toHaveBeenCalled();
+  });
+
+  it("assigns today's date when creating a task from the Today view", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Today task",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      completedAt: null,
+      description: "",
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Today task",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: localDateToNormalizedActionAt("2026-04-09"),
+      completedAt: null,
+      description: "",
+    });
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "today",
+        createTask,
+        updateTask,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Today task{enter}");
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        actionAt: localDateToNormalizedActionAt("2026-04-09"),
+      });
+    });
   });
 });

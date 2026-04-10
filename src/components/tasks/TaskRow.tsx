@@ -1,5 +1,5 @@
 import { cn } from "../../lib/utils";
-import { isOverdue } from "../../lib/tasks";
+import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import type { TaskMetadata, TaskView } from "../../types/tasks";
 
 interface TaskRowProps {
@@ -21,73 +21,70 @@ export function TaskRow({
 }: TaskRowProps) {
   const isCompleted = Boolean(task.completedAt);
   const overdue = !isCompleted && isOverdue(task, today);
-  const secondaryLabel = task.completedAt && view === "logbook"
+  const actionDate = actionAtToLocalDate(task.actionAt);
+  const secondaryLabel = task.completedAt && view === "completed"
     ? formatCompletedAt(task.completedAt)
-    : task.actionAt && view !== "logbook"
-      ? formatDate(task.actionAt, today)
+    : actionDate && view !== "completed"
+      ? formatDate(actionDate, today)
       : null;
 
   return (
     <div
-      role="button"
-      aria-pressed={isSelected}
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") {
-          return;
-        }
-
-        event.preventDefault();
-        onSelect();
-      }}
-      className={cn(
-        "group flex cursor-default items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors duration-100 outline-none",
-        isSelected ? "bg-bg-muted" : "hover:bg-bg-muted/70",
-      )}
+      role="option"
+      aria-selected={isSelected}
+      className="group rounded-md"
     >
-      <button
-        type="button"
-        aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleComplete();
-        }}
+      <div
         className={cn(
-          "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors outline-none",
-          "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
-          isCompleted
-            ? "border-accent bg-accent text-text-inverse"
-            : "border-border bg-bg hover:border-accent/60",
+          "flex items-start gap-2.5 rounded-md pl-2.5 pr-2.5 transition-colors duration-100",
+          secondaryLabel ? "py-2.25" : "py-1.75",
+          isSelected ? "bg-bg-muted" : "hover:bg-bg-muted",
         )}
       >
-        {isCompleted && (
-          <svg viewBox="0 0 10 8" className="h-2 w-2 stroke-current stroke-[2.5] fill-none">
-            <polyline points="1,4 4,7 9,1" />
-          </svg>
-        )}
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <span
+        <button
+          type="button"
+          aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
+          onClick={onToggleComplete}
           className={cn(
-            "block truncate text-sm leading-snug",
-            isCompleted ? "text-text-muted line-through" : "text-text",
+            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors outline-none",
+            "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
+            isCompleted
+              ? "border-accent bg-accent text-text-inverse"
+              : "border-border bg-bg hover:border-accent/60",
           )}
         >
-          {task.title || "Untitled"}
-        </span>
+          {isCompleted && (
+            <svg viewBox="0 0 10 8" className="h-2 w-2 fill-none stroke-current stroke-[2.5]">
+              <polyline points="1,4 4,7 9,1" />
+            </svg>
+          )}
+        </button>
 
-        {secondaryLabel && (
+        <button
+          type="button"
+          onClick={onSelect}
+          className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
+        >
           <span
             className={cn(
-              "mt-0.75 block text-xs leading-none tabular-nums",
-              overdue ? "text-red-500 dark:text-red-400" : "text-text-muted/60",
+              "block truncate text-sm font-medium",
+              isCompleted ? "text-text-muted line-through" : "text-text",
             )}
           >
-            {secondaryLabel}
+            {task.title || "Untitled"}
           </span>
-        )}
+
+          {secondaryLabel && (
+            <span
+              className={cn(
+                "mt-0.5 block text-xs leading-none tabular-nums",
+                overdue ? "text-red-500 dark:text-red-400" : "text-text-muted/60",
+              )}
+            >
+              {secondaryLabel}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );

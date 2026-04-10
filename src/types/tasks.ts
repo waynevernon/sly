@@ -1,23 +1,19 @@
-export type TaskView = 'inbox' | 'today' | 'upcoming' | 'someday' | 'waiting' | 'logbook';
+export type TaskView = 'inbox' | 'today' | 'upcoming' | 'completed';
 
 export interface TaskMetadata {
   id: string;
   title: string;
   createdAt: string;
   actionAt: string | null;
-  waiting: boolean;
-  someday: boolean;
   completedAt: string | null;
 }
 
 export interface Task extends TaskMetadata {
-  notes: string;
+  description: string;
 }
 
 export interface TaskPatch {
   title?: string;
+  description?: string;
   actionAt?: string | null;
-  waiting?: boolean;
-  someday?: boolean;
-  notes?: string;
 }

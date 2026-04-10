@@ -1,566 +1,346 @@
-use anyhow::Result;
-use chrono::Utc;
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Utc};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
-use crate::frontmatter::extract_frontmatter_block;
+const TASKS_DB_SCHEMA_VERSION: i32 = 1;
 
-// ── Public types ─────────────────────────────────────────────────────────────
+// Public types
 
-/// Lightweight metadata returned by `list_tasks`. Parsed from frontmatter only.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskMetadata {
     pub id: String,
     pub title: String,
     pub created_at: String,
-    #[serde(alias = "actionDate")]
     pub action_at: Option<String>,
-    pub waiting: bool,
-    pub someday: bool,
     pub completed_at: Option<String>,
 }
 
-/// Full task including the markdown body (everything after frontmatter).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: String,
     pub title: String,
+    pub description: String,
     pub created_at: String,
-    #[serde(alias = "actionDate")]
     pub action_at: Option<String>,
-    pub waiting: bool,
-    pub someday: bool,
     pub completed_at: Option<String>,
-    pub notes: String,
 }
 
-/// Fields that can be updated via `update_task`. Each field is doubly-optional:
-/// `None` → leave unchanged; `Some(None)` → clear; `Some(Some(v))` → set to v.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskPatch {
     pub title: Option<String>,
-    #[serde(alias = "actionDate")]
+    pub description: Option<String>,
     pub action_at: Option<Option<String>>,
-    pub waiting: Option<bool>,
-    pub someday: Option<bool>,
-    pub notes: Option<String>,
 }
 
-// ── Path helpers ─────────────────────────────────────────────────────────────
-
-pub(crate) fn tasks_dir(notes_root: &Path) -> PathBuf {
-    notes_root.join(".tasks")
-}
-
-/// Generate a new unique task file ID (no extension).
-pub(crate) fn new_task_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    // XOR a stack-address-derived value for uniqueness within the same ms.
-    let discriminant: u64 = {
-        let x: u64 = 0;
-        (&x as *const u64 as u64)
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407)
-    };
-    let rand = (discriminant >> 33) as u32 & 0xFFFFFF;
-    format!("{ms:016}-{rand:06x}")
-}
-
-pub(crate) fn task_path(notes_root: &Path, id: &str) -> PathBuf {
-    tasks_dir(notes_root).join(format!("{id}.md"))
-}
-
-/// True if the given path lives directly inside the `.tasks/` directory.
-pub(crate) fn is_task_path(notes_root: &Path, path: &Path) -> bool {
-    let dir = tasks_dir(notes_root);
-    path.starts_with(&dir)
-        && path.extension().and_then(|e| e.to_str()) == Some("md")
-}
-
-/// Extract a task ID (stem) from an absolute path inside `.tasks/`.
-pub(crate) fn id_from_task_path(notes_root: &Path, path: &Path) -> Option<String> {
-    if !is_task_path(notes_root, path) {
-        return None;
-    }
-    path.file_stem()?.to_str().map(|s| s.to_string())
-}
-
-// ── Frontmatter parsing ───────────────────────────────────────────────────────
-
-struct ParsedFrontmatter {
+#[derive(Debug)]
+struct TaskRow {
+    id: String,
     title: String,
+    description: String,
     created_at: String,
     action_at: Option<String>,
-    waiting: bool,
-    someday: bool,
     completed_at: Option<String>,
 }
 
-impl Default for ParsedFrontmatter {
-    fn default() -> Self {
+impl From<TaskRow> for Task {
+    fn from(row: TaskRow) -> Self {
         Self {
-            title: String::new(),
-            created_at: now_rfc3339(),
-            action_at: None,
-            waiting: false,
-            someday: false,
-            completed_at: None,
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            created_at: row.created_at,
+            action_at: row.action_at,
+            completed_at: row.completed_at,
         }
     }
 }
 
-/// Minimal hand-rolled key:value YAML parser for task frontmatter.
-/// Only handles the fixed set of fields we write; ignores everything else.
-fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
-    let block = match extract_frontmatter_block(content) {
-        Some(b) => b,
-        None => return ParsedFrontmatter::default(),
-    };
-
-    let mut fm = ParsedFrontmatter::default();
-
-    for line in block.lines() {
-        let Some((key, raw_value)) = line.split_once(':') else {
-            continue;
-        };
-        let key = key.trim();
-        let value = raw_value.trim();
-
-        match key {
-            "title" => fm.title = unquote(value).to_string(),
-            "created_at" => {
-                if !value.is_empty() && value != "null" {
-                    fm.created_at = value.to_string();
-                }
-            }
-            "action_at" | "action_date" => {
-                if value.is_empty() || value == "null" {
-                    fm.action_at = None;
-                } else {
-                    fm.action_at = Some(value.to_string());
-                }
-            }
-            "waiting" => fm.waiting = value == "true",
-            "someday" => fm.someday = value == "true",
-            "completed_at" => {
-                if value.is_empty() || value == "null" {
-                    fm.completed_at = None;
-                } else {
-                    fm.completed_at = Some(value.to_string());
-                }
-            }
-            _ => {}
+impl From<TaskRow> for TaskMetadata {
+    fn from(row: TaskRow) -> Self {
+        Self {
+            id: row.id,
+            title: row.title,
+            created_at: row.created_at,
+            action_at: row.action_at,
+            completed_at: row.completed_at,
         }
     }
-
-    fm
 }
 
-/// Strip surrounding single or double quotes from a YAML scalar.
-fn unquote(s: &str) -> &str {
-    if (s.starts_with('"') && s.ends_with('"'))
-        || (s.starts_with('\'') && s.ends_with('\''))
-    {
-        &s[1..s.len() - 1]
-    } else {
-        s
-    }
+// Path helpers
+
+pub(crate) fn tasks_db_path(notes_root: &Path) -> PathBuf {
+    notes_root.join(".sly").join("tasks.db")
 }
 
-/// Extract the notes body (content after frontmatter).
-fn extract_notes_body(content: &str) -> String {
-    use crate::frontmatter::strip_frontmatter;
-    strip_frontmatter(content)
-        .unwrap_or("")
-        .trim_start_matches('\n')
-        .trim_start_matches("\r\n")
-        .to_string()
-}
-
-// ── Serialization ─────────────────────────────────────────────────────────────
-
-fn serialize_task_file(
-    title: &str,
-    created_at: &str,
-    action_at: Option<&str>,
-    waiting: bool,
-    someday: bool,
-    completed_at: Option<&str>,
-    notes: &str,
-) -> String {
-    let action_at_str = action_at
-        .map(|d| d.to_string())
-        .unwrap_or_else(|| "null".to_string());
-    let completed_at_str = completed_at
-        .map(|d| d.to_string())
-        .unwrap_or_else(|| "null".to_string());
-
-    // Escape the title: wrap in double quotes if it contains special chars.
-    let safe_title = escape_yaml_scalar(title);
-
-    let mut s = format!(
-        "---\ntitle: {safe_title}\ncreated_at: {created_at}\naction_at: {action_at_str}\nwaiting: {waiting}\nsomeday: {someday}\ncompleted_at: {completed_at_str}\n---\n"
-    );
-
-    if !notes.is_empty() {
-        s.push('\n');
-        s.push_str(notes);
-        if !notes.ends_with('\n') {
-            s.push('\n');
-        }
+fn open_tasks_db(notes_root: &Path) -> Result<Connection> {
+    let db_path = tasks_db_path(notes_root);
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
     }
 
-    s
+    let conn = Connection::open(db_path)?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "busy_timeout", 5_000)?;
+    initialize_schema(&conn)?;
+    Ok(conn)
 }
 
-fn escape_yaml_scalar(s: &str) -> String {
-    // Use double-quoted form if the string contains characters that need escaping.
-    if s.contains(':') || s.contains('#') || s.contains('"') || s.contains('\'') || s.starts_with(' ') || s.ends_with(' ') {
-        format!("\"{}\"", s.replace('"', "\\\""))
-    } else {
-        s.to_string()
-    }
-}
+fn initialize_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            action_at TEXT NULL,
+            created_at TEXT NOT NULL,
+            completed_at TEXT NULL
+        );
 
-// ── Time helpers ──────────────────────────────────────────────────────────────
+        CREATE INDEX IF NOT EXISTS idx_tasks_completed_at
+            ON tasks (completed_at);
 
-pub(crate) fn now_rfc3339() -> String {
-    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-}
-
-// ── File IO ──────────────────────────────────────────────────────────────────
-
-/// List all tasks in the `.tasks/` directory.
-pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
-    let dir = tasks_dir(notes_root);
-    if !dir.exists() {
-        return Ok(vec![]);
-    }
-
-    let mut tasks = Vec::new();
-    for entry in std::fs::read_dir(&dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("md") {
-            continue;
-        }
-        let id = match id_from_task_path(notes_root, &path) {
-            Some(id) => id,
-            None => continue,
-        };
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            let fm = parse_frontmatter(&content);
-            tasks.push(TaskMetadata {
-                id,
-                title: fm.title,
-                created_at: fm.created_at,
-                action_at: fm.action_at,
-                waiting: fm.waiting,
-                someday: fm.someday,
-                completed_at: fm.completed_at,
-            });
-        }
-    }
-
-    // Sort by created_at descending (newest first in each view)
-    tasks.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    Ok(tasks)
-}
-
-/// Read a single task by ID.
-pub(crate) fn read_task(notes_root: &Path, id: &str) -> Result<Task> {
-    let path = task_path(notes_root, id);
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("Task not found: {id}: {e}"))?;
-    let fm = parse_frontmatter(&content);
-    let notes = extract_notes_body(&content);
-    Ok(Task {
-        id: id.to_string(),
-        title: fm.title,
-        created_at: fm.created_at,
-        action_at: fm.action_at,
-        waiting: fm.waiting,
-        someday: fm.someday,
-        completed_at: fm.completed_at,
-        notes,
-    })
-}
-
-/// Create a new task with the given title. Returns the created task.
-pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
-    let dir = tasks_dir(notes_root);
-    std::fs::create_dir_all(&dir)?;
-
-    let id = new_task_id();
-    let created_at = now_rfc3339();
-    let content = serialize_task_file(
-        title,
-        &created_at,
-        None,
-        false,
-        false,
-        None,
-        "",
-    );
-
-    let path = task_path(notes_root, &id);
-    std::fs::write(&path, &content)?;
-
-    Ok(Task {
-        id,
-        title: title.to_string(),
-        created_at,
-        action_at: None,
-        waiting: false,
-        someday: false,
-        completed_at: None,
-        notes: String::new(),
-    })
-}
-
-/// Apply a patch to an existing task. Returns the updated task.
-pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Result<Task> {
-    let path = task_path(notes_root, id);
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("Task not found: {id}: {e}"))?;
-
-    let fm = parse_frontmatter(&content);
-    let current_notes = extract_notes_body(&content);
-
-    let title = patch.title.unwrap_or(fm.title);
-    let action_at = patch.action_at
-        .unwrap_or(fm.action_at);
-    let waiting = patch.waiting.unwrap_or(fm.waiting);
-    let someday = patch.someday.unwrap_or(fm.someday);
-    let notes = patch.notes.unwrap_or(current_notes);
-
-    let new_content = serialize_task_file(
-        &title,
-        &fm.created_at,
-        action_at.as_deref(),
-        waiting,
-        someday,
-        fm.completed_at.as_deref(),
-        &notes,
-    );
-
-    std::fs::write(&path, &new_content)?;
-
-    Ok(Task {
-        id: id.to_string(),
-        title,
-        created_at: fm.created_at,
-        action_at,
-        waiting,
-        someday,
-        completed_at: fm.completed_at,
-        notes,
-    })
-}
-
-/// Toggle the completed state of a task.
-pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -> Result<Task> {
-    let path = task_path(notes_root, id);
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("Task not found: {id}: {e}"))?;
-
-    let fm = parse_frontmatter(&content);
-    let notes = extract_notes_body(&content);
-
-    let completed_at = if completed {
-        Some(now_rfc3339())
-    } else {
-        None
-    };
-
-    let new_content = serialize_task_file(
-        &fm.title,
-        &fm.created_at,
-        fm.action_at.as_deref(),
-        fm.waiting,
-        fm.someday,
-        completed_at.as_deref(),
-        &notes,
-    );
-
-    std::fs::write(&path, &new_content)?;
-
-    Ok(Task {
-        id: id.to_string(),
-        title: fm.title,
-        created_at: fm.created_at,
-        action_at: fm.action_at,
-        waiting: fm.waiting,
-        someday: fm.someday,
-        completed_at,
-        notes,
-    })
-}
-
-/// Delete a task by ID.
-pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
-    let path = task_path(notes_root, id);
-    if path.exists() {
-        std::fs::remove_file(&path)?;
-    }
+        CREATE INDEX IF NOT EXISTS idx_tasks_action_at
+            ON tasks (action_at);
+        ",
+    )?;
+    conn.pragma_update(None, "user_version", TASKS_DB_SCHEMA_VERSION)?;
     Ok(())
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// Normalization helpers
+
+fn now_rfc3339() -> String {
+    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+fn new_task_id() -> String {
+    Uuid::now_v7().to_string()
+}
+
+fn normalize_action_at(value: Option<String>) -> Result<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    let parsed = DateTime::parse_from_rfc3339(trimmed)
+        .map_err(|error| anyhow!("Invalid actionAt timestamp: {error}"))?;
+    Ok(Some(
+        parsed
+            .with_timezone(&Utc)
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string(),
+    ))
+}
+
+fn normalize_title(title: &str) -> Result<String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow!("Task title cannot be empty"));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
+    Ok(TaskRow {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        description: row.get("description")?,
+        created_at: row.get("created_at")?,
+        action_at: row.get("action_at")?,
+        completed_at: row.get("completed_at")?,
+    })
+}
+
+fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
+    conn.query_row(
+        "
+        SELECT id, title, description, created_at, action_at, completed_at
+        FROM tasks
+        WHERE id = ?1
+        ",
+        [id],
+        task_row_from_query,
+    )
+    .optional()?
+    .ok_or_else(|| anyhow!("Task not found: {id}"))
+}
+
+// CRUD
+
+pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
+    let conn = open_tasks_db(notes_root)?;
+    let mut statement = conn.prepare(
+        "
+        SELECT id, title, description, created_at, action_at, completed_at
+        FROM tasks
+        ORDER BY created_at DESC
+        ",
+    )?;
+
+    let rows = statement.query_map([], task_row_from_query)?;
+    let mut tasks = Vec::new();
+    for row in rows {
+        tasks.push(TaskMetadata::from(row?));
+    }
+    Ok(tasks)
+}
+
+pub(crate) fn read_task(notes_root: &Path, id: &str) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    Ok(Task::from(read_task_row(&conn, id)?))
+}
+
+pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let task = Task {
+        id: new_task_id(),
+        title: normalize_title(title)?,
+        description: String::new(),
+        created_at: now_rfc3339(),
+        action_at: None,
+        completed_at: None,
+    };
+
+    conn.execute(
+        "
+        INSERT INTO tasks (id, title, description, action_at, created_at, completed_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        ",
+        params![
+            &task.id,
+            &task.title,
+            &task.description,
+            &task.action_at,
+            &task.created_at,
+            &task.completed_at,
+        ],
+    )?;
+
+    Ok(task)
+}
+
+pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let existing = read_task_row(&conn, id)?;
+
+    let title = match patch.title {
+        Some(next) => normalize_title(&next)?,
+        None => existing.title,
+    };
+    let description = patch.description.unwrap_or(existing.description);
+    let action_at = match patch.action_at {
+        Some(next) => normalize_action_at(next)?,
+        None => existing.action_at,
+    };
+
+    conn.execute(
+        "
+        UPDATE tasks
+        SET title = ?2,
+            description = ?3,
+            action_at = ?4
+        WHERE id = ?1
+        ",
+        params![id, title, description, action_at],
+    )?;
+
+    Ok(Task {
+        id: id.to_string(),
+        title,
+        description,
+        created_at: existing.created_at,
+        action_at,
+        completed_at: existing.completed_at,
+    })
+}
+
+pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let existing = read_task_row(&conn, id)?;
+    let completed_at = if completed { Some(now_rfc3339()) } else { None };
+
+    conn.execute(
+        "
+        UPDATE tasks
+        SET completed_at = ?2
+        WHERE id = ?1
+        ",
+        params![id, completed_at],
+    )?;
+
+    Ok(Task {
+        id: id.to_string(),
+        title: existing.title,
+        description: existing.description,
+        created_at: existing.created_at,
+        action_at: existing.action_at,
+        completed_at,
+    })
+}
+
+pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
+    let conn = open_tasks_db(notes_root)?;
+    conn.execute("DELETE FROM tasks WHERE id = ?1", [id])?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::TempDir;
 
     fn make_root() -> TempDir {
         tempfile::tempdir().expect("tempdir")
     }
 
-    // ── frontmatter round-trip ────────────────────────────────────────────────
-
     #[test]
-    fn parse_full_frontmatter() {
-        let content = "---\ntitle: Buy milk\ncreated_at: 2026-04-09T10:00:00Z\naction_at: 2026-04-10\nwaiting: true\nsomeday: false\ncompleted_at: null\n---\n\nSome notes here.";
-        let fm = parse_frontmatter(content);
-        assert_eq!(fm.title, "Buy milk");
-        assert_eq!(fm.created_at, "2026-04-09T10:00:00Z");
-        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
-        assert!(fm.waiting);
-        assert!(!fm.someday);
-        assert_eq!(fm.completed_at, None);
+    fn initializes_tasks_db_inside_sly_directory() {
+        let root = make_root();
+        let db_path = tasks_db_path(root.path());
+        assert!(!db_path.exists());
+
+        let conn = open_tasks_db(root.path()).unwrap();
+        let user_version: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(user_version, TASKS_DB_SCHEMA_VERSION);
+        assert!(db_path.exists());
     }
-
-    #[test]
-    fn parse_missing_optional_fields() {
-        let content = "---\ntitle: Minimal\ncreated_at: 2026-01-01T00:00:00Z\naction_at: null\nwaiting: false\nsomeday: false\ncompleted_at: null\n---\n";
-        let fm = parse_frontmatter(content);
-        assert_eq!(fm.title, "Minimal");
-        assert_eq!(fm.action_at, None);
-        assert!(!fm.waiting);
-        assert_eq!(fm.completed_at, None);
-    }
-
-    #[test]
-    fn parse_legacy_action_date_frontmatter() {
-        let content = "---\ntitle: Legacy\ncreated_at: 2026-04-09T10:00:00Z\naction_date: 2026-04-10\nwaiting: false\nsomeday: false\ncompleted_at: null\n---\n";
-        let fm = parse_frontmatter(content);
-        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
-    }
-
-    #[test]
-    fn parse_malformed_no_frontmatter() {
-        let fm = parse_frontmatter("# Just markdown\nNo frontmatter here.");
-        // Should produce defaults without panicking.
-        assert!(!fm.waiting);
-        assert!(!fm.someday);
-        assert_eq!(fm.action_at, None);
-    }
-
-    #[test]
-    fn serialize_round_trip() {
-        let content = serialize_task_file(
-            "Buy milk",
-            "2026-04-09T10:00:00Z",
-            Some("2026-04-10"),
-            false,
-            false,
-            None,
-            "Go to the store.",
-        );
-        let fm = parse_frontmatter(&content);
-        assert_eq!(fm.title, "Buy milk");
-        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
-        assert!(!fm.waiting);
-    }
-
-    #[test]
-    fn serialize_title_with_colon() {
-        let content = serialize_task_file("Fix: the bug", "2026-04-09T00:00:00Z", None, false, false, None, "");
-        assert!(content.contains("\"Fix: the bug\""));
-        let fm = parse_frontmatter(&content);
-        assert_eq!(fm.title, "Fix: the bug");
-    }
-
-    // ── view routing ─────────────────────────────────────────────────────────
-
-    fn meta(
-        action_at: Option<&str>,
-        waiting: bool,
-        someday: bool,
-        completed_at: Option<&str>,
-    ) -> TaskMetadata {
-        TaskMetadata {
-            id: "x".to_string(),
-            title: "T".to_string(),
-            created_at: "2026-04-09T00:00:00Z".to_string(),
-            action_at: action_at.map(str::to_string),
-            waiting,
-            someday,
-            completed_at: completed_at.map(str::to_string),
-        }
-    }
-
-    fn derive(m: &TaskMetadata, today: &str) -> &'static str {
-        // Mirror the frontend deriveView logic in Rust for testing.
-        if m.completed_at.is_some() {
-            return "logbook";
-        }
-        if m.waiting {
-            return "waiting";
-        }
-        if m.someday {
-            return "someday";
-        }
-        if let Some(date) = &m.action_at {
-            if date.as_str() <= today {
-                return "today";
-            } else {
-                return "upcoming";
-            }
-        }
-        "inbox"
-    }
-
-    #[test]
-    fn view_routing_table() {
-        let today = "2026-04-09";
-        let cases: &[(&str, TaskMetadata)] = &[
-            ("logbook",  meta(None,               false, false, Some("2026-04-09T12:00:00Z"))),
-            ("waiting",  meta(Some("2026-04-09"), true,  false, None)),
-            ("someday",  meta(None,               false, true,  None)),
-            ("today",    meta(Some("2026-04-09"), false, false, None)),
-            ("today",    meta(Some("2026-04-08"), false, false, None)), // overdue
-            ("upcoming", meta(Some("2026-04-10"), false, false, None)),
-            ("inbox",    meta(None,               false, false, None)),
-        ];
-
-        for (expected, task) in cases {
-            assert_eq!(derive(task, today), *expected, "Failed for expected={expected}");
-        }
-    }
-
-    // ── file IO ───────────────────────────────────────────────────────────────
 
     #[test]
     fn create_and_read_task() {
         let root = make_root();
         let task = create_task(root.path(), "Hello world").unwrap();
-        assert_eq!(task.title, "Hello world");
-        assert!(!task.id.is_empty());
-
         let read = read_task(root.path(), &task.id).unwrap();
-        assert_eq!(read.title, task.title);
-        assert_eq!(read.created_at, task.created_at);
+
+        assert_eq!(read.id, task.id);
+        assert_eq!(read.title, "Hello world");
+        assert_eq!(read.description, "");
+        assert!(read.action_at.is_none());
+        assert!(read.completed_at.is_none());
+    }
+
+    #[test]
+    fn create_task_rejects_blank_title() {
+        let root = make_root();
+        let result = create_task(root.path(), "   ");
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -568,31 +348,48 @@ mod tests {
         let root = make_root();
         let task = create_task(root.path(), "Original").unwrap();
 
-        let patch = TaskPatch {
-            title: Some("Updated".to_string()),
-            action_at: Some(Some("2026-05-01".to_string())),
-            waiting: Some(true),
-            someday: None,
-            notes: Some("My notes.".to_string()),
-        };
-        let updated = update_task(root.path(), &task.id, patch).unwrap();
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                title: Some("Updated".to_string()),
+                description: Some("Task description".to_string()),
+                action_at: Some(Some("2026-04-10T17:00:00-05:00".to_string())),
+            },
+        )
+        .unwrap();
+
         assert_eq!(updated.title, "Updated");
-        assert_eq!(updated.action_at, Some("2026-05-01".to_string()));
-        assert!(updated.waiting);
-        assert_eq!(updated.notes, "My notes.");
+        assert_eq!(updated.description, "Task description");
+        assert_eq!(updated.action_at.as_deref(), Some("2026-04-10T22:00:00Z"));
     }
 
     #[test]
     fn clear_action_at() {
         let root = make_root();
         let task = create_task(root.path(), "Task").unwrap();
-        // Set date
-        let p1 = TaskPatch { action_at: Some(Some("2026-05-01".to_string())), ..Default::default() };
-        update_task(root.path(), &task.id, p1).unwrap();
-        // Clear date
-        let p2 = TaskPatch { action_at: Some(None), ..Default::default() };
-        let updated = update_task(root.path(), &task.id, p2).unwrap();
-        assert_eq!(updated.action_at, None);
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("2026-04-10T12:00:00Z".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.action_at.as_deref(), Some("2026-04-10T12:00:00Z"));
+
+        let cleared = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(None),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(cleared.action_at.is_none());
     }
 
     #[test]
@@ -604,38 +401,74 @@ mod tests {
         assert!(done.completed_at.is_some());
 
         let undone = set_task_completed(root.path(), &task.id, false).unwrap();
-        assert_eq!(undone.completed_at, None);
+        assert!(undone.completed_at.is_none());
     }
 
     #[test]
-    fn delete_task_removes_file() {
+    fn delete_task_removes_row() {
         let root = make_root();
         let task = create_task(root.path(), "Ephemeral").unwrap();
-        let path = task_path(root.path(), &task.id);
-        assert!(path.exists());
 
         delete_task(root.path(), &task.id).unwrap();
-        assert!(!path.exists());
+        assert!(read_task(root.path(), &task.id).is_err());
     }
 
     #[test]
-    fn list_tasks_excludes_non_md() {
+    fn list_tasks_ignores_legacy_tasks_directory() {
         let root = make_root();
-        let dir = tasks_dir(root.path());
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("ignore.txt"), "not a task").unwrap();
-        create_task(root.path(), "Real task").unwrap();
+        let legacy_dir = root.path().join(".tasks");
+        std::fs::create_dir_all(&legacy_dir).unwrap();
+        std::fs::write(legacy_dir.join("legacy.md"), "# Old task").unwrap();
 
         let tasks = list_tasks(root.path()).unwrap();
-        assert_eq!(tasks.len(), 1);
+        assert!(tasks.is_empty());
     }
 
     #[test]
-    fn is_task_path_works() {
+    fn list_tasks_returns_created_tasks() {
         let root = make_root();
-        let inside = tasks_dir(root.path()).join("2026-04-09-abc.md");
-        let outside = root.path().join("note.md");
-        assert!(is_task_path(root.path(), &inside));
-        assert!(!is_task_path(root.path(), &outside));
+        let first = create_task(root.path(), "First").unwrap();
+        let second = create_task(root.path(), "Second").unwrap();
+
+        let tasks = list_tasks(root.path()).unwrap();
+        let ids: Vec<&str> = tasks.iter().map(|task| task.id.as_str()).collect();
+
+        assert_eq!(tasks.len(), 2);
+        assert!(ids.contains(&first.id.as_str()));
+        assert!(ids.contains(&second.id.as_str()));
+    }
+
+    #[test]
+    fn invalid_action_at_is_rejected() {
+        let root = make_root();
+        let task = create_task(root.path(), "Broken").unwrap();
+
+        let result = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("not-a-date".to_string())),
+                ..Default::default()
+            },
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_task_rejects_blank_title() {
+        let root = make_root();
+        let task = create_task(root.path(), "Keep me").unwrap();
+
+        let result = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                title: Some("   ".to_string()),
+                ..Default::default()
+            },
+        );
+
+        assert!(result.is_err());
     }
 }

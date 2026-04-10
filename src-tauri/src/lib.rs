@@ -24,7 +24,6 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-mod frontmatter;
 mod git;
 mod persistence;
 mod tasks;
@@ -3593,16 +3592,9 @@ fn setup_file_watcher(
                 let mut folder_structure_changed = false;
                 let mut emitted_path: Option<String> = None;
 
-                let mut task_changed = false;
-
                 for path in event.paths.iter() {
                     if !debounce_path(path, &debounce_map) {
                         continue;
-                    }
-
-                    // Detect changes inside .tasks/ and emit a separate event.
-                    if tasks::is_task_path(&notes_root, path) {
-                        task_changed = true;
                     }
 
                     if emitted_path.is_none() {
@@ -3684,10 +3676,6 @@ fn setup_file_watcher(
                             }
                         }
                     }
-                }
-
-                if task_changed {
-                    let _ = app_handle.emit("tasks-changed", ());
                 }
 
                 if folder_structure_changed || !changed_ids.is_empty() {
@@ -5270,9 +5258,15 @@ fn read_task(id: String, state: State<'_, AppState>) -> Result<tasks::Task, Stri
 }
 
 #[tauri::command]
-fn create_task(title: String, state: State<'_, AppState>) -> Result<tasks::Task, String> {
+fn create_task(
+    title: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<tasks::Task, String> {
     let root = notes_root_for_tasks(&state)?;
-    tasks::create_task(&root, &title).map_err(|e| e.to_string())
+    let task = tasks::create_task(&root, &title).map_err(|e| e.to_string())?;
+    let _ = app.emit("tasks-changed", ());
+    Ok(task)
 }
 
 #[tauri::command]
@@ -5280,9 +5274,12 @@ fn update_task(
     id: String,
     patch: tasks::TaskPatch,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<tasks::Task, String> {
     let root = notes_root_for_tasks(&state)?;
-    tasks::update_task(&root, &id, patch).map_err(|e| e.to_string())
+    let task = tasks::update_task(&root, &id, patch).map_err(|e| e.to_string())?;
+    let _ = app.emit("tasks-changed", ());
+    Ok(task)
 }
 
 #[tauri::command]
@@ -5290,15 +5287,20 @@ fn set_task_completed(
     id: String,
     completed: bool,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<tasks::Task, String> {
     let root = notes_root_for_tasks(&state)?;
-    tasks::set_task_completed(&root, &id, completed).map_err(|e| e.to_string())
+    let task = tasks::set_task_completed(&root, &id, completed).map_err(|e| e.to_string())?;
+    let _ = app.emit("tasks-changed", ());
+    Ok(task)
 }
 
 #[tauri::command]
-fn delete_task(id: String, state: State<'_, AppState>) -> Result<(), String> {
+fn delete_task(id: String, state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     let root = notes_root_for_tasks(&state)?;
-    tasks::delete_task(&root, &id).map_err(|e| e.to_string())
+    tasks::delete_task(&root, &id).map_err(|e| e.to_string())?;
+    let _ = app.emit("tasks-changed", ());
+    Ok(())
 }
 
 // Handle CLI arguments: open .md files in preview mode.

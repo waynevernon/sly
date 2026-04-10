@@ -1,20 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, CheckSquare, ChevronLeft, LoaderCircle, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CalendarDays,
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
-import { TASK_VIEW_LABELS } from "../../lib/tasks";
+import {
+  actionAtToLocalDate,
+  localDateString,
+  localDateToNormalizedActionAt,
+} from "../../lib/tasks";
 import { cn } from "../../lib/utils";
 import type { TaskPatch } from "../../types/tasks";
-import { IconButton, PanelEmptyState } from "../ui";
+import { IconButton, PanelEmptyState, PopoverSurface } from "../ui";
 
 const DEBOUNCE_MS = 600;
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
 
 export function TaskDetailPanel() {
   const {
     selectedTask,
-    selectedView,
     selectedTaskId,
     isLoadingTask,
-    selectTask,
     updateTask,
     deleteTask,
     setCompleted,
@@ -22,24 +47,19 @@ export function TaskDetailPanel() {
   } = useTasks();
 
   const [title, setTitle] = useState("");
-  const [actionAt, setActionAt] = useState("");
-  const [waiting, setWaiting] = useState(false);
-  const [someday, setSomeday] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [actionDate, setActionDate] = useState("");
+  const [description, setDescription] = useState("");
 
   const taskIdRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<TaskPatch>({});
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!selectedTask) return;
     taskIdRef.current = selectedTask.id;
     setTitle(selectedTask.title);
-    setActionAt(selectedTask.actionAt ?? "");
-    setWaiting(selectedTask.waiting);
-    setSomeday(selectedTask.someday);
-    setNotes(selectedTask.notes);
+    setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
+    setDescription(selectedTask.description);
     pendingPatchRef.current = {};
   }, [selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -82,34 +102,19 @@ export function TaskDetailPanel() {
     scheduleSave({ title: event.target.value });
   };
 
-  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setActionAt(value);
-    scheduleSave({ actionAt: value || null });
+  const handleDescriptionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(event.target.value);
+    scheduleSave({ description: event.target.value });
   };
 
-  const handleWaitingToggle = () => {
-    const id = taskIdRef.current;
-    if (!id) return;
-    const next = !waiting;
-    setWaiting(next);
-    if (next) setSomeday(false);
-    void updateTask(id, { waiting: next, ...(next ? { someday: false } : {}) });
-  };
-
-  const handleSomedayToggle = () => {
-    const id = taskIdRef.current;
-    if (!id) return;
-    const next = !someday;
-    setSomeday(next);
-    if (next) setWaiting(false);
-    void updateTask(id, { someday: next, ...(next ? { waiting: false } : {}) });
-  };
-
-  const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotes(event.target.value);
-    scheduleSave({ notes: event.target.value });
-  };
+  const commitActionDate = useCallback(
+    (nextDate: string | null) => {
+      setActionDate(nextDate ?? "");
+      scheduleSave({ actionAt: localDateToNormalizedActionAt(nextDate) });
+      flushSave();
+    },
+    [flushSave, scheduleSave],
+  );
 
   const handleToggleComplete = async () => {
     const id = taskIdRef.current;
@@ -123,14 +128,7 @@ export function TaskDetailPanel() {
     await deleteTask(id);
   };
 
-  const handleClearDate = () => {
-    const id = taskIdRef.current;
-    if (!id) return;
-    setActionAt("");
-    void updateTask(id, { actionAt: null });
-  };
-
-  const formattedDate = formatDate(actionAt, today);
+  const formattedDate = formatDate(actionDate, today);
   const isCompleted = Boolean(selectedTask?.completedAt);
   const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
 
@@ -174,7 +172,7 @@ export function TaskDetailPanel() {
             )}
           >
             {isCompleted && (
-              <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 stroke-current stroke-[2.5] fill-none">
+              <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 fill-none stroke-current stroke-[2.5]">
                 <polyline points="1,4 4,7 9,1" />
               </svg>
             )}
@@ -191,67 +189,24 @@ export function TaskDetailPanel() {
 
           <div />
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.focus()
-              }
-              className={cn(
-                "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2.5 text-xs transition-colors",
-                actionAt
-                  ? "text-text-muted hover:bg-bg-muted hover:text-text"
-                  : "text-text-muted/60 hover:bg-bg-muted hover:text-text-muted",
-              )}
-            >
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 stroke-[1.6]" />
-              <span>{formattedDate}</span>
-            </button>
-
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={actionAt}
-              onChange={handleDateChange}
-              onBlur={flushSave}
-              className="pointer-events-none absolute h-0 w-0 opacity-0"
-              aria-hidden="true"
+            <TaskDatePicker
+              value={actionDate}
+              today={today}
+              formattedValue={formattedDate}
+              onSelectDate={commitActionDate}
+              onClearDate={() => commitActionDate(null)}
             />
 
-            {actionAt && (
+            {actionDate && (
               <button
                 type="button"
-                onClick={handleClearDate}
-                className="ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] px-2.5 text-xs text-text-muted/70 transition-colors hover:bg-bg-muted hover:text-text"
+                onClick={() => commitActionDate(null)}
+                className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
               >
-                Clear Date
+                <X className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>Clear Date</span>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={handleWaitingToggle}
-              className={cn(
-                "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] border px-2.5 text-xs transition-colors",
-                waiting
-                  ? "border-accent/35 bg-bg-muted text-text"
-                  : "border-border text-text-muted hover:border-border-solid hover:text-text",
-              )}
-            >
-              Waiting
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSomedayToggle}
-              className={cn(
-                "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] border px-2.5 text-xs transition-colors",
-                someday
-                  ? "border-accent/35 bg-bg-muted text-text"
-                  : "border-border text-text-muted hover:border-border-solid hover:text-text",
-              )}
-            >
-              Someday
-            </button>
           </div>
 
           <div />
@@ -260,12 +215,12 @@ export function TaskDetailPanel() {
           <div />
           <div className="space-y-2">
             <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
-              Notes
+              Description
             </div>
             <textarea
-              value={notes}
-              placeholder="Add notes…"
-              onChange={handleNotesChange}
+              value={description}
+              placeholder="Add description…"
+              onChange={handleDescriptionChange}
               onBlur={flushSave}
               rows={12}
               className="min-h-[320px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
@@ -280,14 +235,7 @@ export function TaskDetailPanel() {
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-bg">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <button
-          type="button"
-          onClick={() => selectTask(null)}
-          className="ui-focus-ring -ml-1 inline-flex items-center gap-1 rounded-[var(--ui-radius-md)] px-1.5 py-1 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-        >
-          <ChevronLeft className="h-4 w-4 shrink-0 stroke-[1.8]" />
-          <span>{TASK_VIEW_LABELS[selectedView]}</span>
-        </button>
+        <div className="flex-1" />
         {selectedTask ? (
           <div className="ui-pane-header-actions ml-auto">
             <IconButton
@@ -313,22 +261,243 @@ export function TaskDetailPanel() {
   );
 }
 
+function TaskDatePicker({
+  value,
+  today,
+  formattedValue,
+  onSelectDate,
+  onClearDate,
+}: {
+  value: string;
+  today: string;
+  formattedValue: string;
+  onSelectDate: (date: string) => void;
+  onClearDate: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(value || today));
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setVisibleMonth(startOfMonth(value || today));
+  }, [isOpen, today, value]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!popoverRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
+  const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
+  const tomorrow = offsetDate(today, 1);
+
+  return (
+    <div ref={popoverRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className={cn(
+          "ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
+          value
+            ? "bg-bg-muted/70 text-text hover:bg-bg-muted"
+            : "text-text-muted hover:bg-bg-muted hover:text-text",
+        )}
+      >
+        <CalendarDays className="h-4 w-4 shrink-0 stroke-[1.7]" />
+        <span>{formattedValue}</span>
+      </button>
+
+      {isOpen && (
+        <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-30 w-80 p-2.5">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-text">{monthLabel}</div>
+              <div className="flex items-center gap-1">
+                <IconButton
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  title="Previous Month"
+                  onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
+                >
+                  <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
+                </IconButton>
+                <IconButton
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  title="Next Month"
+                  onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
+                >
+                  <ChevronRight className="h-4 w-4 stroke-[1.8]" />
+                </IconButton>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <QuickDateButton
+                label="Today"
+                isActive={value === today}
+                onClick={() => {
+                  onSelectDate(today);
+                  setIsOpen(false);
+                }}
+              />
+              <QuickDateButton
+                label="Tomorrow"
+                isActive={value === tomorrow}
+                onClick={() => {
+                  onSelectDate(tomorrow);
+                  setIsOpen(false);
+                }}
+              />
+              {value ? (
+                <QuickDateButton
+                  label="Clear"
+                  onClick={() => {
+                    onClearDate();
+                    setIsOpen(false);
+                  }}
+                />
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
+                >
+                  {label}
+                </div>
+              ))}
+              {weeks.flat().map((day) => {
+                const isSelected = day.date === value;
+                const isToday = day.date === today;
+
+                return (
+                  <button
+                    key={day.date}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      onSelectDate(day.date);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
+                      isSelected
+                        ? "bg-bg-muted text-text"
+                        : day.inCurrentMonth
+                          ? "text-text hover:bg-bg-muted"
+                          : "text-text-muted/50 hover:bg-bg-muted/70",
+                      isToday && !isSelected ? "ring-1 ring-border" : "",
+                    )}
+                  >
+                    {day.day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </PopoverSurface>
+      )}
+    </div>
+  );
+}
+
+function QuickDateButton({
+  label,
+  isActive = false,
+  onClick,
+}: {
+  label: string;
+  isActive?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] px-2.5 text-xs font-medium transition-colors",
+        isActive
+          ? "bg-bg-muted text-text"
+          : "text-text-muted hover:bg-bg-muted hover:text-text",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function buildMonthGrid(month: Date): Array<Array<{ date: string; day: number; inCurrentMonth: boolean }>> {
+  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  return Array.from({ length: 6 }, (_, weekIndex) =>
+    Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(gridStart);
+      date.setDate(gridStart.getDate() + weekIndex * 7 + dayIndex);
+      return {
+        date: localDateString(date),
+        day: date.getDate(),
+        inCurrentMonth: date.getMonth() === monthStart.getMonth(),
+      };
+    }),
+  );
+}
+
+function startOfMonth(value: string): Date {
+  const parsed = parseLocalDate(value);
+  return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+}
+
+function addMonths(date: Date, offset: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
+}
+
+function parseLocalDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day);
+}
+
 function formatDate(date: string, today: string): string {
   if (!date) return "Set date";
   if (date === today) return "Today";
   const tomorrow = offsetDate(today, 1);
   if (date === tomorrow) return "Tomorrow";
   const [y, m, d] = date.split("-").map(Number);
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const todayYear = Number(today.split("-")[0]);
-  return `${names[m - 1]} ${d}${y !== todayYear ? `, ${y}` : ""}`;
+  return `${MONTH_LABELS[m - 1].slice(0, 3)} ${d}${y !== todayYear ? `, ${y}` : ""}`;
 }
 
 function offsetDate(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00`);
+  const d = parseLocalDate(date);
   d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${day}`;
+  return localDateString(d);
 }
