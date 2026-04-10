@@ -54,6 +54,10 @@ const themeState = {
   setRightPanelTab: vi.fn(),
 };
 
+const tasksState = {
+  isTasksModeActive: false,
+};
+
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
@@ -85,6 +89,11 @@ vi.mock("./context/ThemeContext", () => ({
 
 vi.mock("./context/GitContext", () => ({
   GitProvider: ({ children }: PropsWithChildren) => children,
+}));
+
+vi.mock("./context/TasksContext", () => ({
+  TasksProvider: ({ children }: PropsWithChildren) => children,
+  useTasks: () => tasksState,
 }));
 
 const editorListeners = {
@@ -141,6 +150,10 @@ vi.mock("./components/editor/Editor", () => ({
 
     return <div>editor</div>;
   },
+}));
+
+vi.mock("./components/tasks/TaskDetailPanel", () => ({
+  TaskDetailPanel: () => <div>task-detail-panel</div>,
 }));
 
 vi.mock("./components/layout/FolderPicker", () => ({
@@ -217,6 +230,7 @@ describe("App", () => {
     themeState.paneMode = 3;
     themeState.rightPanelVisible = true;
     themeState.rightPanelTab = "outline";
+    tasksState.isTasksModeActive = false;
   });
 
   afterEach(() => {
@@ -323,12 +337,33 @@ describe("App", () => {
     expect(screen.getByText("right-panel")).toBeInTheDocument();
   });
 
+  it("uses the task detail workspace and hides the right panel in task mode", () => {
+    tasksState.isTasksModeActive = true;
+
+    render(<App />);
+
+    expect(screen.getByText("workspace-navigation")).toBeInTheDocument();
+    expect(screen.getByText("task-detail-panel")).toBeInTheDocument();
+    expect(screen.queryByText("editor")).not.toBeInTheDocument();
+    expect(screen.queryByText("right-panel")).not.toBeInTheDocument();
+  });
+
   it("toggles the right panel with Cmd/Ctrl+4", () => {
     render(<App />);
 
     fireEvent.keyDown(window, { key: "4", metaKey: true });
 
     expect(themeState.setRightPanelVisible).toHaveBeenCalledWith(false);
+  });
+
+  it("does not toggle the right panel with Cmd/Ctrl+4 in task mode", () => {
+    tasksState.isTasksModeActive = true;
+
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "4", metaKey: true });
+
+    expect(themeState.setRightPanelVisible).not.toHaveBeenCalled();
   });
 
   it("stores the registered flush callback as a function", () => {

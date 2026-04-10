@@ -12,7 +12,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { Task, TaskMetadata, TaskPatch, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
 import { groupByView, localDateString } from "../lib/tasks";
-import { useNotesData } from "./NotesContext";
+import { useNotesActions, useNotesData } from "./NotesContext";
 import type { NoteScope } from "../types/note";
 
 interface TasksContextValue {
@@ -45,6 +45,7 @@ const TasksContext = createContext<TasksContextValue | null>(null);
 
 export function TasksProvider({ children }: { children: ReactNode }) {
   const { notesFolder, settings, selectedScope } = useNotesData();
+  const { clearNoteSelection } = useNotesActions();
   const tasksEnabled = settings?.tasksEnabled ?? false;
 
   const [tasks, setTasks] = useState<TaskMetadata[]>([]);
@@ -138,11 +139,12 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   }, [tasksEnabled, refreshTasks]);
 
   const selectView = useCallback((view: TaskView) => {
+    clearNoteSelection();
     setIsTasksModeActive(true);
     setSelectedView(view);
     setSelectedTaskId(null);
     setSelectedTask(null);
-  }, []);
+  }, [clearNoteSelection]);
 
   const selectTask = useCallback((id: string | null) => {
     setSelectedTaskId(id);

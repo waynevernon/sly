@@ -30,6 +30,7 @@ import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
+import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
 import { TasksProvider, useTasks } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
@@ -273,6 +274,23 @@ const WorkspaceMain = memo(function WorkspaceMain({
 }: WorkspaceMainProps) {
   const { isTasksModeActive } = useTasks();
 
+  useEffect(() => {
+    if (!isTasksModeActive) {
+      return;
+    }
+
+    onEditorReady(null);
+    onRegisterScrollContainer(null);
+    onRegisterFlushPendingSave(null);
+    onEditorSourceModeChange(false);
+  }, [
+    isTasksModeActive,
+    onEditorReady,
+    onEditorSourceModeChange,
+    onRegisterFlushPendingSave,
+    onRegisterScrollContainer,
+  ]);
+
   return (
     <>
       <WorkspaceNavigation
@@ -281,7 +299,7 @@ const WorkspaceMain = memo(function WorkspaceMain({
       />
       <div className="flex min-w-0 flex-1">
         {isTasksModeActive ? (
-          <div className="flex-1 bg-bg" data-tauri-drag-region />
+          <TaskDetailPanel />
         ) : (
           <>
             <Editor
@@ -319,11 +337,13 @@ function TitlebarPaneSwitch({
   onCyclePaneMode,
   rightPanelVisible,
   onToggleRightPanel,
+  showRightPanelToggle = true,
 }: {
   paneMode: PaneMode;
   onCyclePaneMode: () => void;
   rightPanelVisible: boolean;
   onToggleRightPanel: () => void;
+  showRightPanelToggle?: boolean;
 }) {
   return (
     <>
@@ -338,27 +358,30 @@ function TitlebarPaneSwitch({
           </IconButton>
         </div>
       </div>
-      <div
-        className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
-        data-tauri-drag-region
-      >
-        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
-          <IconButton
-            onClick={onToggleRightPanel}
-            title={`${
-              rightPanelVisible ? "Hide" : "Show"
-            } Right Panel (${mod}${isMac ? "" : "+"}4)`}
-            className="shrink-0"
-          >
-            <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
-          </IconButton>
+      {showRightPanelToggle && (
+        <div
+          className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
+          data-tauri-drag-region
+        >
+          <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+            <IconButton
+              onClick={onToggleRightPanel}
+              title={`${
+                rightPanelVisible ? "Hide" : "Show"
+              } Right Panel (${mod}${isMac ? "" : "+"}4)`}
+              className="shrink-0"
+            >
+              <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
+            </IconButton>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
 
 function AppContent() {
+  const { isTasksModeActive } = useTasks();
   const {
     notesFolder,
     isLoading,
@@ -452,7 +475,13 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
-  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
+  const isTasksModeActiveRef = useRef(isTasksModeActive);
+  isTasksModeActiveRef.current = isTasksModeActive;
+  const showRightPanel =
+    rightPanelVisible &&
+    !focusMode &&
+    !editorSourceMode &&
+    !isTasksModeActive;
 
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
@@ -753,6 +782,9 @@ function AppContent() {
   );
 
   const toggleRightPanel = useCallback(() => {
+    if (isTasksModeActiveRef.current) {
+      return;
+    }
     setRightPanelVisible(!rightPanelVisibleRef.current);
   }, [setRightPanelVisible]);
 
@@ -1538,6 +1570,7 @@ function AppContent() {
             onCyclePaneMode={cyclePaneMode}
             rightPanelVisible={rightPanelVisible}
             onToggleRightPanel={toggleRightPanel}
+            showRightPanelToggle={!isTasksModeActive}
           />
         )}
         {view === "settings" ? (

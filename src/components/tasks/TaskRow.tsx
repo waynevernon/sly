@@ -21,31 +21,44 @@ export function TaskRow({
 }: TaskRowProps) {
   const isCompleted = Boolean(task.completedAt);
   const overdue = !isCompleted && isOverdue(task, today);
+  const secondaryLabel = task.completedAt && view === "logbook"
+    ? formatCompletedAt(task.completedAt)
+    : task.actionDate && view !== "logbook"
+      ? formatDate(task.actionDate, today)
+      : null;
 
   return (
     <div
-      role="option"
-      aria-selected={isSelected}
+      role="button"
+      aria-pressed={isSelected}
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+
+        event.preventDefault();
+        onSelect();
+      }}
       className={cn(
-        "group flex items-center gap-2 cursor-default rounded-md px-2 py-1.5 transition-colors duration-100",
-        isSelected ? "bg-bg-muted" : "hover:bg-bg-muted/70"
+        "group flex cursor-default items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors duration-100 outline-none",
+        isSelected ? "bg-bg-muted" : "hover:bg-bg-muted/70",
       )}
     >
-      {/* Completion circle */}
       <button
         type="button"
         aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
-        onClick={(e) => {
-          e.stopPropagation();
+        onClick={(event) => {
+          event.stopPropagation();
           onToggleComplete();
         }}
         className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors outline-none",
+          "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors outline-none",
           "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
           isCompleted
             ? "border-accent bg-accent text-text-inverse"
-            : "border-border bg-bg hover:border-accent/60"
+            : "border-border bg-bg hover:border-accent/60",
         )}
       >
         {isCompleted && (
@@ -55,31 +68,24 @@ export function TaskRow({
         )}
       </button>
 
-      {/* Title + date */}
       <div className="min-w-0 flex-1">
         <span
           className={cn(
             "block truncate text-sm leading-snug",
-            isCompleted ? "line-through text-text-muted" : "text-text"
+            isCompleted ? "text-text-muted line-through" : "text-text",
           )}
         >
           {task.title || "Untitled"}
         </span>
 
-        {task.actionDate && view !== "logbook" && (
+        {secondaryLabel && (
           <span
             className={cn(
-              "block text-xs leading-none mt-0.5 tabular-nums",
-              overdue ? "text-red-500 dark:text-red-400" : "text-text-muted/60"
+              "mt-0.75 block text-xs leading-none tabular-nums",
+              overdue ? "text-red-500 dark:text-red-400" : "text-text-muted/60",
             )}
           >
-            {formatDate(task.actionDate, today)}
-          </span>
-        )}
-
-        {task.completedAt && view === "logbook" && (
-          <span className="block text-xs leading-none mt-0.5 tabular-nums text-text-muted/60">
-            {formatCompletedAt(task.completedAt)}
+            {secondaryLabel}
           </span>
         )}
       </div>
