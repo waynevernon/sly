@@ -30,7 +30,6 @@ import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
-import { TasksProvider, useTasks } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
@@ -271,8 +270,6 @@ const WorkspaceMain = memo(function WorkspaceMain({
   onRightPanelTabChange,
   onRightPanelWidthChange,
 }: WorkspaceMainProps) {
-  const { isTasksModeActive } = useTasks();
-
   return (
     <>
       <WorkspaceNavigation
@@ -280,35 +277,29 @@ const WorkspaceMain = memo(function WorkspaceMain({
         onOpenSettings={onOpenSettings}
       />
       <div className="flex min-w-0 flex-1">
-        {isTasksModeActive ? (
-          <div className="flex-1 bg-bg" data-tauri-drag-region />
-        ) : (
-          <>
-            <Editor
-              paneMode={paneMode}
-              focusMode={focusMode}
-              hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
-              workspaceMode={workspaceEditorData}
-              assistantSelection={currentAssistantSelection}
-              onSourceModeChange={onEditorSourceModeChange}
-              onRegisterScrollContainer={onRegisterScrollContainer}
-              onRegisterFlushPendingSave={onRegisterFlushPendingSave}
-              onEditorReady={onEditorReady}
-            />
-            <RightPanel
-              editor={editorInstance}
-              scrollContainer={editorScrollContainer}
-              noteId={currentNoteId}
-              hasNote={Boolean(currentNoteId)}
-              visible={showRightPanel}
-              width={rightPanelWidth}
-              activeTab={rightPanelTab}
-              onTabChange={onRightPanelTabChange}
-              onWidthChange={onRightPanelWidthChange}
-              assistantProps={assistantProps}
-            />
-          </>
-        )}
+        <Editor
+          paneMode={paneMode}
+          focusMode={focusMode}
+          hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
+          workspaceMode={workspaceEditorData}
+          assistantSelection={currentAssistantSelection}
+          onSourceModeChange={onEditorSourceModeChange}
+          onRegisterScrollContainer={onRegisterScrollContainer}
+          onRegisterFlushPendingSave={onRegisterFlushPendingSave}
+          onEditorReady={onEditorReady}
+        />
+        <RightPanel
+          editor={editorInstance}
+          scrollContainer={editorScrollContainer}
+          noteId={currentNoteId}
+          hasNote={Boolean(currentNoteId)}
+          visible={showRightPanel}
+          width={rightPanelWidth}
+          activeTab={rightPanelTab}
+          onTabChange={onRightPanelTabChange}
+          onWidthChange={onRightPanelWidthChange}
+          assistantProps={assistantProps}
+        />
       </div>
     </>
   );
@@ -1711,11 +1702,9 @@ function App() {
       <Toaster />
       <TooltipProvider>
         <NotesProvider>
-          <TasksProvider>
-            <GitProvider>
-              <AppContent />
-            </GitProvider>
-          </TasksProvider>
+          <GitProvider>
+            <AppContent />
+          </GitProvider>
         </NotesProvider>
       </TooltipProvider>
     </ThemeProvider>

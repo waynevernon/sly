@@ -211,7 +211,6 @@ export interface Settings {
   noteSortMode: NoteSortMode;
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode: FolderSortMode;
-  tasksEnabled?: boolean | null;
 }
 
 export interface SettingsPatch {
@@ -234,7 +233,6 @@ export interface SettingsPatch {
   noteSortMode?: NoteSortMode;
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode?: FolderSortMode;
-  tasksEnabled?: boolean | null;
 }
 
 export interface FolderNode {

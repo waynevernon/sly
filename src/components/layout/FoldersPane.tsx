@@ -13,7 +13,6 @@ import {
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
-import { TasksSection } from "../tasks/TasksSection";
 
 const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
   key: "name",
@@ -50,10 +49,7 @@ export function FoldersPane({
     setNoteListViewOptions,
     setShowPinnedNotes,
     setShowRecentNotes,
-    settings,
   } = useNotes();
-
-  const tasksEnabled = settings?.tasksEnabled ?? false;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -136,12 +132,6 @@ export function FoldersPane({
         ref={scrollContainerRef}
         className="ui-scrollbar-overlay flex-1 overflow-y-auto py-2.5"
       >
-        {tasksEnabled && (
-          <>
-            <TasksSection />
-            <div className="mx-2 my-1 border-t border-border/40" />
-          </>
-        )}
         <FolderTreeView pendingFolderPath={pendingFolderPath} />
       </div>
 

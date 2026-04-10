@@ -189,7 +189,7 @@ export function ListItem({
         "focus:outline-none focus-visible:outline-none",
         hasSecondaryRow ? "py-2.25" : "py-1.75",
         isActive
-          ? "bg-bg-muted"
+          ? "bg-bg-muted group-focus-visible/notelist:ring-1 group-focus-visible/notelist:ring-text-muted"
           : selectionState === "selected"
             ? "bg-bg-muted/75 hover:bg-bg-muted"
             : "hover:bg-bg-muted",
