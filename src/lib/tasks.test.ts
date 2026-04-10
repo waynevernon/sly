@@ -10,8 +10,12 @@ function meta(
   return {
     id: "test",
     title: "Test Task",
+    description: "",
+    link: "",
+    waitingFor: "",
     createdAt: "2026-04-09T10:00:00Z",
     actionAt: null,
+    scheduleBucket: null,
     completedAt: null,
     ...overrides,
   };
@@ -23,6 +27,8 @@ describe("deriveView", () => {
     ["today",     meta({ actionAt: "2026-04-09T18:00:00Z" })],
     ["today",     meta({ actionAt: "2026-04-08T18:00:00Z" })],
     ["upcoming",  meta({ actionAt: "2026-04-10T18:00:00Z" })],
+    ["anytime",   meta({ scheduleBucket: "anytime" })],
+    ["someday",   meta({ scheduleBucket: "someday" })],
     ["inbox",     meta()],
   ] as [string, TaskMetadata][])(
     "→ %s",
@@ -56,13 +62,17 @@ describe("groupByView", () => {
       meta({ id: "1" }),
       meta({ id: "2", actionAt: "2026-04-09T18:00:00Z" }),
       meta({ id: "3", actionAt: "2026-04-10T18:00:00Z" }),
-      meta({ id: "4", completedAt: "2026-04-09T10:00:00Z" }),
+      meta({ id: "4", scheduleBucket: "anytime" }),
+      meta({ id: "5", scheduleBucket: "someday" }),
+      meta({ id: "6", completedAt: "2026-04-09T10:00:00Z" }),
     ];
     const buckets = groupByView(tasks, TODAY);
     expect(buckets.inbox.map(t => t.id)).toEqual(["1"]);
     expect(buckets.today.map(t => t.id)).toEqual(["2"]);
     expect(buckets.upcoming.map(t => t.id)).toEqual(["3"]);
-    expect(buckets.completed.map(t => t.id)).toEqual(["4"]);
+    expect(buckets.anytime.map(t => t.id)).toEqual(["4"]);
+    expect(buckets.someday.map(t => t.id)).toEqual(["5"]);
+    expect(buckets.completed.map(t => t.id)).toEqual(["6"]);
   });
 });
 

@@ -191,6 +191,11 @@ vi.mock("./components/command-palette/CommandPalette", () => ({
   ),
 }));
 
+vi.mock("./components/tasks/GlobalTaskCaptureDialog", () => ({
+  GlobalTaskCaptureDialog: ({ open }: { open: boolean }) =>
+    open ? <div>global-task-capture-dialog</div> : null,
+}));
+
 vi.mock("./components/preview/PreviewApp", () => ({
   PreviewApp: ({
     filePath,
@@ -290,6 +295,33 @@ describe("App", () => {
     expect(screen.queryByText(/workspace-navigation:/)).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
+  });
+
+  it("opens the global task capture dialog with Cmd/Ctrl+Shift+N when tasks are enabled", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "N", metaKey: true, shiftKey: true });
+
+    expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
+  });
+
+  it("switches back to notes mode before creating a note with Cmd/Ctrl+N", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
+
+    await waitFor(() => {
+      expect(notesActionsState.createNote).toHaveBeenCalled();
+      expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+    });
+    expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
   it("renders print mode without folder mode shell", async () => {

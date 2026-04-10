@@ -1,18 +1,32 @@
 import * as chrono from "chrono-node";
 import type { ParsedResult } from "chrono-node";
-import type { Task, TaskMetadata, TaskView } from "../types/tasks";
+import type {
+  Task,
+  TaskMetadata,
+  TaskScheduleBucket,
+  TaskView,
+} from "../types/tasks";
 
 export const TASK_VIEW_LABELS: Record<TaskView, string> = {
   inbox: "Inbox",
   today: "Today",
   upcoming: "Upcoming",
+  anytime: "Anytime",
+  someday: "Someday",
   completed: "Completed",
+};
+
+export const TASK_SCHEDULE_BUCKET_LABELS: Record<TaskScheduleBucket, string> = {
+  anytime: "Anytime",
+  someday: "Someday",
 };
 
 export const TASK_VIEW_ORDER: TaskView[] = [
   "inbox",
   "today",
   "upcoming",
+  "anytime",
+  "someday",
   "completed",
 ];
 
@@ -28,22 +42,32 @@ export interface DetectedTaskDate {
 /**
  * Derive which horizon view a task belongs to.
  * Priority (first match wins):
- *  1. completed_at set           → completed
+ *  1. completed_at set              → completed
  *  2. action_at local-date <= today → today (includes overdue)
  *  3. action_at local-date > today  → upcoming
- *  4. no action_at               → inbox
+ *  4. schedule_bucket = anytime     → anytime
+ *  5. schedule_bucket = someday     → someday
+ *  6. otherwise                     → inbox
  */
-export function deriveView(task: Pick<TaskMetadata, 'completedAt' | 'actionAt'>, today: string): TaskView {
+export function deriveView(
+  task: Pick<TaskMetadata, "completedAt" | "actionAt" | "scheduleBucket">,
+  today: string,
+): TaskView {
   if (task.completedAt) return "completed";
   const actionDate = actionAtToLocalDate(task.actionAt);
   if (actionDate) {
     return actionDate <= today ? "today" : "upcoming";
   }
+  if (task.scheduleBucket === "anytime") return "anytime";
+  if (task.scheduleBucket === "someday") return "someday";
   return "inbox";
 }
 
 /** True if the task is overdue (action_at in the past, not completed). */
-export function isOverdue(task: Pick<TaskMetadata, 'completedAt' | 'actionAt'>, today: string): boolean {
+export function isOverdue(
+  task: Pick<TaskMetadata, "completedAt" | "actionAt">,
+  today: string,
+): boolean {
   const actionDate = actionAtToLocalDate(task.actionAt);
   if (task.completedAt || !actionDate) return false;
   return actionDate < today;
@@ -58,6 +82,8 @@ export function groupByView(
     inbox: [],
     today: [],
     upcoming: [],
+    anytime: [],
+    someday: [],
     completed: [],
   };
 
@@ -138,6 +164,27 @@ export function formatTaskDate(date: string, today: string): string {
   const todayYear = Number(today.split("-")[0]);
   const month = new Date(y, m - 1, d).toLocaleString("en-US", { month: "short" });
   return `${month} ${d}${y !== todayYear ? `, ${y}` : ""}`;
+}
+
+export function taskScheduleSelectionFromView(
+  view: TaskView,
+  today: string,
+): { actionAt: string | null; scheduleBucket: TaskScheduleBucket | null } | null {
+  if (view === "today") {
+    return {
+      actionAt: localDateToNormalizedActionAt(today),
+      scheduleBucket: null,
+    };
+  }
+
+  if (view === "anytime" || view === "someday") {
+    return {
+      actionAt: null,
+      scheduleBucket: view,
+    };
+  }
+
+  return null;
 }
 
 export function detectTaskDateFromTitle(title: string, today: string): DetectedTaskDate | null {

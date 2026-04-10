@@ -1,10 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { CalendarClock, CheckCheck, CheckSquare, Inbox, Plus, X } from "lucide-react";
+import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, Plus, X } from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
 import {
   compareTasks,
   detectTaskDateFromTitle,
-  localDateToNormalizedActionAt,
+  taskScheduleSelectionFromView,
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
 import { Button, IconButton, PanelEmptyState } from "../ui";
@@ -25,6 +25,14 @@ const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
     title: "Nothing scheduled",
     message: "Set an action date on a task to plan ahead.",
   },
+  anytime: {
+    title: "Nothing queued anytime",
+    message: "Use Anytime for tasks you want to keep active without picking a day.",
+  },
+  someday: {
+    title: "Nothing in someday",
+    message: "Park colder ideas here so they stay visible but out of the way.",
+  },
   completed: {
     title: "No completed tasks",
     message: "Finished tasks appear here.",
@@ -35,6 +43,8 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: Inbox,
   today: CheckSquare,
   upcoming: CalendarClock,
+  anytime: Clock3,
+  someday: Archive,
   completed: CheckCheck,
 };
 const CREATE_DATE_DEBOUNCE_MS = 350;
@@ -130,11 +140,13 @@ export function TaskListPane() {
     if (task && activeDetection && !task.actionAt) {
       await updateTask(task.id, {
         actionAt: activeDetection.actionAt,
+        scheduleBucket: null,
       });
-    } else if (task && selectedView === "today" && !task.actionAt) {
-      await updateTask(task.id, {
-        actionAt: localDateToNormalizedActionAt(today),
-      });
+    } else if (task && !task.actionAt && !task.scheduleBucket) {
+      const defaultSchedule = taskScheduleSelectionFromView(selectedView, today);
+      if (defaultSchedule) {
+        await updateTask(task.id, defaultSchedule);
+      }
     }
 
     if (continueCapturing) {

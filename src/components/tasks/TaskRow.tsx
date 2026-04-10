@@ -1,3 +1,4 @@
+import { Clock3, FileText, Link2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import type { TaskMetadata, TaskView } from "../../types/tasks";
@@ -22,6 +23,9 @@ export function TaskRow({
   const isCompleted = Boolean(task.completedAt);
   const overdue = !isCompleted && isOverdue(task, today);
   const actionDate = actionAtToLocalDate(task.actionAt);
+  const hasDescription = task.description.trim().length > 0;
+  const hasLink = task.link.trim().length > 0;
+  const hasWaitingFor = task.waitingFor.trim().length > 0;
   const secondaryLabel = task.completedAt && view === "completed"
     ? formatCompletedAt(task.completedAt)
     : actionDate && view !== "completed"
@@ -65,13 +69,40 @@ export function TaskRow({
           onClick={onSelect}
           className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
         >
-          <span
-            className={cn(
-              "block truncate text-sm font-medium",
-              isCompleted ? "text-text-muted line-through" : "text-text",
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "block min-w-0 flex-1 truncate text-sm font-medium",
+                isCompleted ? "text-text-muted line-through" : "text-text",
+              )}
+            >
+              {task.title || "Untitled"}
+            </span>
+
+            {(hasLink || hasDescription || hasWaitingFor) && (
+              <span className="flex shrink-0 items-center gap-1 text-text-muted/40">
+                {hasWaitingFor ? (
+                  <span title={`Waiting for ${task.waitingFor}`}>
+                    <Clock3
+                      className="h-3.5 w-3.5 stroke-[1.8]"
+                      data-testid="task-row-waiting-indicator"
+                    />
+                  </span>
+                ) : null}
+                {hasLink ? (
+                  <Link2
+                    className="h-3.5 w-3.5 stroke-[1.8]"
+                    data-testid="task-row-link-indicator"
+                  />
+                ) : null}
+                {hasDescription ? (
+                  <FileText
+                    className="h-3.5 w-3.5 stroke-[1.8]"
+                    data-testid="task-row-description-indicator"
+                  />
+                ) : null}
+              </span>
             )}
-          >
-            {task.title || "Untitled"}
           </span>
 
           {secondaryLabel && (

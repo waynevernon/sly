@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCheck, CheckSquare, Inbox } from "lucide-react";
+import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
@@ -9,6 +9,8 @@ const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: ({ className }) => <Inbox className={className} />,
   today: ({ className }) => <CheckSquare className={className} />,
   upcoming: ({ className }) => <CalendarClock className={className} />,
+  anytime: ({ className }) => <Clock3 className={className} />,
+  someday: ({ className }) => <Archive className={className} />,
   completed: ({ className }) => <CheckCheck className={className} />,
 };
 

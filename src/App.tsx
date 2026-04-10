@@ -31,6 +31,7 @@ import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
+import { GlobalTaskCaptureDialog } from "./components/tasks/GlobalTaskCaptureDialog";
 import { TasksProvider } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
@@ -477,6 +478,7 @@ function AppContent() {
   const currentNoteRef = useRef(currentNote);
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [taskCaptureOpen, setTaskCaptureOpen] = useState(false);
   const [view, setView] = useState<ViewState>("notes");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("notes");
   const [focusMode, setFocusMode] = useState(false);
@@ -1324,6 +1326,18 @@ function AppContent() {
         return;
       }
 
+      // Cmd/Ctrl+Shift+N - Global task capture
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        if (!tasksEnabled) {
+          toast("Enable tasks in Settings to capture tasks.");
+          return;
+        }
+        setPaletteOpen(false);
+        setTaskCaptureOpen(true);
+        return;
+      }
+
       // Cmd+Shift+Enter - Toggle focus mode
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
         e.preventDefault();
@@ -1390,6 +1404,7 @@ function AppContent() {
       // Cmd+N - New note
       if ((e.metaKey || e.ctrlKey) && e.key === "n") {
         e.preventDefault();
+        showNotesMode();
         createNote();
         return;
       }
@@ -1551,12 +1566,19 @@ function AppContent() {
     setPaneMode,
     toggleRightPanel,
     openSettings,
+    showNotesMode,
+    tasksEnabled,
     toggleFocusMode,
     setInterfaceZoom,
   ]);
 
   const handleClosePalette = useCallback(() => {
     setPaletteOpen(false);
+    editorRef.current?.commands.focus();
+  }, []);
+
+  const handleCloseTaskCapture = useCallback(() => {
+    setTaskCaptureOpen(false);
     editorRef.current?.commands.focus();
   }, []);
 
@@ -1710,6 +1732,12 @@ function AppContent() {
           flushPendingSave={flushPendingSave}
         />
       </Suspense>
+
+      <GlobalTaskCaptureDialog
+        open={taskCaptureOpen}
+        workspaceMode={workspaceMode}
+        onClose={handleCloseTaskCapture}
+      />
     </>
   );
 }

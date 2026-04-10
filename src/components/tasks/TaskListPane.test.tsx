@@ -1,7 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { localDateToNormalizedActionAt } from "../../lib/tasks";
+import { localDateToNormalizedActionAt, taskScheduleSelectionFromView } from "../../lib/tasks";
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
 
@@ -25,6 +25,8 @@ function makeTasksHookValue(
       inbox: [],
       today: [],
       upcoming: [],
+      anytime: [],
+      someday: [],
       completed: [],
     },
     selectedView: "inbox",
@@ -37,10 +39,13 @@ function makeTasksHookValue(
     createTask: vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Draft task",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     }),
     ...overrides,
   } as never;
@@ -62,10 +67,13 @@ describe("TaskListPane", () => {
     const createTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "First task",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
     const selectTask = vi.fn();
 
@@ -100,18 +108,24 @@ describe("TaskListPane", () => {
     const createTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Today task",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
     const updateTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Today task",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: localDateToNormalizedActionAt("2026-04-09"),
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
 
     vi.mocked(tasksContext.useTasks).mockReturnValue(
@@ -134,7 +148,49 @@ describe("TaskListPane", () => {
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", {
         actionAt: localDateToNormalizedActionAt("2026-04-09"),
+        scheduleBucket: null,
       });
+    });
+  });
+
+  it("assigns anytime when creating a task from the Anytime view", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Anytime task",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+    });
+    const updateTask = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "anytime",
+        createTask,
+        updateTask,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Anytime task{enter}");
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith(
+        "task-1",
+        taskScheduleSelectionFromView("anytime", "2026-04-09"),
+      );
     });
   });
 
@@ -161,18 +217,24 @@ describe("TaskListPane", () => {
     const createTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Pay rent",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
     const updateTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Pay rent",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: localDateToNormalizedActionAt("2026-04-10"),
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
 
     vi.mocked(tasksContext.useTasks).mockReturnValue(
@@ -192,6 +254,7 @@ describe("TaskListPane", () => {
       expect(createTask).toHaveBeenCalledWith("Pay rent");
       expect(updateTask).toHaveBeenCalledWith("task-1", {
         actionAt: localDateToNormalizedActionAt("2026-04-10"),
+        scheduleBucket: null,
       });
     });
   });
@@ -202,10 +265,13 @@ describe("TaskListPane", () => {
     const createTask = vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Pay rent tomorrow",
+      description: "",
+      link: "",
+      waitingFor: "",
       createdAt: "2026-04-09T10:00:00Z",
       actionAt: null,
+      scheduleBucket: null,
       completedAt: null,
-      description: "",
     });
     const updateTask = vi.fn();
 

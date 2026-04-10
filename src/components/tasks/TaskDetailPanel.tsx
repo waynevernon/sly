@@ -1,45 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
-  CalendarDays,
   CheckSquare,
-  ChevronLeft,
-  ChevronRight,
+  Clock3,
+  ExternalLink,
   LoaderCircle,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
   actionAtToLocalDate,
-  localDateString,
   localDateToNormalizedActionAt,
 } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
-import type { TaskPatch } from "../../types/tasks";
-import { IconButton, PanelEmptyState, PopoverSurface } from "../ui";
+import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
+import { Button, IconButton, PanelEmptyState, PopoverSurface } from "../ui";
+import { TaskDatePicker } from "./TaskDatePicker";
 
 const DEBOUNCE_MS = 600;
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTH_LABELS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
 
 export function TaskDetailPanel() {
   const {
     selectedTask,
     selectedTaskId,
     isLoadingTask,
+    tasks,
     updateTask,
     deleteTask,
     setCompleted,
@@ -48,17 +36,28 @@ export function TaskDetailPanel() {
 
   const [title, setTitle] = useState("");
   const [actionDate, setActionDate] = useState("");
+  const [scheduleBucket, setScheduleBucket] = useState<TaskScheduleBucket | null>(null);
+  const [link, setLink] = useState("");
+  const [waitingFor, setWaitingFor] = useState("");
+  const [waitingForEnabled, setWaitingForEnabled] = useState(false);
+  const [waitingForFocused, setWaitingForFocused] = useState(false);
   const [description, setDescription] = useState("");
 
   const taskIdRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<TaskPatch>({});
+  const waitingForInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!selectedTask) return;
     taskIdRef.current = selectedTask.id;
     setTitle(selectedTask.title);
     setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
+    setScheduleBucket(selectedTask.scheduleBucket);
+    setLink(selectedTask.link);
+    setWaitingFor(selectedTask.waitingFor);
+    setWaitingForEnabled(selectedTask.waitingFor.trim().length > 0);
+    setWaitingForFocused(false);
     setDescription(selectedTask.description);
     pendingPatchRef.current = {};
   }, [selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,10 +106,24 @@ export function TaskDetailPanel() {
     scheduleSave({ description: event.target.value });
   };
 
-  const commitActionDate = useCallback(
-    (nextDate: string | null) => {
-      setActionDate(nextDate ?? "");
-      scheduleSave({ actionAt: localDateToNormalizedActionAt(nextDate) });
+  const handleLinkChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setLink(event.target.value);
+    scheduleSave({ link: event.target.value });
+  };
+
+  const handleWaitingForChange = (nextValue: string) => {
+    setWaitingFor(nextValue);
+    scheduleSave({ waitingFor: nextValue });
+  };
+
+  const commitSchedule = useCallback(
+    (next: { actionDate: string | null; scheduleBucket: TaskScheduleBucket | null }) => {
+      setActionDate(next.actionDate ?? "");
+      setScheduleBucket(next.scheduleBucket);
+      scheduleSave({
+        actionAt: localDateToNormalizedActionAt(next.actionDate),
+        scheduleBucket: next.scheduleBucket,
+      });
       flushSave();
     },
     [flushSave, scheduleSave],
@@ -128,9 +141,53 @@ export function TaskDetailPanel() {
     await deleteTask(id);
   };
 
-  const formattedDate = formatDate(actionDate, today);
+  const openableLink = useMemo(() => normalizeTaskLinkUrl(link), [link]);
+  const waitingForSuggestions = useMemo(() => {
+    const counts = new Map<string, { value: string; count: number }>();
+
+    for (const task of tasks) {
+      const candidate = task.waitingFor.trim();
+      if (!candidate) continue;
+      if (task.id === selectedTask?.id) continue;
+
+      const key = candidate.toLocaleLowerCase();
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(key, { value: candidate, count: 1 });
+      }
+    }
+
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+      .map((entry) => entry.value);
+  }, [selectedTask?.id, tasks]);
+  const filteredWaitingForSuggestions = useMemo(() => {
+    const query = waitingFor.trim().toLocaleLowerCase();
+    return waitingForSuggestions
+      .filter((value) => {
+        const normalized = value.toLocaleLowerCase();
+        if (!query) return true;
+        if (normalized === query) return false;
+        return normalized.includes(query);
+      })
+      .slice(0, 6);
+  }, [waitingFor, waitingForSuggestions]);
+  const showWaitingForSuggestions =
+    waitingForEnabled && waitingForFocused && filteredWaitingForSuggestions.length > 0;
   const isCompleted = Boolean(selectedTask?.completedAt);
   const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
+
+  const handleOpenLink = useCallback(async () => {
+    if (!openableLink) return;
+    try {
+      await invoke("open_url_safe", { url: openableLink });
+    } catch (err) {
+      console.error("Failed to open task link:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to open link");
+    }
+  }, [openableLink]);
 
   const renderBody = () => {
     if (isLoadingTask && selectedTaskId) {
@@ -190,27 +247,117 @@ export function TaskDetailPanel() {
           <div />
           <div className="flex flex-wrap items-center gap-2">
             <TaskDatePicker
-              value={actionDate}
+              actionDate={actionDate}
+              scheduleBucket={scheduleBucket}
               today={today}
-              formattedValue={formattedDate}
-              onSelectDate={commitActionDate}
-              onClearDate={() => commitActionDate(null)}
+              onChange={commitSchedule}
             />
+            {waitingForEnabled ? (
+              <div className="relative min-w-[220px] max-w-[320px] flex-1">
+                <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+                  <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                  <input
+                    ref={waitingForInputRef}
+                    type="text"
+                    value={waitingFor}
+                    placeholder="Waiting for…"
+                    onChange={(event) => handleWaitingForChange(event.target.value)}
+                    onFocus={() => setWaitingForFocused(true)}
+                    onBlur={() => {
+                      setWaitingForFocused(false);
+                      flushSave();
+                    }}
+                    className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setWaitingFor("");
+                      setWaitingForEnabled(false);
+                      setWaitingForFocused(false);
+                      scheduleSave({ waitingFor: "" });
+                      flushSave();
+                    }}
+                    className="ui-focus-ring inline-flex h-5 w-5 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                    aria-label="Clear waiting for"
+                  >
+                    <X className="h-3.5 w-3.5 stroke-[1.9]" />
+                  </button>
+                </div>
 
-            {actionDate && (
-              <button
+                {showWaitingForSuggestions ? (
+                  <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 w-full p-1.5">
+                    <div className="flex flex-col gap-1">
+                      {filteredWaitingForSuggestions.map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setWaitingFor(value);
+                            setWaitingForFocused(false);
+                            scheduleSave({ waitingFor: value });
+                            flushSave();
+                            waitingForInputRef.current?.focus();
+                          }}
+                          className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
+                        >
+                          <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted" />
+                          <span className="truncate">{value}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverSurface>
+                ) : null}
+              </div>
+            ) : (
+              <Button
                 type="button"
-                onClick={() => commitActionDate(null)}
-                className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setWaitingForEnabled(true);
+                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
+                }}
+                className="gap-2"
               >
-                <X className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>Clear Date</span>
-              </button>
+                <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                <span>Waiting for</span>
+              </Button>
             )}
           </div>
 
           <div />
           <div className="border-t border-border/40" />
+
+          <div />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+                Link
+              </div>
+              {openableLink ? (
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => void handleOpenLink()}
+                  className="ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                  <span>Open Link</span>
+                </button>
+              ) : null}
+            </div>
+            <input
+              type="text"
+              value={link}
+              placeholder="Add link…"
+              onChange={handleLinkChange}
+              onBlur={flushSave}
+              className="w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+            />
+          </div>
 
           <div />
           <div className="space-y-2">
@@ -261,243 +408,26 @@ export function TaskDetailPanel() {
   );
 }
 
-function TaskDatePicker({
-  value,
-  today,
-  formattedValue,
-  onSelectDate,
-  onClearDate,
-}: {
-  value: string;
-  today: string;
-  formattedValue: string;
-  onSelectDate: (date: string) => void;
-  onClearDate: () => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(value || today));
-  const popoverRef = useRef<HTMLDivElement>(null);
+function normalizeTaskLinkUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setVisibleMonth(startOfMonth(value || today));
-  }, [isOpen, today, value]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!popoverRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isOpen]);
-
-  const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
-  const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
-  const tomorrow = offsetDate(today, 1);
-
-  return (
-    <div ref={popoverRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-        className={cn(
-          "ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
-          value
-            ? "bg-bg-muted/70 text-text hover:bg-bg-muted"
-            : "text-text-muted hover:bg-bg-muted hover:text-text",
-        )}
-      >
-        <CalendarDays className="h-4 w-4 shrink-0 stroke-[1.7]" />
-        <span>{formattedValue}</span>
-      </button>
-
-      {isOpen && (
-        <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-30 w-80 p-2.5">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-text">{monthLabel}</div>
-              <div className="flex items-center gap-1">
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Previous Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Next Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-                >
-                  <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <QuickDateButton
-                label="Today"
-                isActive={value === today}
-                onClick={() => {
-                  onSelectDate(today);
-                  setIsOpen(false);
-                }}
-              />
-              <QuickDateButton
-                label="Tomorrow"
-                isActive={value === tomorrow}
-                onClick={() => {
-                  onSelectDate(tomorrow);
-                  setIsOpen(false);
-                }}
-              />
-              {value ? (
-                <QuickDateButton
-                  label="Clear"
-                  onClick={() => {
-                    onClearDate();
-                    setIsOpen(false);
-                  }}
-                />
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
-                >
-                  {label}
-                </div>
-              ))}
-              {weeks.flat().map((day) => {
-                const isSelected = day.date === value;
-                const isToday = day.date === today;
-
-                return (
-                  <button
-                    key={day.date}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => {
-                      onSelectDate(day.date);
-                      setIsOpen(false);
-                    }}
-                    className={cn(
-                      "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
-                      isSelected
-                        ? "bg-bg-muted text-text"
-                        : day.inCurrentMonth
-                          ? "text-text hover:bg-bg-muted"
-                          : "text-text-muted/50 hover:bg-bg-muted/70",
-                      isToday && !isSelected ? "ring-1 ring-border" : "",
-                    )}
-                  >
-                    {day.day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </PopoverSurface>
-      )}
-    </div>
-  );
-}
-
-function QuickDateButton({
-  label,
-  isActive = false,
-  onClick,
-}: {
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center rounded-[var(--ui-radius-md)] px-2.5 text-xs font-medium transition-colors",
-        isActive
-          ? "bg-bg-muted text-text"
-          : "text-text-muted hover:bg-bg-muted hover:text-text",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function buildMonthGrid(month: Date): Array<Array<{ date: string; day: number; inCurrentMonth: boolean }>> {
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const gridStart = new Date(monthStart);
-  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
-
-  return Array.from({ length: 6 }, (_, weekIndex) =>
-    Array.from({ length: 7 }, (_, dayIndex) => {
-      const date = new Date(gridStart);
-      date.setDate(gridStart.getDate() + weekIndex * 7 + dayIndex);
-      return {
-        date: localDateString(date),
-        day: date.getDate(),
-        inCurrentMonth: date.getMonth() === monthStart.getMonth(),
-      };
-    }),
-  );
-}
-
-function startOfMonth(value: string): Date {
-  const parsed = parseLocalDate(value);
-  return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
-}
-
-function addMonths(date: Date, offset: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
-}
-
-function parseLocalDate(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return new Date();
+  if (trimmed.startsWith("mailto:")) {
+    return trimmed;
   }
 
-  return new Date(year, month - 1, day);
-}
+  const withScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
 
-function formatDate(date: string, today: string): string {
-  if (!date) return "Set date";
-  if (date === today) return "Today";
-  const tomorrow = offsetDate(today, 1);
-  if (date === tomorrow) return "Tomorrow";
-  const [y, m, d] = date.split("-").map(Number);
-  const todayYear = Number(today.split("-")[0]);
-  return `${MONTH_LABELS[m - 1].slice(0, 3)} ${d}${y !== todayYear ? `, ${y}` : ""}`;
-}
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:") {
+      return url.toString();
+    }
+  } catch {
+    return null;
+  }
 
-function offsetDate(date: string, days: number): string {
-  const d = parseLocalDate(date);
-  d.setDate(d.getDate() + days);
-  return localDateString(d);
+  return null;
 }

@@ -148,8 +148,12 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         {
           id: task.id,
           title: task.title,
+          description: task.description,
+          link: task.link,
+          waitingFor: task.waitingFor,
           createdAt: task.createdAt,
           actionAt: task.actionAt,
+          scheduleBucket: task.scheduleBucket,
           completedAt: task.completedAt,
         },
       ]);
@@ -169,7 +173,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
             ? {
                 ...t,
                 title: task.title,
+                description: task.description,
+                link: task.link,
+                waitingFor: task.waitingFor,
                 actionAt: task.actionAt,
+                scheduleBucket: task.scheduleBucket,
               }
             : t
         )
@@ -259,7 +267,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
 const TASKS_NOOP: TasksContextValue = {
   tasks: [],
-  buckets: { inbox: [], today: [], upcoming: [], completed: [] },
+  buckets: { inbox: [], today: [], upcoming: [], anytime: [], someday: [], completed: [] },
   today: "",
   isLoading: false,
   lastError: null,
