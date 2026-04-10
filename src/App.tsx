@@ -21,6 +21,7 @@ import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { GitProvider } from "./context/GitContext";
 import {
+  Button,
   IconButton,
   LoadingSpinner,
   TooltipProvider,
@@ -31,7 +32,7 @@ import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
-import { TasksProvider, useTasks } from "./context/TasksContext";
+import { TasksProvider } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
@@ -155,6 +156,7 @@ function getWindowMode():
 }
 
 type ViewState = "notes" | "settings";
+type WorkspaceMode = "notes" | "tasks";
 
 function formatPaneModeLabel(mode: PaneMode): string {
   if (mode === 1) return "1 Pane";
@@ -231,6 +233,7 @@ function PreviewFallback() {
 
 interface WorkspaceMainProps {
   paneMode: PaneMode;
+  workspaceMode: WorkspaceMode;
   focusMode: boolean;
   showRightPanel: boolean;
   rightPanelWidth: number;
@@ -254,6 +257,7 @@ interface WorkspaceMainProps {
 
 const WorkspaceMain = memo(function WorkspaceMain({
   paneMode,
+  workspaceMode,
   focusMode,
   showRightPanel,
   rightPanelWidth,
@@ -272,7 +276,7 @@ const WorkspaceMain = memo(function WorkspaceMain({
   onRightPanelTabChange,
   onRightPanelWidthChange,
 }: WorkspaceMainProps) {
-  const { isTasksModeActive } = useTasks();
+  const isTasksModeActive = workspaceMode === "tasks";
 
   useEffect(() => {
     if (!isTasksModeActive) {
@@ -295,6 +299,7 @@ const WorkspaceMain = memo(function WorkspaceMain({
     <>
       <WorkspaceNavigation
         paneMode={focusMode ? 1 : paneMode}
+        workspaceMode={workspaceMode}
         onOpenSettings={onOpenSettings}
       />
       <div className="flex min-w-0 flex-1">
@@ -337,12 +342,20 @@ function TitlebarPaneSwitch({
   onCyclePaneMode,
   rightPanelVisible,
   onToggleRightPanel,
+  tasksEnabled = false,
+  isTasksModeActive = false,
+  onShowNotes,
+  onShowTasks,
   showRightPanelToggle = true,
 }: {
   paneMode: PaneMode;
   onCyclePaneMode: () => void;
   rightPanelVisible: boolean;
   onToggleRightPanel: () => void;
+  tasksEnabled?: boolean;
+  isTasksModeActive?: boolean;
+  onShowNotes?: () => void;
+  onShowTasks?: () => void;
   showRightPanelToggle?: boolean;
 }) {
   return (
@@ -358,6 +371,30 @@ function TitlebarPaneSwitch({
           </IconButton>
         </div>
       </div>
+      {tasksEnabled && onShowNotes && onShowTasks && (
+        <div className="ui-titlebar-mode-switch" data-tauri-drag-region>
+          <div className="titlebar-no-drag flex items-center rounded-[var(--ui-radius-lg)] border border-border bg-bg-secondary/92 p-1 backdrop-blur-sm">
+            <Button
+              type="button"
+              size="xs"
+              variant={isTasksModeActive ? "ghost" : "default"}
+              onClick={onShowNotes}
+              className="min-w-16"
+            >
+              Notes
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant={isTasksModeActive ? "default" : "ghost"}
+              onClick={onShowTasks}
+              className="min-w-16"
+            >
+              Tasks
+            </Button>
+          </div>
+        </div>
+      )}
       {showRightPanelToggle && (
         <div
           className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
@@ -381,7 +418,6 @@ function TitlebarPaneSwitch({
 }
 
 function AppContent() {
-  const { isTasksModeActive } = useTasks();
   const {
     notesFolder,
     isLoading,
@@ -434,6 +470,7 @@ function AppContent() {
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [view, setView] = useState<ViewState>("notes");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("notes");
   const [focusMode, setFocusMode] = useState(false);
   const [flushPendingSave, setFlushPendingSave] = useState<
     (() => Promise<void>) | null
@@ -475,13 +512,27 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
+  const isTasksModeActive = workspaceMode === "tasks";
   const isTasksModeActiveRef = useRef(isTasksModeActive);
   isTasksModeActiveRef.current = isTasksModeActive;
+  const tasksEnabled = settings?.tasksEnabled ?? false;
   const showRightPanel =
     rightPanelVisible &&
     !focusMode &&
     !editorSourceMode &&
     !isTasksModeActive;
+
+  useEffect(() => {
+    if (!tasksEnabled && workspaceMode !== "notes") {
+      setWorkspaceMode("notes");
+    }
+  }, [tasksEnabled, workspaceMode]);
+
+  useEffect(() => {
+    if (isTasksModeActive && paneMode === 1) {
+      setPaneMode(2);
+    }
+  }, [isTasksModeActive, paneMode, setPaneMode]);
 
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
@@ -787,6 +838,20 @@ function AppContent() {
     }
     setRightPanelVisible(!rightPanelVisibleRef.current);
   }, [setRightPanelVisible]);
+
+  const showNotesMode = useCallback(() => {
+    setWorkspaceMode("notes");
+  }, []);
+
+  const showTasksMode = useCallback(() => {
+    clearNoteSelection();
+    setFocusMode(false);
+    setEditorSourceMode(false);
+    if (paneModeRef.current === 1) {
+      setPaneMode(2);
+    }
+    setWorkspaceMode("tasks");
+  }, [clearNoteSelection, setPaneMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1570,6 +1635,10 @@ function AppContent() {
             onCyclePaneMode={cyclePaneMode}
             rightPanelVisible={rightPanelVisible}
             onToggleRightPanel={toggleRightPanel}
+            tasksEnabled={tasksEnabled}
+            isTasksModeActive={isTasksModeActive}
+            onShowNotes={showNotesMode}
+            onShowTasks={showTasksMode}
             showRightPanelToggle={!isTasksModeActive}
           />
         )}
@@ -1585,6 +1654,7 @@ function AppContent() {
         ) : (
           <WorkspaceMain
             paneMode={paneMode}
+            workspaceMode={workspaceMode}
             focusMode={focusMode}
             showRightPanel={showRightPanel}
             rightPanelWidth={rightPanelWidth}

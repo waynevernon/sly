@@ -17,7 +17,7 @@ const notesDataState = {
     path: "/notes/alpha.md",
     modified: 1,
   },
-  settings: { ollamaModel: "qwen3:8b" },
+  settings: { ollamaModel: "qwen3:8b", tasksEnabled: false },
   searchQuery: "",
   searchResults: [],
   hasExternalChanges: false,
@@ -52,10 +52,6 @@ const themeState = {
   setRightPanelVisible: vi.fn(),
   setRightPanelWidth: vi.fn(),
   setRightPanelTab: vi.fn(),
-};
-
-const tasksState = {
-  isTasksModeActive: false,
 };
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -93,7 +89,7 @@ vi.mock("./context/GitContext", () => ({
 
 vi.mock("./context/TasksContext", () => ({
   TasksProvider: ({ children }: PropsWithChildren) => children,
-  useTasks: () => tasksState,
+  useTasks: () => ({}),
 }));
 
 const editorListeners = {
@@ -119,11 +115,13 @@ const fakeEditor = {
 vi.mock("./components/layout/WorkspaceNavigation", () => ({
   WorkspaceNavigation: ({
     onOpenSettings,
+    workspaceMode,
   }: {
     onOpenSettings: (tab?: "general" | "editor" | "shortcuts" | "about") => void;
+    workspaceMode: "notes" | "tasks";
   }) => (
     <div>
-      <div>workspace-navigation</div>
+      <div>workspace-navigation:{workspaceMode}</div>
       <button onClick={() => onOpenSettings()}>open settings</button>
     </div>
   ),
@@ -230,7 +228,7 @@ describe("App", () => {
     themeState.paneMode = 3;
     themeState.rightPanelVisible = true;
     themeState.rightPanelTab = "outline";
-    tasksState.isTasksModeActive = false;
+    notesDataState.settings.tasksEnabled = false;
   });
 
   afterEach(() => {
@@ -240,7 +238,7 @@ describe("App", () => {
   it("renders folder mode shell and opens settings after lazy load", async () => {
     render(<App />);
 
-    expect(screen.getByText("workspace-navigation")).toBeInTheDocument();
+    expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
     expect(screen.getByText("editor")).toBeInTheDocument();
     expect(screen.getByText("right-panel")).toBeInTheDocument();
     expect(screen.queryByText("settings-page")).not.toBeInTheDocument();
@@ -289,7 +287,7 @@ describe("App", () => {
     expect(
       await screen.findByText("preview-app:interactive:/tmp/preview-note.md"),
     ).toBeInTheDocument();
-    expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText(/workspace-navigation:/)).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
   });
@@ -306,7 +304,7 @@ describe("App", () => {
     expect(
       await screen.findByText("preview-app:print:/tmp/print-note.md"),
     ).toBeInTheDocument();
-    expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText(/workspace-navigation:/)).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
   });
@@ -323,7 +321,7 @@ describe("App", () => {
     expect(
       await screen.findByText("workspace-note-app:docs/alpha"),
     ).toBeInTheDocument();
-    expect(screen.queryByText("workspace-navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText(/workspace-navigation:/)).not.toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
   });
@@ -338,14 +336,41 @@ describe("App", () => {
   });
 
   it("uses the task detail workspace and hides the right panel in task mode", () => {
-    tasksState.isTasksModeActive = true;
+    notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
 
-    expect(screen.getByText("workspace-navigation")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
     expect(screen.getByText("task-detail-panel")).toBeInTheDocument();
     expect(screen.queryByText("editor")).not.toBeInTheDocument();
     expect(screen.queryByText("right-panel")).not.toBeInTheDocument();
+  });
+
+  it("shows a Notes/Tasks toggle in the top chrome when tasks are enabled", () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "Notes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tasks" })).toBeInTheDocument();
+  });
+
+  it("switches between notes and tasks from the top chrome toggle", () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+    expect(screen.getByText("task-detail-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+
+    expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+    expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
   it("toggles the right panel with Cmd/Ctrl+4", () => {
@@ -357,9 +382,11 @@ describe("App", () => {
   });
 
   it("does not toggle the right panel with Cmd/Ctrl+4 in task mode", () => {
-    tasksState.isTasksModeActive = true;
+    notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
 
     fireEvent.keyDown(window, { key: "4", metaKey: true });
 

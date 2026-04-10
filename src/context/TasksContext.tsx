@@ -12,8 +12,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { Task, TaskMetadata, TaskPatch, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
 import { groupByView, localDateString } from "../lib/tasks";
-import { useNotesActions, useNotesData } from "./NotesContext";
-import type { NoteScope } from "../types/note";
+import { useNotesData } from "./NotesContext";
 
 interface TasksContextValue {
   // Data
@@ -24,8 +23,6 @@ interface TasksContextValue {
   lastError: string | null;
 
   // Navigation
-  /** True when the user is actively browsing task horizons (vs notes/folders). */
-  isTasksModeActive: boolean;
   selectedView: TaskView;
   selectedTaskId: string | null;
   selectedTask: Task | null;
@@ -44,14 +41,12 @@ interface TasksContextValue {
 const TasksContext = createContext<TasksContextValue | null>(null);
 
 export function TasksProvider({ children }: { children: ReactNode }) {
-  const { notesFolder, settings, selectedScope } = useNotesData();
-  const { clearNoteSelection } = useNotesActions();
+  const { notesFolder, settings } = useNotesData();
   const tasksEnabled = settings?.tasksEnabled ?? false;
 
   const [tasks, setTasks] = useState<TaskMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [isTasksModeActive, setIsTasksModeActive] = useState(false);
   const [selectedView, setSelectedView] = useState<TaskView>("inbox");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -112,20 +107,16 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [selectedTaskId]);
 
-  // Deactivate task mode when the user clicks a folder/scope in the notes pane.
-  const prevScopeRef = useRef<NoteScope | null>(null);
-  useEffect(() => {
-    if (prevScopeRef.current !== null && prevScopeRef.current !== selectedScope) {
-      setIsTasksModeActive(false);
-    }
-    prevScopeRef.current = selectedScope;
-  }, [selectedScope]);
-
   // Initial load when enabled/folder changes.
   useEffect(() => {
     hasLoadedRef.current = false;
     setTasks([]);
-    if (!tasksEnabled || !notesFolder) return;
+    setSelectedTaskId(null);
+    setSelectedTask(null);
+    if (!tasksEnabled) {
+      return;
+    }
+    if (!notesFolder) return;
     void refreshTasks();
   }, [tasksEnabled, notesFolder]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -139,12 +130,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   }, [tasksEnabled, refreshTasks]);
 
   const selectView = useCallback((view: TaskView) => {
-    clearNoteSelection();
-    setIsTasksModeActive(true);
     setSelectedView(view);
     setSelectedTaskId(null);
     setSelectedTask(null);
-  }, [clearNoteSelection]);
+  }, []);
 
   const selectTask = useCallback((id: string | null) => {
     setSelectedTaskId(id);
@@ -160,7 +149,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           id: task.id,
           title: task.title,
           createdAt: task.createdAt,
-          actionDate: task.actionDate,
+          actionAt: task.actionAt,
           waiting: task.waiting,
           someday: task.someday,
           completedAt: task.completedAt,
@@ -182,7 +171,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
             ? {
                 ...t,
                 title: task.title,
-                actionDate: task.actionDate,
+                actionAt: task.actionAt,
                 waiting: task.waiting,
                 someday: task.someday,
               }
@@ -237,7 +226,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       today,
       isLoading,
       lastError,
-      isTasksModeActive,
       selectedView,
       selectedTaskId,
       selectedTask,
@@ -256,7 +244,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       today,
       isLoading,
       lastError,
-      isTasksModeActive,
       selectedView,
       selectedTaskId,
       selectedTask,
@@ -280,7 +267,6 @@ const TASKS_NOOP: TasksContextValue = {
   today: "",
   isLoading: false,
   lastError: null,
-  isTasksModeActive: false,
   selectedView: "inbox",
   selectedTaskId: null,
   selectedTask: null,

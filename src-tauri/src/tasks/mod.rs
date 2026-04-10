@@ -14,7 +14,8 @@ pub struct TaskMetadata {
     pub id: String,
     pub title: String,
     pub created_at: String,
-    pub action_date: Option<String>,
+    #[serde(alias = "actionDate")]
+    pub action_at: Option<String>,
     pub waiting: bool,
     pub someday: bool,
     pub completed_at: Option<String>,
@@ -27,7 +28,8 @@ pub struct Task {
     pub id: String,
     pub title: String,
     pub created_at: String,
-    pub action_date: Option<String>,
+    #[serde(alias = "actionDate")]
+    pub action_at: Option<String>,
     pub waiting: bool,
     pub someday: bool,
     pub completed_at: Option<String>,
@@ -40,7 +42,8 @@ pub struct Task {
 #[serde(rename_all = "camelCase")]
 pub struct TaskPatch {
     pub title: Option<String>,
-    pub action_date: Option<Option<String>>,
+    #[serde(alias = "actionDate")]
+    pub action_at: Option<Option<String>>,
     pub waiting: Option<bool>,
     pub someday: Option<bool>,
     pub notes: Option<String>,
@@ -94,7 +97,7 @@ pub(crate) fn id_from_task_path(notes_root: &Path, path: &Path) -> Option<String
 struct ParsedFrontmatter {
     title: String,
     created_at: String,
-    action_date: Option<String>,
+    action_at: Option<String>,
     waiting: bool,
     someday: bool,
     completed_at: Option<String>,
@@ -105,7 +108,7 @@ impl Default for ParsedFrontmatter {
         Self {
             title: String::new(),
             created_at: now_rfc3339(),
-            action_date: None,
+            action_at: None,
             waiting: false,
             someday: false,
             completed_at: None,
@@ -137,11 +140,11 @@ fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
                     fm.created_at = value.to_string();
                 }
             }
-            "action_date" => {
+            "action_at" | "action_date" => {
                 if value.is_empty() || value == "null" {
-                    fm.action_date = None;
+                    fm.action_at = None;
                 } else {
-                    fm.action_date = Some(value.to_string());
+                    fm.action_at = Some(value.to_string());
                 }
             }
             "waiting" => fm.waiting = value == "true",
@@ -186,13 +189,13 @@ fn extract_notes_body(content: &str) -> String {
 fn serialize_task_file(
     title: &str,
     created_at: &str,
-    action_date: Option<&str>,
+    action_at: Option<&str>,
     waiting: bool,
     someday: bool,
     completed_at: Option<&str>,
     notes: &str,
 ) -> String {
-    let action_date_str = action_date
+    let action_at_str = action_at
         .map(|d| d.to_string())
         .unwrap_or_else(|| "null".to_string());
     let completed_at_str = completed_at
@@ -203,7 +206,7 @@ fn serialize_task_file(
     let safe_title = escape_yaml_scalar(title);
 
     let mut s = format!(
-        "---\ntitle: {safe_title}\ncreated_at: {created_at}\naction_date: {action_date_str}\nwaiting: {waiting}\nsomeday: {someday}\ncompleted_at: {completed_at_str}\n---\n"
+        "---\ntitle: {safe_title}\ncreated_at: {created_at}\naction_at: {action_at_str}\nwaiting: {waiting}\nsomeday: {someday}\ncompleted_at: {completed_at_str}\n---\n"
     );
 
     if !notes.is_empty() {
@@ -258,7 +261,7 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
                 id,
                 title: fm.title,
                 created_at: fm.created_at,
-                action_date: fm.action_date,
+                action_at: fm.action_at,
                 waiting: fm.waiting,
                 someday: fm.someday,
                 completed_at: fm.completed_at,
@@ -283,7 +286,7 @@ pub(crate) fn read_task(notes_root: &Path, id: &str) -> Result<Task> {
         id: id.to_string(),
         title: fm.title,
         created_at: fm.created_at,
-        action_date: fm.action_date,
+        action_at: fm.action_at,
         waiting: fm.waiting,
         someday: fm.someday,
         completed_at: fm.completed_at,
@@ -315,7 +318,7 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
         id,
         title: title.to_string(),
         created_at,
-        action_date: None,
+        action_at: None,
         waiting: false,
         someday: false,
         completed_at: None,
@@ -333,8 +336,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
     let current_notes = extract_notes_body(&content);
 
     let title = patch.title.unwrap_or(fm.title);
-    let action_date = patch.action_date
-        .unwrap_or(fm.action_date);
+    let action_at = patch.action_at
+        .unwrap_or(fm.action_at);
     let waiting = patch.waiting.unwrap_or(fm.waiting);
     let someday = patch.someday.unwrap_or(fm.someday);
     let notes = patch.notes.unwrap_or(current_notes);
@@ -342,7 +345,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
     let new_content = serialize_task_file(
         &title,
         &fm.created_at,
-        action_date.as_deref(),
+        action_at.as_deref(),
         waiting,
         someday,
         fm.completed_at.as_deref(),
@@ -355,7 +358,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         id: id.to_string(),
         title,
         created_at: fm.created_at,
-        action_date,
+        action_at,
         waiting,
         someday,
         completed_at: fm.completed_at,
@@ -381,7 +384,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
     let new_content = serialize_task_file(
         &fm.title,
         &fm.created_at,
-        fm.action_date.as_deref(),
+        fm.action_at.as_deref(),
         fm.waiting,
         fm.someday,
         completed_at.as_deref(),
@@ -394,7 +397,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
         id: id.to_string(),
         title: fm.title,
         created_at: fm.created_at,
-        action_date: fm.action_date,
+        action_at: fm.action_at,
         waiting: fm.waiting,
         someday: fm.someday,
         completed_at,
@@ -427,11 +430,11 @@ mod tests {
 
     #[test]
     fn parse_full_frontmatter() {
-        let content = "---\ntitle: Buy milk\ncreated_at: 2026-04-09T10:00:00Z\naction_date: 2026-04-10\nwaiting: true\nsomeday: false\ncompleted_at: null\n---\n\nSome notes here.";
+        let content = "---\ntitle: Buy milk\ncreated_at: 2026-04-09T10:00:00Z\naction_at: 2026-04-10\nwaiting: true\nsomeday: false\ncompleted_at: null\n---\n\nSome notes here.";
         let fm = parse_frontmatter(content);
         assert_eq!(fm.title, "Buy milk");
         assert_eq!(fm.created_at, "2026-04-09T10:00:00Z");
-        assert_eq!(fm.action_date, Some("2026-04-10".to_string()));
+        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
         assert!(fm.waiting);
         assert!(!fm.someday);
         assert_eq!(fm.completed_at, None);
@@ -439,12 +442,19 @@ mod tests {
 
     #[test]
     fn parse_missing_optional_fields() {
-        let content = "---\ntitle: Minimal\ncreated_at: 2026-01-01T00:00:00Z\naction_date: null\nwaiting: false\nsomeday: false\ncompleted_at: null\n---\n";
+        let content = "---\ntitle: Minimal\ncreated_at: 2026-01-01T00:00:00Z\naction_at: null\nwaiting: false\nsomeday: false\ncompleted_at: null\n---\n";
         let fm = parse_frontmatter(content);
         assert_eq!(fm.title, "Minimal");
-        assert_eq!(fm.action_date, None);
+        assert_eq!(fm.action_at, None);
         assert!(!fm.waiting);
         assert_eq!(fm.completed_at, None);
+    }
+
+    #[test]
+    fn parse_legacy_action_date_frontmatter() {
+        let content = "---\ntitle: Legacy\ncreated_at: 2026-04-09T10:00:00Z\naction_date: 2026-04-10\nwaiting: false\nsomeday: false\ncompleted_at: null\n---\n";
+        let fm = parse_frontmatter(content);
+        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
     }
 
     #[test]
@@ -453,7 +463,7 @@ mod tests {
         // Should produce defaults without panicking.
         assert!(!fm.waiting);
         assert!(!fm.someday);
-        assert_eq!(fm.action_date, None);
+        assert_eq!(fm.action_at, None);
     }
 
     #[test]
@@ -469,7 +479,7 @@ mod tests {
         );
         let fm = parse_frontmatter(&content);
         assert_eq!(fm.title, "Buy milk");
-        assert_eq!(fm.action_date, Some("2026-04-10".to_string()));
+        assert_eq!(fm.action_at, Some("2026-04-10".to_string()));
         assert!(!fm.waiting);
     }
 
@@ -484,7 +494,7 @@ mod tests {
     // ── view routing ─────────────────────────────────────────────────────────
 
     fn meta(
-        action_date: Option<&str>,
+        action_at: Option<&str>,
         waiting: bool,
         someday: bool,
         completed_at: Option<&str>,
@@ -493,7 +503,7 @@ mod tests {
             id: "x".to_string(),
             title: "T".to_string(),
             created_at: "2026-04-09T00:00:00Z".to_string(),
-            action_date: action_date.map(str::to_string),
+            action_at: action_at.map(str::to_string),
             waiting,
             someday,
             completed_at: completed_at.map(str::to_string),
@@ -511,7 +521,7 @@ mod tests {
         if m.someday {
             return "someday";
         }
-        if let Some(date) = &m.action_date {
+        if let Some(date) = &m.action_at {
             if date.as_str() <= today {
                 return "today";
             } else {
@@ -560,29 +570,29 @@ mod tests {
 
         let patch = TaskPatch {
             title: Some("Updated".to_string()),
-            action_date: Some(Some("2026-05-01".to_string())),
+            action_at: Some(Some("2026-05-01".to_string())),
             waiting: Some(true),
             someday: None,
             notes: Some("My notes.".to_string()),
         };
         let updated = update_task(root.path(), &task.id, patch).unwrap();
         assert_eq!(updated.title, "Updated");
-        assert_eq!(updated.action_date, Some("2026-05-01".to_string()));
+        assert_eq!(updated.action_at, Some("2026-05-01".to_string()));
         assert!(updated.waiting);
         assert_eq!(updated.notes, "My notes.");
     }
 
     #[test]
-    fn clear_action_date() {
+    fn clear_action_at() {
         let root = make_root();
         let task = create_task(root.path(), "Task").unwrap();
         // Set date
-        let p1 = TaskPatch { action_date: Some(Some("2026-05-01".to_string())), ..Default::default() };
+        let p1 = TaskPatch { action_at: Some(Some("2026-05-01".to_string())), ..Default::default() };
         update_task(root.path(), &task.id, p1).unwrap();
         // Clear date
-        let p2 = TaskPatch { action_date: Some(None), ..Default::default() };
+        let p2 = TaskPatch { action_at: Some(None), ..Default::default() };
         let updated = update_task(root.path(), &task.id, p2).unwrap();
-        assert_eq!(updated.action_date, None);
+        assert_eq!(updated.action_at, None);
     }
 
     #[test]

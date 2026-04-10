@@ -4,7 +4,7 @@ export interface TaskMetadata {
   id: string;
   title: string;
   createdAt: string;
-  actionDate: string | null;
+  actionAt: string | null;
   waiting: boolean;
   someday: boolean;
   completedAt: string | null;
@@ -16,7 +16,7 @@ export interface Task extends TaskMetadata {
 
 export interface TaskPatch {
   title?: string;
-  actionDate?: string | null;
+  actionAt?: string | null;
   waiting?: boolean;
   someday?: boolean;
   notes?: string;

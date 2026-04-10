@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, Trash2 } from "lucide-react";
+import { CalendarDays, CheckSquare, ChevronLeft, LoaderCircle, Trash2 } from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
 import { TASK_VIEW_LABELS } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
@@ -22,7 +22,7 @@ export function TaskDetailPanel() {
   } = useTasks();
 
   const [title, setTitle] = useState("");
-  const [actionDate, setActionDate] = useState("");
+  const [actionAt, setActionAt] = useState("");
   const [waiting, setWaiting] = useState(false);
   const [someday, setSomeday] = useState(false);
   const [notes, setNotes] = useState("");
@@ -36,7 +36,7 @@ export function TaskDetailPanel() {
     if (!selectedTask) return;
     taskIdRef.current = selectedTask.id;
     setTitle(selectedTask.title);
-    setActionDate(selectedTask.actionDate ?? "");
+    setActionAt(selectedTask.actionAt ?? "");
     setWaiting(selectedTask.waiting);
     setSomeday(selectedTask.someday);
     setNotes(selectedTask.notes);
@@ -84,8 +84,8 @@ export function TaskDetailPanel() {
 
   const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    setActionDate(value);
-    scheduleSave({ actionDate: value || null });
+    setActionAt(value);
+    scheduleSave({ actionAt: value || null });
   };
 
   const handleWaitingToggle = () => {
@@ -126,17 +126,19 @@ export function TaskDetailPanel() {
   const handleClearDate = () => {
     const id = taskIdRef.current;
     if (!id) return;
-    setActionDate("");
-    void updateTask(id, { actionDate: null });
+    setActionAt("");
+    void updateTask(id, { actionAt: null });
   };
 
-  const formattedDate = formatDate(actionDate, today);
+  const formattedDate = formatDate(actionAt, today);
   const isCompleted = Boolean(selectedTask?.completedAt);
+  const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
 
   const renderBody = () => {
     if (isLoadingTask && selectedTaskId) {
       return (
         <PanelEmptyState
+          icon={<LoaderCircle className="animate-spin" />}
           title="Loading task"
           message="Opening task details."
         />
@@ -146,7 +148,8 @@ export function TaskDetailPanel() {
     if (!selectedTaskId || !selectedTask) {
       return (
         <PanelEmptyState
-          title="No task selected"
+          icon={<CheckSquare />}
+          title="Select a task"
           message="Choose a task from the list to open its details here."
         />
       );
@@ -195,7 +198,7 @@ export function TaskDetailPanel() {
               }
               className={cn(
                 "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2.5 text-xs transition-colors",
-                actionDate
+                actionAt
                   ? "text-text-muted hover:bg-bg-muted hover:text-text"
                   : "text-text-muted/60 hover:bg-bg-muted hover:text-text-muted",
               )}
@@ -207,14 +210,14 @@ export function TaskDetailPanel() {
             <input
               ref={dateInputRef}
               type="date"
-              value={actionDate}
+              value={actionAt}
               onChange={handleDateChange}
               onBlur={flushSave}
               className="pointer-events-none absolute h-0 w-0 opacity-0"
               aria-hidden="true"
             />
 
-            {actionDate && (
+            {actionAt && (
               <button
                 type="button"
                 onClick={handleClearDate}
@@ -300,7 +303,11 @@ export function TaskDetailPanel() {
       </div>
 
       <div className="ui-scrollbar-overlay flex-1 overflow-y-auto">
-        {renderBody()}
+        {showEmptyState ? (
+          <div className="flex min-h-full">
+            {renderBody()}
+          </div>
+        ) : renderBody()}
       </div>
     </div>
   );

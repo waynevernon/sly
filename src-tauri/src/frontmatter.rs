@@ -63,9 +63,9 @@ mod tests {
 
     #[test]
     fn extract_block_returns_inner_yaml() {
-        let content = "---\ntitle: Hello\naction_date: 2026-04-10\n---\nBody";
+        let content = "---\ntitle: Hello\naction_at: 2026-04-10\n---\nBody";
         let block = extract_frontmatter_block(content).unwrap();
         assert!(block.contains("title: Hello"));
-        assert!(block.contains("action_date: 2026-04-10"));
+        assert!(block.contains("action_at: 2026-04-10"));
     }
 }

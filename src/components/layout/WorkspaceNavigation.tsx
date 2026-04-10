@@ -25,10 +25,11 @@ import { PaneResizeHandle } from "./PaneResizeHandle";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
 import { TaskListPane } from "../tasks/TaskListPane";
-import { useTasks } from "../../context/TasksContext";
+import { TaskNavigationPane } from "../tasks/TaskNavigationPane";
 
 interface WorkspaceNavigationProps {
   paneMode: PaneMode;
+  workspaceMode: "notes" | "tasks";
   onOpenSettings?: () => void;
 }
 
@@ -80,6 +81,7 @@ function getOverlayHotspot(overlaySize: number, inset: number): number {
 
 export function WorkspaceNavigation({
   paneMode,
+  workspaceMode,
   onOpenSettings,
 }: WorkspaceNavigationProps) {
   const {
@@ -89,7 +91,6 @@ export function WorkspaceNavigation({
     revealFolder,
     folderAppearances,
   } = useNotes();
-  const { isTasksModeActive } = useTasks();
   const { foldersPaneWidth, notesPaneWidth, resolvedTheme, setPaneWidths } =
     useTheme();
 
@@ -314,6 +315,7 @@ export function WorkspaceNavigation({
 
   const foldersVisible = paneMode === 3;
   const notesVisible = paneMode >= 2;
+  const isTasksModeActive = workspaceMode === "tasks";
 
   return (
     <DndContext
@@ -341,10 +343,14 @@ export function WorkspaceNavigation({
                 : "opacity-0 -translate-x-3",
             )}
           >
-            <FoldersPane
-              onOpenSettings={onOpenSettings}
-              pendingFolderPath={pendingFolderPath}
-            />
+            {isTasksModeActive ? (
+              <TaskNavigationPane onOpenSettings={onOpenSettings} />
+            ) : (
+              <FoldersPane
+                onOpenSettings={onOpenSettings}
+                pendingFolderPath={pendingFolderPath}
+              />
+            )}
           </div>
           {foldersVisible && notesVisible && (
             <PaneResizeHandle

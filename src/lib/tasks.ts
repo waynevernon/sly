@@ -24,24 +24,24 @@ export const TASK_VIEW_ORDER: TaskView[] = [
  *  1. completed_at set           → logbook
  *  2. waiting                    → waiting
  *  3. someday                    → someday
- *  4. action_date <= today       → today  (includes overdue)
- *  5. action_date > today        → upcoming
+ *  4. action_at <= today         → today  (includes overdue)
+ *  5. action_at > today          → upcoming
  *  6. (no date, no flags)        → inbox
  */
-export function deriveView(task: Pick<TaskMetadata, 'completedAt' | 'waiting' | 'someday' | 'actionDate'>, today: string): TaskView {
+export function deriveView(task: Pick<TaskMetadata, 'completedAt' | 'waiting' | 'someday' | 'actionAt'>, today: string): TaskView {
   if (task.completedAt) return "logbook";
   if (task.waiting) return "waiting";
   if (task.someday) return "someday";
-  if (task.actionDate) {
-    return task.actionDate <= today ? "today" : "upcoming";
+  if (task.actionAt) {
+    return task.actionAt <= today ? "today" : "upcoming";
   }
   return "inbox";
 }
 
-/** True if the task is overdue (action_date in the past, not completed). */
-export function isOverdue(task: Pick<TaskMetadata, 'completedAt' | 'actionDate'>, today: string): boolean {
-  if (task.completedAt || !task.actionDate) return false;
-  return task.actionDate < today;
+/** True if the task is overdue (action_at in the past, not completed). */
+export function isOverdue(task: Pick<TaskMetadata, 'completedAt' | 'actionAt'>, today: string): boolean {
+  if (task.completedAt || !task.actionAt) return false;
+  return task.actionAt < today;
 }
 
 /** Group a flat task list into per-view buckets. */
@@ -68,17 +68,17 @@ export function groupByView(
 
 /**
  * Compare two tasks for display ordering within a view.
- * Within Today/Upcoming: sort by action_date ASC, then created_at ASC.
+ * Within Today/Upcoming: sort by action_at ASC, then created_at ASC.
  * All other views: sort by created_at ASC (most recently created last = natural append order).
  */
 export function compareTasks(a: TaskMetadata, b: TaskMetadata, view: TaskView): number {
   if (view === "today" || view === "upcoming") {
-    if (a.actionDate && b.actionDate) {
-      const dateCmp = a.actionDate.localeCompare(b.actionDate);
+    if (a.actionAt && b.actionAt) {
+      const dateCmp = a.actionAt.localeCompare(b.actionAt);
       if (dateCmp !== 0) return dateCmp;
-    } else if (a.actionDate) {
+    } else if (a.actionAt) {
       return -1;
-    } else if (b.actionDate) {
+    } else if (b.actionAt) {
       return 1;
     }
   }

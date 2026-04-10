@@ -23,8 +23,8 @@ export function TaskRow({
   const overdue = !isCompleted && isOverdue(task, today);
   const secondaryLabel = task.completedAt && view === "logbook"
     ? formatCompletedAt(task.completedAt)
-    : task.actionDate && view !== "logbook"
-      ? formatDate(task.actionDate, today)
+    : task.actionAt && view !== "logbook"
+      ? formatDate(task.actionAt, today)
       : null;
 
   return (

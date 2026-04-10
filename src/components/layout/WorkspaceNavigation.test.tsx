@@ -29,10 +29,6 @@ vi.mock("../../context/ThemeContext", () => ({
   useTheme: vi.fn(),
 }));
 
-vi.mock("../../context/TasksContext", () => ({
-  useTasks: vi.fn(),
-}));
-
 vi.mock("./FoldersPane", () => ({
   FoldersPane: () => <div data-testid="folders-pane" />,
 }));
@@ -43,6 +39,10 @@ vi.mock("./NotesPane", () => ({
 
 vi.mock("../tasks/TaskListPane", () => ({
   TaskListPane: () => <div data-testid="task-list-pane" />,
+}));
+
+vi.mock("../tasks/TaskNavigationPane", () => ({
+  TaskNavigationPane: () => <div data-testid="task-navigation-pane" />,
 }));
 
 type NotesHookValue = ReturnType<
@@ -77,10 +77,6 @@ describe("WorkspaceNavigation", () => {
       setPaneWidths: vi.fn(),
     } as never);
 
-    const tasksContext = await import("../../context/TasksContext");
-    vi.mocked(tasksContext.useTasks).mockReturnValue({
-      isTasksModeActive: false,
-    } as never);
   });
 
   it("moves folders into another folder on drop", async () => {
@@ -92,7 +88,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveFolder, revealFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -127,7 +123,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -163,7 +159,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveNote, moveSelectedNotes, revealFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -192,16 +188,13 @@ describe("WorkspaceNavigation", () => {
   });
 
   it("renders the task list pane instead of the notes pane in task mode", async () => {
-    const tasksContext = await import("../../context/TasksContext");
-    vi.mocked(tasksContext.useTasks).mockReturnValue({
-      isTasksModeActive: true,
-    } as never);
-
     const { queryByTestId, getByTestId } = render(
-      <WorkspaceNavigation paneMode={3} />,
+      <WorkspaceNavigation paneMode={3} workspaceMode="tasks" />,
     );
 
     expect(getByTestId("task-list-pane")).toBeInTheDocument();
+    expect(getByTestId("task-navigation-pane")).toBeInTheDocument();
+    expect(queryByTestId("folders-pane")).not.toBeInTheDocument();
     expect(queryByTestId("notes-pane")).not.toBeInTheDocument();
   });
 });

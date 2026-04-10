@@ -1,10 +1,11 @@
 import { useRef, useState, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { BookOpen, CalendarClock, CheckSquare, Clock, HelpCircle, Inbox, Plus } from "lucide-react";
 import { useTasks } from "../../context/TasksContext";
 import { compareTasks, TASK_VIEW_LABELS } from "../../lib/tasks";
-import { IconButton, PanelEmptyState } from "../ui";
+import { Button, IconButton, PanelEmptyState } from "../ui";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
+import type { TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
   inbox: {
@@ -33,6 +34,15 @@ const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
   },
 };
 
+const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
+  inbox: Inbox,
+  today: CheckSquare,
+  upcoming: CalendarClock,
+  someday: HelpCircle,
+  waiting: Clock,
+  logbook: BookOpen,
+};
+
 export function TaskListPane() {
   const {
     buckets,
@@ -52,33 +62,57 @@ export function TaskListPane() {
   const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
     compareTasks(a, b, selectedView),
   );
+  const showEmptyState = isLoading || (tasks.length === 0 && !isCreating);
   const empty = EMPTY_MESSAGES[selectedView] ?? {
     title: "Nothing here",
     message: "",
   };
+  const EmptyStateIcon = EMPTY_STATE_ICONS[selectedView];
+
+  const focusCreateInput = useCallback(() => {
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, []);
 
   const handleStartCreate = useCallback(() => {
     setIsCreating(true);
     setNewTitle("");
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+    focusCreateInput();
+  }, [focusCreateInput]);
 
-  const handleCommitCreate = useCallback(async () => {
+  const handleCommitCreate = useCallback(async (options?: {
+    continueCapturing?: boolean;
+  }) => {
+    const continueCapturing = options?.continueCapturing ?? false;
     const title = newTitle.trim();
-    setIsCreating(false);
-    setNewTitle("");
-    if (!title) return;
+    if (!title) {
+      if (continueCapturing) {
+        focusCreateInput();
+      } else {
+        setIsCreating(false);
+      }
+      return;
+    }
+
     const task = await createTask(title);
+    setNewTitle("");
+
+    if (continueCapturing) {
+      setIsCreating(true);
+      focusCreateInput();
+      return;
+    }
+
+    setIsCreating(false);
     if (task) {
       selectTask(task.id);
     }
-  }, [createTask, newTitle, selectTask]);
+  }, [createTask, focusCreateInput, newTitle, selectTask]);
 
   const handleCreateKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        void handleCommitCreate();
+        void handleCommitCreate({ continueCapturing: true });
       } else if (event.key === "Escape") {
         setIsCreating(false);
         setNewTitle("");
@@ -108,14 +142,37 @@ export function TaskListPane() {
         )}
       </div>
 
-      <div className="ui-scrollbar-overlay flex-1 overflow-y-auto px-1.5 py-2">
+      <div
+        className={cn(
+          "ui-scrollbar-overlay flex-1 overflow-y-auto",
+          showEmptyState ? "" : "px-1.5 py-2",
+        )}
+      >
         {isLoading ? (
-          <PanelEmptyState
-            title="Loading tasks"
-            message="Reading your task list."
-          />
+          <div className="flex min-h-full">
+            <PanelEmptyState
+              title="Loading tasks"
+              message="Reading your task list."
+            />
+          </div>
         ) : tasks.length === 0 && !isCreating ? (
-          <PanelEmptyState title={empty.title} message={empty.message} />
+          <div className="flex min-h-full">
+            <PanelEmptyState
+              icon={<EmptyStateIcon />}
+              title={empty.title}
+              message={empty.message}
+              action={selectedView !== "logbook" ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={handleStartCreate}
+                >
+                  New Task
+                </Button>
+              ) : undefined}
+            />
+          </div>
         ) : (
           <div role="listbox" aria-label={TASK_VIEW_LABELS[selectedView]}>
             {tasks.map((task) => (

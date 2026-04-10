@@ -15,19 +15,43 @@ const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
 };
 
 export function TasksSection() {
-  const { selectedView, isTasksModeActive, selectView, buckets } = useTasks();
+  const { selectedView, selectView, buckets } = useTasks();
+  return (
+    <TasksSectionInner
+      selectedView={selectedView}
+      selectView={selectView}
+      buckets={buckets}
+      showLabel
+    />
+  );
+}
 
+interface TasksSectionInnerProps {
+  selectedView: ReturnType<typeof useTasks>["selectedView"];
+  selectView: ReturnType<typeof useTasks>["selectView"];
+  buckets: ReturnType<typeof useTasks>["buckets"];
+  showLabel: boolean;
+}
+
+function TasksSectionInner({
+  selectedView,
+  selectView,
+  buckets,
+  showLabel,
+}: TasksSectionInnerProps) {
   return (
     <section className="px-2 pb-0.5" aria-label="Tasks">
-      <div className="px-1.5 pb-1 pt-0.5">
-        <span className="select-none text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
-          Tasks
-        </span>
-      </div>
+      {showLabel && (
+        <div className="px-1.5 pb-1 pt-0.5">
+          <span className="select-none text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
+            Tasks
+          </span>
+        </div>
+      )}
       <nav className="space-y-0.5" aria-label="Task horizons">
         {TASK_VIEW_ORDER.map((view) => {
           const Icon = VIEW_ICONS[view];
-          const isSelected = isTasksModeActive && selectedView === view;
+          const isSelected = selectedView === view;
           const count = view !== "logbook" ? buckets[view].length : undefined;
 
           return (
@@ -66,5 +90,17 @@ export function TasksSection() {
         })}
       </nav>
     </section>
+  );
+}
+
+export function TaskModeNavigationSection() {
+  const { selectedView, selectView, buckets } = useTasks();
+  return (
+    <TasksSectionInner
+      selectedView={selectedView}
+      selectView={selectView}
+      buckets={buckets}
+      showLabel={false}
+    />
   );
 }

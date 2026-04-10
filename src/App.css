@@ -392,6 +392,18 @@ body {
   padding-right: var(--ui-pane-padding-end);
 }
 
+.ui-titlebar-mode-switch {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  height: var(--ui-drag-region-height);
+  align-items: center;
+  justify-content: center;
+  padding-left: calc(var(--ui-titlebar-leading-offset) + 24px);
+  padding-right: calc(var(--ui-titlebar-trailing-offset) + 24px);
+}
+
 .ui-titlebar-leading-offset {
   padding-left: var(--ui-titlebar-leading-offset);
 }
