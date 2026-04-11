@@ -382,17 +382,23 @@ export function TaskDetailPanel() {
               <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
                 Link
               </div>
-              {openableLink ? (
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => void handleOpenLink()}
-                  className="ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                  <span>Open Link</span>
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleOpenLink()}
+                disabled={!openableLink}
+                aria-hidden={!openableLink}
+                tabIndex={openableLink ? 0 : -1}
+                className={cn(
+                  "ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs transition-colors",
+                  openableLink
+                    ? "text-text-muted hover:bg-bg-muted hover:text-text"
+                    : "pointer-events-none invisible",
+                )}
+              >
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>Open Link</span>
+              </button>
             </div>
             <input
               type="text"
