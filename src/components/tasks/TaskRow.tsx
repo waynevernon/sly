@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Clock3, FileText, Link2 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -10,6 +11,7 @@ type SelectionState = "none" | "selected" | "active";
 
 interface TaskRowProps {
   task: TaskMetadata;
+  dragIds: string[];
   view: TaskView;
   today: string;
   selectionState: SelectionState;
@@ -25,6 +27,7 @@ interface TaskRowProps {
 
 export function TaskRow({
   task,
+  dragIds,
   view,
   today,
   selectionState,
@@ -39,21 +42,42 @@ export function TaskRow({
   const hasDescription = task.description.trim().length > 0;
   const hasLink = task.link.trim().length > 0;
   const hasWaitingFor = task.waitingFor.trim().length > 0;
+  const showActionDateLabel = view !== "completed" && view !== "today";
   const secondaryLabel = task.completedAt && view === "completed"
     ? formatCompletedAt(task.completedAt)
-      : actionDate && view !== "completed"
+      : actionDate && showActionDateLabel
       ? formatDate(actionDate, today)
       : null;
   const isSelected = selectionState !== "none";
   const isActive = selectionState === "active";
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    isDragging,
+  } = useDraggable({
+    id: `task:${task.id}`,
+    data: {
+      type: "task",
+      id: task.id,
+      ids: dragIds,
+      title: task.title || "Untitled",
+    },
+  });
 
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
           role="option"
           aria-selected={isSelected}
-          className="group rounded-[var(--ui-radius-md)]"
+          className={cn(
+            "group rounded-[var(--ui-radius-md)]",
+            isDragging && "opacity-40",
+          )}
           onContextMenu={onContextMenuOpen}
         >
           <div

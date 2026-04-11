@@ -83,6 +83,16 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   someday: Archive,
   completed: CheckCheck,
 };
+
+const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
+  inbox: Inbox,
+  today: CheckSquare,
+  upcoming: CalendarClock,
+  waiting: UserRound,
+  anytime: Clock3,
+  someday: Archive,
+  completed: CheckCheck,
+};
 const CREATE_DATE_DEBOUNCE_MS = 350;
 
 export function TaskListPane() {
@@ -135,6 +145,7 @@ export function TaskListPane() {
     message: "",
   };
   const EmptyStateIcon = EMPTY_STATE_ICONS[selectedView];
+  const HeaderIcon = HEADER_ICONS[selectedView];
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
   const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting";
@@ -317,8 +328,11 @@ export function TaskListPane() {
     <div className="flex h-full flex-col select-none bg-bg">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <div className="font-medium text-base text-text">
-          {hasBatchSelection ? `${selectionCount} selected` : TASK_VIEW_LABELS[selectedView]}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
+          <div className="min-w-0 truncate font-medium text-base text-text">
+            {hasBatchSelection ? `${selectionCount} selected` : TASK_VIEW_LABELS[selectedView]}
+          </div>
         </div>
         {hasBatchSelection ? (
           <div className="ui-pane-header-actions ml-auto">
@@ -427,6 +441,11 @@ export function TaskListPane() {
                   <TaskRow
                     key={task.id}
                     task={task}
+                    dragIds={
+                      selectedTaskIds.length > 1 && selectedTaskIdSet.has(task.id)
+                        ? selectedTaskIds
+                        : [task.id]
+                    }
                     view={selectedView}
                     today={today}
                     selectionState={

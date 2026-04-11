@@ -32,6 +32,14 @@ export const TASK_VIEW_ORDER: TaskView[] = [
   "waiting",
 ];
 
+export const TASK_DRAG_TARGET_VIEWS: TaskView[] = [
+  "inbox",
+  "today",
+  "anytime",
+  "someday",
+  "completed",
+];
+
 export interface DetectedTaskDate {
   actionAt: string;
   cleanedTitle: string;

@@ -4,6 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { TaskRow } from "./TaskRow";
 import type { TaskMetadata } from "../../types/tasks";
 
+vi.mock("@dnd-kit/core", () => ({
+  useDraggable: vi.fn(() => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    isDragging: false,
+  })),
+}));
+
 function makeTask(overrides: Partial<TaskMetadata> = {}): TaskMetadata {
   return {
     id: "task-1",
@@ -27,6 +36,7 @@ describe("TaskRow", () => {
           description: "Write rollout notes",
           link: "https://example.com",
         })}
+        dragIds={["task-1"]}
         view="inbox"
         today="2026-04-10"
         selectionState="none"
@@ -44,6 +54,7 @@ describe("TaskRow", () => {
     render(
       <TaskRow
         task={makeTask({ waitingFor: "Jordan" })}
+        dragIds={["task-1"]}
         view="inbox"
         today="2026-04-10"
         selectionState="none"
@@ -60,6 +71,7 @@ describe("TaskRow", () => {
     render(
       <TaskRow
         task={makeTask()}
+        dragIds={["task-1"]}
         view="inbox"
         today="2026-04-10"
         selectionState="none"
@@ -80,6 +92,7 @@ describe("TaskRow", () => {
     render(
       <TaskRow
         task={makeTask()}
+        dragIds={["task-1"]}
         view="inbox"
         today="2026-04-10"
         selectionState="none"

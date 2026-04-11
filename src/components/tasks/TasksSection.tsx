@@ -1,6 +1,7 @@
+import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, UserRound } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
+import { TASK_DRAG_TARGET_VIEWS, TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
 import { useTasks } from "../../context/TasksContext";
 import { CountBadge } from "../ui";
@@ -54,49 +55,97 @@ function TasksSectionInner({
           const Icon = VIEW_ICONS[view];
           const isSelected = selectedView === view;
           const count = buckets[view].length;
+          const isDragTarget = TASK_DRAG_TARGET_VIEWS.includes(view);
 
           return (
-            <div key={view}>
-              {view === "waiting" && (
-                <div className="mx-3 my-1.5 border-t border-border/50" />
-              )}
-            <button
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => selectView(view)}
-              className={cn(
-                "ui-focus-ring flex w-full items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200",
-                isSelected
-                  ? "bg-bg-muted text-text"
-                  : "text-text hover:bg-bg-muted/80"
-              )}
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <Icon
-                  className={cn(
-                    "h-4.25 w-4.25 shrink-0 stroke-[1.7]",
-                    isSelected ? "text-text-muted" : "text-text-muted/80"
-                  )}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {TASK_VIEW_LABELS[view]}
-                </span>
-              </span>
-              {count !== undefined && count > 0 && (
-                <span className="ui-count-badge-column">
-                  <CountBadge
-                    count={count}
-                    layout="column"
-                    emphasis={isSelected ? "active" : "inactive"}
-                  />
-                </span>
-              )}
-            </button>
-            </div>
+            <TaskViewButton
+              key={view}
+              view={view}
+              icon={Icon}
+              isSelected={isSelected}
+              count={count}
+              isDragTarget={isDragTarget}
+              onSelect={() => selectView(view)}
+            />
           );
         })}
       </nav>
     </section>
+  );
+}
+
+interface TaskViewButtonProps {
+  view: TaskView;
+  icon: React.FC<{ className?: string }>;
+  isSelected: boolean;
+  count: number;
+  isDragTarget: boolean;
+  onSelect: () => void;
+}
+
+function TaskViewButton({
+  view,
+  icon: Icon,
+  isSelected,
+  count,
+  isDragTarget,
+  onSelect,
+}: TaskViewButtonProps) {
+  const { active } = useDndContext();
+  const isTaskDragActive = active?.data.current?.type === "task";
+  const { setNodeRef, isOver } = useDroppable({
+    id: `task-view:${view}`,
+    disabled: !isDragTarget,
+    data: isDragTarget
+      ? {
+          type: "task-view-drop-target",
+          view,
+        }
+      : undefined,
+  });
+  const isTaskDropOver = isDragTarget && isTaskDragActive && isOver;
+
+  return (
+    <div>
+      {view === "waiting" && (
+        <div className="mx-3 my-1.5 border-t border-border/50" />
+      )}
+      <button
+        ref={setNodeRef}
+        type="button"
+        aria-pressed={isSelected}
+        onClick={onSelect}
+        className={cn(
+          "ui-focus-ring flex w-full items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200",
+          isTaskDropOver
+            ? "bg-accent/10 text-text ring-1 ring-inset ring-accent/35"
+            : isSelected
+              ? "bg-bg-muted text-text"
+              : "text-text hover:bg-bg-muted/80"
+        )}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <Icon
+            className={cn(
+              "h-4.25 w-4.25 shrink-0 stroke-[1.7]",
+              isSelected || isTaskDropOver ? "text-text-muted" : "text-text-muted/80"
+            )}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {TASK_VIEW_LABELS[view]}
+          </span>
+        </span>
+        {count !== undefined && count > 0 && (
+          <span className="ui-count-badge-column">
+            <CountBadge
+              count={count}
+              layout="column"
+              emphasis={isSelected ? "active" : "inactive"}
+            />
+          </span>
+        )}
+      </button>
+    </div>
   );
 }
 

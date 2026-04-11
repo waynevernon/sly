@@ -433,8 +433,11 @@ export function TaskDetailPanel() {
 
           <div />
           <div className="space-y-2">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
-              Description
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+                Description
+              </div>
+              <div className="h-[28px] px-2 py-1 invisible" aria-hidden="true" />
             </div>
             <textarea
               value={description}

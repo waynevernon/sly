@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Clock3, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarClock, Clock3, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
 import type { TaskScheduleBucket } from "../../types/tasks";
-import { Button, DialogShell } from "../ui";
+import { Button, DialogShell, PopoverSurface } from "../ui";
 import { TaskDatePicker } from "./TaskDatePicker";
 
 interface GlobalTaskCaptureDialogProps {
@@ -28,6 +28,7 @@ export function GlobalTaskCaptureDialog({
 }: GlobalTaskCaptureDialogProps) {
   const {
     createTask,
+    tasks,
     updateTask,
     selectTask,
     selectView,
@@ -38,6 +39,7 @@ export function GlobalTaskCaptureDialog({
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
+  const [waitingForFocused, setWaitingForFocused] = useState(false);
   const [manualActionDate, setManualActionDate] = useState("");
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
@@ -52,6 +54,7 @@ export function GlobalTaskCaptureDialog({
     setDescription("");
     setLink("");
     setWaitingFor("");
+    setWaitingForFocused(false);
     setManualActionDate("");
     setManualScheduleBucket(null);
     setDetectedDate(null);
@@ -185,6 +188,39 @@ export function GlobalTaskCaptureDialog({
   const effectiveActionDate =
     manualScheduleBucket ? "" : manualActionDate || detectedDate?.localDate || "";
   const showDetectedDateChip = Boolean(detectedDate && !manualActionDate && !manualScheduleBucket);
+  const waitingForSuggestions = useMemo(() => {
+    const counts = new Map<string, { value: string; count: number }>();
+
+    for (const task of tasks) {
+      const candidate = task.waitingFor.trim();
+      if (!candidate) continue;
+
+      const key = candidate.toLocaleLowerCase();
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(key, { value: candidate, count: 1 });
+      }
+    }
+
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+      .map((entry) => entry.value);
+  }, [tasks]);
+  const filteredWaitingForSuggestions = useMemo(() => {
+    const query = waitingFor.trim().toLocaleLowerCase();
+    return waitingForSuggestions
+      .filter((value) => {
+        const normalized = value.toLocaleLowerCase();
+        if (!query) return true;
+        if (normalized === query) return false;
+        return normalized.includes(query);
+      })
+      .slice(0, 6);
+  }, [waitingFor, waitingForSuggestions]);
+  const showWaitingForSuggestions =
+    waitingForFocused && filteredWaitingForSuggestions.length > 0;
 
   if (!open) return null;
 
@@ -249,14 +285,39 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
-            <div className="flex h-[var(--ui-control-height-standard)] min-w-[200px] flex-1 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
-              <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-              <input
-                value={waitingFor}
-                placeholder="Waiting for…"
-                onChange={(event) => setWaitingFor(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
-              />
+            <div className="relative min-w-[200px] flex-1">
+              <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                <input
+                  value={waitingFor}
+                  placeholder="Waiting for…"
+                  onChange={(event) => setWaitingFor(event.target.value)}
+                  onFocus={() => setWaitingForFocused(true)}
+                  onBlur={() => setWaitingForFocused(false)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
+                />
+              </div>
+              {showWaitingForSuggestions ? (
+                <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 w-full p-1.5">
+                  <div className="flex flex-col gap-1">
+                    {filteredWaitingForSuggestions.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setWaitingFor(value);
+                          setWaitingForFocused(false);
+                        }}
+                        className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
+                      >
+                        <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted" />
+                        <span className="truncate">{value}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverSurface>
+              ) : null}
             </div>
           </div>
 

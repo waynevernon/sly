@@ -9,11 +9,15 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { CheckSquare } from "lucide-react";
 import type { PaneMode } from "../../types/note";
 import { useNotes } from "../../context/NotesContext";
+import { useTasks } from "../../context/TasksContext";
 import { useTheme } from "../../context/ThemeContext";
 import { workspaceCollisionDetection } from "../../lib/dragCollision";
 import { cn } from "../../lib/utils";
+import { TASK_DRAG_TARGET_VIEWS, localDateToNormalizedActionAt } from "../../lib/tasks";
+import type { TaskView } from "../../types/tasks";
 import { NoteIcon } from "../icons";
 import { FolderGlyph } from "../folders/FolderGlyph";
 import {
@@ -33,8 +37,8 @@ interface WorkspaceNavigationProps {
   onOpenSettings?: () => void;
 }
 
-const NOTE_DRAG_CURSOR_INSET_X = 12;
-const NOTE_DRAG_CURSOR_INSET_Y = 8;
+const ITEM_DRAG_CURSOR_INSET_X = 12;
+const ITEM_DRAG_CURSOR_INSET_Y = 8;
 
 function getEventClientCoordinates(event: Event | null): {
   x: number;
@@ -91,6 +95,7 @@ export function WorkspaceNavigation({
     revealFolder,
     folderAppearances,
   } = useNotes();
+  const { tasks, today, updateTask, setCompleted } = useTasks();
   const { foldersPaneWidth, notesPaneWidth, resolvedTheme, setPaneWidths } =
     useTheme();
 
@@ -155,7 +160,7 @@ export function WorkspaceNavigation({
   );
 
   const [dragLabel, setDragLabel] = useState<string | null>(null);
-  const [dragType, setDragType] = useState<"folder" | "note" | null>(null);
+  const [dragType, setDragType] = useState<"folder" | "note" | "task" | null>(null);
   const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
   const [pendingFolderPath, setPendingFolderPath] = useState<string | null>(null);
 
@@ -197,13 +202,24 @@ export function WorkspaceNavigation({
       setDragLabel(name);
       setDragType("folder");
       setDragFolderPath(path);
+      return;
+    }
+
+    if (data?.type === "task") {
+      const taskIds = Array.isArray(data.ids)
+        ? (data.ids as string[])
+        : [(data.id as string) ?? ""];
+      setDragLabel(taskIds.length > 1 ? `${taskIds.length} tasks` : ((data.title as string) || "Untitled"));
+      setDragType("task");
+      setDragFolderPath(null);
     }
   }, []);
 
-  const noteDragOverlayModifier = useCallback<Modifier>(
+  const itemDragOverlayModifier = useCallback<Modifier>(
     ({ active, activatorEvent, activeNodeRect, overlayNodeRect, transform }) => {
       if (
-        active?.data.current?.type !== "note" ||
+        (active?.data.current?.type !== "note" &&
+          active?.data.current?.type !== "task") ||
         !activeNodeRect ||
         !overlayNodeRect
       ) {
@@ -220,11 +236,11 @@ export function WorkspaceNavigation({
 
       const overlayHotspotX = getOverlayHotspot(
         overlayNodeRect.width,
-        NOTE_DRAG_CURSOR_INSET_X,
+        ITEM_DRAG_CURSOR_INSET_X,
       );
       const overlayHotspotY = getOverlayHotspot(
         overlayNodeRect.height,
-        NOTE_DRAG_CURSOR_INSET_Y,
+        ITEM_DRAG_CURSOR_INSET_Y,
       );
 
       return {
@@ -301,6 +317,65 @@ export function WorkspaceNavigation({
             currentPath === folderPath ? null : currentPath,
           );
         }
+        return;
+      }
+
+      if (activeData.type === "task") {
+        clearDragState();
+        if (overData?.type !== "task-view-drop-target") return;
+
+        const targetView = overData.view as TaskView;
+        if (!TASK_DRAG_TARGET_VIEWS.includes(targetView)) {
+          return;
+        }
+
+        const taskIds = Array.isArray(activeData.ids)
+          ? (activeData.ids as string[])
+          : [activeData.id as string];
+
+        await Promise.all(
+          taskIds.map(async (taskId) => {
+            const task = tasks.find((entry) => entry.id === taskId);
+            if (!task) {
+              return;
+            }
+
+            if (targetView === "completed") {
+              if (!task.completedAt) {
+                await setCompleted(taskId, true);
+              }
+              return;
+            }
+
+            if (task.completedAt) {
+              await setCompleted(taskId, false);
+            }
+
+            const patch =
+              targetView === "inbox"
+                ? {
+                    actionAt: null,
+                    scheduleBucket: null,
+                  }
+                : targetView === "today"
+                  ? {
+                      actionAt: localDateToNormalizedActionAt(today),
+                      scheduleBucket: null,
+                    }
+                  : targetView === "anytime" || targetView === "someday"
+                    ? {
+                        actionAt: null,
+                        scheduleBucket: targetView,
+                      }
+                    : null;
+
+            if (!patch) {
+              return;
+            }
+
+            await updateTask(taskId, patch);
+          }),
+        );
       }
     } catch (error) {
       console.error("Failed to move item:", error);
@@ -311,6 +386,10 @@ export function WorkspaceNavigation({
     moveNote,
     moveSelectedNotes,
     revealFolder,
+    setCompleted,
+    tasks,
+    today,
+    updateTask,
   ]);
 
   const foldersVisible = paneMode === 3;
@@ -392,7 +471,7 @@ export function WorkspaceNavigation({
 
       <DragOverlay
         dropAnimation={null}
-        modifiers={[noteDragOverlayModifier]}
+        modifiers={[itemDragOverlayModifier]}
         style={{ width: "max-content", height: "max-content" }}
       >
         {dragLabel && (
@@ -421,6 +500,8 @@ export function WorkspaceNavigation({
                         strokeWidth={1.75}
                         style={dragFolderIconColor ? { color: dragFolderIconColor } : undefined}
                       />
+                    ) : dragType === "task" ? (
+                      <CheckSquare className="w-4 h-4 stroke-[1.8] opacity-60 shrink-0" />
                     ) : (
                       <NoteIcon className="w-4 h-4 stroke-[1.6] opacity-50 shrink-0" />
                     )}

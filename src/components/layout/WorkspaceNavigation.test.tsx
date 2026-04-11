@@ -1,6 +1,7 @@
 import { act, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { localDateToNormalizedActionAt } from "../../lib/tasks";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 
 let latestDndProps: Record<string, unknown> | null = null;
@@ -23,6 +24,10 @@ vi.mock("@dnd-kit/core", () => ({
 
 vi.mock("../../context/NotesContext", () => ({
   useNotes: vi.fn(),
+}));
+
+vi.mock("../../context/TasksContext", () => ({
+  useTasks: vi.fn(),
 }));
 
 vi.mock("../../context/ThemeContext", () => ({
@@ -48,6 +53,9 @@ vi.mock("../tasks/TaskNavigationPane", () => ({
 type NotesHookValue = ReturnType<
   typeof import("../../context/NotesContext").useNotes
 >;
+type TasksHookValue = ReturnType<
+  typeof import("../../context/TasksContext").useTasks
+>;
 
 function makeNotesHookValue(
   overrides: Partial<NotesHookValue> = {},
@@ -62,12 +70,51 @@ function makeNotesHookValue(
   } as never;
 }
 
+function makeTasksHookValue(
+  overrides: Partial<TasksHookValue> = {},
+): TasksHookValue {
+  return {
+    tasks: [],
+    buckets: {
+      inbox: [],
+      today: [],
+      upcoming: [],
+      waiting: [],
+      anytime: [],
+      someday: [],
+      completed: [],
+    },
+    today: "2026-04-11",
+    isLoading: false,
+    lastError: null,
+    selectedView: "inbox",
+    selectedTaskId: null,
+    selectedTaskIds: [],
+    selectedTask: null,
+    isLoadingTask: false,
+    selectView: vi.fn(),
+    selectTask: vi.fn(),
+    toggleTaskSelection: vi.fn(),
+    selectTaskRange: vi.fn(),
+    clearTaskSelection: vi.fn(),
+    createTask: vi.fn(),
+    updateTask: vi.fn(),
+    setCompleted: vi.fn(),
+    deleteTask: vi.fn(),
+    refreshTasks: vi.fn(),
+    ...overrides,
+  } as never;
+}
+
 describe("WorkspaceNavigation", () => {
   beforeEach(async () => {
     latestDndProps = null;
 
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
+
+    const tasksContext = await import("../../context/TasksContext");
+    vi.mocked(tasksContext.useTasks).mockReturnValue(makeTasksHookValue());
 
     const themeContext = await import("../../context/ThemeContext");
     vi.mocked(themeContext.useTheme).mockReturnValue({
@@ -196,5 +243,130 @@ describe("WorkspaceNavigation", () => {
     expect(getByTestId("task-navigation-pane")).toBeInTheDocument();
     expect(queryByTestId("folders-pane")).not.toBeInTheDocument();
     expect(queryByTestId("notes-pane")).not.toBeInTheDocument();
+  });
+
+  it("moves a multi-selected task drag to Anytime", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    const updateTask = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        tasks: [
+          {
+            id: "task-1",
+            title: "One",
+            description: "",
+            link: "",
+            waitingFor: "",
+            createdAt: "2026-04-10T10:00:00Z",
+            actionAt: null,
+            scheduleBucket: null,
+            completedAt: null,
+          },
+          {
+            id: "task-2",
+            title: "Two",
+            description: "",
+            link: "",
+            waitingFor: "",
+            createdAt: "2026-04-10T11:00:00Z",
+            actionAt: null,
+            scheduleBucket: null,
+            completedAt: null,
+          },
+        ],
+        updateTask,
+      }),
+    );
+
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="tasks" />);
+
+    await act(async () => {
+      await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
+        active: {
+          data: {
+            current: {
+              type: "task",
+              id: "task-1",
+              ids: ["task-1", "task-2"],
+            },
+          },
+        },
+        over: {
+          data: {
+            current: {
+              type: "task-view-drop-target",
+              view: "anytime",
+            },
+          },
+        },
+      });
+    });
+
+    expect(updateTask).toHaveBeenCalledTimes(2);
+    expect(updateTask).toHaveBeenCalledWith("task-1", {
+      actionAt: null,
+      scheduleBucket: "anytime",
+    });
+    expect(updateTask).toHaveBeenCalledWith("task-2", {
+      actionAt: null,
+      scheduleBucket: "anytime",
+    });
+  });
+
+  it("reopens completed tasks before dropping them into an active horizon", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    const updateTask = vi.fn();
+    const setCompleted = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        today: "2026-04-11",
+        tasks: [
+          {
+            id: "task-1",
+            title: "Done",
+            description: "",
+            link: "",
+            waitingFor: "",
+            createdAt: "2026-04-10T10:00:00Z",
+            actionAt: null,
+            scheduleBucket: null,
+            completedAt: "2026-04-11T08:00:00Z",
+          },
+        ],
+        updateTask,
+        setCompleted,
+      }),
+    );
+
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="tasks" />);
+
+    await act(async () => {
+      await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
+        active: {
+          data: {
+            current: {
+              type: "task",
+              id: "task-1",
+            },
+          },
+        },
+        over: {
+          data: {
+            current: {
+              type: "task-view-drop-target",
+              view: "today",
+            },
+          },
+        },
+      });
+    });
+
+    expect(setCompleted).toHaveBeenCalledWith("task-1", false);
+    expect(updateTask).toHaveBeenCalledWith("task-1", {
+      actionAt: localDateToNormalizedActionAt("2026-04-11"),
+      scheduleBucket: null,
+    });
   });
 });

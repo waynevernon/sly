@@ -231,4 +231,56 @@ describe("GlobalTaskCaptureDialog", () => {
     expect(selectView).not.toHaveBeenCalled();
     expect(selectTask).not.toHaveBeenCalled();
   });
+
+  it("autocompletes waiting for from existing task values", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        tasks: [
+          {
+            id: "task-a",
+            title: "Follow up",
+            description: "",
+            link: "",
+            waitingFor: "Jordan",
+            createdAt: "2026-04-09T12:00:00Z",
+            actionAt: null,
+            scheduleBucket: null,
+            completedAt: null,
+          },
+          {
+            id: "task-b",
+            title: "Review",
+            description: "",
+            link: "",
+            waitingFor: "Legal",
+            createdAt: "2026-04-08T12:00:00Z",
+            actionAt: null,
+            scheduleBucket: null,
+            completedAt: null,
+          },
+        ],
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <GlobalTaskCaptureDialog
+          open
+          workspaceMode="tasks"
+          onClose={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    const input = screen.getByPlaceholderText("Waiting for…");
+    await user.click(input);
+    await screen.findByRole("button", { name: "Jordan" });
+    await user.type(input, "jor");
+    await user.click(screen.getByRole("button", { name: "Jordan" }));
+
+    expect(screen.getByPlaceholderText("Waiting for…")).toHaveValue("Jordan");
+  });
 });
