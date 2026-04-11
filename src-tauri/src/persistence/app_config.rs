@@ -10,6 +10,7 @@ use crate::{
 };
 
 const CURRENT_APP_CONFIG_SCHEMA_VERSION: u32 = 1;
+const CLI_APP_IDENTIFIER: &str = "com.waynevernon.sly";
 
 pub(crate) fn current_app_config_schema_version() -> u32 {
     CURRENT_APP_CONFIG_SCHEMA_VERSION
@@ -19,6 +20,10 @@ pub(crate) fn get_app_config_path<R: Runtime>(app: &AppHandle<R>) -> Result<Path
     let app_data = app.path().app_data_dir()?;
     std::fs::create_dir_all(&app_data)?;
     Ok(app_data.join("config.json"))
+}
+
+pub(crate) fn default_app_config_path_for_cli() -> Option<PathBuf> {
+    dirs::data_local_dir().map(|path| path.join(CLI_APP_IDENTIFIER).join("config.json"))
 }
 
 pub(crate) fn load_app_config<R: Runtime>(app: &AppHandle<R>) -> AppConfig {

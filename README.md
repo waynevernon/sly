@@ -24,7 +24,7 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 - Optional AI help without AI lock-in. Use the built-in side assistant or run note editing flows through Claude Code, OpenAI Codex, OpenCode, or Ollama when you want assistance, while keeping plain files and local workflows at the center.
 - Built-in Git workflows for notes on disk. Initialize a repo, inspect status, commit changes, configure remotes, and push without leaving the app.
 - Deep workspace customization. Choose from a growing set of theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
-- Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms, and get in-app update checks through the Tauri updater.
+- Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms to launch notes and manage tasks, and get in-app update checks through the Tauri updater.
 
 ## Platform Status
 
@@ -84,6 +84,108 @@ Sly is designed to stay usable from the keyboard. A few of the core shortcuts:
 | `Cmd/Ctrl+=`, `-`, `0` | Zoom in, out, reset |
 
 Open Settings → Shortcuts inside the app for the full reference.
+
+## CLI
+
+On macOS, install the CLI from Settings → Assistant & CLI. The `sly` command keeps the existing launch behavior for the app:
+
+- `sly` launches Sly
+- `sly .` opens a notes folder
+- `sly file.md` opens a markdown file
+
+Task management commands:
+
+```bash
+sly doctor [--format table|json]
+sly [--notes-folder PATH] task list [--view all|inbox|today|upcoming|waiting|anytime|someday|completed] [-q QUERY] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] task search QUERY [--view all|inbox|today|upcoming|waiting|anytime|someday|completed] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] task show SELECTOR [--format text|json]
+sly [--notes-folder PATH] task create TITLE [--description TEXT] [--link URL] [--waiting-for TEXT] [--date YYYY-MM-DD | --bucket anytime|someday] [--format text|json]
+sly [--notes-folder PATH] task update SELECTOR [--title TEXT] [--description TEXT | --clear-description] [--link URL | --clear-link] [--waiting-for TEXT | --clear-waiting-for] [--date YYYY-MM-DD | --clear-date] [--bucket anytime|someday | --clear-bucket] [--format text|json]
+sly [--notes-folder PATH] task complete SELECTOR [--format text|json]
+sly [--notes-folder PATH] task reopen SELECTOR [--format text|json]
+sly [--notes-folder PATH] task reschedule SELECTOR (--date YYYY-MM-DD | --bucket anytime|someday | --clear) [--format text|json]
+sly [--notes-folder PATH] task delete SELECTOR
+```
+
+Selector resolution order for single-task commands:
+
+1. Exact UUID
+2. Exact title
+3. Unique UUID prefix
+4. Unique case-insensitive title fragment
+
+Global option available before any subcommand:
+
+- `--notes-folder PATH`: use a specific notes folder instead of the folder saved in Sly app config
+
+`doctor` options:
+
+- `--format table|json`: show discovery details as a terminal report or machine-readable JSON
+
+`task list` options (`task search` is an alias that takes the query as a positional argument):
+
+- `-q`/`--query TEXT`: filter tasks by text across title, description, link, and waiting-for
+- `--view ...`: filter to one task horizon or bucket
+- `-n`/`--limit N`: cap the number of returned tasks
+- `--format table|json|csv`: choose human-readable table output or machine-readable JSON/CSV
+
+`task show` options:
+
+- `SELECTOR`: exact UUID, exact title, unique UUID prefix, or unique case-insensitive title fragment
+- `--format text|json`: show a terminal-friendly view or the full task object
+
+`task create` options:
+
+- `TITLE`: task title
+- `--description TEXT`: set description
+- `--link URL`: set link
+- `--waiting-for TEXT`: mark the task as waiting on someone or something
+- `--date YYYY-MM-DD`: schedule the task for a specific day
+- `--bucket anytime|someday`: assign an unscheduled horizon bucket
+- `--format text|json`: print terminal text or the full task object
+
+`task update` options:
+
+- `SELECTOR`: same selector rules as `task show`
+- `--title TEXT`: replace the title
+- `--description TEXT` or `--clear-description`: replace or clear the description
+- `--link URL` or `--clear-link`: replace or clear the link
+- `--waiting-for TEXT` or `--clear-waiting-for`: replace or clear the waiting-for field
+- `--date YYYY-MM-DD` or `--clear-date`: replace or clear the scheduled day
+- `--bucket anytime|someday` or `--clear-bucket`: replace or clear the schedule bucket
+- `--format text|json`: print terminal text or the full task object
+
+`task complete`, `task reopen`, and `task reschedule` options:
+
+- `SELECTOR`: same selector rules as `task show`
+- `task complete` / `task reopen`: toggle completion state
+- `task reschedule --date YYYY-MM-DD`: assign a specific day
+- `task reschedule --bucket anytime|someday`: assign a bucket instead of a date
+- `task reschedule --clear`: clear both date and bucket
+- `--format text|json`: print terminal text or the full task object
+
+Examples:
+
+```bash
+# Show discovery and task-store status
+sly doctor
+
+# Use a specific vault without changing the app's saved folder
+sly --notes-folder ~/Notes task list --view today
+
+# Capture a new task directly into Anytime
+sly task create "Plan launch notes" --bucket anytime
+
+# Search tasks as JSON for scripting
+sly task search launch --format json
+
+# Schedule a task for a specific day
+sly task reschedule "Plan launch notes" --date 2026-04-12
+
+# Mark a task complete by UUID prefix
+sly task complete 0195d9f1
+```
 
 ## Build From Source
 

@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
@@ -48,6 +48,54 @@ pub struct TaskPatch {
     pub action_at: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub schedule_bucket: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TaskView {
+    Inbox,
+    Today,
+    Upcoming,
+    Waiting,
+    Anytime,
+    Someday,
+    Completed,
+}
+
+impl TaskView {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Inbox => "inbox",
+            Self::Today => "today",
+            Self::Upcoming => "upcoming",
+            Self::Waiting => "waiting",
+            Self::Anytime => "anytime",
+            Self::Someday => "someday",
+            Self::Completed => "completed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TaskSelectorCandidate {
+    pub(crate) id: String,
+    pub(crate) title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedTaskSelector {
+    pub(crate) id: String,
+    pub(crate) title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ResolveTaskSelectorError {
+    NotFound {
+        selector: String,
+    },
+    Ambiguous {
+        selector: String,
+        candidates: Vec<TaskSelectorCandidate>,
+    },
 }
 
 fn deserialize_optional_nullable_string<'de, D>(
@@ -154,10 +202,7 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
     }
 
     if !table_column_exists(conn, "tasks", "schedule_bucket")? {
-        conn.execute(
-            "ALTER TABLE tasks ADD COLUMN schedule_bucket TEXT NULL",
-            [],
-        )?;
+        conn.execute("ALTER TABLE tasks ADD COLUMN schedule_bucket TEXT NULL", [])?;
     }
 
     if !table_column_exists(conn, "tasks", "waiting_for")? {
@@ -199,6 +244,23 @@ fn normalize_action_at(value: Option<String>) -> Result<Option<String>> {
             .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string(),
     ))
+}
+
+pub(crate) fn local_date_to_action_at(date: &str) -> Result<String> {
+    let parsed = NaiveDate::parse_from_str(date.trim(), "%Y-%m-%d")
+        .map_err(|error| anyhow!("Invalid date `{date}`: {error}"))?;
+    let local_noon = parsed
+        .and_hms_opt(12, 0, 0)
+        .ok_or_else(|| anyhow!("Invalid local noon for date `{date}`"))?;
+    let localized = Local
+        .from_local_datetime(&local_noon)
+        .single()
+        .or_else(|| Local.from_local_datetime(&local_noon).earliest())
+        .ok_or_else(|| anyhow!("Invalid local time for date `{date}`"))?;
+    Ok(localized
+        .with_timezone(&Utc)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string())
 }
 
 fn normalize_title(title: &str) -> Result<String> {
@@ -245,6 +307,145 @@ fn table_column_exists(conn: &Connection, table: &str, column: &str) -> Result<b
     }
 
     Ok(false)
+}
+
+fn action_at_to_local_date(action_at: Option<&str>) -> Option<String> {
+    let action_at = action_at?;
+    let parsed = DateTime::parse_from_rfc3339(action_at).ok()?;
+    Some(parsed.with_timezone(&Local).format("%Y-%m-%d").to_string())
+}
+
+fn schedule_bucket_sort_order(bucket: Option<&str>) -> i32 {
+    match bucket {
+        Some("anytime") => 0,
+        Some("someday") => 1,
+        _ => 2,
+    }
+}
+
+pub(crate) fn derive_task_view(task: &TaskMetadata, today: &str) -> TaskView {
+    if task.completed_at.is_some() {
+        return TaskView::Completed;
+    }
+
+    if let Some(action_date) = action_at_to_local_date(task.action_at.as_deref()) {
+        return if action_date.as_str() <= today {
+            TaskView::Today
+        } else {
+            TaskView::Upcoming
+        };
+    }
+
+    match task.schedule_bucket.as_deref() {
+        Some("anytime") => TaskView::Anytime,
+        Some("someday") => TaskView::Someday,
+        _ => TaskView::Inbox,
+    }
+}
+
+pub(crate) fn is_task_overdue(task: &TaskMetadata, today: &str) -> bool {
+    if task.completed_at.is_some() {
+        return false;
+    }
+
+    action_at_to_local_date(task.action_at.as_deref())
+        .map(|date| date.as_str() < today)
+        .unwrap_or(false)
+}
+
+pub(crate) fn task_matches_view(task: &TaskMetadata, view: Option<TaskView>, today: &str) -> bool {
+    let Some(view) = view else {
+        return true;
+    };
+
+    if view == TaskView::Waiting {
+        return task.completed_at.is_none() && !task.waiting_for.trim().is_empty();
+    }
+
+    derive_task_view(task, today) == view
+}
+
+pub(crate) fn task_matches_query(task: &TaskMetadata, query: &str) -> bool {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return true;
+    }
+
+    [
+        task.title.as_str(),
+        task.description.as_str(),
+        task.link.as_str(),
+        task.waiting_for.as_str(),
+    ]
+    .iter()
+    .any(|field| field.to_lowercase().contains(&needle))
+}
+
+pub(crate) fn sort_tasks_for_view(tasks: &mut [TaskMetadata], view: Option<TaskView>, today: &str) {
+    tasks.sort_by(|left, right| compare_tasks(left, right, view, today));
+}
+
+fn compare_tasks(
+    left: &TaskMetadata,
+    right: &TaskMetadata,
+    view: Option<TaskView>,
+    today: &str,
+) -> std::cmp::Ordering {
+    match view {
+        Some(TaskView::Today) | Some(TaskView::Upcoming) | Some(TaskView::Waiting) => {
+            let left_date = action_at_to_local_date(left.action_at.as_deref());
+            let right_date = action_at_to_local_date(right.action_at.as_deref());
+            match (left_date, right_date) {
+                (Some(left_date), Some(right_date)) => {
+                    let cmp = left_date.cmp(&right_date);
+                    if cmp != std::cmp::Ordering::Equal {
+                        return cmp;
+                    }
+
+                    let cmp = left.action_at.cmp(&right.action_at);
+                    if cmp != std::cmp::Ordering::Equal {
+                        return cmp;
+                    }
+                }
+                (Some(_), None) => return std::cmp::Ordering::Less,
+                (None, Some(_)) => return std::cmp::Ordering::Greater,
+                (None, None) => {}
+            }
+
+            if matches!(view, Some(TaskView::Waiting)) {
+                let cmp = schedule_bucket_sort_order(left.schedule_bucket.as_deref()).cmp(
+                    &schedule_bucket_sort_order(right.schedule_bucket.as_deref()),
+                );
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+
+            left.created_at.cmp(&right.created_at)
+        }
+        Some(TaskView::Completed) => right.completed_at.cmp(&left.completed_at),
+        Some(TaskView::Inbox) | Some(TaskView::Anytime) | Some(TaskView::Someday) | None => {
+            let left_view = derive_task_view(left, today);
+            let right_view = derive_task_view(right, today);
+            let view_cmp = task_view_sort_order(left_view).cmp(&task_view_sort_order(right_view));
+            if view_cmp != std::cmp::Ordering::Equal && view.is_none() {
+                return view_cmp;
+            }
+            left.created_at.cmp(&right.created_at)
+        }
+    }
+}
+
+fn task_view_sort_order(view: TaskView) -> i32 {
+    match view {
+        TaskView::Today => 0,
+        TaskView::Upcoming => 1,
+        TaskView::Anytime => 2,
+        TaskView::Someday => 3,
+        TaskView::Inbox => 4,
+        TaskView::Completed => 5,
+        TaskView::Waiting => 6,
+    }
 }
 
 fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
@@ -298,6 +499,17 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
 pub(crate) fn read_task(notes_root: &Path, id: &str) -> Result<Task> {
     let conn = open_tasks_db(notes_root)?;
     Ok(Task::from(read_task_row(&conn, id)?))
+}
+
+pub(crate) fn task_count_if_db_exists(notes_root: &Path) -> Result<Option<usize>> {
+    let db_path = tasks_db_path(notes_root);
+    if !db_path.exists() {
+        return Ok(None);
+    }
+
+    let conn = Connection::open(db_path)?;
+    let count = conn.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get::<_, i64>(0))?;
+    Ok(Some(count.max(0) as usize))
 }
 
 pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
@@ -380,7 +592,15 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             schedule_bucket = ?7
         WHERE id = ?1
         ",
-        params![id, title, description, link, waiting_for, action_at, schedule_bucket],
+        params![
+            id,
+            title,
+            description,
+            link,
+            waiting_for,
+            action_at,
+            schedule_bucket
+        ],
     )?;
 
     Ok(Task {
@@ -427,6 +647,106 @@ pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
     let conn = open_tasks_db(notes_root)?;
     conn.execute("DELETE FROM tasks WHERE id = ?1", [id])?;
     Ok(())
+}
+
+pub(crate) fn resolve_task_selector(
+    notes_root: &Path,
+    selector: &str,
+) -> std::result::Result<ResolvedTaskSelector, ResolveTaskSelectorError> {
+    let selector = selector.trim();
+    if selector.is_empty() {
+        return Err(ResolveTaskSelectorError::NotFound {
+            selector: selector.to_string(),
+        });
+    }
+
+    let tasks = list_tasks(notes_root).map_err(|_| ResolveTaskSelectorError::NotFound {
+        selector: selector.to_string(),
+    })?;
+
+    if let Some(task) = tasks.iter().find(|task| task.id == selector) {
+        return Ok(ResolvedTaskSelector {
+            id: task.id.clone(),
+            title: task.title.clone(),
+        });
+    }
+
+    let exact_title_matches = tasks
+        .iter()
+        .filter(|task| task.title == selector)
+        .collect::<Vec<_>>();
+    if exact_title_matches.len() == 1 {
+        let task = exact_title_matches[0];
+        return Ok(ResolvedTaskSelector {
+            id: task.id.clone(),
+            title: task.title.clone(),
+        });
+    }
+    if exact_title_matches.len() > 1 {
+        return Err(ResolveTaskSelectorError::Ambiguous {
+            selector: selector.to_string(),
+            candidates: exact_title_matches
+                .into_iter()
+                .map(|task| TaskSelectorCandidate {
+                    id: task.id.clone(),
+                    title: task.title.clone(),
+                })
+                .collect(),
+        });
+    }
+
+    let prefix_matches = tasks
+        .iter()
+        .filter(|task| task.id.starts_with(selector))
+        .collect::<Vec<_>>();
+    if prefix_matches.len() == 1 {
+        let task = prefix_matches[0];
+        return Ok(ResolvedTaskSelector {
+            id: task.id.clone(),
+            title: task.title.clone(),
+        });
+    }
+    if prefix_matches.len() > 1 {
+        return Err(ResolveTaskSelectorError::Ambiguous {
+            selector: selector.to_string(),
+            candidates: prefix_matches
+                .into_iter()
+                .map(|task| TaskSelectorCandidate {
+                    id: task.id.clone(),
+                    title: task.title.clone(),
+                })
+                .collect(),
+        });
+    }
+
+    let selector_lower = selector.to_lowercase();
+    let fragment_matches = tasks
+        .iter()
+        .filter(|task| task.title.to_lowercase().contains(&selector_lower))
+        .collect::<Vec<_>>();
+    if fragment_matches.len() == 1 {
+        let task = fragment_matches[0];
+        return Ok(ResolvedTaskSelector {
+            id: task.id.clone(),
+            title: task.title.clone(),
+        });
+    }
+    if fragment_matches.len() > 1 {
+        return Err(ResolveTaskSelectorError::Ambiguous {
+            selector: selector.to_string(),
+            candidates: fragment_matches
+                .into_iter()
+                .map(|task| TaskSelectorCandidate {
+                    id: task.id.clone(),
+                    title: task.title.clone(),
+                })
+                .collect(),
+        });
+    }
+
+    Err(ResolveTaskSelectorError::NotFound {
+        selector: selector.to_string(),
+    })
 }
 
 #[cfg(test)]

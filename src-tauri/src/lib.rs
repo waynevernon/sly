@@ -24,6 +24,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
+mod cli;
 mod git;
 mod persistence;
 mod tasks;
@@ -447,7 +448,11 @@ pub struct Settings {
     pub folder_note_sort_modes: Option<HashMap<String, NoteSortMode>>,
     #[serde(rename = "folderSortMode", default)]
     pub folder_sort_mode: FolderSortMode,
-    #[serde(rename = "tasksEnabled", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "tasksEnabled",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub tasks_enabled: Option<bool>,
 }
 
@@ -4364,11 +4369,12 @@ fn install_cli() -> Result<String, String> {
         let exe_str = exe_path.to_string_lossy();
         let escaped_exe = format!("'{}'", exe_str.replace('\'', "'\\''"));
 
-        // Write a wrapper script that launches the binary in the background so
-        // the terminal is not blocked waiting for the GUI app to exit.
+        // Run task/doctor/help/version CLI invocations in the foreground so
+        // stdout, stderr, and exit codes are preserved. GUI launch/open-folder
+        // flows stay backgrounded to preserve the current terminal UX.
         let script = format!(
-            "#!/bin/sh\n{}\nnohup {} \"$@\" >/dev/null 2>&1 &\n",
-            SLY_CLI_MARKER, escaped_exe
+            "#!/bin/sh\n{}\nforeground=0\nskip_next=0\nfor arg in \"$@\"; do\n  if [ \"$skip_next\" -eq 1 ]; then\n    skip_next=0\n    continue\n  fi\n  case \"$arg\" in\n    --notes-folder)\n      skip_next=1\n      ;;\n    --notes-folder=*)\n      ;;\n    task|doctor|-h|--help|-V|--version)\n      foreground=1\n      break\n      ;;\n  esac\ndone\nif [ \"$foreground\" -eq 1 ]; then\n  exec {} \"$@\"\nfi\nnohup {} \"$@\" >/dev/null 2>&1 &\n",
+            SLY_CLI_MARKER, escaped_exe, escaped_exe
         );
         std::fs::write(&target, script.as_bytes())
             .map_err(|e| format!("Failed to write CLI script: {}", e))?;
@@ -5565,6 +5571,11 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(code) = cli::maybe_run_preflight(&args) {
+        std::process::exit(code);
+    }
+
     let app = tauri::Builder::default()
         .menu(build_app_menu)
         .on_menu_event(handle_app_menu_event)
@@ -5577,7 +5588,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
+        .setup(move |app| {
             // Load app config on startup (contains notes folder path)
             let mut app_config = load_app_config(app.handle());
             let mut app_config_dirty = false;
@@ -5661,7 +5672,6 @@ pub fn run() {
             // notes folder is already configured, the main window is closed so users only
             // see the preview. When no notes folder is configured yet, the main window is
             // always shown so new users can complete onboarding via the FolderPicker.
-            let args: Vec<String> = std::env::args().collect();
             let opened_preview = if args.len() > 1 {
                 let cwd = std::env::current_dir()
                     .unwrap_or_default()

@@ -53,11 +53,11 @@ function cliReducer(state: CliState, action: CliAction): CliState {
 function CliUsageHint() {
   return (
     <p className="text-sm text-text-muted font-mono">
-      sly file.md # open note
+      sly task list
       <br />
-      sly . # open folder
+      sly task create "Plan launch" --bucket anytime
       <br />
-      sly # launch app
+      sly task complete 01HXYZ...
     </p>
   );
 }
@@ -347,7 +347,7 @@ export function ExtensionsSettingsSection({
           <section className="space-y-4">
             <h2 className="text-xl font-medium mb-0.5">CLI Tool</h2>
             <p className="text-sm text-text-muted mb-4">
-              Open notes from the terminal with the{" "}
+              Manage tasks and open notes from the terminal with the{" "}
               <code className="ui-kbd font-mono">sly</code> command
             </p>
 
