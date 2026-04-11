@@ -113,6 +113,12 @@ function getScopeLabel(scope: NoteScope, path: string | null): string {
   return parts[parts.length - 1];
 }
 
+function getNotesRootLabel(notesFolder: string | null): string {
+  if (!notesFolder) return "Notes";
+  const parts = notesFolder.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || "Notes";
+}
+
 function getSortMenuTitle(scope: NoteScope): string {
   if (scope.type === "pinned") return "Sort Pinned";
   if (scope.type === "recent") return "Recent View";
@@ -138,6 +144,7 @@ function getPreviewLinesLabel(lines: 0 | NoteListPreviewLines): string {
 
 export function NotesPane() {
   const {
+    notesFolder,
     notes,
     scopedNotes,
     folderAppearances,
@@ -200,7 +207,9 @@ export function NotesPane() {
 
   const heading = searchQuery.trim()
     ? "Search Results"
-    : getScopeLabel(selectedScope, selectedFolderPath);
+    : selectedScope.type === "all"
+      ? getNotesRootLabel(notesFolder)
+      : getScopeLabel(selectedScope, selectedFolderPath);
   const sortMenuTitle = getSortMenuTitle(selectedScope);
   const showSortItems = selectedScope.type !== "recent";
   const scopeSupportsSubfolderToggle =

@@ -90,6 +90,12 @@ function getFolderLeaf(path: string): string {
   return path.split("/").pop() || path;
 }
 
+function getNotesRootLabel(notesFolder: string | null): string {
+  if (!notesFolder) return "Notes";
+  const parts = notesFolder.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || "Notes";
+}
+
 function getFolderOptionId(path: string): string {
   return `folder-option-${encodeURIComponent(path)}`;
 }
@@ -683,6 +689,8 @@ export function FolderTreeView({
     [showNotesFromSubfolders],
   );
   const rootNoteCount = showNotesFromSubfolders ? notes.length : tree.rootNotes.length;
+  const rootFolderLabel = getNotesRootLabel(notesFolder);
+  const showVirtualScopeDivider = showPinnedNotes || showRecentNotes;
   const visibleNavigationItems = useMemo(() => {
     const items: Array<
       | { kind: "pinned" | "recent" | "all" }
@@ -1394,6 +1402,13 @@ export function FolderTreeView({
             </button>
           </div>
         )}
+        {showVirtualScopeDivider ? (
+          <div
+            aria-hidden="true"
+            className="mx-3 my-1 border-t border-border/50"
+            data-testid="folder-tree-virtual-scope-divider"
+          />
+        ) : null}
         <ContextMenu.Root>
           <ContextMenu.Trigger asChild>
             <div
@@ -1425,7 +1440,7 @@ export function FolderTreeView({
                     strokeWidth={1.7}
                   />
                   <span className="text-sm font-medium text-text truncate">
-                    Notes
+                    {rootFolderLabel}
                   </span>
                 </span>
                 {showNoteCounts && (

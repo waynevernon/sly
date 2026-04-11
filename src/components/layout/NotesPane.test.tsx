@@ -56,6 +56,7 @@ function makeNotesHookValue(
   overrides: Partial<NotesHookValue> = {},
 ): NotesHookValue {
   return {
+    notesFolder: "/notes",
     notes: [
       {
         id: "alpha",
@@ -371,6 +372,24 @@ describe("NotesPane", () => {
     expect(
       screen.getByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
     ).toBeInTheDocument();
+  });
+
+  it("uses the actual notes folder name for the root scope heading", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notesFolder: "/Users/wayne/Documents/My Vault",
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <NotesPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("My Vault")).toBeInTheDocument();
   });
 
   it("shows recent-note view options without folder or sort controls", async () => {

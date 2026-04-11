@@ -158,6 +158,46 @@ describe("FolderTreeView", () => {
     expect(selectRecentNotes).toHaveBeenCalledTimes(1);
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByTestId("folder-tree-virtual-scope-divider")).toBeInTheDocument();
+  });
+
+  it("hides the virtual scope divider when pinned and recent are both hidden", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        showPinnedNotes: false,
+        showRecentNotes: false,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("folder-tree-virtual-scope-divider")).not.toBeInTheDocument();
+  });
+
+  it("uses the actual notes folder name for the root row label", async () => {
+    const notesContext = await import("../../context/NotesContext");
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        notesFolder: "/Users/wayne/Documents/My Vault",
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^My Vault(?: \d+)?$/i }),
+      ).toBeInTheDocument();
+    });
   });
 
   it("applies selected styling to the active virtual scope", async () => {
