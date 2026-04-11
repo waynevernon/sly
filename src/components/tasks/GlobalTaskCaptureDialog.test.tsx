@@ -94,7 +94,7 @@ describe("GlobalTaskCaptureDialog", () => {
       title: "Pay rent",
       description: "Before noon",
       link: "https://example.com",
-      waitingFor: "",
+      waitingFor: "Jordan",
       createdAt: "2026-04-10T12:00:00Z",
       actionAt: "2026-04-11T17:00:00.000Z",
       scheduleBucket: null,
@@ -123,6 +123,7 @@ describe("GlobalTaskCaptureDialog", () => {
       "Pay rent tomorrow",
     );
     await screen.findByText("Date: Tomorrow");
+    await user.type(screen.getByPlaceholderText("Waiting for…"), "Jordan");
     await user.type(screen.getByPlaceholderText("Add link…"), "example.com");
     await user.type(screen.getByPlaceholderText("Add description…"), "Before noon");
     await user.click(screen.getByRole("button", { name: "Create Task" }));
@@ -132,6 +133,7 @@ describe("GlobalTaskCaptureDialog", () => {
       expect(updateTask).toHaveBeenCalledWith("task-1", {
         description: "Before noon",
         link: "example.com",
+        waitingFor: "Jordan",
         actionAt: localDateToNormalizedActionAt("2026-04-11"),
         scheduleBucket: null,
       });

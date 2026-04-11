@@ -51,7 +51,7 @@ import type {
   AssistantThreadState,
   AssistantTurn,
 } from "./types/assistant";
-import { isMac, mod } from "./lib/platform";
+import { alt, isMac, mod, shift, shortcut } from "./lib/platform";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
   applyLineReplacement,
@@ -381,6 +381,7 @@ function TitlebarPaneSwitch({
                 type="button"
                 aria-pressed={!isTasksModeActive}
                 onClick={onShowNotes}
+                title={`Notes (${shortcut(mod, "1")})`}
                 className={`ui-focus-ring ui-mode-toggle-item ${
                   isTasksModeActive ? "" : "ui-mode-toggle-item-active"
                 }`}
@@ -392,6 +393,7 @@ function TitlebarPaneSwitch({
                 type="button"
                 aria-pressed={isTasksModeActive}
                 onClick={onShowTasks}
+                title={`Tasks (${shortcut(mod, "2")})`}
                 className={`ui-focus-ring ui-mode-toggle-item ${
                   isTasksModeActive ? "ui-mode-toggle-item-active" : ""
                 }`}
@@ -409,11 +411,11 @@ function TitlebarPaneSwitch({
           data-tauri-drag-region
         >
           <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
-            <IconButton
+              <IconButton
               onClick={onToggleRightPanel}
               title={`${
                 rightPanelVisible ? "Hide" : "Show"
-              } Right Panel (${mod}${isMac ? "" : "+"}4)`}
+              } Right Pane (${shortcut(mod, alt, "4")})`}
               className="shrink-0"
             >
               <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -873,6 +875,9 @@ function AppContent() {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
     let unlistenOpenSettingsAbout: (() => void) | undefined;
+    let unlistenShowNotesMode: (() => void) | undefined;
+    let unlistenShowTasksMode: (() => void) | undefined;
+    let unlistenCycleLeftPanes: (() => void) | undefined;
     let unlistenSetPaneMode: (() => void) | undefined;
     let unlistenToggleFocusMode: (() => void) | undefined;
     let unlistenToggleRightPanel: (() => void) | undefined;
@@ -889,6 +894,27 @@ function AppContent() {
     }).then((fn) => {
       if (cancelled) fn();
       else unlistenOpenSettingsAbout = fn;
+    });
+
+    listen("show-notes-mode", () => {
+      showNotesMode();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenShowNotesMode = fn;
+    });
+
+    listen("show-tasks-mode", () => {
+      showTasksMode();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenShowTasksMode = fn;
+    });
+
+    listen("cycle-left-panes", () => {
+      cycleWorkspacePaneMode();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenCycleLeftPanes = fn;
     });
 
     listen<number>("set-pane-mode", (event) => {
@@ -919,11 +945,22 @@ function AppContent() {
       cancelled = true;
       unlistenOpenSettings?.();
       unlistenOpenSettingsAbout?.();
+      unlistenShowNotesMode?.();
+      unlistenShowTasksMode?.();
+      unlistenCycleLeftPanes?.();
       unlistenSetPaneMode?.();
       unlistenToggleFocusMode?.();
       unlistenToggleRightPanel?.();
     };
-  }, [applyPaneModeSelection, openSettings, toggleFocusMode, toggleRightPanel]);
+  }, [
+    applyPaneModeSelection,
+    openSettings,
+    showNotesMode,
+    showTasksMode,
+    cycleWorkspacePaneMode,
+    toggleFocusMode,
+    toggleRightPanel,
+  ]);
 
   const handleAssistantProviderChange = useCallback(
     (provider: AiProvider) => {
@@ -1312,8 +1349,8 @@ function AppContent() {
         return;
       }
 
-      // Cmd/Ctrl+4 - Toggle outline panel
-      if ((e.metaKey || e.ctrlKey) && e.key === "4") {
+      // Cmd/Ctrl+Alt+4 - Toggle right pane
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === "4") {
         e.preventDefault();
         toggleRightPanel();
         return;
@@ -1321,6 +1358,36 @@ function AppContent() {
 
       // Block all other shortcuts when in settings view
       if (viewRef.current === "settings") {
+        return;
+      }
+
+      // Cmd/Ctrl+1 - Switch to notes mode
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "1") {
+        e.preventDefault();
+        showNotesMode();
+        return;
+      }
+
+      // Cmd/Ctrl+2 - Switch to tasks mode
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "2") {
+        e.preventDefault();
+        if (!tasksEnabled) {
+          toast("Enable tasks in Settings to switch to task mode.");
+          return;
+        }
+        showTasksMode();
+        return;
+      }
+
+      // Cmd/Ctrl+Alt+1/2/3 - Set pane layout
+      if ((e.metaKey || e.ctrlKey) && e.altKey && ["1", "2", "3"].includes(e.key)) {
+        e.preventDefault();
+        const requestedPaneMode = Number(e.key) as PaneMode;
+        const nextPaneMode =
+          isTasksModeActiveRef.current && requestedPaneMode === 1
+            ? 2
+            : requestedPaneMode;
+        applyPaneModeSelection(nextPaneMode);
         return;
       }
 
@@ -1554,6 +1621,7 @@ function AppContent() {
     };
   }, [
     createNote,
+    applyPaneModeSelection,
     cycleWorkspacePaneMode,
     duplicateNote,
     reloadCurrentNote,
@@ -1565,6 +1633,7 @@ function AppContent() {
     toggleRightPanel,
     openSettings,
     showNotesMode,
+    showTasksMode,
     tasksEnabled,
     toggleFocusMode,
     setInterfaceZoom,

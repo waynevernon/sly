@@ -33,6 +33,9 @@ use persistence::app_config::{load_app_config, save_app_config};
 use persistence::workspace_settings::{apply_settings_patch, load_settings, save_settings};
 
 const MENU_SETTINGS_ID: &str = "app-settings";
+const MENU_VIEW_NOTES_MODE_ID: &str = "view-mode-notes";
+const MENU_VIEW_TASKS_MODE_ID: &str = "view-mode-tasks";
+const MENU_CYCLE_LEFT_PANES_ID: &str = "view-cycle-left-panes";
 const MENU_VIEW_1_PANE_ID: &str = "view-pane-1";
 const MENU_VIEW_2_PANE_ID: &str = "view-pane-2";
 const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
@@ -5371,19 +5374,28 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let settings_item = MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings...")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
-    let one_pane_item = MenuItemBuilder::with_id(MENU_VIEW_1_PANE_ID, "1 Pane")
+    let notes_mode_item = MenuItemBuilder::with_id(MENU_VIEW_NOTES_MODE_ID, "Notes")
         .accelerator("CmdOrCtrl+1")
         .build(app)?;
-    let two_pane_item = MenuItemBuilder::with_id(MENU_VIEW_2_PANE_ID, "2 Panes")
+    let tasks_mode_item = MenuItemBuilder::with_id(MENU_VIEW_TASKS_MODE_ID, "Tasks")
         .accelerator("CmdOrCtrl+2")
         .build(app)?;
-    let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
-        .accelerator("CmdOrCtrl+3")
-        .build(app)?;
-    let outline_panel_item =
-        MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Outline Panel")
-            .accelerator("CmdOrCtrl+4")
+    let cycle_left_panes_item =
+        MenuItemBuilder::with_id(MENU_CYCLE_LEFT_PANES_ID, "Cycle Left Panes")
+            .accelerator("CmdOrCtrl+\\")
             .build(app)?;
+    let one_pane_item = MenuItemBuilder::with_id(MENU_VIEW_1_PANE_ID, "1 Pane")
+        .accelerator("CmdOrCtrl+Alt+1")
+        .build(app)?;
+    let two_pane_item = MenuItemBuilder::with_id(MENU_VIEW_2_PANE_ID, "2 Panes")
+        .accelerator("CmdOrCtrl+Alt+2")
+        .build(app)?;
+    let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
+        .accelerator("CmdOrCtrl+Alt+3")
+        .build(app)?;
+    let right_pane_item = MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Right Pane")
+        .accelerator("CmdOrCtrl+Alt+4")
+        .build(app)?;
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
@@ -5445,10 +5457,14 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "View",
         true,
         &[
+            &notes_mode_item,
+            &tasks_mode_item,
+            &PredefinedMenuItem::separator(app)?,
+            &cycle_left_panes_item,
             &one_pane_item,
             &two_pane_item,
             &three_pane_item,
-            &outline_panel_item,
+            &right_pane_item,
             &PredefinedMenuItem::separator(app)?,
             &focus_mode_item,
             &PredefinedMenuItem::fullscreen(app, None)?,
@@ -5534,6 +5550,18 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_SETTINGS_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "open-settings", ());
+        }
+        MENU_VIEW_NOTES_MODE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "show-notes-mode", ());
+        }
+        MENU_VIEW_TASKS_MODE_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "show-tasks-mode", ());
+        }
+        MENU_CYCLE_LEFT_PANES_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "cycle-left-panes", ());
         }
         MENU_VIEW_1_PANE_ID => {
             focus_main_window(app);

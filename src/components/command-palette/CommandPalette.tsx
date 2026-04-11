@@ -52,7 +52,7 @@ import {
   FolderIcon,
   FolderPlusIcon,
 } from "../icons";
-import { mod, shift } from "../../lib/platform";
+import { alt, mod, shift } from "../../lib/platform";
 
 interface Command {
   id: string;
@@ -391,8 +391,8 @@ export function CommandPalette({
     baseCommands.push(
       {
         id: "toggle-outline-panel",
-        label: `${rightPanelVisible ? "Hide" : "Show"} Right Panel`,
-        shortcut: `${mod} 4`,
+        label: `${rightPanelVisible ? "Hide" : "Show"} Right Pane`,
+        shortcut: `${mod} ${alt} 4`,
         icon: <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           onToggleRightPanel?.();

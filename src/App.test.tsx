@@ -324,6 +324,54 @@ describe("App", () => {
     expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
+  it("switches to task mode with Cmd/Ctrl+2 when tasks are enabled", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "2", metaKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+    });
+  });
+
+  it("switches back to notes mode with Cmd/Ctrl+1", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "1", metaKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+    });
+  });
+
+  it("switches to a 2-pane layout with Cmd/Ctrl+Alt+2", () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "2", metaKey: true, altKey: true });
+
+    expect(themeState.setPaneMode).toHaveBeenCalledWith(2);
+  });
+
+  it("maps Cmd/Ctrl+Alt+1 to 2-pane layout while in task mode", () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "1", metaKey: true, altKey: true });
+
+    expect(themeState.setPaneMode).toHaveBeenCalledWith(2);
+  });
+
   it("renders print mode without folder mode shell", async () => {
     window.history.replaceState(
       {},
@@ -405,22 +453,22 @@ describe("App", () => {
     expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
-  it("toggles the right panel with Cmd/Ctrl+4", () => {
+  it("toggles the right pane with Cmd/Ctrl+Alt+4", () => {
     render(<App />);
 
-    fireEvent.keyDown(window, { key: "4", metaKey: true });
+    fireEvent.keyDown(window, { key: "4", metaKey: true, altKey: true });
 
     expect(themeState.setRightPanelVisible).toHaveBeenCalledWith(false);
   });
 
-  it("does not toggle the right panel with Cmd/Ctrl+4 in task mode", () => {
+  it("does not toggle the right pane with Cmd/Ctrl+Alt+4 in task mode", () => {
     notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
 
-    fireEvent.keyDown(window, { key: "4", metaKey: true });
+    fireEvent.keyDown(window, { key: "4", metaKey: true, altKey: true });
 
     expect(themeState.setRightPanelVisible).not.toHaveBeenCalled();
   });

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CalendarClock, Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
@@ -8,7 +8,6 @@ import {
   localDateToNormalizedActionAt,
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
-import { mod } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import type { TaskScheduleBucket } from "../../types/tasks";
 import { Button, DialogShell } from "../ui";
@@ -38,6 +37,7 @@ export function GlobalTaskCaptureDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
+  const [waitingFor, setWaitingFor] = useState("");
   const [manualActionDate, setManualActionDate] = useState("");
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
@@ -51,6 +51,7 @@ export function GlobalTaskCaptureDialog({
     setTitle("");
     setDescription("");
     setLink("");
+    setWaitingFor("");
     setManualActionDate("");
     setManualScheduleBucket(null);
     setDetectedDate(null);
@@ -115,6 +116,7 @@ export function GlobalTaskCaptureDialog({
       const patch = {
         description,
         link,
+        waitingFor: waitingFor.trim(),
         actionAt: localDateToNormalizedActionAt(effectiveActionDate),
         scheduleBucket: manualScheduleBucket,
       };
@@ -122,6 +124,7 @@ export function GlobalTaskCaptureDialog({
       const hasPatch =
         description.trim().length > 0 ||
         link.trim().length > 0 ||
+        waitingFor.trim().length > 0 ||
         Boolean(effectiveActionDate) ||
         Boolean(manualScheduleBucket);
 
@@ -156,6 +159,7 @@ export function GlobalTaskCaptureDialog({
     title,
     today,
     updateTask,
+    waitingFor,
     workspaceMode,
   ]);
 
@@ -169,10 +173,6 @@ export function GlobalTaskCaptureDialog({
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        void handleSubmit();
-      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -182,7 +182,6 @@ export function GlobalTaskCaptureDialog({
   }, [handleClose, handleSubmit, open]);
 
   const canSubmit = title.trim().length > 0 && !isSaving;
-  const submitShortcutLabel = useMemo(() => `${mod}+Enter`, []);
   const effectiveActionDate =
     manualScheduleBucket ? "" : manualActionDate || detectedDate?.localDate || "";
   const showDetectedDateChip = Boolean(detectedDate && !manualActionDate && !manualScheduleBucket);
@@ -255,6 +254,15 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
+            <div className="flex h-[var(--ui-control-height-standard)] min-w-[220px] flex-1 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+              <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+              <input
+                value={waitingFor}
+                placeholder="Waiting for…"
+                onChange={(event) => setWaitingFor(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
+              />
+            </div>
           </div>
 
           <div />
@@ -282,14 +290,13 @@ export function GlobalTaskCaptureDialog({
               value={description}
               placeholder="Add description…"
               onChange={(event) => setDescription(event.target.value)}
-              rows={5}
-              className="min-h-[140px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              rows={3}
+              className="min-h-[96px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
             />
           </div>
 
           <div />
           <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
-            <div className="mr-auto text-xs text-text-muted">{submitShortcutLabel}</div>
             <Button
               type="button"
               variant="ghost"
