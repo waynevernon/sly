@@ -190,6 +190,51 @@ describe("TaskDetailPanel", () => {
     expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
   });
 
+  it("shows the created timestamp and omits completed when the task is still open", () => {
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTaskTimestampForTest("2026-04-10T12:00:00Z")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+  });
+
+  it("shows the completed timestamp when the task is done", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedTask: {
+          id: "task-1",
+          title: "Follow up",
+          description: "",
+          link: "",
+          waitingFor: "",
+          createdAt: "2026-04-10T12:00:00Z",
+          actionAt: null,
+          scheduleBucket: null,
+          completedAt: "2026-04-11T09:15:00Z",
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTaskTimestampForTest("2026-04-11T09:15:00Z")),
+    ).toBeInTheDocument();
+  });
+
   it("flushes a pending edit before switching to a different task", async () => {
     const tasksContext = await import("../../context/TasksContext");
     const updateTask = vi.fn().mockResolvedValue(null);
@@ -238,3 +283,13 @@ describe("TaskDetailPanel", () => {
     });
   });
 });
+
+function formatTaskTimestampForTest(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}

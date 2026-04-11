@@ -377,6 +377,27 @@ export function TaskDetailPanel() {
           <div className="border-t border-border/40" />
 
           <div />
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-text-muted/70">
+            <div className="flex items-center gap-2">
+              <span className="font-medium uppercase tracking-[0.08em] text-text-muted/65">
+                Created
+              </span>
+              <span>{formatTaskTimestamp(selectedTask.createdAt)}</span>
+            </div>
+            {selectedTask.completedAt ? (
+              <div className="flex items-center gap-2">
+                <span className="font-medium uppercase tracking-[0.08em] text-text-muted/65">
+                  Completed
+                </span>
+                <span>{formatTaskTimestamp(selectedTask.completedAt)}</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div />
+          <div className="border-t border-border/40" />
+
+          <div />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
@@ -481,4 +502,19 @@ function normalizeTaskLinkUrl(value: string): string | null {
   }
 
   return null;
+}
+
+function formatTaskTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
