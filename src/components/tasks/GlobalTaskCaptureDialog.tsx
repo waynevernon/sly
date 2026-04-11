@@ -191,15 +191,19 @@ export function GlobalTaskCaptureDialog({
   return (
     <DialogShell
       onBackdropClick={handleClose}
-      panelClassName="max-w-2xl"
+      panelClassName="max-w-xl"
     >
-      <div className="px-6 py-6 sm:px-7">
-        <div
-          className="grid gap-x-4 gap-y-4"
-          style={{ gridTemplateColumns: "20px minmax(0, 1fr)" }}
+      <div className="relative mx-auto w-full max-w-[38rem] px-5 py-5 sm:px-6">
+        <button
+          type="button"
+          onClick={handleClose}
+          className="ui-focus-ring absolute right-5 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-6 sm:top-5"
+          aria-label="Close task capture"
         >
-          <div />
-          <div className="flex items-start gap-3">
+          <X className="h-4 w-4 stroke-[1.9]" />
+        </button>
+        <div className="flex flex-col gap-3.5">
+          <div className="pr-10">
             <input
               ref={titleInputRef}
               value={title}
@@ -211,19 +215,10 @@ export function GlobalTaskCaptureDialog({
                   void handleSubmit();
                 }
               }}
-              className="min-w-0 flex-1 bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+              className="min-w-0 flex-1 bg-transparent text-[1.7rem] font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
             />
-            <button
-              type="button"
-              onClick={handleClose}
-              className="ui-focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-              aria-label="Close task capture"
-            >
-              <X className="h-4 w-4 stroke-[1.9]" />
-            </button>
           </div>
 
-          <div />
           <div className="flex flex-wrap items-center gap-2">
             <TaskDatePicker
               actionDate={effectiveActionDate}
@@ -254,7 +249,7 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
-            <div className="flex h-[var(--ui-control-height-standard)] min-w-[220px] flex-1 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+            <div className="flex h-[var(--ui-control-height-standard)] min-w-[200px] flex-1 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
               <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
               <input
                 value={waitingFor}
@@ -265,7 +260,6 @@ export function GlobalTaskCaptureDialog({
             </div>
           </div>
 
-          <div />
           <div className="space-y-2">
             <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
               Link
@@ -278,10 +272,8 @@ export function GlobalTaskCaptureDialog({
             />
           </div>
 
-          <div />
           <div className="border-t border-border/40" />
 
-          <div />
           <div className="space-y-2">
             <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
               Description
@@ -290,12 +282,11 @@ export function GlobalTaskCaptureDialog({
               value={description}
               placeholder="Add description…"
               onChange={(event) => setDescription(event.target.value)}
-              rows={3}
-              className="min-h-[96px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              rows={2}
+              className="min-h-[72px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
             />
           </div>
 
-          <div />
           <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
             <Button
               type="button"

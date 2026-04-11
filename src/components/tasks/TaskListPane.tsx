@@ -107,6 +107,7 @@ export function TaskListPane() {
   const [newTitle, setNewTitle] = useState("");
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
+  const [pendingSelectionTaskId, setPendingSelectionTaskId] = useState<string | null>(null);
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -173,6 +174,19 @@ export function TaskListPane() {
     return () => clearTimeout(timer);
   }, [ignoredDetectionSignature, isCreating, newTitle, today]);
 
+  useEffect(() => {
+    if (!pendingSelectionTaskId) {
+      return;
+    }
+
+    if (!tasks.some((task) => task.id === pendingSelectionTaskId)) {
+      return;
+    }
+
+    selectTask(pendingSelectionTaskId);
+    setPendingSelectionTaskId(null);
+  }, [pendingSelectionTaskId, selectTask, tasks]);
+
   const handleCommitCreate = useCallback(async (options?: {
     continueCapturing?: boolean;
   }) => {
@@ -209,6 +223,10 @@ export function TaskListPane() {
       }
     }
 
+    if (task) {
+      setPendingSelectionTaskId(task.id);
+    }
+
     if (continueCapturing) {
       setIsCreating(true);
       focusCreateInput();
@@ -216,15 +234,11 @@ export function TaskListPane() {
     }
 
     setIsCreating(false);
-    if (task) {
-      selectTask(task.id);
-    }
   }, [
     createTask,
     focusCreateInput,
     ignoredDetectionSignature,
     newTitle,
-    selectTask,
     selectedView,
     today,
     updateTask,

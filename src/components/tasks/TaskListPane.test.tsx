@@ -66,10 +66,10 @@ describe("TaskListPane", () => {
     vi.useRealTimers();
   });
 
-  it("keeps inline capture open after pressing Enter so another task can be added", async () => {
+  it("keeps inline capture open and selects the created task after pressing Enter", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");
-    const createTask = vi.fn().mockResolvedValue({
+    const createdTask = {
       id: "task-1",
       title: "First task",
       description: "",
@@ -79,14 +79,18 @@ describe("TaskListPane", () => {
       actionAt: null,
       scheduleBucket: null,
       completedAt: null,
+    };
+    const createTask = vi.fn().mockResolvedValue({
+      ...createdTask,
     });
     const selectTask = vi.fn();
+    const hookValue = makeTasksHookValue({ createTask, selectTask });
 
     vi.mocked(tasksContext.useTasks).mockReturnValue(
-      makeTasksHookValue({ createTask, selectTask }),
+      hookValue,
     );
 
-    render(
+    const { rerender } = render(
       <TooltipProvider>
         <TaskListPane />
       </TooltipProvider>,
@@ -101,10 +105,19 @@ describe("TaskListPane", () => {
       expect(createTask).toHaveBeenCalledWith("First task");
     });
 
+    hookValue.buckets.inbox = [createdTask];
+    rerender(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
     const refreshedInput = screen.getByPlaceholderText("Task name");
     expect(refreshedInput).toHaveValue("");
     expect(refreshedInput).toHaveFocus();
-    expect(selectTask).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(selectTask).toHaveBeenCalledWith("task-1");
+    });
   });
 
   it("assigns today's date when creating a task from the Today view", async () => {
