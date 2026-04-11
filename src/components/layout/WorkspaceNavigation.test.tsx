@@ -37,6 +37,14 @@ vi.mock("./NotesPane", () => ({
   NotesPane: () => <div data-testid="notes-pane" />,
 }));
 
+vi.mock("../tasks/TaskListPane", () => ({
+  TaskListPane: () => <div data-testid="task-list-pane" />,
+}));
+
+vi.mock("../tasks/TaskNavigationPane", () => ({
+  TaskNavigationPane: () => <div data-testid="task-navigation-pane" />,
+}));
+
 type NotesHookValue = ReturnType<
   typeof import("../../context/NotesContext").useNotes
 >;
@@ -68,6 +76,7 @@ describe("WorkspaceNavigation", () => {
       resolvedTheme: "light",
       setPaneWidths: vi.fn(),
     } as never);
+
   });
 
   it("moves folders into another folder on drop", async () => {
@@ -79,7 +88,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveFolder, revealFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -114,7 +123,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -150,7 +159,7 @@ describe("WorkspaceNavigation", () => {
       makeNotesHookValue({ moveNote, moveSelectedNotes, revealFolder }),
     );
 
-    render(<WorkspaceNavigation paneMode={3} />);
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
 
     await act(async () => {
       await (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
@@ -176,5 +185,16 @@ describe("WorkspaceNavigation", () => {
     expect(moveNote).toHaveBeenCalledWith("alpha", "archive");
     expect(moveSelectedNotes).not.toHaveBeenCalled();
     expect(revealFolder).toHaveBeenCalledWith("archive");
+  });
+
+  it("renders the task list pane instead of the notes pane in task mode", async () => {
+    const { queryByTestId, getByTestId } = render(
+      <WorkspaceNavigation paneMode={3} workspaceMode="tasks" />,
+    );
+
+    expect(getByTestId("task-list-pane")).toBeInTheDocument();
+    expect(getByTestId("task-navigation-pane")).toBeInTheDocument();
+    expect(queryByTestId("folders-pane")).not.toBeInTheDocument();
+    expect(queryByTestId("notes-pane")).not.toBeInTheDocument();
   });
 });

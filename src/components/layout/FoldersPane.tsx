@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
@@ -56,7 +56,10 @@ export function FoldersPane({
     <div className="h-full bg-bg-secondary flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <div className="font-medium text-base text-text">Folders</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <FileText className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
+          <div className="font-medium text-base text-text">Notes</div>
+        </div>
         <div className="ui-pane-header-actions">
           <SortMenuButton
             title="Sort Folders"

@@ -9,7 +9,7 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { PanelLeft, PanelRight } from "lucide-react";
+import { CheckSquare, FileText, PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   NotesProvider,
@@ -30,6 +30,9 @@ import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
 import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
+import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
+import { GlobalTaskCaptureDialog } from "./components/tasks/GlobalTaskCaptureDialog";
+import { TasksProvider } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
@@ -153,6 +156,7 @@ function getWindowMode():
 }
 
 type ViewState = "notes" | "settings";
+type WorkspaceMode = "notes" | "tasks";
 
 function formatPaneModeLabel(mode: PaneMode): string {
   if (mode === 1) return "1 Pane";
@@ -162,6 +166,10 @@ function formatPaneModeLabel(mode: PaneMode): string {
 
 function getNextPaneMode(mode: PaneMode): PaneMode {
   return mode === 1 ? 3 : ((mode - 1) as PaneMode);
+}
+
+function getNextTaskPaneMode(mode: PaneMode): PaneMode {
+  return mode === 3 ? 2 : 3;
 }
 
 function getDefaultAssistantProvider(
@@ -229,6 +237,7 @@ function PreviewFallback() {
 
 interface WorkspaceMainProps {
   paneMode: PaneMode;
+  workspaceMode: WorkspaceMode;
   focusMode: boolean;
   showRightPanel: boolean;
   rightPanelWidth: number;
@@ -252,6 +261,7 @@ interface WorkspaceMainProps {
 
 const WorkspaceMain = memo(function WorkspaceMain({
   paneMode,
+  workspaceMode,
   focusMode,
   showRightPanel,
   rightPanelWidth,
@@ -270,36 +280,62 @@ const WorkspaceMain = memo(function WorkspaceMain({
   onRightPanelTabChange,
   onRightPanelWidthChange,
 }: WorkspaceMainProps) {
+  const isTasksModeActive = workspaceMode === "tasks";
+
+  useEffect(() => {
+    if (!isTasksModeActive) {
+      return;
+    }
+
+    onEditorReady(null);
+    onRegisterScrollContainer(null);
+    onRegisterFlushPendingSave(null);
+    onEditorSourceModeChange(false);
+  }, [
+    isTasksModeActive,
+    onEditorReady,
+    onEditorSourceModeChange,
+    onRegisterFlushPendingSave,
+    onRegisterScrollContainer,
+  ]);
+
   return (
     <>
       <WorkspaceNavigation
         paneMode={focusMode ? 1 : paneMode}
+        workspaceMode={workspaceMode}
         onOpenSettings={onOpenSettings}
       />
       <div className="flex min-w-0 flex-1">
-        <Editor
-          paneMode={paneMode}
-          focusMode={focusMode}
-          hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
-          workspaceMode={workspaceEditorData}
-          assistantSelection={currentAssistantSelection}
-          onSourceModeChange={onEditorSourceModeChange}
-          onRegisterScrollContainer={onRegisterScrollContainer}
-          onRegisterFlushPendingSave={onRegisterFlushPendingSave}
-          onEditorReady={onEditorReady}
-        />
-        <RightPanel
-          editor={editorInstance}
-          scrollContainer={editorScrollContainer}
-          noteId={currentNoteId}
-          hasNote={Boolean(currentNoteId)}
-          visible={showRightPanel}
-          width={rightPanelWidth}
-          activeTab={rightPanelTab}
-          onTabChange={onRightPanelTabChange}
-          onWidthChange={onRightPanelWidthChange}
-          assistantProps={assistantProps}
-        />
+        {isTasksModeActive ? (
+          <TaskDetailPanel />
+        ) : (
+          <>
+            <Editor
+              paneMode={paneMode}
+              focusMode={focusMode}
+              hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
+              workspaceMode={workspaceEditorData}
+              assistantSelection={currentAssistantSelection}
+              onSourceModeChange={onEditorSourceModeChange}
+              onRegisterScrollContainer={onRegisterScrollContainer}
+              onRegisterFlushPendingSave={onRegisterFlushPendingSave}
+              onEditorReady={onEditorReady}
+            />
+            <RightPanel
+              editor={editorInstance}
+              scrollContainer={editorScrollContainer}
+              noteId={currentNoteId}
+              hasNote={Boolean(currentNoteId)}
+              visible={showRightPanel}
+              width={rightPanelWidth}
+              activeTab={rightPanelTab}
+              onTabChange={onRightPanelTabChange}
+              onWidthChange={onRightPanelWidthChange}
+              assistantProps={assistantProps}
+            />
+          </>
+        )}
       </div>
     </>
   );
@@ -308,43 +344,83 @@ const WorkspaceMain = memo(function WorkspaceMain({
 function TitlebarPaneSwitch({
   paneMode,
   onCyclePaneMode,
+  nextPaneMode,
   rightPanelVisible,
   onToggleRightPanel,
+  tasksEnabled = false,
+  isTasksModeActive = false,
+  onShowNotes,
+  onShowTasks,
+  showRightPanelToggle = true,
 }: {
   paneMode: PaneMode;
   onCyclePaneMode: () => void;
+  nextPaneMode: PaneMode;
   rightPanelVisible: boolean;
   onToggleRightPanel: () => void;
+  tasksEnabled?: boolean;
+  isTasksModeActive?: boolean;
+  onShowNotes?: () => void;
+  onShowTasks?: () => void;
+  showRightPanelToggle?: boolean;
 }) {
   return (
     <>
       <div className="ui-titlebar-pane-switch" data-tauri-drag-region>
-        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-2">
           <IconButton
             onClick={onCyclePaneMode}
-            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(getNextPaneMode(paneMode))} (${mod}${isMac ? "" : "+"}\\)`}
+            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(nextPaneMode)} (${mod}${isMac ? "" : "+"}\\)`}
             className="shrink-0"
           >
             <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
+          {tasksEnabled && onShowNotes && onShowTasks && (
+            <div className="ui-mode-toggle">
+              <button
+                type="button"
+                aria-pressed={!isTasksModeActive}
+                onClick={onShowNotes}
+                className={`ui-focus-ring ui-mode-toggle-item ${
+                  isTasksModeActive ? "" : "ui-mode-toggle-item-active"
+                }`}
+              >
+                <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span>Notes</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={isTasksModeActive}
+                onClick={onShowTasks}
+                className={`ui-focus-ring ui-mode-toggle-item ${
+                  isTasksModeActive ? "ui-mode-toggle-item-active" : ""
+                }`}
+              >
+                <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span>Tasks</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      <div
-        className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
-        data-tauri-drag-region
-      >
-        <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
-          <IconButton
-            onClick={onToggleRightPanel}
-            title={`${
-              rightPanelVisible ? "Hide" : "Show"
-            } Right Panel (${mod}${isMac ? "" : "+"}4)`}
-            className="shrink-0"
-          >
-            <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
-          </IconButton>
+      {showRightPanelToggle && (
+        <div
+          className="ui-titlebar-pane-switch ui-titlebar-pane-switch-right"
+          data-tauri-drag-region
+        >
+          <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center">
+            <IconButton
+              onClick={onToggleRightPanel}
+              title={`${
+                rightPanelVisible ? "Hide" : "Show"
+              } Right Panel (${mod}${isMac ? "" : "+"}4)`}
+              className="shrink-0"
+            >
+              <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
+            </IconButton>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
@@ -384,7 +460,6 @@ function AppContent() {
     setInterfaceZoom,
     paneMode,
     setPaneMode,
-    cyclePaneMode,
     rightPanelVisible,
     rightPanelWidth,
     rightPanelTab,
@@ -401,7 +476,9 @@ function AppContent() {
   const currentNoteRef = useRef(currentNote);
   currentNoteRef.current = currentNote;
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [taskCaptureOpen, setTaskCaptureOpen] = useState(false);
   const [view, setView] = useState<ViewState>("notes");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("notes");
   const [focusMode, setFocusMode] = useState(false);
   const [flushPendingSave, setFlushPendingSave] = useState<
     (() => Promise<void>) | null
@@ -443,7 +520,27 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
-  const showRightPanel = rightPanelVisible && !focusMode && !editorSourceMode;
+  const isTasksModeActive = workspaceMode === "tasks";
+  const isTasksModeActiveRef = useRef(isTasksModeActive);
+  isTasksModeActiveRef.current = isTasksModeActive;
+  const tasksEnabled = settings?.tasksEnabled ?? false;
+  const showRightPanel =
+    rightPanelVisible &&
+    !focusMode &&
+    !editorSourceMode &&
+    !isTasksModeActive;
+
+  useEffect(() => {
+    if (!tasksEnabled && workspaceMode !== "notes") {
+      setWorkspaceMode("notes");
+    }
+  }, [tasksEnabled, workspaceMode]);
+
+  useEffect(() => {
+    if (isTasksModeActive && paneMode === 1) {
+      setPaneMode(2);
+    }
+  }, [isTasksModeActive, paneMode, setPaneMode]);
 
   // Listen for set-notes-folder event from CLI (sly .)
   // Placed here in AppContent where both NotesContext and ThemeContext are available
@@ -743,9 +840,34 @@ function AppContent() {
     [setPaneMode],
   );
 
+  const cycleWorkspacePaneMode = useCallback(() => {
+    const currentMode = paneModeRef.current;
+    const nextMode = isTasksModeActiveRef.current
+      ? getNextTaskPaneMode(currentMode)
+      : getNextPaneMode(currentMode);
+    applyPaneModeSelection(nextMode);
+  }, [applyPaneModeSelection]);
+
   const toggleRightPanel = useCallback(() => {
+    if (isTasksModeActiveRef.current) {
+      return;
+    }
     setRightPanelVisible(!rightPanelVisibleRef.current);
   }, [setRightPanelVisible]);
+
+  const showNotesMode = useCallback(() => {
+    setWorkspaceMode("notes");
+  }, []);
+
+  const showTasksMode = useCallback(() => {
+    clearNoteSelection();
+    setFocusMode(false);
+    setEditorSourceMode(false);
+    if (paneModeRef.current === 1) {
+      setPaneMode(2);
+    }
+    setWorkspaceMode("tasks");
+  }, [clearNoteSelection, setPaneMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1202,6 +1324,18 @@ function AppContent() {
         return;
       }
 
+      // Cmd/Ctrl+Shift+N - Global task capture
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        if (!tasksEnabled) {
+          toast("Enable tasks in Settings to capture tasks.");
+          return;
+        }
+        setPaletteOpen(false);
+        setTaskCaptureOpen(true);
+        return;
+      }
+
       // Cmd+Shift+Enter - Toggle focus mode
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
         e.preventDefault();
@@ -1261,13 +1395,14 @@ function AppContent() {
       // Cmd+\ - Cycle pane layout
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
-        cyclePaneMode();
+        cycleWorkspacePaneMode();
         return;
       }
 
       // Cmd+N - New note
       if ((e.metaKey || e.ctrlKey) && e.key === "n") {
         e.preventDefault();
+        showNotesMode();
         createNote();
         return;
       }
@@ -1419,7 +1554,7 @@ function AppContent() {
     };
   }, [
     createNote,
-    cyclePaneMode,
+    cycleWorkspacePaneMode,
     duplicateNote,
     reloadCurrentNote,
     selectNote,
@@ -1429,12 +1564,19 @@ function AppContent() {
     setPaneMode,
     toggleRightPanel,
     openSettings,
+    showNotesMode,
+    tasksEnabled,
     toggleFocusMode,
     setInterfaceZoom,
   ]);
 
   const handleClosePalette = useCallback(() => {
     setPaletteOpen(false);
+    editorRef.current?.commands.focus();
+  }, []);
+
+  const handleCloseTaskCapture = useCallback(() => {
+    setTaskCaptureOpen(false);
     editorRef.current?.commands.focus();
   }, []);
 
@@ -1526,9 +1668,19 @@ function AppContent() {
         {view === "notes" && !focusMode && (
           <TitlebarPaneSwitch
             paneMode={paneMode}
-            onCyclePaneMode={cyclePaneMode}
+            onCyclePaneMode={cycleWorkspacePaneMode}
+            nextPaneMode={
+              isTasksModeActive
+                ? getNextTaskPaneMode(paneMode)
+                : getNextPaneMode(paneMode)
+            }
             rightPanelVisible={rightPanelVisible}
             onToggleRightPanel={toggleRightPanel}
+            tasksEnabled={tasksEnabled}
+            isTasksModeActive={isTasksModeActive}
+            onShowNotes={showNotesMode}
+            onShowTasks={showTasksMode}
+            showRightPanelToggle={!isTasksModeActive}
           />
         )}
         {view === "settings" ? (
@@ -1543,6 +1695,7 @@ function AppContent() {
         ) : (
           <WorkspaceMain
             paneMode={paneMode}
+            workspaceMode={workspaceMode}
             focusMode={focusMode}
             showRightPanel={showRightPanel}
             rightPanelWidth={rightPanelWidth}
@@ -1577,6 +1730,12 @@ function AppContent() {
           flushPendingSave={flushPendingSave}
         />
       </Suspense>
+
+      <GlobalTaskCaptureDialog
+        open={taskCaptureOpen}
+        workspaceMode={workspaceMode}
+        onClose={handleCloseTaskCapture}
+      />
     </>
   );
 }
@@ -1702,9 +1861,11 @@ function App() {
       <Toaster />
       <TooltipProvider>
         <NotesProvider>
-          <GitProvider>
-            <AppContent />
-          </GitProvider>
+          <TasksProvider>
+            <GitProvider>
+              <AppContent />
+            </GitProvider>
+          </TasksProvider>
         </NotesProvider>
       </TooltipProvider>
     </ThemeProvider>

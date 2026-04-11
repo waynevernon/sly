@@ -17,7 +17,8 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 
 - Plain markdown notes you own. Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
 - A serious writing and editing surface. Sly combines a polished rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
-- Fast navigation through large note collections. Full-text search, command palette workflows, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
+- Fast navigation through large note collections. Full-text search, command palette workflows, recent notes, find-in-note, better keyboard folder navigation, and keyboard-first shortcuts keep you moving without digging through menus.
+- A lightweight task mode when notes turn into action. Enable the beta tasks view to capture work in an inbox, sort it into Today, Upcoming, Someday, Waiting, and Logbook, and keep task notes in plain markdown inside your vault.
 - Flexible organization that still feels lightweight. Use pinned and recent notes, a dedicated pinned notes view, recursive folder views, per-folder note sorting, folder sorting, note counts, drag-and-drop, multi-note move/delete, rename and duplicate commands, and customizable folder icons with color or emoji.
 - Editor-first layouts that adapt to how you work. Switch between 1, 2, and 3 pane views, detach notes into their own windows, tune editor width, and keep folders, note lists, outline, assistant, and the current note visible in the balance you want.
 - Optional AI help without AI lock-in. Use the built-in side assistant or run note editing flows through Claude Code, OpenAI Codex, OpenCode, or Ollama when you want assistance, while keeping plain files and local workflows at the center.

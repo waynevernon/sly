@@ -24,9 +24,12 @@ import {
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { FoldersPane } from "./FoldersPane";
 import { NotesPane } from "./NotesPane";
+import { TaskListPane } from "../tasks/TaskListPane";
+import { TaskNavigationPane } from "../tasks/TaskNavigationPane";
 
 interface WorkspaceNavigationProps {
   paneMode: PaneMode;
+  workspaceMode: "notes" | "tasks";
   onOpenSettings?: () => void;
 }
 
@@ -78,6 +81,7 @@ function getOverlayHotspot(overlaySize: number, inset: number): number {
 
 export function WorkspaceNavigation({
   paneMode,
+  workspaceMode,
   onOpenSettings,
 }: WorkspaceNavigationProps) {
   const {
@@ -311,6 +315,7 @@ export function WorkspaceNavigation({
 
   const foldersVisible = paneMode === 3;
   const notesVisible = paneMode >= 2;
+  const isTasksModeActive = workspaceMode === "tasks";
 
   return (
     <DndContext
@@ -331,17 +336,21 @@ export function WorkspaceNavigation({
         >
           <div
             className={cn(
-              "h-full overflow-hidden",
+              "h-full overflow-visible",
               !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
               foldersVisible
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-3",
             )}
           >
-            <FoldersPane
-              onOpenSettings={onOpenSettings}
-              pendingFolderPath={pendingFolderPath}
-            />
+            {isTasksModeActive ? (
+              <TaskNavigationPane onOpenSettings={onOpenSettings} />
+            ) : (
+              <FoldersPane
+                onOpenSettings={onOpenSettings}
+                pendingFolderPath={pendingFolderPath}
+              />
+            )}
           </div>
           {foldersVisible && notesVisible && (
             <PaneResizeHandle
@@ -362,14 +371,14 @@ export function WorkspaceNavigation({
         >
           <div
             className={cn(
-              "h-full overflow-hidden",
+              "h-full overflow-visible",
               !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
               notesVisible
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-3",
             )}
           >
-            <NotesPane />
+            {isTasksModeActive ? <TaskListPane /> : <NotesPane />}
           </div>
           {notesVisible && (
             <PaneResizeHandle

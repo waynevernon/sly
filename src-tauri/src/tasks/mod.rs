@@ -1,0 +1,766 @@
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Utc};
+use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
+
+const TASKS_DB_SCHEMA_VERSION: i32 = 4;
+
+// Public types
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskMetadata {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub link: String,
+    pub waiting_for: String,
+    pub created_at: String,
+    pub action_at: Option<String>,
+    pub schedule_bucket: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Task {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub link: String,
+    pub waiting_for: String,
+    pub created_at: String,
+    pub action_at: Option<String>,
+    pub schedule_bucket: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskPatch {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub link: Option<String>,
+    pub waiting_for: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub action_at: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub schedule_bucket: Option<Option<String>>,
+}
+
+fn deserialize_optional_nullable_string<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::<String>::deserialize(deserializer)?))
+}
+
+#[derive(Debug)]
+struct TaskRow {
+    id: String,
+    title: String,
+    description: String,
+    link: String,
+    waiting_for: String,
+    created_at: String,
+    action_at: Option<String>,
+    schedule_bucket: Option<String>,
+    completed_at: Option<String>,
+}
+
+impl From<TaskRow> for Task {
+    fn from(row: TaskRow) -> Self {
+        Self {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            link: row.link,
+            waiting_for: row.waiting_for,
+            created_at: row.created_at,
+            action_at: row.action_at,
+            schedule_bucket: row.schedule_bucket,
+            completed_at: row.completed_at,
+        }
+    }
+}
+
+impl From<TaskRow> for TaskMetadata {
+    fn from(row: TaskRow) -> Self {
+        Self {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            link: row.link,
+            waiting_for: row.waiting_for,
+            created_at: row.created_at,
+            action_at: row.action_at,
+            schedule_bucket: row.schedule_bucket,
+            completed_at: row.completed_at,
+        }
+    }
+}
+
+// Path helpers
+
+pub(crate) fn tasks_db_path(notes_root: &Path) -> PathBuf {
+    notes_root.join(".sly").join("tasks.db")
+}
+
+fn open_tasks_db(notes_root: &Path) -> Result<Connection> {
+    let db_path = tasks_db_path(notes_root);
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let conn = Connection::open(db_path)?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "busy_timeout", 5_000)?;
+    initialize_schema(&conn)?;
+    Ok(conn)
+}
+
+fn initialize_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            link TEXT NOT NULL DEFAULT '',
+            waiting_for TEXT NOT NULL DEFAULT '',
+            action_at TEXT NULL,
+            schedule_bucket TEXT NULL,
+            created_at TEXT NOT NULL,
+            completed_at TEXT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tasks_completed_at
+            ON tasks (completed_at);
+
+        CREATE INDEX IF NOT EXISTS idx_tasks_action_at
+            ON tasks (action_at);
+        ",
+    )?;
+
+    if !table_column_exists(conn, "tasks", "link")? {
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN link TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
+    }
+
+    if !table_column_exists(conn, "tasks", "schedule_bucket")? {
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN schedule_bucket TEXT NULL",
+            [],
+        )?;
+    }
+
+    if !table_column_exists(conn, "tasks", "waiting_for")? {
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN waiting_for TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
+    }
+
+    conn.pragma_update(None, "user_version", TASKS_DB_SCHEMA_VERSION)?;
+    Ok(())
+}
+
+// Normalization helpers
+
+fn now_rfc3339() -> String {
+    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+fn new_task_id() -> String {
+    Uuid::now_v7().to_string()
+}
+
+fn normalize_action_at(value: Option<String>) -> Result<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    let parsed = DateTime::parse_from_rfc3339(trimmed)
+        .map_err(|error| anyhow!("Invalid actionAt timestamp: {error}"))?;
+    Ok(Some(
+        parsed
+            .with_timezone(&Utc)
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string(),
+    ))
+}
+
+fn normalize_title(title: &str) -> Result<String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow!("Task title cannot be empty"));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn normalize_link(link: &str) -> String {
+    link.trim().to_string()
+}
+
+fn normalize_waiting_for(waiting_for: &str) -> String {
+    waiting_for.trim().to_string()
+}
+
+fn normalize_schedule_bucket(value: Option<String>) -> Result<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    match trimmed {
+        "anytime" | "someday" => Ok(Some(trimmed.to_string())),
+        _ => Err(anyhow!("Invalid scheduleBucket value: {trimmed}")),
+    }
+}
+
+fn table_column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut statement = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+
+    for name in columns {
+        if name? == column {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
+    Ok(TaskRow {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        description: row.get("description")?,
+        link: row.get("link")?,
+        waiting_for: row.get("waiting_for")?,
+        created_at: row.get("created_at")?,
+        action_at: row.get("action_at")?,
+        schedule_bucket: row.get("schedule_bucket")?,
+        completed_at: row.get("completed_at")?,
+    })
+}
+
+fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
+    conn.query_row(
+        "
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at
+        FROM tasks
+        WHERE id = ?1
+        ",
+        [id],
+        task_row_from_query,
+    )
+    .optional()?
+    .ok_or_else(|| anyhow!("Task not found: {id}"))
+}
+
+// CRUD
+
+pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
+    let conn = open_tasks_db(notes_root)?;
+    let mut statement = conn.prepare(
+        "
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at
+        FROM tasks
+        ORDER BY created_at DESC
+        ",
+    )?;
+
+    let rows = statement.query_map([], task_row_from_query)?;
+    let mut tasks = Vec::new();
+    for row in rows {
+        tasks.push(TaskMetadata::from(row?));
+    }
+    Ok(tasks)
+}
+
+pub(crate) fn read_task(notes_root: &Path, id: &str) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    Ok(Task::from(read_task_row(&conn, id)?))
+}
+
+pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let task = Task {
+        id: new_task_id(),
+        title: normalize_title(title)?,
+        description: String::new(),
+        link: String::new(),
+        waiting_for: String::new(),
+        created_at: now_rfc3339(),
+        action_at: None,
+        schedule_bucket: None,
+        completed_at: None,
+    };
+
+    conn.execute(
+        "
+        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        ",
+        params![
+            &task.id,
+            &task.title,
+            &task.description,
+            &task.link,
+            &task.waiting_for,
+            &task.action_at,
+            &task.schedule_bucket,
+            &task.created_at,
+            &task.completed_at,
+        ],
+    )?;
+
+    Ok(task)
+}
+
+pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let existing = read_task_row(&conn, id)?;
+
+    let title = match patch.title {
+        Some(next) => normalize_title(&next)?,
+        None => existing.title,
+    };
+    let description = patch.description.unwrap_or(existing.description);
+    let link = match patch.link {
+        Some(next) => normalize_link(&next),
+        None => existing.link,
+    };
+    let waiting_for = match patch.waiting_for {
+        Some(next) => normalize_waiting_for(&next),
+        None => existing.waiting_for,
+    };
+    let mut action_at = existing.action_at;
+    let mut schedule_bucket = existing.schedule_bucket;
+
+    if let Some(next) = patch.action_at {
+        action_at = normalize_action_at(next)?;
+        if action_at.is_some() {
+            schedule_bucket = None;
+        }
+    }
+
+    if let Some(next) = patch.schedule_bucket {
+        schedule_bucket = normalize_schedule_bucket(next)?;
+        if schedule_bucket.is_some() {
+            action_at = None;
+        }
+    }
+
+    conn.execute(
+        "
+        UPDATE tasks
+        SET title = ?2,
+            description = ?3,
+            link = ?4,
+            waiting_for = ?5,
+            action_at = ?6,
+            schedule_bucket = ?7
+        WHERE id = ?1
+        ",
+        params![id, title, description, link, waiting_for, action_at, schedule_bucket],
+    )?;
+
+    Ok(Task {
+        id: id.to_string(),
+        title,
+        description,
+        link,
+        waiting_for,
+        created_at: existing.created_at,
+        action_at,
+        schedule_bucket,
+        completed_at: existing.completed_at,
+    })
+}
+
+pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -> Result<Task> {
+    let conn = open_tasks_db(notes_root)?;
+    let existing = read_task_row(&conn, id)?;
+    let completed_at = if completed { Some(now_rfc3339()) } else { None };
+
+    conn.execute(
+        "
+        UPDATE tasks
+        SET completed_at = ?2
+        WHERE id = ?1
+        ",
+        params![id, completed_at],
+    )?;
+
+    Ok(Task {
+        id: id.to_string(),
+        title: existing.title,
+        description: existing.description,
+        link: existing.link,
+        waiting_for: existing.waiting_for,
+        created_at: existing.created_at,
+        action_at: existing.action_at,
+        schedule_bucket: existing.schedule_bucket,
+        completed_at,
+    })
+}
+
+pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
+    let conn = open_tasks_db(notes_root)?;
+    conn.execute("DELETE FROM tasks WHERE id = ?1", [id])?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn make_root() -> TempDir {
+        tempfile::tempdir().expect("tempdir")
+    }
+
+    #[test]
+    fn initializes_tasks_db_inside_sly_directory() {
+        let root = make_root();
+        let db_path = tasks_db_path(root.path());
+        assert!(!db_path.exists());
+
+        let conn = open_tasks_db(root.path()).unwrap();
+        let user_version: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(user_version, TASKS_DB_SCHEMA_VERSION);
+        assert!(db_path.exists());
+    }
+
+    #[test]
+    fn create_and_read_task() {
+        let root = make_root();
+        let task = create_task(root.path(), "Hello world").unwrap();
+        let read = read_task(root.path(), &task.id).unwrap();
+
+        assert_eq!(read.id, task.id);
+        assert_eq!(read.title, "Hello world");
+        assert_eq!(read.description, "");
+        assert_eq!(read.link, "");
+        assert_eq!(read.waiting_for, "");
+        assert!(read.action_at.is_none());
+        assert!(read.schedule_bucket.is_none());
+        assert!(read.completed_at.is_none());
+    }
+
+    #[test]
+    fn create_task_rejects_blank_title() {
+        let root = make_root();
+        let result = create_task(root.path(), "   ");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_task_fields() {
+        let root = make_root();
+        let task = create_task(root.path(), "Original").unwrap();
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                title: Some("Updated".to_string()),
+                description: Some("Task description".to_string()),
+                link: Some(" https://example.com/task ".to_string()),
+                waiting_for: Some(" Jordan ".to_string()),
+                action_at: Some(Some("2026-04-10T17:00:00-05:00".to_string())),
+                schedule_bucket: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(updated.title, "Updated");
+        assert_eq!(updated.description, "Task description");
+        assert_eq!(updated.link, "https://example.com/task");
+        assert_eq!(updated.waiting_for, "Jordan");
+        assert_eq!(updated.action_at.as_deref(), Some("2026-04-10T22:00:00Z"));
+        assert!(updated.schedule_bucket.is_none());
+    }
+
+    #[test]
+    fn migrates_legacy_db_to_add_link_column() {
+        let root = make_root();
+        let db_path = tasks_db_path(root.path());
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                action_at TEXT NULL,
+                schedule_bucket TEXT NULL,
+                created_at TEXT NOT NULL,
+                completed_at TEXT NULL
+            );
+            PRAGMA user_version = 1;
+            INSERT INTO tasks (id, title, description, action_at, created_at, completed_at)
+            VALUES ('task-1', 'Legacy task', 'Existing description', NULL, '2026-04-10T12:00:00Z', NULL);
+            ",
+        )
+        .unwrap();
+        drop(conn);
+
+        let migrated = read_task(root.path(), "task-1").unwrap();
+        let migrated_conn = Connection::open(&db_path).unwrap();
+        let user_version: i32 = migrated_conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(migrated.link, "");
+        assert_eq!(migrated.waiting_for, "");
+        assert!(migrated.schedule_bucket.is_none());
+        assert_eq!(user_version, TASKS_DB_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn update_waiting_for_trims_and_can_clear() {
+        let root = make_root();
+        let task = create_task(root.path(), "Waiting").unwrap();
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                waiting_for: Some(" Jordan ".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.waiting_for, "Jordan");
+
+        let cleared = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                waiting_for: Some("   ".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.waiting_for, "");
+    }
+
+    #[test]
+    fn clear_action_at() {
+        let root = make_root();
+        let task = create_task(root.path(), "Task").unwrap();
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("2026-04-10T12:00:00Z".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.action_at.as_deref(), Some("2026-04-10T12:00:00Z"));
+
+        let cleared = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(None),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(cleared.action_at.is_none());
+    }
+
+    #[test]
+    fn task_patch_deserializes_explicit_null_as_clear() {
+        let patch: TaskPatch =
+            serde_json::from_str(r#"{"actionAt":null,"scheduleBucket":null}"#).unwrap();
+
+        assert_eq!(patch.action_at, Some(None));
+        assert_eq!(patch.schedule_bucket, Some(None));
+    }
+
+    #[test]
+    fn set_schedule_bucket_clears_action_at() {
+        let root = make_root();
+        let task = create_task(root.path(), "Task").unwrap();
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("2026-04-10T12:00:00Z".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.action_at.as_deref(), Some("2026-04-10T12:00:00Z"));
+
+        let bucketed = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                schedule_bucket: Some(Some("anytime".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(bucketed.action_at.is_none());
+        assert_eq!(bucketed.schedule_bucket.as_deref(), Some("anytime"));
+    }
+
+    #[test]
+    fn set_action_at_clears_schedule_bucket() {
+        let root = make_root();
+        let task = create_task(root.path(), "Task").unwrap();
+
+        let bucketed = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                schedule_bucket: Some(Some("someday".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(bucketed.schedule_bucket.as_deref(), Some("someday"));
+
+        let dated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("2026-04-10T12:00:00Z".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(dated.action_at.as_deref(), Some("2026-04-10T12:00:00Z"));
+        assert!(dated.schedule_bucket.is_none());
+    }
+
+    #[test]
+    fn complete_and_uncomplete_task() {
+        let root = make_root();
+        let task = create_task(root.path(), "Done soon").unwrap();
+
+        let done = set_task_completed(root.path(), &task.id, true).unwrap();
+        assert!(done.completed_at.is_some());
+
+        let undone = set_task_completed(root.path(), &task.id, false).unwrap();
+        assert!(undone.completed_at.is_none());
+    }
+
+    #[test]
+    fn delete_task_removes_row() {
+        let root = make_root();
+        let task = create_task(root.path(), "Ephemeral").unwrap();
+
+        delete_task(root.path(), &task.id).unwrap();
+        assert!(read_task(root.path(), &task.id).is_err());
+    }
+
+    #[test]
+    fn list_tasks_ignores_legacy_tasks_directory() {
+        let root = make_root();
+        let legacy_dir = root.path().join(".tasks");
+        std::fs::create_dir_all(&legacy_dir).unwrap();
+        std::fs::write(legacy_dir.join("legacy.md"), "# Old task").unwrap();
+
+        let tasks = list_tasks(root.path()).unwrap();
+        assert!(tasks.is_empty());
+    }
+
+    #[test]
+    fn list_tasks_returns_created_tasks() {
+        let root = make_root();
+        let first = create_task(root.path(), "First").unwrap();
+        let second = create_task(root.path(), "Second").unwrap();
+
+        let tasks = list_tasks(root.path()).unwrap();
+        let ids: Vec<&str> = tasks.iter().map(|task| task.id.as_str()).collect();
+
+        assert_eq!(tasks.len(), 2);
+        assert!(ids.contains(&first.id.as_str()));
+        assert!(ids.contains(&second.id.as_str()));
+    }
+
+    #[test]
+    fn invalid_action_at_is_rejected() {
+        let root = make_root();
+        let task = create_task(root.path(), "Broken").unwrap();
+
+        let result = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("not-a-date".to_string())),
+                ..Default::default()
+            },
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn invalid_schedule_bucket_is_rejected() {
+        let root = make_root();
+        let task = create_task(root.path(), "Broken bucket").unwrap();
+
+        let result = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                schedule_bucket: Some(Some("later".to_string())),
+                ..Default::default()
+            },
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_task_rejects_blank_title() {
+        let root = make_root();
+        let task = create_task(root.path(), "Keep me").unwrap();
+
+        let result = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                title: Some("   ".to_string()),
+                ..Default::default()
+            },
+        );
+
+        assert!(result.is_err());
+    }
+}

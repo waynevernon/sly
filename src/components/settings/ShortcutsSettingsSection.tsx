@@ -35,6 +35,11 @@ const shortcuts: Shortcut[] = [
     category: "Notes",
   },
   {
+    keys: [mod, "Shift", "N"],
+    description: "Open quick task capture",
+    category: "Tasks",
+  },
+  {
     keys: [mod, "D"],
     description: "Duplicate current note",
     category: "Notes",
@@ -231,7 +236,7 @@ function ShortcutKeys({ keys }: { keys: string[] }) {
 }
 
 function ShortcutsReference() {
-  const categoryOrder = ["Navigation", "Notes", "Editor", "Settings"];
+  const categoryOrder = ["Navigation", "Notes", "Tasks", "Editor", "Settings"];
 
   return (
     <div className="space-y-10">
