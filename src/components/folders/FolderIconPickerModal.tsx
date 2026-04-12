@@ -104,33 +104,25 @@ export function FolderIconPickerModal({
 
   useEffect(() => {
     if (!open) return;
-
-    const frameId = requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-
-    return () => cancelAnimationFrame(frameId);
+    inputRef.current?.focus();
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     let observer: ResizeObserver | null = null;
-    const frameId = requestAnimationFrame(() => {
-      const element = gridMeasureRef.current;
-      if (!element) return;
+    const element = gridMeasureRef.current;
+    if (!element) return;
 
-      const updateWidth = () => {
-        setGridWidth(element.getBoundingClientRect().width);
-      };
+    const updateWidth = () => {
+      setGridWidth(element.getBoundingClientRect().width);
+    };
 
-      updateWidth();
-      observer = new ResizeObserver(updateWidth);
-      observer.observe(element);
-    });
+    updateWidth();
+    observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
 
     return () => {
-      cancelAnimationFrame(frameId);
       observer?.disconnect();
     };
   }, [open]);

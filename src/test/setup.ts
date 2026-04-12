@@ -10,7 +10,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   clearMocks();
+  vi.clearAllTimers();
+  vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 if (!window.matchMedia) {

@@ -51,7 +51,7 @@ import type {
   AssistantThreadState,
   AssistantTurn,
 } from "./types/assistant";
-import { alt, isMac, mod, shift, shortcut } from "./lib/platform";
+import { alt, isMac, mod, shortcut } from "./lib/platform";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
   applyLineReplacement,

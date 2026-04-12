@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { Schema } from "@tiptap/pm/model";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RightPanel } from "./RightPanel";
 import { extractOutlineItems } from "./rightPanelOutline";
 import { TooltipProvider } from "../ui";
@@ -122,7 +122,35 @@ function renderRightPanel(ui: ReactElement) {
 
 describe("RightPanel", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     Element.prototype.scrollIntoView = vi.fn();
+    let nextAnimationFrameId = 1;
+    const canceledAnimationFrames = new Set<number>();
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      ((callback: FrameRequestCallback) => {
+        const frameId = nextAnimationFrameId++;
+        queueMicrotask(() => {
+          if (canceledAnimationFrames.has(frameId)) {
+            return;
+          }
+          callback(performance.now());
+        });
+        return frameId;
+      }) as typeof requestAnimationFrame,
+    );
+    vi.stubGlobal(
+      "cancelAnimationFrame",
+      ((id: number) => {
+        canceledAnimationFrames.add(id);
+      }) as typeof cancelAnimationFrame,
+    );
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("renders outline items with nested indentation", async () => {
@@ -680,7 +708,6 @@ describe("RightPanel", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByText("Loading outline...")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Title" })).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Next Note" })).toBeInTheDocument();
   });

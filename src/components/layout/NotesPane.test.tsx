@@ -116,6 +116,7 @@ describe("NotesPane", () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 

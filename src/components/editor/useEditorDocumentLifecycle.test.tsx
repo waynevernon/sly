@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import {
   blockIndexToPos,
@@ -25,6 +25,11 @@ describe("useEditorDocumentLifecycle", () => {
       return 0;
     });
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("uses the renamed note id for source-mode saves before the next render", async () => {

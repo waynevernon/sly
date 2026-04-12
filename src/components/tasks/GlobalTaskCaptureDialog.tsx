@@ -60,13 +60,8 @@ export function GlobalTaskCaptureDialog({
     setDetectedDate(null);
     setIgnoredDetectionSignature(null);
     setIsSaving(false);
-
-    const focusTimer = window.setTimeout(() => {
-      titleInputRef.current?.focus();
-      titleInputRef.current?.select();
-    }, 0);
-
-    return () => window.clearTimeout(focusTimer);
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
   }, [open]);
 
   useEffect(() => {

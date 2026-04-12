@@ -79,8 +79,6 @@ export function RightPanel({
   const liveWidthRef = useRef(liveWidth);
   const outlineScrollRef = useRef<HTMLDivElement>(null);
   const outlineItemsRef = useRef<OutlineItem[]>([]);
-  const panelHydrationFrameRef = useRef<number | null>(null);
-  const outlineHydrationFrameRef = useRef<number | null>(null);
   const outlineViewportFrameRef = useRef<number | null>(null);
   const outlineUpdateTimeoutRef = useRef<number | null>(null);
   const [hydratedPanelKey, setHydratedPanelKey] = useState<string | null>(null);
@@ -99,10 +97,6 @@ export function RightPanel({
   }, [width, isResizing]);
 
   const clearPendingOutlineWork = useCallback(() => {
-    if (outlineHydrationFrameRef.current !== null) {
-      cancelAnimationFrame(outlineHydrationFrameRef.current);
-      outlineHydrationFrameRef.current = null;
-    }
     if (outlineViewportFrameRef.current !== null) {
       cancelAnimationFrame(outlineViewportFrameRef.current);
       outlineViewportFrameRef.current = null;
@@ -174,32 +168,18 @@ export function RightPanel({
   }, [editor, hasNote, scrollContainer]);
 
   useEffect(() => {
-    if (panelHydrationFrameRef.current !== null) {
-      cancelAnimationFrame(panelHydrationFrameRef.current);
-      panelHydrationFrameRef.current = null;
-    }
-
     if (!panelHydrationKey) {
       setHydratedPanelKey(null);
       return;
     }
 
     setHydratedPanelKey(null);
-    panelHydrationFrameRef.current = requestAnimationFrame(() => {
-      startTransition(() => {
-        setHydratedPanelKey(panelHydrationKey);
-      });
-      if (activeTab === "assistant" && noteId) {
-        finishNoteOpenTiming(noteId, "assistant panel hydrated");
-      }
+    startTransition(() => {
+      setHydratedPanelKey(panelHydrationKey);
     });
-
-    return () => {
-      if (panelHydrationFrameRef.current !== null) {
-        cancelAnimationFrame(panelHydrationFrameRef.current);
-        panelHydrationFrameRef.current = null;
-      }
-    };
+    if (activeTab === "assistant" && noteId) {
+      finishNoteOpenTiming(noteId, "assistant panel hydrated");
+    }
   }, [activeTab, noteId, panelHydrationKey]);
 
   useEffect(() => {
@@ -221,9 +201,7 @@ export function RightPanel({
       });
     };
 
-    outlineHydrationFrameRef.current = requestAnimationFrame(() => {
-      hydrateOutline("initial");
-    });
+    hydrateOutline("initial");
 
     const handleUpdate = () => {
       clearPendingOutlineWork();
@@ -282,9 +260,6 @@ export function RightPanel({
   useEffect(() => {
     return () => {
       clearPendingOutlineWork();
-      if (panelHydrationFrameRef.current !== null) {
-        cancelAnimationFrame(panelHydrationFrameRef.current);
-      }
     };
   }, [clearPendingOutlineWork]);
 

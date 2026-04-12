@@ -93,6 +93,7 @@ describe("NoteList", () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 

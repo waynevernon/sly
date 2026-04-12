@@ -509,18 +509,18 @@ fn handle_task_create(
 
     let mut task =
         tasks::create_task(&vault.notes_folder, &args.title).map_err(|error| error.to_string())?;
-    let patch = patch_from_optional_fields(
-        args.description,
-        false,
-        args.link,
-        false,
-        args.waiting_for,
-        false,
-        args.date,
-        false,
-        args.bucket,
-        false,
-    )?;
+    let patch = patch_from_optional_fields(TaskPatchFieldArgs {
+        description: args.description,
+        clear_description: false,
+        link: args.link,
+        clear_link: false,
+        waiting_for: args.waiting_for,
+        clear_waiting_for: false,
+        date: args.date,
+        clear_date: false,
+        bucket: args.bucket,
+        clear_bucket: false,
+    })?;
 
     if task_patch_has_changes(&patch) {
         task = tasks::update_task(&vault.notes_folder, &task.id, patch)
@@ -540,18 +540,18 @@ fn handle_task_update(
     persist_tasks_enabled(&vault.notes_folder, &mut vault.settings)?;
     let resolved = resolve_task_selector(&vault.notes_folder, &args.selector)
         .map_err(selector_error_message)?;
-    let patch = patch_from_optional_fields(
-        args.description,
-        args.clear_description,
-        args.link,
-        args.clear_link,
-        args.waiting_for,
-        args.clear_waiting_for,
-        args.date,
-        args.clear_date,
-        args.bucket,
-        args.clear_bucket,
-    )?
+    let patch = patch_from_optional_fields(TaskPatchFieldArgs {
+        description: args.description,
+        clear_description: args.clear_description,
+        link: args.link,
+        clear_link: args.clear_link,
+        waiting_for: args.waiting_for,
+        clear_waiting_for: args.clear_waiting_for,
+        date: args.date,
+        clear_date: args.clear_date,
+        bucket: args.bucket,
+        clear_bucket: args.clear_bucket,
+    })?
     .with_title(args.title);
 
     if !task_patch_has_changes(&patch) {
@@ -740,7 +740,7 @@ fn load_tasks_enabled(path: &Path) -> Option<bool> {
     load_settings(path.to_string_lossy().as_ref()).tasks_enabled
 }
 
-fn patch_from_optional_fields(
+struct TaskPatchFieldArgs {
     description: Option<String>,
     clear_description: bool,
     link: Option<String>,
@@ -751,20 +751,22 @@ fn patch_from_optional_fields(
     clear_date: bool,
     bucket: Option<ScheduleBucketArg>,
     clear_bucket: bool,
-) -> Result<TaskPatch, String> {
-    let action_at = if let Some(date) = date {
+}
+
+fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, String> {
+    let action_at = if let Some(date) = args.date {
         Some(Some(
             local_date_to_action_at(&date).map_err(|error| error.to_string())?,
         ))
-    } else if clear_date {
+    } else if args.clear_date {
         Some(None)
     } else {
         None
     };
 
-    let schedule_bucket = if let Some(bucket) = bucket {
+    let schedule_bucket = if let Some(bucket) = args.bucket {
         Some(Some(bucket.as_str().to_string()))
-    } else if clear_bucket {
+    } else if args.clear_bucket {
         Some(None)
     } else {
         None
@@ -772,20 +774,20 @@ fn patch_from_optional_fields(
 
     Ok(TaskPatch {
         title: None,
-        description: if clear_description {
+        description: if args.clear_description {
             Some(String::new())
         } else {
-            description
+            args.description
         },
-        link: if clear_link {
+        link: if args.clear_link {
             Some(String::new())
         } else {
-            link
+            args.link
         },
-        waiting_for: if clear_waiting_for {
+        waiting_for: if args.clear_waiting_for {
             Some(String::new())
         } else {
-            waiting_for
+            args.waiting_for
         },
         action_at,
         schedule_bucket,

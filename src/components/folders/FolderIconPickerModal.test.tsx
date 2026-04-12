@@ -1,6 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmojiCatalogItems, searchEmojiShortcodes } from "../../lib/emoji";
 import { searchLucideIcons } from "../../lib/lucideIcons";
 import { TooltipProvider } from "../ui";
@@ -16,6 +16,10 @@ describe("FolderIconPickerModal", () => {
         disconnect() {}
       },
     );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("keeps icon picks local until apply", async () => {
@@ -34,7 +38,9 @@ describe("FolderIconPickerModal", () => {
       </TooltipProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Search Lucide icons..."), {
+    const iconSearch = screen.getByPlaceholderText("Search Lucide icons...");
+    iconSearch.focus();
+    fireEvent.change(iconSearch, {
       target: { value: "folder-open-dot" },
     });
     await user.keyboard("{Enter}");
@@ -67,12 +73,13 @@ describe("FolderIconPickerModal", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
-    fireEvent.change(
-      screen.getByPlaceholderText("Search emoji names or aliases..."),
-      {
-        target: { value: "open-book" },
-      },
+    const emojiSearch = screen.getByPlaceholderText(
+      "Search emoji names or aliases...",
     );
+    emojiSearch.focus();
+    fireEvent.change(emojiSearch, {
+      target: { value: "open-book" },
+    });
 
     await user.click(screen.getByRole("button", { name: "Icons" }));
     await waitFor(() => {
@@ -80,6 +87,7 @@ describe("FolderIconPickerModal", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
+    screen.getByPlaceholderText("Search emoji names or aliases...").focus();
     await user.keyboard("{Enter}");
     await user.click(screen.getByRole("button", { name: "Use blue folder color" }));
     await user.click(screen.getByRole("button", { name: "Apply" }));
@@ -166,6 +174,7 @@ describe("FolderIconPickerModal", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Emoji" }));
+    screen.getByPlaceholderText("Search emoji names or aliases...").focus();
 
     expect(
       screen.getByText(
