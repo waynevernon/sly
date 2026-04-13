@@ -232,16 +232,16 @@ export function GlobalTaskCaptureDialog({
       onBackdropClick={handleClose}
       panelClassName="max-w-xl"
     >
-      <div className="relative mx-auto w-full max-w-[38rem] px-5 py-5 sm:px-6">
+      <div className="relative mx-auto w-full max-w-[38rem] px-6 py-5">
         <button
           type="button"
           onClick={handleClose}
-          className="ui-focus-ring absolute right-5 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-6 sm:top-5"
+          className="ui-focus-ring absolute right-6 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
           aria-label="Close task capture"
         >
-          <X className="h-4 w-4 stroke-[1.9]" />
+          <X className="h-4.5 w-4.5 stroke-[1.5]" />
         </button>
-        <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-4">
           <div className="pointer-events-none relative pr-10">
             {titleHighlight && (
               <div
@@ -249,7 +249,7 @@ export function GlobalTaskCaptureDialog({
                 className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[1.7rem] font-medium leading-tight text-transparent"
               >
                 {title.slice(0, titleHighlight.start)}
-                <span className="rounded-sm bg-accent/12">
+                <span className="rounded-[var(--ui-radius-sm)] bg-accent/12">
                   {title.slice(titleHighlight.start, titleHighlight.end)}
                 </span>
                 {title.slice(titleHighlight.end)}
@@ -339,7 +339,7 @@ export function GlobalTaskCaptureDialog({
           </div>
 
           <div className="space-y-2">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+            <div className="text-[11px] font-medium text-text-muted">
               Link
             </div>
             <input
@@ -353,7 +353,7 @@ export function GlobalTaskCaptureDialog({
           <div className="border-t border-border/40" />
 
           <div className="space-y-2">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+            <div className="text-[11px] font-medium text-text-muted">
               Description
             </div>
             <textarea
