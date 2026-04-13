@@ -216,7 +216,7 @@ export function NotesPane() {
         return noteFolder === folderPath;
       });
     }
-    // "subfolders": all descendants of this folder
+    // "subfolders": this folder and all descendants
     if (!folderPath) return searchResults;
     return searchResults.filter((result) =>
       result.id.startsWith(folderPath + "/"),
