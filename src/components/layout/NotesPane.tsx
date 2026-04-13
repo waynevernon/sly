@@ -198,11 +198,17 @@ export function NotesPane() {
   }, []);
 
   const scopedSearchResults = useMemo(() => {
-    if (!searchQuery.trim() || selectedScope.type !== "folder" || searchScope === "all") {
+    const scopeType = selectedScope.type;
+    if (
+      !searchQuery.trim() ||
+      (scopeType !== "folder" && scopeType !== "all") ||
+      searchScope === "all"
+    ) {
       return searchResults;
     }
-    const folderPath = selectedFolderPath ?? "";
+    const folderPath = scopeType === "folder" ? (selectedFolderPath ?? "") : "";
     if (searchScope === "folder") {
+      // Root folder: notes with no path prefix; subfolder: notes directly in that folder
       return searchResults.filter((result) => {
         const noteFolder = result.id.includes("/")
           ? result.id.slice(0, result.id.lastIndexOf("/"))
@@ -210,10 +216,10 @@ export function NotesPane() {
         return noteFolder === folderPath;
       });
     }
-    // "subfolders": this folder and all descendants
+    // "subfolders": all descendants of this folder
     if (!folderPath) return searchResults;
     return searchResults.filter((result) =>
-      result.id.startsWith(folderPath + "/")
+      result.id.startsWith(folderPath + "/"),
     );
   }, [searchQuery, searchResults, searchScope, selectedScope.type, selectedFolderPath]);
 
@@ -660,7 +666,7 @@ export function NotesPane() {
                 </button>
               )}
             </div>
-            {selectedScope.type === "folder" && (
+            {(selectedScope.type === "folder" || selectedScope.type === "all") && (
               <div className="mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
                 {(["folder", "subfolders", "all"] as const).map((scope) => (
                   <button
