@@ -3605,6 +3605,18 @@ fn setup_file_watcher(
                         continue;
                     }
 
+                    // Detect external changes to the tasks database (e.g. from the CLI)
+                    // and notify the frontend so it can refresh without a restart.
+                    if let Some(filename) = path.file_name() {
+                        let name = filename.to_string_lossy();
+                        if (name == "tasks.db" || name == "tasks.db-wal")
+                            && path.parent().map(|p| p.ends_with(".sly")).unwrap_or(false)
+                        {
+                            let _ = app_handle.emit("tasks-changed", ());
+                            continue;
+                        }
+                    }
+
                     if emitted_path.is_none() {
                         emitted_path = Some(path.to_string_lossy().into_owned());
                     }
