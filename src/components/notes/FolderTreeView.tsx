@@ -1393,7 +1393,7 @@ export function FolderTreeView({
                   Recent
                 </span>
               </span>
-              {showNoteCounts && (
+              {showNoteCounts && recentNotes.length > 0 && (
                 <FolderRowTrailing
                   count={recentNotes.length}
                   isActive={selectedScope.type === "recent"}
