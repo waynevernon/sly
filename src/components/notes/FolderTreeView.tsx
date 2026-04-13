@@ -1443,7 +1443,7 @@ export function FolderTreeView({
                     {rootFolderLabel}
                   </span>
                 </span>
-                {showNoteCounts && (
+                {showNoteCounts && rootNoteCount > 0 && (
                   <FolderRowTrailing
                     count={rootNoteCount}
                     isActive={selectedScope.type === "all"}
