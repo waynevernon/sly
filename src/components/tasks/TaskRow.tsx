@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
@@ -24,6 +24,7 @@ interface TaskRowProps {
   onContextMenuOpen: () => void;
   onToggleComplete: () => void;
   onToggleStar: () => void;
+  onRename: (title: string) => void;
   contextMenu?: ReactNode;
 }
 
@@ -37,8 +38,13 @@ export function TaskRow({
   onContextMenuOpen,
   onToggleComplete,
   onToggleStar,
+  onRename,
   contextMenu,
 }: TaskRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
   const isCompleted = Boolean(task.completedAt);
   const overdue = !isCompleted && isOverdue(task, today);
   const actionDate = actionAtToLocalDate(task.actionAt);
@@ -53,6 +59,7 @@ export function TaskRow({
       : null;
   const isSelected = selectionState !== "none";
   const isActive = selectionState === "active";
+
   const {
     attributes,
     listeners,
@@ -68,11 +75,41 @@ export function TaskRow({
       ids: dragIds,
       title: task.title || "Untitled",
     },
+    disabled: isEditing,
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const enterEditMode = () => {
+    setEditValue(task.title);
+    setIsEditing(true);
+    // select-all after the input mounts
+    setTimeout(() => editInputRef.current?.select(), 0);
+  };
+
+  const commitRename = () => {
+    const trimmed = editValue.trim();
+    setIsEditing(false);
+    if (trimmed && trimmed !== task.title) {
+      onRename(trimmed);
+    }
+  };
+
+  const cancelRename = () => {
+    setIsEditing(false);
+  };
+
+  const handleRenameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitRename();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      cancelRename();
+    }
   };
 
   return (
@@ -92,13 +129,14 @@ export function TaskRow({
           onContextMenu={onContextMenuOpen}
         >
           <div
-            onClick={(event) =>
+            onClick={(event) => {
+              if (isEditing) return;
               onSelect({
                 shiftKey: event.shiftKey,
                 metaKey: event.metaKey,
                 ctrlKey: event.ctrlKey,
-              })
-            }
+              });
+            }}
             className={cn(
               "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-100",
               secondaryLabel ? "py-2.25" : "py-1.75",
@@ -131,66 +169,82 @@ export function TaskRow({
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelect({
-                  shiftKey: event.shiftKey,
-                  metaKey: event.metaKey,
-                  ctrlKey: event.ctrlKey,
-                });
-              }}
-              className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
-            >
+            {isEditing ? (
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editValue}
+                onChange={(event) => setEditValue(event.target.value)}
+                onBlur={commitRename}
+                onKeyDown={handleRenameKeyDown}
+                onClick={(event) => event.stopPropagation()}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-text outline-none"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect({
+                    shiftKey: event.shiftKey,
+                    metaKey: event.metaKey,
+                    ctrlKey: event.ctrlKey,
+                  });
+                }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  enterEditMode();
+                }}
+                className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "block min-w-0 flex-1 truncate text-sm font-medium",
+                      isCompleted ? "text-text-muted line-through" : "text-text",
+                    )}
+                  >
+                    {task.title || "Untitled"}
+                  </span>
 
-              <span className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "block min-w-0 flex-1 truncate text-sm font-medium",
-                    isCompleted ? "text-text-muted line-through" : "text-text",
+                  {(hasLink || hasDescription || hasWaitingFor) && (
+                    <span className="flex shrink-0 items-center gap-1 text-text-muted/40">
+                      {hasWaitingFor ? (
+                        <span title={`Waiting for ${task.waitingFor}`}>
+                          <Clock3
+                            className="h-3.5 w-3.5 stroke-[1.8]"
+                            data-testid="task-row-waiting-indicator"
+                          />
+                        </span>
+                      ) : null}
+                      {hasLink ? (
+                        <Link2
+                          className="h-3.5 w-3.5 stroke-[1.8]"
+                          data-testid="task-row-link-indicator"
+                        />
+                      ) : null}
+                      {hasDescription ? (
+                        <FileText
+                          className="h-3.5 w-3.5 stroke-[1.8]"
+                          data-testid="task-row-description-indicator"
+                        />
+                      ) : null}
+                    </span>
                   )}
-                >
-                  {task.title || "Untitled"}
                 </span>
 
-                {(hasLink || hasDescription || hasWaitingFor) && (
-                  <span className="flex shrink-0 items-center gap-1 text-text-muted/40">
-                    {hasWaitingFor ? (
-                      <span title={`Waiting for ${task.waitingFor}`}>
-                        <Clock3
-                          className="h-3.5 w-3.5 stroke-[1.8]"
-                          data-testid="task-row-waiting-indicator"
-                        />
-                      </span>
-                    ) : null}
-                    {hasLink ? (
-                      <Link2
-                        className="h-3.5 w-3.5 stroke-[1.8]"
-                        data-testid="task-row-link-indicator"
-                      />
-                    ) : null}
-                    {hasDescription ? (
-                      <FileText
-                        className="h-3.5 w-3.5 stroke-[1.8]"
-                        data-testid="task-row-description-indicator"
-                      />
-                    ) : null}
+                {secondaryLabel && (
+                  <span
+                    className={cn(
+                      "mt-0.5 block text-xs leading-none tabular-nums",
+                      overdue ? "text-[var(--color-danger)]" : "text-text-muted/60",
+                    )}
+                  >
+                    {secondaryLabel}
                   </span>
                 )}
-              </span>
-
-              {secondaryLabel && (
-                <span
-                  className={cn(
-                    "mt-0.5 block text-xs leading-none tabular-nums",
-                    overdue ? "text-[var(--color-danger)]" : "text-text-muted/60",
-                  )}
-                >
-                  {secondaryLabel}
-                </span>
-              )}
-            </button>
+              </button>
+            )}
 
             <button
               type="button"

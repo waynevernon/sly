@@ -603,6 +603,7 @@ export function TaskListPane() {
                     }}
                     onToggleComplete={() => void setCompleted(task.id, !task.completedAt)}
                     onToggleStar={() => void updateTask(task.id, { starred: !task.starred })}
+                    onRename={(title) => void updateTask(task.id, { title })}
                     contextMenu={
                       hasBatchSelection && selectedTaskIdSet.has(task.id) ? (
                         <>
