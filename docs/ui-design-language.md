@@ -22,6 +22,7 @@ The interface should read as:
 3. Shared primitives outrank local one-off styling.
 4. Density is good if scanning remains immediate.
 5. Motion should explain structure, not decorate it.
+6. Notes and Tasks are parallel workspaces. Any UI pattern introduced in one must be applied to the other. When changing a pane header, search bar, list item, or toolbar interaction, always audit both views and update both before shipping.
 
 ## Core Principles
 
@@ -108,6 +109,8 @@ Large `17px` inputs are reserved for command-style surfaces such as the command 
 
 Icons should sharpen affordance and scanning, not decorate space.
 
+Never use raw Unicode characters (✓, ×, etc.) as visual indicators. All checkmarks, radio dots, and similar glyphs must come from the Lucide icon set at the correct size and stroke weight. Raw Unicode renders inconsistently across fonts and platforms and breaks visual coherence with the rest of the icon system.
+
 ## Hierarchy
 
 Use this visual order consistently:
@@ -177,11 +180,16 @@ All transient surfaces should derive from one of three shells:
 - Avoid stacked segmented controls and repeated dashed separators.
 - Settings widths and padding should follow shared panel and layout conventions. Introduce one-off spacing or max-width values only when a surface has a documented reason to diverge.
 
+### Segmented Controls
+
+Segmented controls and scope toggles use a single sliding indicator pill that translates between positions with `transition-transform`. Do not toggle background color per button — the pill moves, the buttons only change text color. This makes the selected position readable as a continuous spatial property, not a series of independent toggle states.
+
 ### Navigation Collections
 
 - Note rows, folder rows, and other primary navigation collections must define keyboard behavior alongside pointer behavior.
 - Use real buttons where possible. If custom row semantics are required, implement a documented roving-tabindex or listbox/tree pattern with arrow-key movement and Enter/Space activation.
 - Do not ship core interactions or primary collection rows as non-tabbable `div`s with `role="button"`.
+- Composite widget containers (listboxes, trees) must not display the standard interactive element focus ring. The active item's fill is the visual focus indicator. Use `outline-none` on the container; screen readers use `aria-activedescendant` to communicate focus position.
 
 ### Editor Modes
 
@@ -192,7 +200,7 @@ All transient surfaces should derive from one of three shells:
 
 - `hover`: slight fill or stronger text, never noisy contrast jumps
 - `focus-visible`: one shared outline/ring style
-- `active/selected`: muted fill with subtle emphasis
+- `active/selected`: the active item (currently open or focused) uses `bg-bg-emphasis`; multi-selected items use `bg-bg-muted/75`. The active state must be visually distinct from hover (`bg-bg-muted`) and from multi-selection. Never let an active item look indistinguishable from a hovered-but-inactive one.
 - `disabled`: lower opacity plus interaction lock
 - `success`: quiet confirmation
 - `warning`: tinted container with a clear next step
@@ -284,6 +292,12 @@ npm run tauri dev
 - Do not use smooth scrolling for dense keyboard stepping in command or note lists.
 - Layout transitions should feel crisp, not floaty.
 - If motion does not improve orientation, remove it.
+- Transient UI that appears in response to a user action (search bars, panels, inline tools) must use an entrance animation drawn from the motion token system. An element that appears instantly without transition signals accidental visibility rather than deliberate UI.
+- Let primitive components own their state transitions. Use `ItemIndicator` for check and radio indicators rather than manual conditional rendering — the primitive's mount/unmount animation is part of the interaction feedback. Do not re-implement what a component primitive already handles.
+
+### Sticky Surfaces
+
+Any element with `sticky` positioning that has scrollable content passing behind it must declare its plane with a `border-b border-border` separator. Do not rely on background color alone to separate a sticky surface from content beneath it.
 
 ## Do / Don't
 

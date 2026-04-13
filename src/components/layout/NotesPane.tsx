@@ -11,6 +11,7 @@ import {
   ArrowUpAZ,
   CalendarArrowDown,
   CalendarArrowUp,
+  Check,
   ClockArrowDown,
   ClockArrowUp,
   FilePlusCorner,
@@ -437,7 +438,7 @@ export function NotesPane() {
                       >
                         <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                           <DropdownMenu.ItemIndicator>
-                            <span className="text-xs leading-none">✓</span>
+                            <Check className="h-3 w-3 stroke-[2.2]" />
                           </DropdownMenu.ItemIndicator>
                         </span>
                         <span>Notes From Subfolders</span>
@@ -475,9 +476,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListPreviewLines === 3 && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>3 Lines</span>
                           </DropdownMenu.RadioItem>
@@ -486,9 +487,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListPreviewLines === 2 && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>2 Lines</span>
                           </DropdownMenu.RadioItem>
@@ -497,9 +498,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListPreviewLines === 1 && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>1 Line</span>
                           </DropdownMenu.RadioItem>
@@ -508,9 +509,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListPreviewLines === 0 && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>None</span>
                           </DropdownMenu.RadioItem>
@@ -547,9 +548,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListDateMode === "modified" && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>Modified Time</span>
                           </DropdownMenu.RadioItem>
@@ -558,9 +559,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListDateMode === "created" && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>Created Time</span>
                           </DropdownMenu.RadioItem>
@@ -569,9 +570,9 @@ export function NotesPane() {
                             className={menuItemClassName}
                           >
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              {noteListDateMode === "off" && (
+                              <DropdownMenu.ItemIndicator>
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              )}
+                              </DropdownMenu.ItemIndicator>
                             </span>
                             <span>None</span>
                           </DropdownMenu.RadioItem>
@@ -642,7 +643,7 @@ export function NotesPane() {
         className="ui-scrollbar-overlay flex-1 overflow-y-auto"
       >
         {searchOpen && (
-          <div className="sticky top-0 z-10 px-4 pt-2 bg-bg">
+          <div className="sticky top-0 z-10 px-4 pt-2 pb-2 bg-bg border-b border-border animate-slide-down">
             <div className="relative">
               <Input
                 ref={searchInputRef}
@@ -667,16 +668,24 @@ export function NotesPane() {
               )}
             </div>
             {(selectedScope.type === "folder" || selectedScope.type === "all") && (
-              <div className="mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
+              <div className="relative mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
+                <div
+                  className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-[calc(var(--ui-radius-md)-2px)] bg-bg shadow-sm transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  style={{
+                    left: 2,
+                    width: "calc((100% - 4px) / 3)",
+                    transform: `translateX(calc(${["folder", "subfolders", "all"].indexOf(searchScope)} * 100%))`,
+                  }}
+                />
                 {(["folder", "subfolders", "all"] as const).map((scope) => (
                   <button
                     key={scope}
                     type="button"
                     onClick={() => setSearchScope(scope)}
                     className={cn(
-                      "ui-focus-ring flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors",
+                      "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors duration-[160ms]",
                       searchScope === scope
-                        ? "bg-bg text-text shadow-sm"
+                        ? "text-text"
                         : "text-text-muted hover:text-text",
                     )}
                   >
