@@ -55,7 +55,7 @@ export const TASK_VIEW_ORDER: TaskView[] = [
 ];
 
 /** Views that support manual drag-to-reorder sort. */
-export const MANUAL_SORT_VIEWS: TaskView[] = ["today", "anytime"];
+export const MANUAL_SORT_VIEWS: TaskView[] = ["inbox", "today", "anytime", "someday"];
 
 export const TASK_DRAG_TARGET_VIEWS: TaskView[] = [
   "inbox",
