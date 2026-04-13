@@ -152,125 +152,125 @@ export function TaskDatePicker({
               style={{ left: popoverPosition.left, top: popoverPosition.top }}
             >
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-text">{monthLabel}</div>
-              <div className="flex items-center gap-1">
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Previous Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Next Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-                >
-                  <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
-                >
-                  {label}
-                </div>
-              ))}
-              {weeks.flat().map((day) => {
-                const isSelected = day.date === actionDate;
-                const isToday = day.date === today;
-
-                return (
-                  <button
-                    key={day.date}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => {
-                      onChange({ actionDate: day.date, scheduleBucket: null });
-                      setIsOpen(false);
-                    }}
-                    className={cn(
-                      "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
-                      isSelected
-                        ? "bg-bg-muted text-text"
-                        : day.inCurrentMonth
-                          ? "text-text hover:bg-bg-muted"
-                          : "text-text-muted/50 hover:bg-bg-muted/70",
-                      isToday && !isSelected ? "ring-1 ring-border" : "",
-                    )}
-                  >
-                    {day.day}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-1.5">
+              <QuickDateButton
+                label="Today"
+                icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
+                isActive={actionDate === today}
+                onClick={() => {
+                  onChange({ actionDate: today, scheduleBucket: null });
+                  setIsOpen(false);
+                }}
+              />
+              <QuickDateButton
+                label="Tomorrow"
+                icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
+                isActive={actionDate === tomorrow}
+                onClick={() => {
+                  onChange({ actionDate: tomorrow, scheduleBucket: null });
+                  setIsOpen(false);
+                }}
+              />
+              <QuickDateButton
+                label="Next week"
+                icon={<CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />}
+                isActive={actionDate === nextWeek}
+                onClick={() => {
+                  onChange({ actionDate: nextWeek, scheduleBucket: null });
+                  setIsOpen(false);
+                }}
+              />
+              <QuickDateButton
+                label="Anytime"
+                icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
+                isActive={scheduleBucket === "anytime"}
+                onClick={() => {
+                  onChange({ actionDate: null, scheduleBucket: "anytime" });
+                  setIsOpen(false);
+                }}
+              />
+              <QuickDateButton
+                label="Someday"
+                icon={<Archive className="h-3.5 w-3.5 stroke-[1.8]" />}
+                isActive={scheduleBucket === "someday"}
+                onClick={() => {
+                  onChange({ actionDate: null, scheduleBucket: "someday" });
+                  setIsOpen(false);
+                }}
+              />
+              {hasSelection ? (
+                <QuickDateButton
+                  label="Clear"
+                  icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
+                  onClick={() => {
+                    onChange({ actionDate: null, scheduleBucket: null });
+                    setIsOpen(false);
+                  }}
+                />
+              ) : null}
             </div>
 
             <div className="border-t border-border/60 pt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                <QuickDateButton
-                  label="Today"
-                  icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  isActive={actionDate === today}
-                  onClick={() => {
-                    onChange({ actionDate: today, scheduleBucket: null });
-                    setIsOpen(false);
-                  }}
-                />
-                <QuickDateButton
-                  label="Tomorrow"
-                  icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  isActive={actionDate === tomorrow}
-                  onClick={() => {
-                    onChange({ actionDate: tomorrow, scheduleBucket: null });
-                    setIsOpen(false);
-                  }}
-                />
-                <QuickDateButton
-                  label="Next week"
-                  icon={<CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  isActive={actionDate === nextWeek}
-                  onClick={() => {
-                    onChange({ actionDate: nextWeek, scheduleBucket: null });
-                    setIsOpen(false);
-                  }}
-                />
-                <QuickDateButton
-                  label="Anytime"
-                  icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  isActive={scheduleBucket === "anytime"}
-                  onClick={() => {
-                    onChange({ actionDate: null, scheduleBucket: "anytime" });
-                    setIsOpen(false);
-                  }}
-                />
-                <QuickDateButton
-                  label="Someday"
-                  icon={<Archive className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  isActive={scheduleBucket === "someday"}
-                  onClick={() => {
-                    onChange({ actionDate: null, scheduleBucket: "someday" });
-                    setIsOpen(false);
-                  }}
-                />
-                {hasSelection ? (
-                  <QuickDateButton
-                    label="Clear"
-                    icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
-                    onClick={() => {
-                      onChange({ actionDate: null, scheduleBucket: null });
-                      setIsOpen(false);
-                    }}
-                  />
-                ) : null}
+              <div className="flex items-center justify-between pb-1">
+                <div className="text-sm font-medium text-text">{monthLabel}</div>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    title="Previous Month"
+                    onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
+                  >
+                    <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
+                  </IconButton>
+                  <IconButton
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    title="Next Month"
+                    onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
+                  >
+                    <ChevronRight className="h-4 w-4 stroke-[1.8]" />
+                  </IconButton>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div
+                    key={label}
+                    className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
+                  >
+                    {label}
+                  </div>
+                ))}
+                {weeks.flat().map((day) => {
+                  const isSelected = day.date === actionDate;
+                  const isToday = day.date === today;
+
+                  return (
+                    <button
+                      key={day.date}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        onChange({ actionDate: day.date, scheduleBucket: null });
+                        setIsOpen(false);
+                      }}
+                      className={cn(
+                        "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
+                        isSelected
+                          ? "bg-bg-muted text-text"
+                          : day.inCurrentMonth
+                            ? "text-text hover:bg-bg-muted"
+                            : "text-text-muted/50 hover:bg-bg-muted/70",
+                        isToday && !isSelected ? "ring-1 ring-border" : "",
+                      )}
+                    >
+                      {day.day}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
