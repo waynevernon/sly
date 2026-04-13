@@ -582,16 +582,6 @@ export function TaskListPane() {
                 onChange={setTaskSortMode}
               />
             )}
-            {canInlineCreate && !isSearching && (
-              <IconButton
-                type="button"
-                title="New Task"
-                variant="ghost"
-                onClick={handleStartCreate}
-              >
-                <Plus className="h-4 w-4 stroke-[1.8]" />
-              </IconButton>
-            )}
             <IconButton
               type="button"
               title="Search Tasks"
@@ -603,6 +593,16 @@ export function TaskListPane() {
                 <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
               )}
             </IconButton>
+            {canInlineCreate && !isSearching && (
+              <IconButton
+                type="button"
+                title="New Task"
+                variant="ghost"
+                onClick={handleStartCreate}
+              >
+                <Plus className="h-4 w-4 stroke-[1.8]" />
+              </IconButton>
+            )}
           </div>
         )}
       </div>
