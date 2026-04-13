@@ -3,6 +3,10 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import { createPortal } from "react-dom";
 import {
   Archive,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  CalendarArrowDown,
+  CalendarArrowUp,
   CalendarClock,
   CalendarDays,
   CheckCheck,
@@ -10,9 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ClockArrowDown,
+  ClockArrowUp,
   Inbox,
   Plus,
   RotateCcw,
+  Star,
   Sun,
   Sunrise,
   Trash2,
@@ -39,9 +46,10 @@ import {
   menuItemClassName,
   menuSeparatorClassName,
 } from "../ui";
+import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
-import type { TaskMetadata, TaskScheduleBucket, TaskView } from "../../types/tasks";
+import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
   inbox: {
@@ -72,6 +80,10 @@ const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
     title: "No completed tasks",
     message: "Finished tasks appear here.",
   },
+  starred: {
+    title: "No starred tasks",
+    message: "Star tasks to surface them here.",
+  },
 };
 
 const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
@@ -82,6 +94,7 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   anytime: Clock3,
   someday: Archive,
   completed: CheckCheck,
+  starred: Star,
 };
 
 const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
@@ -92,7 +105,60 @@ const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   anytime: Clock3,
   someday: Archive,
   completed: CheckCheck,
+  starred: Star,
 };
+
+const taskSortItems: SortMenuItem<TaskSortMode>[] = [
+  {
+    key: "action",
+    label: "Action Date",
+    isActive: (value) => value === "actionAsc" || value === "actionDesc",
+    getNextValue: (value) =>
+      value === "actionAsc" ? "actionDesc" : value === "actionDesc" ? "actionAsc" : "actionAsc",
+    renderIcon: (value, isActive) => {
+      const isAscending = value === "actionAsc";
+      const Icon = isActive && isAscending ? CalendarArrowUp : CalendarArrowDown;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+  {
+    key: "completed",
+    label: "Completed Date",
+    isActive: (value) => value === "completedAsc" || value === "completedDesc",
+    getNextValue: (value) =>
+      value === "completedAsc" ? "completedDesc" : value === "completedDesc" ? "completedAsc" : "completedDesc",
+    renderIcon: (value, isActive) => {
+      const isAscending = value === "completedAsc";
+      const Icon = isActive && isAscending ? ClockArrowUp : ClockArrowDown;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+  {
+    key: "created",
+    label: "Created",
+    isActive: (value) => value === "createdAsc" || value === "createdDesc",
+    getNextValue: (value) =>
+      value === "createdAsc" ? "createdDesc" : value === "createdDesc" ? "createdAsc" : "createdAsc",
+    renderIcon: (value, isActive) => {
+      const isAscending = value === "createdAsc";
+      const Icon = isActive && isAscending ? CalendarArrowUp : CalendarArrowDown;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+  {
+    key: "title",
+    label: "Title",
+    isActive: (value) => value === "titleAsc" || value === "titleDesc",
+    getNextValue: (value) =>
+      value === "titleAsc" ? "titleDesc" : value === "titleDesc" ? "titleAsc" : "titleAsc",
+    renderIcon: (value, isActive) => {
+      const isDescending = value === "titleDesc";
+      const Icon = isActive && isDescending ? ArrowUpAZ : ArrowDownAZ;
+      return <Icon className="w-4 h-4 stroke-[1.6]" />;
+    },
+  },
+];
+
 const CREATE_DATE_DEBOUNCE_MS = 350;
 
 export function TaskListPane() {
@@ -103,6 +169,8 @@ export function TaskListPane() {
     selectedTaskIds,
     today,
     isLoading,
+    taskSortMode,
+    setTaskSortMode,
     selectTask,
     toggleTaskSelection,
     selectTaskRange,
@@ -122,7 +190,7 @@ export function TaskListPane() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
-    compareTasks(a, b, selectedView),
+    compareTasks(a, b, selectedView, taskSortMode),
   );
   const taskMap = useMemo(
     () => new Map(tasks.map((task) => [task.id, task] as const)),
@@ -148,7 +216,7 @@ export function TaskListPane() {
   const HeaderIcon = HEADER_ICONS[selectedView];
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
-  const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting";
+  const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting" && selectedView !== "starred";
   const inlineTitleHighlight = useMemo(() => {
     if (!detectedDate) return null;
     const lower = newTitle.toLowerCase();
@@ -368,18 +436,31 @@ export function TaskListPane() {
               <X className="h-4 w-4 stroke-[1.6]" />
             </IconButton>
           </div>
-        ) : canInlineCreate ? (
+        ) : (
           <div className="ui-pane-header-actions ml-auto">
-            <IconButton
-              type="button"
-              title="New Task"
-              variant="ghost"
-              onClick={handleStartCreate}
-            >
-              <Plus className="h-4 w-4 stroke-[1.8]" />
-            </IconButton>
+            <SortMenuButton
+              title="Sort Tasks"
+              menuTitle={TASK_VIEW_LABELS[selectedView]}
+              value={taskSortMode}
+              items={
+                selectedView === "completed"
+                  ? taskSortItems
+                  : taskSortItems.filter((item) => item.key !== "completed")
+              }
+              onChange={setTaskSortMode}
+            />
+            {canInlineCreate && (
+              <IconButton
+                type="button"
+                title="New Task"
+                variant="ghost"
+                onClick={handleStartCreate}
+              >
+                <Plus className="h-4 w-4 stroke-[1.8]" />
+              </IconButton>
+            )}
           </div>
-        ) : null}
+        )}
       </div>
 
       <div
@@ -470,6 +551,7 @@ export function TaskListPane() {
                       }
                     }}
                     onToggleComplete={() => void setCompleted(task.id, !task.completedAt)}
+                    onToggleStar={() => void updateTask(task.id, { starred: !task.starred })}
                     contextMenu={
                       hasBatchSelection && selectedTaskIdSet.has(task.id) ? (
                         <>

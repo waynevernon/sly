@@ -791,6 +791,7 @@ fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, Str
         },
         action_at,
         schedule_bucket,
+        starred: None,
     })
 }
 

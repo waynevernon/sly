@@ -9,9 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { Task, TaskMetadata, TaskPatch, TaskView } from "../types/tasks";
+import type { Task, TaskMetadata, TaskPatch, TaskSortMode, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
-import { compareTasks, groupByView, localDateString } from "../lib/tasks";
+import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString } from "../lib/tasks";
 import { useNotesData } from "./NotesContext";
 
 interface TasksContextValue {
@@ -28,6 +28,10 @@ interface TasksContextValue {
   selectedTaskIds: string[];
   selectedTask: Task | null;
   isLoadingTask: boolean;
+
+  // Sort
+  taskSortMode: TaskSortMode;
+  setTaskSortMode: (mode: TaskSortMode) => void;
 
   // Actions
   selectView: (view: TaskView) => void;
@@ -52,6 +56,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [selectedView, setSelectedView] = useState<TaskView>("inbox");
+  const [taskSortModes, setTaskSortModes] = useState<Partial<Record<TaskView, TaskSortMode>>>({});
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -69,13 +74,18 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const today = localDateString();
   const buckets = useMemo(() => groupByView(tasks, today), [tasks, today]);
+  const taskSortMode = taskSortModes[selectedView] ?? getDefaultTaskSortMode(selectedView);
   const visibleTaskIds = useMemo(
     () =>
       [...(buckets[selectedView] ?? [])]
-        .sort((a, b) => compareTasks(a, b, selectedView))
+        .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode))
         .map((task) => task.id),
-    [buckets, selectedView],
+    [buckets, selectedView, taskSortMode],
   );
+
+  const setTaskSortMode = useCallback((mode: TaskSortMode) => {
+    setTaskSortModes((prev) => ({ ...prev, [selectedView]: mode }));
+  }, [selectedView]);
 
   const setSelectionState = useCallback(
     (
@@ -309,6 +319,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           actionAt: task.actionAt,
           scheduleBucket: task.scheduleBucket,
           completedAt: task.completedAt,
+          starred: task.starred,
         },
       ]);
       return task;
@@ -332,6 +343,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
                 waitingFor: task.waitingFor,
                 actionAt: task.actionAt,
                 scheduleBucket: task.scheduleBucket,
+                starred: task.starred,
               }
             : t
         )
@@ -390,6 +402,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       selectedTaskIds,
       selectedTask,
       isLoadingTask,
+      taskSortMode,
+      setTaskSortMode,
       selectView,
       selectTask,
       toggleTaskSelection,
@@ -412,6 +426,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       selectedTaskIds,
       selectedTask,
       isLoadingTask,
+      taskSortMode,
+      setTaskSortMode,
       selectView,
       selectTask,
       toggleTaskSelection,
@@ -430,7 +446,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
 const TASKS_NOOP: TasksContextValue = {
   tasks: [],
-  buckets: { inbox: [], today: [], upcoming: [], waiting: [], anytime: [], someday: [], completed: [] },
+  buckets: { inbox: [], today: [], upcoming: [], waiting: [], anytime: [], someday: [], completed: [], starred: [] },
   today: "",
   isLoading: false,
   lastError: null,
@@ -439,6 +455,8 @@ const TASKS_NOOP: TasksContextValue = {
   selectedTaskIds: [],
   selectedTask: null,
   isLoadingTask: false,
+  taskSortMode: "createdAsc",
+  setTaskSortMode: () => {},
   selectView: () => {},
   selectTask: () => {},
   toggleTaskSelection: () => {},

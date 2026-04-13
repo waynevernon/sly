@@ -1,5 +1,5 @@
 import { useDndContext, useDroppable } from "@dnd-kit/core";
-import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, UserRound } from "lucide-react";
+import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, Star, UserRound } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { TASK_DRAG_TARGET_VIEWS, TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
@@ -14,6 +14,7 @@ const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   anytime: ({ className }) => <Clock3 className={className} />,
   someday: ({ className }) => <Archive className={className} />,
   completed: ({ className }) => <CheckCheck className={className} />,
+  starred: ({ className }) => <Star className={className} />,
 };
 
 export function TasksSection() {
@@ -107,7 +108,7 @@ function TaskViewButton({
 
   return (
     <div>
-      {view === "waiting" && (
+      {(view === "starred" || view === "waiting") && (
         <div className="mx-3 my-1.5 border-t border-border/50" />
       )}
       <button

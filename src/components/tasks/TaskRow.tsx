@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Clock3, FileText, Link2 } from "lucide-react";
+import { Clock3, FileText, Link2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import { menuSurfaceClassName } from "../ui";
@@ -22,6 +22,7 @@ interface TaskRowProps {
   }) => void;
   onContextMenuOpen: () => void;
   onToggleComplete: () => void;
+  onToggleStar: () => void;
   contextMenu?: ReactNode;
 }
 
@@ -34,6 +35,7 @@ export function TaskRow({
   onSelect,
   onContextMenuOpen,
   onToggleComplete,
+  onToggleStar,
   contextMenu,
 }: TaskRowProps) {
   const isCompleted = Boolean(task.completedAt);
@@ -132,6 +134,7 @@ export function TaskRow({
               }}
               className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
             >
+
               <span className="flex items-center gap-2">
                 <span
                   className={cn(
@@ -178,6 +181,28 @@ export function TaskRow({
                   {secondaryLabel}
                 </span>
               )}
+            </button>
+
+            <button
+              type="button"
+              aria-label={task.starred ? "Unstar task" : "Star task"}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleStar();
+              }}
+              className={cn(
+                "mt-0.5 shrink-0 rounded transition-colors outline-none",
+                "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
+                task.starred
+                  ? "text-amber-400"
+                  : "text-transparent group-hover:text-text-muted/30 hover:!text-text-muted/60",
+              )}
+            >
+              <Star
+                className="h-3.5 w-3.5"
+                fill={task.starred ? "currentColor" : "none"}
+                strokeWidth={task.starred ? 0 : 1.8}
+              />
             </button>
           </div>
         </div>

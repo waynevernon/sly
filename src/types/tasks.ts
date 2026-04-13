@@ -1,6 +1,12 @@
 export type TaskScheduleBucket = 'anytime' | 'someday';
 
-export type TaskView = 'inbox' | 'today' | 'upcoming' | 'waiting' | 'anytime' | 'someday' | 'completed';
+export type TaskView = 'inbox' | 'today' | 'upcoming' | 'waiting' | 'anytime' | 'someday' | 'completed' | 'starred';
+
+export type TaskSortMode =
+  | 'actionAsc' | 'actionDesc'
+  | 'createdAsc' | 'createdDesc'
+  | 'titleAsc' | 'titleDesc'
+  | 'completedAsc' | 'completedDesc';
 
 export interface TaskMetadata {
   id: string;
@@ -12,6 +18,7 @@ export interface TaskMetadata {
   actionAt: string | null;
   scheduleBucket: TaskScheduleBucket | null;
   completedAt: string | null;
+  starred: boolean;
 }
 
 export interface Task extends TaskMetadata {
@@ -24,4 +31,5 @@ export interface TaskPatch {
   waitingFor?: string;
   actionAt?: string | null;
   scheduleBucket?: TaskScheduleBucket | null;
+  starred?: boolean;
 }

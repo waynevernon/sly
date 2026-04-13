@@ -3610,7 +3610,7 @@ fn setup_file_watcher(
                     if let Some(filename) = path.file_name() {
                         let name = filename.to_string_lossy();
                         if (name == "tasks.db" || name == "tasks.db-wal")
-                            && path.parent().map(|p| p.ends_with(".sly")).unwrap_or(false)
+                            && path.parent().map(|p| p.file_name().is_some_and(|n| n == ".sly")).unwrap_or(false)
                         {
                             let _ = app_handle.emit("tasks-changed", ());
                             continue;

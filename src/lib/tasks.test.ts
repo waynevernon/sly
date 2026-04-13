@@ -17,6 +17,7 @@ function meta(
     actionAt: null,
     scheduleBucket: null,
     completedAt: null,
+    starred: false,
     ...overrides,
   };
 }

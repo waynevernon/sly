@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const TASKS_DB_SCHEMA_VERSION: i32 = 4;
+const TASKS_DB_SCHEMA_VERSION: i32 = 5;
 
 // Public types
 
@@ -21,6 +21,7 @@ pub struct TaskMetadata {
     pub action_at: Option<String>,
     pub schedule_bucket: Option<String>,
     pub completed_at: Option<String>,
+    pub starred: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +36,7 @@ pub struct Task {
     pub action_at: Option<String>,
     pub schedule_bucket: Option<String>,
     pub completed_at: Option<String>,
+    pub starred: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -48,6 +50,7 @@ pub struct TaskPatch {
     pub action_at: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub schedule_bucket: Option<Option<String>>,
+    pub starred: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +121,7 @@ struct TaskRow {
     action_at: Option<String>,
     schedule_bucket: Option<String>,
     completed_at: Option<String>,
+    starred: bool,
 }
 
 impl From<TaskRow> for Task {
@@ -132,6 +136,7 @@ impl From<TaskRow> for Task {
             action_at: row.action_at,
             schedule_bucket: row.schedule_bucket,
             completed_at: row.completed_at,
+            starred: row.starred,
         }
     }
 }
@@ -148,6 +153,7 @@ impl From<TaskRow> for TaskMetadata {
             action_at: row.action_at,
             schedule_bucket: row.schedule_bucket,
             completed_at: row.completed_at,
+            starred: row.starred,
         }
     }
 }
@@ -208,6 +214,13 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
     if !table_column_exists(conn, "tasks", "waiting_for")? {
         conn.execute(
             "ALTER TABLE tasks ADD COLUMN waiting_for TEXT NOT NULL DEFAULT ''",
+            [],
+        )?;
+    }
+
+    if !table_column_exists(conn, "tasks", "starred")? {
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
             [],
         )?;
     }
@@ -459,13 +472,14 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
         action_at: row.get("action_at")?,
         schedule_bucket: row.get("schedule_bucket")?,
         completed_at: row.get("completed_at")?,
+        starred: row.get::<_, i64>("starred").map(|v| v != 0).unwrap_or(false),
     })
 }
 
 fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
     conn.query_row(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred
         FROM tasks
         WHERE id = ?1
         ",
@@ -482,7 +496,7 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
     let conn = open_tasks_db(notes_root)?;
     let mut statement = conn.prepare(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred
         FROM tasks
         ORDER BY created_at DESC
         ",
@@ -524,12 +538,13 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
         action_at: None,
         schedule_bucket: None,
         completed_at: None,
+        starred: false,
     };
 
     conn.execute(
         "
-        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         ",
         params![
             &task.id,
@@ -541,6 +556,7 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
             &task.schedule_bucket,
             &task.created_at,
             &task.completed_at,
+            task.starred as i64,
         ],
     )?;
 
@@ -564,6 +580,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         Some(next) => normalize_waiting_for(&next),
         None => existing.waiting_for,
     };
+    let starred = patch.starred.unwrap_or(existing.starred);
     let mut action_at = existing.action_at;
     let mut schedule_bucket = existing.schedule_bucket;
 
@@ -589,7 +606,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             link = ?4,
             waiting_for = ?5,
             action_at = ?6,
-            schedule_bucket = ?7
+            schedule_bucket = ?7,
+            starred = ?8
         WHERE id = ?1
         ",
         params![
@@ -599,7 +617,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             link,
             waiting_for,
             action_at,
-            schedule_bucket
+            schedule_bucket,
+            starred as i64,
         ],
     )?;
 
@@ -613,6 +632,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         action_at,
         schedule_bucket,
         completed_at: existing.completed_at,
+        starred,
     })
 }
 
@@ -640,6 +660,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
         action_at: existing.action_at,
         schedule_bucket: existing.schedule_bucket,
         completed_at,
+        starred: existing.starred,
     })
 }
 
@@ -812,6 +833,7 @@ mod tests {
                 waiting_for: Some(" Jordan ".to_string()),
                 action_at: Some(Some("2026-04-10T17:00:00-05:00".to_string())),
                 schedule_bucket: None,
+                starred: None,
             },
         )
         .unwrap();

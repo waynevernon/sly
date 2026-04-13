@@ -70,7 +70,7 @@ describe("workspaceCollisionDetection", () => {
     expect(rectIntersection(args)[0]?.id).toBe("folder-a");
   });
 
-  it("falls back to rectIntersection when note drags do not have a pointer hit", () => {
+  it("returns no collisions for note drags when the pointer is not over any target", () => {
     const folderAbove = makeRect(0);
     const folderBelow = makeRect(40);
     const args = {
@@ -87,7 +87,8 @@ describe("workspaceCollisionDetection", () => {
       pointerCoordinates: null,
     };
 
-    expect(workspaceCollisionDetection(args)).toEqual(rectIntersection(args));
+    // Notes must be dragged directly over a target — no rect-intersection fallback.
+    expect(workspaceCollisionDetection(args)).toEqual([]);
   });
 
   it("keeps non-note drags on rectIntersection behavior", () => {

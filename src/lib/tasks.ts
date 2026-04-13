@@ -4,6 +4,7 @@ import type {
   Task,
   TaskMetadata,
   TaskScheduleBucket,
+  TaskSortMode,
   TaskView,
 } from "../types/tasks";
 
@@ -34,6 +35,7 @@ export const TASK_VIEW_LABELS: Record<TaskView, string> = {
   anytime: "Anytime",
   someday: "Someday",
   completed: "Completed",
+  starred: "Starred",
 };
 
 export const TASK_SCHEDULE_BUCKET_LABELS: Record<TaskScheduleBucket, string> = {
@@ -48,6 +50,7 @@ export const TASK_VIEW_ORDER: TaskView[] = [
   "anytime",
   "someday",
   "completed",
+  "starred",
   "waiting",
 ];
 
@@ -119,6 +122,7 @@ export function groupByView(
     anytime: [],
     someday: [],
     completed: [],
+    starred: [],
   };
 
   for (const task of tasks) {
@@ -127,45 +131,84 @@ export function groupByView(
     if (!task.completedAt && task.waitingFor.trim()) {
       buckets.waiting.push(task);
     }
+    if (task.starred && !task.completedAt) {
+      buckets.starred.push(task);
+    }
   }
 
   return buckets;
 }
 
+export function getDefaultTaskSortMode(view: TaskView): TaskSortMode {
+  switch (view) {
+    case "today":
+    case "upcoming":
+    case "waiting":
+      return "actionAsc";
+    case "completed":
+      return "completedDesc";
+    default:
+      return "createdAsc";
+  }
+}
+
 /**
  * Compare two tasks for display ordering within a view.
- * Within Today/Upcoming: sort by action_at ASC, then created_at ASC.
- * All other views: sort by created_at ASC (most recently created last = natural append order).
+ * Starred tasks always sort first within any view.
+ * Secondary ordering follows the provided sortMode, defaulting to each view's
+ * natural order when omitted.
  */
-export function compareTasks(a: TaskMetadata, b: TaskMetadata, view: TaskView): number {
-  if (view === "today" || view === "upcoming" || view === "waiting") {
-    const aDate = actionAtToLocalDate(a.actionAt);
-    const bDate = actionAtToLocalDate(b.actionAt);
-    if (aDate && bDate) {
-      const dateCmp = aDate.localeCompare(bDate);
-      if (dateCmp !== 0) return dateCmp;
-      const timeCmp = (a.actionAt ?? "").localeCompare(b.actionAt ?? "");
-      if (timeCmp !== 0) return timeCmp;
-    } else if (aDate) {
-      return -1;
-    } else if (bDate) {
-      return 1;
-    }
+export function compareTasks(
+  a: TaskMetadata,
+  b: TaskMetadata,
+  view: TaskView,
+  sortMode?: TaskSortMode,
+): number {
+  // Stars always float first
+  if (a.starred !== b.starred) return a.starred ? -1 : 1;
 
-    if (view === "waiting") {
-      const bucketCmp =
-        scheduleBucketSortOrder(a.scheduleBucket) -
-        scheduleBucketSortOrder(b.scheduleBucket);
-      if (bucketCmp !== 0) return bucketCmp;
+  const mode = sortMode ?? getDefaultTaskSortMode(view);
+
+  switch (mode) {
+    case "actionAsc":
+    case "actionDesc": {
+      const dir = mode === "actionAsc" ? 1 : -1;
+      const aDate = actionAtToLocalDate(a.actionAt);
+      const bDate = actionAtToLocalDate(b.actionAt);
+      if (aDate && bDate) {
+        const dateCmp = aDate.localeCompare(bDate);
+        if (dateCmp !== 0) return dateCmp * dir;
+        const timeCmp = (a.actionAt ?? "").localeCompare(b.actionAt ?? "");
+        if (timeCmp !== 0) return timeCmp * dir;
+      } else if (aDate) {
+        return -1;
+      } else if (bDate) {
+        return 1;
+      }
+      // Waiting: secondary bucket sort when dates are equal/absent
+      if (view === "waiting") {
+        const bucketCmp =
+          scheduleBucketSortOrder(a.scheduleBucket) -
+          scheduleBucketSortOrder(b.scheduleBucket);
+        if (bucketCmp !== 0) return bucketCmp;
+      }
+      return a.createdAt.localeCompare(b.createdAt);
     }
+    case "createdAsc":
+      return a.createdAt.localeCompare(b.createdAt);
+    case "createdDesc":
+      return b.createdAt.localeCompare(a.createdAt);
+    case "titleAsc":
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    case "titleDesc":
+      return b.title.localeCompare(a.title, undefined, { sensitivity: "base" });
+    case "completedAsc":
+      return (a.completedAt ?? "").localeCompare(b.completedAt ?? "");
+    case "completedDesc":
+      return (b.completedAt ?? "").localeCompare(a.completedAt ?? "");
+    default:
+      return a.createdAt.localeCompare(b.createdAt);
   }
-  if (view === "completed") {
-    const aTs = a.completedAt ?? "";
-    const bTs = b.completedAt ?? "";
-    return bTs.localeCompare(aTs);
-  }
-  // Default: most recently created last (natural capture order).
-  return a.createdAt.localeCompare(b.createdAt);
 }
 
 function scheduleBucketSortOrder(bucket: TaskScheduleBucket | null): number {

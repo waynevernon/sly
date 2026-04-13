@@ -31,6 +31,7 @@ function makeTasksHookValue(
         actionAt: null,
         scheduleBucket: null,
         completedAt: null,
+        starred: false,
       },
       {
         id: "task-2",
@@ -42,6 +43,7 @@ function makeTasksHookValue(
         actionAt: null,
         scheduleBucket: null,
         completedAt: null,
+        starred: false,
       },
       {
         id: "task-3",
@@ -53,6 +55,7 @@ function makeTasksHookValue(
         actionAt: null,
         scheduleBucket: null,
         completedAt: null,
+        starred: false,
       },
       {
         id: "task-4",
@@ -64,6 +67,7 @@ function makeTasksHookValue(
         actionAt: null,
         scheduleBucket: null,
         completedAt: null,
+        starred: false,
       },
     ],
     buckets: {
@@ -74,6 +78,7 @@ function makeTasksHookValue(
       anytime: [],
       someday: [],
       completed: [],
+      starred: [],
     },
     today: "2026-04-10",
     isLoading: false,
@@ -91,8 +96,11 @@ function makeTasksHookValue(
       actionAt: null,
       scheduleBucket: null,
       completedAt: null,
+      starred: false,
     },
     isLoadingTask: false,
+    taskSortMode: "createdAsc",
+    setTaskSortMode: vi.fn(),
     selectView: vi.fn(),
     selectTask: vi.fn(),
     toggleTaskSelection: vi.fn(),
@@ -219,6 +227,7 @@ describe("TaskDetailPanel", () => {
           actionAt: null,
           scheduleBucket: null,
           completedAt: "2026-04-11T09:15:00Z",
+          starred: false,
         },
       }),
     );
@@ -267,6 +276,7 @@ describe("TaskDetailPanel", () => {
         actionAt: null,
         scheduleBucket: null,
         completedAt: null,
+        starred: false,
       },
     });
 

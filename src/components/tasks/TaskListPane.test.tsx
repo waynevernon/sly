@@ -29,12 +29,15 @@ function makeTasksHookValue(
       anytime: [],
       someday: [],
       completed: [],
+      starred: [],
     },
     selectedView: "inbox",
     selectedTaskId: null,
     selectedTaskIds: [],
     today: "2026-04-09",
     isLoading: false,
+    taskSortMode: "createdAsc",
+    setTaskSortMode: vi.fn(),
     selectTask: vi.fn(),
     toggleTaskSelection: vi.fn(),
     selectTaskRange: vi.fn(),
@@ -51,6 +54,7 @@ function makeTasksHookValue(
       actionAt: null,
       scheduleBucket: null,
       completedAt: null,
+      starred: false,
     }),
     ...overrides,
   } as never;
@@ -79,6 +83,7 @@ describe("TaskListPane", () => {
       actionAt: null,
       scheduleBucket: null,
       completedAt: null,
+      starred: false,
     };
     const createTask = vi.fn().mockResolvedValue({
       ...createdTask,
@@ -339,6 +344,7 @@ describe("TaskListPane", () => {
               actionAt: localDateToNormalizedActionAt("2026-04-08"),
               scheduleBucket: null,
               completedAt: null,
+              starred: false,
             },
             {
               id: "task-today",
@@ -350,6 +356,7 @@ describe("TaskListPane", () => {
               actionAt: localDateToNormalizedActionAt("2026-04-09"),
               scheduleBucket: null,
               completedAt: null,
+              starred: false,
             },
           ],
           upcoming: [],
@@ -357,6 +364,7 @@ describe("TaskListPane", () => {
           anytime: [],
           someday: [],
           completed: [],
+          starred: [],
         },
       }),
     );
@@ -396,6 +404,7 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: null,
               completedAt: "2026-04-09T13:00:00Z",
+              starred: false,
             },
             {
               id: "task-yesterday",
@@ -407,6 +416,7 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: null,
               completedAt: "2026-04-08T13:00:00Z",
+              starred: false,
             },
             {
               id: "task-earlier",
@@ -418,8 +428,10 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: null,
               completedAt: "2026-04-01T13:00:00Z",
+              starred: false,
             },
           ],
+          starred: [],
         },
       }),
     );
@@ -454,6 +466,7 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: null,
               completedAt: null,
+              starred: false,
             },
             {
               id: "task-2",
@@ -465,6 +478,7 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: null,
               completedAt: null,
+              starred: false,
             },
           ],
           today: [],
@@ -473,6 +487,7 @@ describe("TaskListPane", () => {
           anytime: [],
           someday: [],
           completed: [],
+          starred: [],
         },
       }),
     );
@@ -510,6 +525,7 @@ describe("TaskListPane", () => {
               actionAt: localDateToNormalizedActionAt("2026-04-08"),
               scheduleBucket: null,
               completedAt: null,
+              starred: false,
             },
             {
               id: "task-anytime",
@@ -521,11 +537,13 @@ describe("TaskListPane", () => {
               actionAt: null,
               scheduleBucket: "anytime",
               completedAt: null,
+              starred: false,
             },
           ],
           anytime: [],
           someday: [],
           completed: [],
+          starred: [],
         },
       }),
     );

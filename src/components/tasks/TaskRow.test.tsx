@@ -24,6 +24,7 @@ function makeTask(overrides: Partial<TaskMetadata> = {}): TaskMetadata {
     actionAt: null,
     scheduleBucket: null,
     completedAt: null,
+    starred: false,
     ...overrides,
   };
 }
@@ -43,6 +44,7 @@ describe("TaskRow", () => {
         onSelect={vi.fn()}
         onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
+        onToggleStar={vi.fn()}
       />,
     );
 
@@ -61,6 +63,7 @@ describe("TaskRow", () => {
         onSelect={vi.fn()}
         onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
+        onToggleStar={vi.fn()}
       />,
     );
 
@@ -78,6 +81,7 @@ describe("TaskRow", () => {
         onSelect={vi.fn()}
         onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
+        onToggleStar={vi.fn()}
       />,
     );
 
@@ -99,6 +103,7 @@ describe("TaskRow", () => {
         onSelect={onSelect}
         onContextMenuOpen={vi.fn()}
         onToggleComplete={vi.fn()}
+        onToggleStar={vi.fn()}
       />,
     );
 
