@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
+import { cn } from "../../lib/utils";
 import type {
   NoteListDateMode,
   NoteListPreviewLines,
@@ -171,6 +172,7 @@ export function NotesPane() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [inputValue, setInputValue] = useState(searchQuery);
+  const [searchScope, setSearchScope] = useState<"folder" | "subfolders" | "all">("all");
   const debounceRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +184,11 @@ export function NotesPane() {
     }
   }, [searchQuery]);
 
+  // Reset scope when navigating to a different folder.
+  useEffect(() => {
+    setSearchScope("all");
+  }, [selectedFolderPath]);
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -190,10 +197,30 @@ export function NotesPane() {
     };
   }, []);
 
+  const scopedSearchResults = useMemo(() => {
+    if (!searchQuery.trim() || selectedScope.type !== "folder" || searchScope === "all") {
+      return searchResults;
+    }
+    const folderPath = selectedFolderPath ?? "";
+    if (searchScope === "folder") {
+      return searchResults.filter((result) => {
+        const noteFolder = result.id.includes("/")
+          ? result.id.slice(0, result.id.lastIndexOf("/"))
+          : "";
+        return noteFolder === folderPath;
+      });
+    }
+    // "subfolders": this folder and all descendants
+    if (!folderPath) return searchResults;
+    return searchResults.filter((result) =>
+      result.id.startsWith(folderPath + "/")
+    );
+  }, [searchQuery, searchResults, searchScope, selectedScope.type, selectedFolderPath]);
+
   const displayItems = useMemo<NoteListItem[]>(() => {
     if (searchQuery.trim()) {
       const notesById = new Map(notes.map((note) => [note.id, note] as const));
-      return searchResults.map((result) => ({
+      return scopedSearchResults.map((result) => ({
         id: result.id,
         title: result.title,
         preview: result.preview,
@@ -203,7 +230,7 @@ export function NotesPane() {
     }
 
     return scopedNotes;
-  }, [notes, scopedNotes, searchQuery, searchResults]);
+  }, [notes, scopedNotes, searchQuery, scopedSearchResults]);
 
   const heading = searchQuery.trim()
     ? "Search Results"
@@ -258,6 +285,7 @@ export function NotesPane() {
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setInputValue("");
+    setSearchScope("all");
     clearSearch();
   }, [clearSearch]);
 
@@ -265,6 +293,7 @@ export function NotesPane() {
     setSearchOpen((prev) => {
       if (prev) {
         setInputValue("");
+        setSearchScope("all");
         clearSearch();
       }
       return !prev;
@@ -631,6 +660,29 @@ export function NotesPane() {
                 </button>
               )}
             </div>
+            {selectedScope.type === "folder" && (
+              <div className="mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
+                {(["folder", "subfolders", "all"] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    type="button"
+                    onClick={() => setSearchScope(scope)}
+                    className={cn(
+                      "ui-focus-ring flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors",
+                      searchScope === scope
+                        ? "bg-bg text-text shadow-sm"
+                        : "text-text-muted hover:text-text",
+                    )}
+                  >
+                    {scope === "folder"
+                      ? "Folder"
+                      : scope === "subfolders"
+                        ? "Subfolders"
+                        : "All"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
