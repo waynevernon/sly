@@ -239,12 +239,19 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const selectTask = useCallback((id: string | null) => {
     if (!id) {
-      setSelectionState([], { activeId: null, anchorId: null });
+      setSelectedTaskIds([]);
+      setSelectedTaskId(null);
+      setSelectedTask(null);
+      selectionAnchorIdRef.current = null;
       return;
     }
 
-    setSelectionState([id], { activeId: id, anchorId: id });
-  }, [setSelectionState]);
+    // Bypass visibleTaskIds filtering so tasks selected from search results
+    // (which may not be in the current view's sorted list) are accepted.
+    setSelectedTaskIds([id]);
+    setSelectedTaskId(id);
+    selectionAnchorIdRef.current = id;
+  }, []);
 
   const toggleTaskSelection = useCallback((id: string) => {
     if (!visibleTaskIds.includes(id)) return;
