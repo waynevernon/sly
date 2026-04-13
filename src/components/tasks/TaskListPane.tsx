@@ -533,7 +533,7 @@ export function TaskListPane() {
                     {inlineTitleHighlight && (
                       <div
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm font-normal leading-normal text-transparent"
+                        className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm font-medium leading-normal text-transparent"
                       >
                         {newTitle.slice(0, inlineTitleHighlight.start)}
                         <span className="rounded-sm bg-accent/12">
@@ -551,7 +551,7 @@ export function TaskListPane() {
                       onBlur={() => void handleCommitCreate()}
                       onKeyDown={handleCreateKeyDown}
                       className={cn(
-                        "relative min-w-0 w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50",
+                        "relative min-w-0 w-full bg-transparent text-sm font-medium text-text outline-none placeholder:text-text-muted/50",
                       )}
                     />
                   </div>
