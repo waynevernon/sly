@@ -377,7 +377,7 @@ export function TaskDetailPanel() {
           <div className="border-t border-border/40" />
 
           <div />
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-text-muted/70">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-text-muted/70">
             <div className="flex items-center gap-2">
               <span className="font-medium uppercase tracking-[0.08em] text-text-muted/65">
                 Created
