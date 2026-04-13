@@ -85,6 +85,8 @@ Always use `var(--ui-motion-*)` tokens for duration and easing. Never hardcode n
 | `--ui-pane-padding-start` | `16px` | left pane/header inset |
 | `--ui-pane-padding-end` | `12px` | right pane/header inset |
 | `--ui-action-gap` | `2px` | action clusters |
+| `--ui-list-item-py` | `7px` | vertical padding — single-line list items |
+| `--ui-list-item-py-tall` | `9px` | vertical padding — multi-line list items |
 
 Use a `4px` spacing grid for layout rhythm. Shared pane headers should align to one row model:
 

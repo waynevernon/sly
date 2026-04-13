@@ -139,7 +139,7 @@ export function TaskRow({
             }}
             className={cn(
               "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-100",
-              secondaryLabel ? "py-2.25" : "py-1.75",
+              secondaryLabel ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
               isActive
                 ? "bg-bg-emphasis"
                 : isSelected

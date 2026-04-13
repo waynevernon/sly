@@ -31,6 +31,7 @@ import {
   CountBadge,
   IconButton,
   Input,
+  SearchClearButton,
   menuItemClassName,
   menuLabelClassName,
   menuSeparatorClassName,
@@ -655,16 +656,7 @@ export function NotesPane() {
                 className="pr-8 text-sm"
               />
               {inputValue && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInputValue("");
-                    clearSearch();
-                  }}
-                  className="ui-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded-[var(--ui-radius-sm)] text-text-muted hover:text-text"
-                >
-                  <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-                </button>
+                <SearchClearButton onClick={() => { setInputValue(""); clearSearch(); }} />
               )}
             </div>
             {(selectedScope.type === "folder" || selectedScope.type === "all") && (

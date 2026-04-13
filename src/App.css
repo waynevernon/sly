@@ -101,6 +101,8 @@
   --ui-pane-header-height: 36px;
   --ui-pane-padding-start: 16px;
   --ui-pane-padding-end: 12px;
+  --ui-list-item-py: 0.4375rem;  /* 7px — single-line list items (py-1.75) */
+  --ui-list-item-py-tall: 0.5625rem; /* 9px — multi-line list items (py-2.25) */
   --ui-titlebar-control-gap: 8px;
   --ui-titlebar-control-offset: 16px;
   --ui-titlebar-leading-offset: calc(

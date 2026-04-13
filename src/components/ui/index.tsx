@@ -1,5 +1,6 @@
 import * as React from "react";
 import { type ButtonHTMLAttributes, type ReactNode } from "react";
+import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Tooltip } from "./Tooltip";
 import { PinIcon } from "../icons";
@@ -129,6 +130,19 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
 );
 IconButton.displayName = "IconButton";
 
+// Clear button for search inputs — positioned absolute inside a relative container
+export function SearchClearButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ui-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded-[var(--ui-radius-sm)] text-text-muted hover:text-text"
+    >
+      <X className="w-4.5 h-4.5 stroke-[1.5]" />
+    </button>
+  );
+}
+
 // List item for sidebar
 interface ListItemProps {
   title: string;
@@ -187,7 +201,7 @@ export function ListItem({
       className={cn(
         "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-md",
         "focus:outline-none focus-visible:outline-none",
-        hasSecondaryRow ? "py-2.25" : "py-1.75",
+        hasSecondaryRow ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
         isActive
           ? "bg-bg-emphasis"
           : selectionState === "selected"
