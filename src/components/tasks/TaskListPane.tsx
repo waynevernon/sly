@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { Fragment, useRef, useState, useCallback, useEffect, useMemo } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { createPortal } from "react-dom";
 import {
@@ -11,18 +11,13 @@ import {
   CalendarDays,
   CheckCheck,
   CheckSquare,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   ClockArrowDown,
   ClockArrowUp,
   GripVertical,
   Inbox,
   Plus,
-  RotateCcw,
   Star,
-  Sun,
-  Sunrise,
   Trash2,
   UserRound,
   X,
@@ -37,7 +32,6 @@ import {
   localDateString,
   localDateToNormalizedActionAt,
   taskScheduleSelectionFromView,
-  TASK_SCHEDULE_BUCKET_LABELS,
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
 import {
@@ -51,6 +45,7 @@ import {
   menuSeparatorClassName,
 } from "../ui";
 import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
+import { TaskDatePickerPanel } from "./TaskDatePicker";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
 import { compareTasks, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
@@ -1070,7 +1065,6 @@ function BulkReschedulePicker({
 }) {
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   const [isSaving, setIsSaving] = useState(false);
-  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(today));
   const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -1078,11 +1072,6 @@ function BulkReschedulePicker({
   useEffect(() => {
     setIsOpen(initiallyOpen);
   }, [initiallyOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setVisibleMonth(startOfMonth(today));
-  }, [isOpen, today]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1137,11 +1126,6 @@ function BulkReschedulePicker({
     };
   }, [align, isOpen, showTrigger]);
 
-  const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
-  const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
-  const tomorrow = offsetLocalDate(today, 1);
-  const nextWeek = nextMonday(today);
-
   const applySelection = useCallback(
     async (selection: { actionDate: string | null; scheduleBucket: TaskScheduleBucket | null }) => {
       if (isSaving) return;
@@ -1159,6 +1143,15 @@ function BulkReschedulePicker({
   if (tasks.length === 0) {
     return null;
   }
+
+  const panelContent = (
+    <TaskDatePickerPanel
+      today={today}
+      actionDate={null}
+      scheduleBucket={null}
+      onSelect={(selection) => void applySelection(selection)}
+    />
+  );
 
   return (
     <div className="relative">
@@ -1182,197 +1175,17 @@ function BulkReschedulePicker({
                 className="fixed z-[100] w-80 p-2.5"
                 style={{ left: popoverPosition.left, top: popoverPosition.top }}
               >
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-text">{monthLabel}</div>
-              <div className="flex items-center gap-1">
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Previous Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Next Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-                >
-                  <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
-                >
-                  {label}
-                </div>
-              ))}
-              {weeks.flat().map((day) => {
-                const isToday = day.date === today;
-
-                return (
-                  <button
-                    key={day.date}
-                    type="button"
-                    onClick={() => void applySelection({ actionDate: day.date, scheduleBucket: null })}
-                    className={cn(
-                      "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
-                      day.inCurrentMonth
-                        ? "text-text hover:bg-bg-muted"
-                        : "text-text-muted/50 hover:bg-bg-muted/70",
-                      isToday ? "ring-1 ring-border" : "",
-                    )}
-                  >
-                    {day.day}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="border-t border-border/60 pt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                <QuickRescheduleButton
-                  label="Today"
-                  icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: today, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label="Tomorrow"
-                  icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: tomorrow, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label="Next week"
-                  icon={<CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: nextWeek, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label={TASK_SCHEDULE_BUCKET_LABELS.anytime}
-                  icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: "anytime" })}
-                />
-                <QuickRescheduleButton
-                  label={TASK_SCHEDULE_BUCKET_LABELS.someday}
-                  icon={<Archive className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: "someday" })}
-                />
-                <QuickRescheduleButton
-                  label="Clear"
-                  icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: null })}
-                />
-              </div>
-            </div>
-          </div>
+                {panelContent}
               </PopoverSurface>,
               document.body,
             )
           : (
-        <PopoverSurface
-          ref={popoverRef}
-          className="relative z-50 w-80 p-2.5"
-        >
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-text">{monthLabel}</div>
-              <div className="flex items-center gap-1">
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Previous Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-                <IconButton
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  title="Next Month"
-                  onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-                >
-                  <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-                </IconButton>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
-                >
-                  {label}
-                </div>
-              ))}
-              {weeks.flat().map((day) => {
-                const isToday = day.date === today;
-
-                return (
-                  <button
-                    key={day.date}
-                    type="button"
-                    onClick={() => void applySelection({ actionDate: day.date, scheduleBucket: null })}
-                    className={cn(
-                      "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
-                      day.inCurrentMonth
-                        ? "text-text hover:bg-bg-muted"
-                        : "text-text-muted/50 hover:bg-bg-muted/70",
-                      isToday ? "ring-1 ring-border" : "",
-                    )}
-                  >
-                    {day.day}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="border-t border-border/60 pt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                <QuickRescheduleButton
-                  label="Today"
-                  icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: today, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label="Tomorrow"
-                  icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: tomorrow, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label="Next week"
-                  icon={<CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: nextWeek, scheduleBucket: null })}
-                />
-                <QuickRescheduleButton
-                  label={TASK_SCHEDULE_BUCKET_LABELS.anytime}
-                  icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: "anytime" })}
-                />
-                <QuickRescheduleButton
-                  label={TASK_SCHEDULE_BUCKET_LABELS.someday}
-                  icon={<Archive className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: "someday" })}
-                />
-                <QuickRescheduleButton
-                  label="Clear"
-                  icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
-                  onClick={() => void applySelection({ actionDate: null, scheduleBucket: null })}
-                />
-              </div>
-            </div>
-          </div>
-        </PopoverSurface>
+            <PopoverSurface
+              ref={popoverRef}
+              className="relative z-50 w-80 p-2.5"
+            >
+              {panelContent}
+            </PopoverSurface>
           )
         : null}
     </div>
@@ -1431,70 +1244,6 @@ function TaskBulkRescheduleDialog({
   );
 }
 
-function QuickRescheduleButton({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 text-xs font-medium text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-    >
-      <span className="shrink-0 text-current">{icon}</span>
-      {label}
-    </button>
-  );
-}
-
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTH_LABELS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
-function buildMonthGrid(month: Date): Array<Array<{ date: string; day: number; inCurrentMonth: boolean }>> {
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const gridStart = new Date(monthStart);
-  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
-
-  return Array.from({ length: 6 }, (_, weekIndex) =>
-    Array.from({ length: 7 }, (_, dayIndex) => {
-      const date = new Date(gridStart);
-      date.setDate(gridStart.getDate() + weekIndex * 7 + dayIndex);
-      return {
-        date: localDateString(date),
-        day: date.getDate(),
-        inCurrentMonth: date.getMonth() === monthStart.getMonth(),
-      };
-    }),
-  );
-}
-
-function startOfMonth(value: string): Date {
-  const parsed = parseLocalDate(value);
-  return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
-}
-
-function addMonths(date: Date, offset: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
-}
-
 function parseLocalDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) {
@@ -1523,10 +1272,3 @@ function startOfWeek(date: string): string {
   return localDateString(currentDate);
 }
 
-function nextMonday(date: string): string {
-  const currentDate = parseLocalDate(date);
-  const day = currentDate.getDay();
-  const daysUntilMonday = ((8 - day) % 7) || 7;
-  currentDate.setDate(currentDate.getDate() + daysUntilMonday);
-  return localDateString(currentDate);
-}
