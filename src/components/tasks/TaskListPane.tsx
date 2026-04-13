@@ -604,7 +604,7 @@ export function TaskListPane() {
 
       <div className="ui-scrollbar-overlay flex-1 overflow-y-auto">
         {searchOpen && (
-          <div className="sticky top-0 z-10 px-3 pt-2 pb-2 bg-bg border-b border-border animate-slide-down">
+          <div className="sticky top-0 z-10 px-4 pt-2 pb-2 bg-bg border-b border-border animate-slide-down">
             <div className="relative">
               <Input
                 ref={searchInputRef}

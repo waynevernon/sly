@@ -72,6 +72,8 @@ Permanent layout regions should not use decorative shadows.
 | `--ui-motion-ease-standard` | standard UI motion |
 | `--ui-motion-ease-emphasized` | larger layout movement |
 
+Always use `var(--ui-motion-*)` tokens for duration and easing. Never hardcode numeric durations or cubic-bezier strings inline — they bypass the system and require regex search to update.
+
 ### Sizing and Rhythm
 
 | Token | Value | Use |
@@ -298,6 +300,10 @@ npm run tauri dev
 ### Sticky Surfaces
 
 Any element with `sticky` positioning that has scrollable content passing behind it must declare its plane with a `border-b border-border` separator. Do not rely on background color alone to separate a sticky surface from content beneath it.
+
+## Detail Panel Labels
+
+Section labels in detail panels (task detail, settings, metadata rows) use `text-[11px] font-medium text-text-muted`. Do not apply `uppercase` or `tracking-[*]` to these labels — the decorative weight competes with content and adds visual noise without improving scannability. The muted color at small size is sufficient hierarchy on its own.
 
 ## Do / Don't
 

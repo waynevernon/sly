@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ, FileText } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, Check, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
@@ -83,7 +83,7 @@ export function FoldersPane({
             >
               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                 <DropdownMenu.ItemIndicator>
-                  <span className="text-xs leading-none">✓</span>
+                  <Check className="h-3 w-3 stroke-[2.2]" />
                 </DropdownMenu.ItemIndicator>
               </span>
               <span>Pinned</span>
@@ -97,7 +97,7 @@ export function FoldersPane({
             >
               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                 <DropdownMenu.ItemIndicator>
-                  <span className="text-xs leading-none">✓</span>
+                  <Check className="h-3 w-3 stroke-[2.2]" />
                 </DropdownMenu.ItemIndicator>
               </span>
               <span>Recent</span>
@@ -113,7 +113,7 @@ export function FoldersPane({
             >
               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                 <DropdownMenu.ItemIndicator>
-                  <span className="text-xs leading-none">✓</span>
+                  <Check className="h-3 w-3 stroke-[2.2]" />
                 </DropdownMenu.ItemIndicator>
               </span>
               <span>Note Count</span>

@@ -141,9 +141,9 @@ export function TaskRow({
               "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-100",
               secondaryLabel ? "py-2.25" : "py-1.75",
               isActive
-                ? "bg-bg-muted"
+                ? "bg-bg-emphasis"
                 : isSelected
-                  ? "bg-bg-muted/70"
+                  ? "bg-bg-muted/75"
                   : "hover:bg-bg-muted",
             )}
           >

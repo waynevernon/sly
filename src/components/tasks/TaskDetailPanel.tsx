@@ -246,8 +246,7 @@ export function TaskDetailPanel() {
             aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
             onClick={() => void handleToggleComplete()}
             className={cn(
-              "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors outline-none",
-              "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
+              "ui-focus-ring mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
               isCompleted
                 ? "border-accent bg-accent text-text-inverse"
                 : "border-border hover:border-accent/60",
@@ -381,14 +380,14 @@ export function TaskDetailPanel() {
           <div />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-text-muted/70">
             <div className="flex items-center gap-2">
-              <span className="font-medium uppercase tracking-[0.08em] text-text-muted/65">
+              <span className="font-medium text-text-muted">
                 Created
               </span>
               <span>{formatTaskTimestamp(selectedTask.createdAt)}</span>
             </div>
             {selectedTask.completedAt ? (
               <div className="flex items-center gap-2">
-                <span className="font-medium uppercase tracking-[0.08em] text-text-muted/65">
+                <span className="font-medium text-text-muted">
                   Completed
                 </span>
                 <span>{formatTaskTimestamp(selectedTask.completedAt)}</span>
@@ -402,7 +401,7 @@ export function TaskDetailPanel() {
           <div />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+              <div className="text-[11px] font-medium text-text-muted">
                 Link
               </div>
               <button
@@ -436,7 +435,7 @@ export function TaskDetailPanel() {
           <div />
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65">
+              <div className="text-[11px] font-medium text-text-muted">
                 Description
               </div>
               <div className="h-[28px] px-2 py-1 invisible" aria-hidden="true" />
@@ -470,9 +469,9 @@ export function TaskDetailPanel() {
               className={selectedTask.starred ? "text-amber-400 hover:text-amber-400/80" : undefined}
             >
               <Star
-                className="h-4 w-4"
+                className="h-4.5 w-4.5"
                 fill={selectedTask.starred ? "currentColor" : "none"}
-                strokeWidth={selectedTask.starred ? 0 : 1.6}
+                strokeWidth={selectedTask.starred ? 0 : 1.5}
               />
             </IconButton>
             <IconButton
@@ -481,7 +480,7 @@ export function TaskDetailPanel() {
               title="Delete Task"
               onClick={() => void handleDelete()}
             >
-              <Trash2 className="h-4 w-4 stroke-[1.6]" />
+              <Trash2 className="h-4.5 w-4.5 stroke-[1.5]" />
             </IconButton>
           </div>
         ) : null}

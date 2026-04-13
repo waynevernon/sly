@@ -670,7 +670,7 @@ export function NotesPane() {
             {(selectedScope.type === "folder" || selectedScope.type === "all") && (
               <div className="relative mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
                 <div
-                  className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-[calc(var(--ui-radius-md)-2px)] bg-bg shadow-sm transition-transform duration-[160ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-[calc(var(--ui-radius-md)-2px)] bg-bg shadow-sm transition-transform duration-[var(--ui-motion-duration-fade)] ease-[var(--ui-motion-ease-standard)]"
                   style={{
                     left: 2,
                     width: "calc((100% - 4px) / 3)",
@@ -683,7 +683,7 @@ export function NotesPane() {
                     type="button"
                     onClick={() => setSearchScope(scope)}
                     className={cn(
-                      "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors duration-[160ms]",
+                      "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors duration-[var(--ui-motion-duration-fade)]",
                       searchScope === scope
                         ? "text-text"
                         : "text-text-muted hover:text-text",
