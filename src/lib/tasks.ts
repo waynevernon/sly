@@ -54,6 +54,9 @@ export const TASK_VIEW_ORDER: TaskView[] = [
   "waiting",
 ];
 
+/** Views that support manual drag-to-reorder sort. */
+export const MANUAL_SORT_VIEWS: TaskView[] = ["today", "anytime"];
+
 export const TASK_DRAG_TARGET_VIEWS: TaskView[] = [
   "inbox",
   "today",
@@ -154,20 +157,32 @@ export function getDefaultTaskSortMode(view: TaskView): TaskSortMode {
 
 /**
  * Compare two tasks for display ordering within a view.
- * Starred tasks always sort first within any view.
- * Secondary ordering follows the provided sortMode, defaulting to each view's
- * natural order when omitted.
+ * Starred tasks float first in all modes except "manual".
+ * In "manual" mode tasks are ordered by their position in viewOrder (if provided),
+ * falling back to createdAt ascending.
  */
 export function compareTasks(
   a: TaskMetadata,
   b: TaskMetadata,
   view: TaskView,
   sortMode?: TaskSortMode,
+  viewOrder?: string[],
 ): number {
-  // Stars always float first
-  if (a.starred !== b.starred) return a.starred ? -1 : 1;
-
   const mode = sortMode ?? getDefaultTaskSortMode(view);
+
+  if (mode === "manual") {
+    if (viewOrder) {
+      const aIdx = viewOrder.indexOf(a.id);
+      const bIdx = viewOrder.indexOf(b.id);
+      const aPos = aIdx === -1 ? Infinity : aIdx;
+      const bPos = bIdx === -1 ? Infinity : bIdx;
+      if (aPos !== bPos) return aPos < bPos ? -1 : 1;
+    }
+    return a.createdAt.localeCompare(b.createdAt);
+  }
+
+  // Stars always float first in all non-manual modes
+  if (a.starred !== b.starred) return a.starred ? -1 : 1;
 
   switch (mode) {
     case "actionAsc":

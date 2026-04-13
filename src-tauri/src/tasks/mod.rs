@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const TASKS_DB_SCHEMA_VERSION: i32 = 5;
+const TASKS_DB_SCHEMA_VERSION: i32 = 6;
 
 // Public types
 
@@ -224,6 +224,17 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
             [],
         )?;
     }
+
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS task_view_order (
+            view TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            PRIMARY KEY (view, task_id)
+        );
+        ",
+    )?;
 
     conn.pragma_update(None, "user_version", TASKS_DB_SCHEMA_VERSION)?;
     Ok(())
@@ -667,6 +678,30 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
 pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
     let conn = open_tasks_db(notes_root)?;
     conn.execute("DELETE FROM tasks WHERE id = ?1", [id])?;
+    conn.execute("DELETE FROM task_view_order WHERE task_id = ?1", [id])?;
+    Ok(())
+}
+
+pub(crate) fn get_task_view_order(notes_root: &Path, view: &str) -> Result<Vec<String>> {
+    let conn = open_tasks_db(notes_root)?;
+    let mut stmt = conn.prepare(
+        "SELECT task_id FROM task_view_order WHERE view = ?1 ORDER BY position ASC",
+    )?;
+    let ids = stmt
+        .query_map([view], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(ids)
+}
+
+pub(crate) fn set_task_view_order(notes_root: &Path, view: &str, task_ids: &[String]) -> Result<()> {
+    let conn = open_tasks_db(notes_root)?;
+    conn.execute("DELETE FROM task_view_order WHERE view = ?1", [view])?;
+    for (i, id) in task_ids.iter().enumerate() {
+        conn.execute(
+            "INSERT INTO task_view_order (view, task_id, position) VALUES (?1, ?2, ?3)",
+            params![view, id, i as i64],
+        )?;
+    }
     Ok(())
 }
 

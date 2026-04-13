@@ -5324,6 +5324,22 @@ fn delete_task(id: String, state: State<'_, AppState>, app: AppHandle) -> Result
     Ok(())
 }
 
+#[tauri::command]
+fn get_task_view_order(view: String, state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::get_task_view_order(&root, &view).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_task_view_order(
+    view: String,
+    task_ids: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let root = notes_root_for_tasks(&state)?;
+    tasks::set_task_view_order(&root, &view, &task_ids).map_err(|e| e.to_string())
+}
+
 // Handle CLI arguments: open .md files in preview mode.
 // Returns true if a standalone preview window was created (file outside notes folder).
 fn handle_cli_args(app: &AppHandle, args: &[String], cwd: &str) -> bool {
@@ -5844,6 +5860,8 @@ pub fn run() {
             update_task,
             set_task_completed,
             delete_task,
+            get_task_view_order,
+            set_task_view_order,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

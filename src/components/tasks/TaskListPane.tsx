@@ -1,4 +1,4 @@
-import { type ReactNode, useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { Fragment, type ReactNode, useRef, useState, useCallback, useEffect, useMemo } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { createPortal } from "react-dom";
 import {
@@ -16,6 +16,7 @@ import {
   Clock3,
   ClockArrowDown,
   ClockArrowUp,
+  GripVertical,
   Inbox,
   Plus,
   RotateCcw,
@@ -26,6 +27,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDndMonitor } from "@dnd-kit/core";
 import { useTasks } from "../../context/TasksContext";
 import {
   actionAtToLocalDate,
@@ -49,6 +52,7 @@ import {
 import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
+import { MANUAL_SORT_VIEWS } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
@@ -108,7 +112,7 @@ const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   starred: Star,
 };
 
-const taskSortItems: SortMenuItem<TaskSortMode>[] = [
+const BASE_TASK_SORT_ITEMS: SortMenuItem<TaskSortMode>[] = [
   {
     key: "action",
     label: "Action Date",
@@ -159,6 +163,14 @@ const taskSortItems: SortMenuItem<TaskSortMode>[] = [
   },
 ];
 
+const MANUAL_SORT_ITEM: SortMenuItem<TaskSortMode> = {
+  key: "manual",
+  label: "Manual",
+  isActive: (value) => value === "manual",
+  getNextValue: () => "manual",
+  renderIcon: () => <GripVertical className="w-4 h-4 stroke-[1.6]" />,
+};
+
 const CREATE_DATE_DEBOUNCE_MS = 350;
 
 export function TaskListPane() {
@@ -171,6 +183,8 @@ export function TaskListPane() {
     isLoading,
     taskSortMode,
     setTaskSortMode,
+    taskViewOrders,
+    setTaskViewOrder,
     selectTask,
     toggleTaskSelection,
     selectTaskRange,
@@ -189,8 +203,9 @@ export function TaskListPane() {
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const viewOrder = taskViewOrders[selectedView];
   const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
-    compareTasks(a, b, selectedView, taskSortMode),
+    compareTasks(a, b, selectedView, taskSortMode, viewOrder),
   );
   const taskMap = useMemo(
     () => new Map(tasks.map((task) => [task.id, task] as const)),
@@ -346,7 +361,38 @@ export function TaskListPane() {
     [handleCommitCreate],
   );
 
+  const isManualSort = taskSortMode === "manual" && MANUAL_SORT_VIEWS.includes(selectedView);
   const groupedSections = getTaskSections(tasks, selectedView, today);
+
+  // Handle same-section manual reorders via dnd-kit's monitor
+  useDndMonitor({
+    onDragEnd(event) {
+      if (!isManualSort) return;
+      const activeData = event.active.data.current;
+      const overData = event.over?.data.current;
+      if (activeData?.type !== "task") return;
+      if (overData?.type !== "task") return;
+
+      const activeTaskId = activeData.id as string;
+      const overTaskId = overData.id as string;
+      if (activeTaskId === overTaskId) return;
+
+      // Only reorder if both tasks are in the same section
+      const inSameSection = groupedSections.some(
+        (s) =>
+          s.tasks.some((t) => t.id === activeTaskId) &&
+          s.tasks.some((t) => t.id === overTaskId),
+      );
+      if (!inSameSection) return;
+
+      const currentOrder = viewOrder ?? tasks.map((t) => t.id);
+      const activeIndex = currentOrder.indexOf(activeTaskId);
+      const overIndex = currentOrder.indexOf(overTaskId);
+      if (activeIndex === -1 || overIndex === -1) return;
+
+      setTaskViewOrder(selectedView, arrayMove(currentOrder, activeIndex, overIndex));
+    },
+  });
   const rescheduleTasks = useMemo(
     () =>
       (rescheduleTaskIds ?? [])
@@ -442,11 +488,14 @@ export function TaskListPane() {
               title="Sort Tasks"
               menuTitle={TASK_VIEW_LABELS[selectedView]}
               value={taskSortMode}
-              items={
-                selectedView === "completed"
-                  ? taskSortItems
-                  : taskSortItems.filter((item) => item.key !== "completed")
-              }
+              items={(() => {
+                const base = selectedView === "completed"
+                  ? BASE_TASK_SORT_ITEMS
+                  : BASE_TASK_SORT_ITEMS.filter((item) => item.key !== "completed");
+                return MANUAL_SORT_VIEWS.includes(selectedView)
+                  ? [...base, MANUAL_SORT_ITEM]
+                  : base;
+              })()}
               onChange={setTaskSortMode}
             />
             {canInlineCreate && (
@@ -501,8 +550,10 @@ export function TaskListPane() {
             aria-multiselectable={true}
             className="flex flex-col gap-1 px-1.5 pt-2.5 pb-1.5 outline-none"
           >
-            {groupedSections.map((section) => (
-              <div key={section.id} className="flex flex-col gap-1">
+            {groupedSections.map((section) => {
+              const sectionItems = section.tasks.map((t) => `task:${t.id}`);
+              const sectionContent = (
+              <div className="flex flex-col gap-1">
                 {section.label ? (
                   <div className="flex items-center justify-between gap-2 px-2.5 pt-1 pb-0.5">
                     <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
@@ -605,7 +656,17 @@ export function TaskListPane() {
                   />
                 ))}
               </div>
-            ))}
+              );
+              return isManualSort ? (
+                <SortableContext
+                  key={section.id}
+                  items={sectionItems}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {sectionContent}
+                </SortableContext>
+              ) : <Fragment key={section.id}>{sectionContent}</Fragment>;
+            })}
 
             {isCreating && (
               <div className="rounded-[var(--ui-radius-md)] bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">

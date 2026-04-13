@@ -38,6 +38,8 @@ function makeTasksHookValue(
     isLoadingTask: false,
     taskSortMode: "createdAsc",
     setTaskSortMode: vi.fn(),
+    taskViewOrders: {},
+    setTaskViewOrder: vi.fn(),
     selectView: vi.fn(),
     selectTask: vi.fn(),
     toggleTaskSelection: vi.fn(),

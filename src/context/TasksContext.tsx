@@ -11,7 +11,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import type { Task, TaskMetadata, TaskPatch, TaskSortMode, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
-import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString } from "../lib/tasks";
+import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString, MANUAL_SORT_VIEWS } from "../lib/tasks";
 import { useNotesData } from "./NotesContext";
 
 interface TasksContextValue {
@@ -32,6 +32,8 @@ interface TasksContextValue {
   // Sort
   taskSortMode: TaskSortMode;
   setTaskSortMode: (mode: TaskSortMode) => void;
+  taskViewOrders: Partial<Record<TaskView, string[]>>;
+  setTaskViewOrder: (view: TaskView, ids: string[]) => void;
 
   // Actions
   selectView: (view: TaskView) => void;
@@ -57,6 +59,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [lastError, setLastError] = useState<string | null>(null);
   const [selectedView, setSelectedView] = useState<TaskView>("inbox");
   const [taskSortModes, setTaskSortModes] = useState<Partial<Record<TaskView, TaskSortMode>>>({});
+  const [taskViewOrders, setTaskViewOrdersState] = useState<Partial<Record<TaskView, string[]>>>({});
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -78,14 +81,32 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const visibleTaskIds = useMemo(
     () =>
       [...(buckets[selectedView] ?? [])]
-        .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode))
+        .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode, taskViewOrders[selectedView]))
         .map((task) => task.id),
-    [buckets, selectedView, taskSortMode],
+    [buckets, selectedView, taskSortMode, taskViewOrders],
   );
+
+  const setTaskViewOrder = useCallback((view: TaskView, ids: string[]) => {
+    setTaskViewOrdersState((prev) => ({ ...prev, [view]: ids }));
+    if (notesFolder) {
+      void tasksService.setTaskViewOrder(view, ids);
+    }
+  }, [notesFolder]);
 
   const setTaskSortMode = useCallback((mode: TaskSortMode) => {
     setTaskSortModes((prev) => ({ ...prev, [selectedView]: mode }));
-  }, [selectedView]);
+    // When switching to manual for the first time, seed the stored order from the
+    // current visible order so the user sees no unexpected reordering.
+    if (mode === "manual") {
+      setTaskViewOrdersState((prev) => {
+        if (prev[selectedView] !== undefined) return prev;
+        return { ...prev, [selectedView]: visibleTaskIds };
+      });
+      if (notesFolder && taskViewOrders[selectedView] === undefined) {
+        void tasksService.setTaskViewOrder(selectedView, visibleTaskIds);
+      }
+    }
+  }, [selectedView, visibleTaskIds, taskViewOrders, notesFolder]);
 
   const setSelectionState = useCallback(
     (
@@ -128,10 +149,32 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     if (isInitialLoad) setIsLoading(true);
 
     try {
-      const result = await tasksService.listTasks();
+      const [result, ...viewOrders] = await Promise.all([
+        tasksService.listTasks(),
+        ...(isInitialLoad
+          ? MANUAL_SORT_VIEWS.map((v) =>
+              tasksService.getTaskViewOrder(v).catch((): string[] => []),
+            )
+          : []),
+      ]);
       if (isStale()) return;
       hasLoadedRef.current = true;
-      setTasks(result);
+      setTasks(result as TaskMetadata[]);
+      if (isInitialLoad) {
+        const ordersToSet: Partial<Record<TaskView, string[]>> = {};
+        const sortModesToSet: Partial<Record<TaskView, TaskSortMode>> = {};
+        MANUAL_SORT_VIEWS.forEach((view, i) => {
+          const order = viewOrders[i] as string[];
+          if (order && order.length > 0) {
+            ordersToSet[view] = order;
+            sortModesToSet[view] = "manual";
+          }
+        });
+        if (Object.keys(ordersToSet).length > 0) {
+          setTaskViewOrdersState(ordersToSet);
+          setTaskSortModes((prev) => ({ ...prev, ...sortModesToSet }));
+        }
+      }
     } catch (err) {
       if (isStale()) return;
       setLastError(err instanceof Error ? err.message : "Failed to load tasks");
@@ -404,6 +447,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       isLoadingTask,
       taskSortMode,
       setTaskSortMode,
+      taskViewOrders,
+      setTaskViewOrder,
       selectView,
       selectTask,
       toggleTaskSelection,
@@ -428,6 +473,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       isLoadingTask,
       taskSortMode,
       setTaskSortMode,
+      taskViewOrders,
+      setTaskViewOrder,
       selectView,
       selectTask,
       toggleTaskSelection,
@@ -457,6 +504,8 @@ const TASKS_NOOP: TasksContextValue = {
   isLoadingTask: false,
   taskSortMode: "createdAsc",
   setTaskSortMode: () => {},
+  taskViewOrders: {},
+  setTaskViewOrder: () => {},
   selectView: () => {},
   selectTask: () => {},
   toggleTaskSelection: () => {},

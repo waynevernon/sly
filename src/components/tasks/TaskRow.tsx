@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Clock3, FileText, Link2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -57,7 +58,9 @@ export function TaskRow({
     listeners,
     setNodeRef,
     isDragging,
-  } = useDraggable({
+    transform,
+    transition,
+  } = useSortable({
     id: `task:${task.id}`,
     data: {
       type: "task",
@@ -67,11 +70,17 @@ export function TaskRow({
     },
   });
 
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         <div
           ref={setNodeRef}
+          style={style}
           {...attributes}
           {...listeners}
           role="option"

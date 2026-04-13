@@ -6,7 +6,8 @@ export type TaskSortMode =
   | 'actionAsc' | 'actionDesc'
   | 'createdAsc' | 'createdDesc'
   | 'titleAsc' | 'titleDesc'
-  | 'completedAsc' | 'completedDesc';
+  | 'completedAsc' | 'completedDesc'
+  | 'manual';
 
 export interface TaskMetadata {
   id: string;

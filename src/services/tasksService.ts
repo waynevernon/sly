@@ -24,3 +24,11 @@ export async function setTaskCompleted(id: string, completed: boolean): Promise<
 export async function deleteTask(id: string): Promise<void> {
   return invoke("delete_task", { id });
 }
+
+export async function getTaskViewOrder(view: string): Promise<string[]> {
+  return invoke("get_task_view_order", { view });
+}
+
+export async function setTaskViewOrder(view: string, taskIds: string[]): Promise<void> {
+  return invoke("set_task_view_order", { view, taskIds });
+}

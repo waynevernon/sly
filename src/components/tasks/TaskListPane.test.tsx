@@ -5,6 +5,11 @@ import { localDateToNormalizedActionAt, taskScheduleSelectionFromView } from "..
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
 
+vi.mock("@dnd-kit/core", async () => {
+  const actual = await vi.importActual("@dnd-kit/core");
+  return { ...(actual as object), useDndMonitor: vi.fn() };
+});
+
 vi.mock("../../context/TasksContext", () => ({
   useTasks: vi.fn(),
 }));
@@ -38,6 +43,8 @@ function makeTasksHookValue(
     isLoading: false,
     taskSortMode: "createdAsc",
     setTaskSortMode: vi.fn(),
+    taskViewOrders: {},
+    setTaskViewOrder: vi.fn(),
     selectTask: vi.fn(),
     toggleTaskSelection: vi.fn(),
     selectTaskRange: vi.fn(),
