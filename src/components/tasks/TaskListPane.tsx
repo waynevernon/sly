@@ -27,12 +27,12 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { SearchIcon, SearchOffIcon, XIcon } from "../icons";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDndMonitor } from "@dnd-kit/core";
 import { useTasks } from "../../context/TasksContext";
 import {
   actionAtToLocalDate,
-  compareTasks,
   detectTaskDateFromTitle,
   localDateString,
   localDateToNormalizedActionAt,
@@ -43,6 +43,7 @@ import {
 import {
   Button,
   IconButton,
+  Input,
   PanelEmptyState,
   PopoverSurface,
   destructiveMenuItemClassName,
@@ -52,7 +53,7 @@ import {
 import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
 import { TaskRow } from "./TaskRow";
 import { cn } from "../../lib/utils";
-import { MANUAL_SORT_VIEWS } from "../../lib/tasks";
+import { compareTasks, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
@@ -175,6 +176,7 @@ const CREATE_DATE_DEBOUNCE_MS = 350;
 
 export function TaskListPane() {
   const {
+    tasks: allTasks,
     buckets,
     selectedView,
     selectedTaskId,
@@ -203,6 +205,15 @@ export function TaskListPane() {
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<number | null>(null);
+
+  const isSearching = searchQuery.trim().length > 0;
+
   const viewOrder = taskViewOrders[selectedView];
   const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
     compareTasks(a, b, selectedView, taskSortMode, viewOrder),
@@ -222,7 +233,6 @@ export function TaskListPane() {
         .filter((task): task is TaskMetadata => Boolean(task)),
     [selectedTaskIds, taskMap],
   );
-  const showEmptyState = isLoading || (tasks.length === 0 && !isCreating);
   const empty = EMPTY_MESSAGES[selectedView] ?? {
     title: "Nothing here",
     message: "",
@@ -364,6 +374,74 @@ export function TaskListPane() {
   const isManualSort = taskSortMode === "manual" && MANUAL_SORT_VIEWS.includes(selectedView);
   const groupedSections = getTaskSections(tasks, selectedView, today);
 
+  // Search results: filter all tasks across every view, sort starred first then newest first
+  const searchResults = useMemo(() => {
+    if (!isSearching) return null;
+    return allTasks
+      .filter((task) => taskMatchesQuery(task, searchQuery))
+      .sort((a, b) => {
+        if (a.starred !== b.starred) return a.starred ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  }, [allTasks, isSearching, searchQuery]);
+
+  const handleSearchChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setInputValue(value);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = window.setTimeout(() => {
+        setSearchQuery(value);
+      }, 200);
+    },
+    [],
+  );
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setInputValue("");
+    setSearchQuery("");
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+  }, []);
+
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((prev) => {
+      if (prev) {
+        setInputValue("");
+        setSearchQuery("");
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      } else {
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+      return !prev;
+    });
+  }, []);
+
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (inputValue) {
+        setInputValue("");
+        setSearchQuery("");
+      } else {
+        closeSearch();
+      }
+    },
+    [closeSearch, inputValue],
+  );
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, [searchOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
   // Handle same-section manual reorders via dnd-kit's monitor
   useDndMonitor({
     onDragEnd(event) {
@@ -451,9 +529,13 @@ export function TaskListPane() {
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="flex min-w-0 items-center gap-1.5">
-          <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
+          {!isSearching && <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />}
           <div className="min-w-0 truncate font-medium text-base text-text">
-            {hasBatchSelection ? `${selectionCount} selected` : TASK_VIEW_LABELS[selectedView]}
+            {hasBatchSelection
+              ? `${selectionCount} selected`
+              : isSearching
+                ? "Search Results"
+                : TASK_VIEW_LABELS[selectedView]}
           </div>
         </div>
         {hasBatchSelection ? (
@@ -484,21 +566,23 @@ export function TaskListPane() {
           </div>
         ) : (
           <div className="ui-pane-header-actions ml-auto">
-            <SortMenuButton
-              title="Sort Tasks"
-              menuTitle={TASK_VIEW_LABELS[selectedView]}
-              value={taskSortMode}
-              items={(() => {
-                const base = selectedView === "completed"
-                  ? BASE_TASK_SORT_ITEMS
-                  : BASE_TASK_SORT_ITEMS.filter((item) => item.key !== "completed");
-                return MANUAL_SORT_VIEWS.includes(selectedView)
-                  ? [...base, MANUAL_SORT_ITEM]
-                  : base;
-              })()}
-              onChange={setTaskSortMode}
-            />
-            {canInlineCreate && (
+            {!isSearching && (
+              <SortMenuButton
+                title="Sort Tasks"
+                menuTitle={TASK_VIEW_LABELS[selectedView]}
+                value={taskSortMode}
+                items={(() => {
+                  const base = selectedView === "completed"
+                    ? BASE_TASK_SORT_ITEMS
+                    : BASE_TASK_SORT_ITEMS.filter((item) => item.key !== "completed");
+                  return MANUAL_SORT_VIEWS.includes(selectedView)
+                    ? [...base, MANUAL_SORT_ITEM]
+                    : base;
+                })()}
+                onChange={setTaskSortMode}
+              />
+            )}
+            {canInlineCreate && !isSearching && (
               <IconButton
                 type="button"
                 title="New Task"
@@ -508,16 +592,47 @@ export function TaskListPane() {
                 <Plus className="h-4 w-4 stroke-[1.8]" />
               </IconButton>
             )}
+            <IconButton
+              type="button"
+              title="Search Tasks"
+              onClick={toggleSearch}
+            >
+              {searchOpen ? (
+                <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+              ) : (
+                <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+              )}
+            </IconButton>
           </div>
         )}
       </div>
 
-      <div
-        className={cn(
-          "ui-scrollbar-overlay flex-1 overflow-y-auto",
-          showEmptyState ? "" : "",
+      <div className="ui-scrollbar-overlay flex-1 overflow-y-auto">
+        {searchOpen && (
+          <div className="sticky top-0 z-10 px-3 pt-2 pb-1 bg-bg">
+            <div className="relative">
+              <Input
+                ref={searchInputRef}
+                type="text"
+                value={inputValue}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search tasks…"
+                className="pr-8 text-sm"
+              />
+              {inputValue && (
+                <button
+                  type="button"
+                  onClick={() => { setInputValue(""); setSearchQuery(""); }}
+                  className="ui-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded-[var(--ui-radius-sm)] text-text-muted hover:text-text"
+                >
+                  <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+                </button>
+              )}
+            </div>
+          </div>
         )}
-      >
+
         {isLoading ? (
           <div className="flex min-h-full">
             <PanelEmptyState
@@ -525,6 +640,72 @@ export function TaskListPane() {
               message="Reading your task list."
             />
           </div>
+        ) : isSearching ? (
+          searchResults!.length === 0 ? (
+            <div className="flex min-h-full">
+              <PanelEmptyState
+                icon={<SearchIcon className="h-full w-full" />}
+                title="No matching tasks"
+                message="Try a different search term."
+              />
+            </div>
+          ) : (
+            <div
+              role="listbox"
+              aria-label="Search Results"
+              aria-multiselectable={true}
+              className="flex flex-col gap-1 px-1.5 pt-1.5 pb-1.5 outline-none"
+            >
+              {searchResults!.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  dragIds={
+                    selectedTaskIds.length > 1 && selectedTaskIdSet.has(task.id)
+                      ? selectedTaskIds
+                      : [task.id]
+                  }
+                  view={task.completedAt ? "completed" : "upcoming"}
+                  today={today}
+                  selectionState={
+                    selectedTaskId === task.id
+                      ? "active"
+                      : selectedTaskIdSet.has(task.id)
+                        ? "selected"
+                        : "none"
+                  }
+                  onSelect={(event) => handleTaskSelect(task.id, event)}
+                  onContextMenuOpen={() => {
+                    if (!(hasBatchSelection && selectedTaskIdSet.has(task.id))) {
+                      selectTask(task.id);
+                    }
+                  }}
+                  onToggleComplete={() => void setCompleted(task.id, !task.completedAt)}
+                  onToggleStar={() => void updateTask(task.id, { starred: !task.starred })}
+                  onRename={(title) => void updateTask(task.id, { title })}
+                  contextMenu={
+                    <>
+                      <ContextMenu.Item
+                        className={menuItemClassName}
+                        onSelect={() => setRescheduleTaskIds([task.id])}
+                      >
+                        <CalendarDays className="h-4 w-4 stroke-[1.6]" />
+                        Reschedule…
+                      </ContextMenu.Item>
+                      <ContextMenu.Separator className={menuSeparatorClassName} />
+                      <ContextMenu.Item
+                        className={destructiveMenuItemClassName}
+                        onSelect={() => void handleDeleteTasks([task.id])}
+                      >
+                        <Trash2 className="h-4 w-4 stroke-[1.6]" />
+                        Delete
+                      </ContextMenu.Item>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )
         ) : tasks.length === 0 && !isCreating ? (
           <div className="flex min-h-full">
             <PanelEmptyState

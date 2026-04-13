@@ -142,6 +142,18 @@ export function groupByView(
   return buckets;
 }
 
+/**
+ * Returns true if the task matches the given search query.
+ * Searches title, description, link, and waitingFor (case-insensitive contains).
+ */
+export function taskMatchesQuery(task: TaskMetadata, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return [task.title, task.description, task.link, task.waitingFor].some(
+    (field) => field.toLowerCase().includes(needle),
+  );
+}
+
 export function getDefaultTaskSortMode(view: TaskView): TaskSortMode {
   switch (view) {
     case "today":

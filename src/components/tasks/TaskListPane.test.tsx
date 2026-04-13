@@ -26,6 +26,7 @@ function makeTasksHookValue(
   overrides: Partial<TasksHookValue> = {},
 ): TasksHookValue {
   return {
+    tasks: [],
     buckets: {
       inbox: [],
       today: [],
@@ -51,6 +52,7 @@ function makeTasksHookValue(
     clearTaskSelection: vi.fn(),
     setCompleted: vi.fn(),
     updateTask: vi.fn(),
+    deleteTask: vi.fn().mockResolvedValue(undefined),
     createTask: vi.fn().mockResolvedValue({
       id: "task-1",
       title: "Draft task",
@@ -564,5 +566,75 @@ describe("TaskListPane", () => {
     expect(screen.getByText("Overdue")).toBeInTheDocument();
     expect(screen.getByText("Anytime")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New Task" })).not.toBeInTheDocument();
+  });
+
+  it("opens the search input when the search button is clicked", async () => {
+    const user = userEvent.setup();
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    expect(screen.queryByPlaceholderText("Search tasks…")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    expect(screen.getByPlaceholderText("Search tasks…")).toBeInTheDocument();
+  });
+
+  it("shows matching task rows when a query is typed", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        tasks: [
+          { id: "t1", title: "Fix login bug", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+          { id: "t2", title: "Write unit tests", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+          { id: "t3", title: "Deploy hotfix", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+        ],
+      }),
+    );
+
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.type(screen.getByPlaceholderText("Search tasks…"), "fix");
+
+    // "Fix login bug" and "Deploy hotfix" match; "Write unit tests" does not
+    await waitFor(() => {
+      expect(screen.getAllByTestId("task-row")).toHaveLength(2);
+    });
+  });
+
+  it("shows empty state when no tasks match the search query", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        tasks: [
+          { id: "t1", title: "Buy groceries", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+        ],
+      }),
+    );
+
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.type(screen.getByPlaceholderText("Search tasks…"), "zzznomatch");
+
+    await waitFor(() => {
+      expect(screen.getByText("No matching tasks")).toBeInTheDocument();
+    });
+  });
+
+  it("closes search and resets header when Escape is pressed on an empty input", async () => {
+    const user = userEvent.setup();
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    const input = screen.getByPlaceholderText("Search tasks…");
+    await user.click(input);
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByPlaceholderText("Search tasks…")).not.toBeInTheDocument();
+    expect(screen.getByText("Inbox")).toBeInTheDocument();
   });
 });

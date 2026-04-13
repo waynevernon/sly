@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskMetadata } from "../types/tasks";
-import { compareTasks, deriveView, detectTaskDateFromTitle, groupByView, isOverdue, localDateString } from "./tasks";
+import { compareTasks, deriveView, detectTaskDateFromTitle, groupByView, isOverdue, localDateString, taskMatchesQuery } from "./tasks";
 
 const TODAY = "2026-04-09";
 
@@ -151,5 +151,33 @@ describe("detectTaskDateFromTitle", () => {
     const result = detectTaskDateFromTitle("Do it tomorrow", TODAY);
     expect(result?.localDate).toBe("2026-04-10");
     expect(result?.matchedText).toBe("tomorrow");
+  });
+});
+
+describe("taskMatchesQuery", () => {
+  it("matches title (case-insensitive)", () => {
+    expect(taskMatchesQuery(meta({ title: "Deploy hotfix" }), "hotfix")).toBe(true);
+    expect(taskMatchesQuery(meta({ title: "Deploy hotfix" }), "HOTFIX")).toBe(true);
+  });
+
+  it("matches description", () => {
+    expect(taskMatchesQuery(meta({ description: "Check the logs first" }), "logs")).toBe(true);
+  });
+
+  it("matches link", () => {
+    expect(taskMatchesQuery(meta({ link: "https://github.com/org/repo" }), "github")).toBe(true);
+  });
+
+  it("matches waitingFor", () => {
+    expect(taskMatchesQuery(meta({ waitingFor: "Jordan" }), "jordan")).toBe(true);
+  });
+
+  it("returns false when no field matches", () => {
+    expect(taskMatchesQuery(meta({ title: "Write tests" }), "deploy")).toBe(false);
+  });
+
+  it("returns true for an empty query", () => {
+    expect(taskMatchesQuery(meta(), "")).toBe(true);
+    expect(taskMatchesQuery(meta(), "   ")).toBe(true);
   });
 });
