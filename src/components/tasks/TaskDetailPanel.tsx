@@ -5,6 +5,7 @@ import {
   Clock3,
   ExternalLink,
   LoaderCircle,
+  Star,
   Trash2,
   UserRound,
   X,
@@ -33,6 +34,7 @@ export function TaskDetailPanel() {
     setCompleted,
     today,
   } = useTasks();
+
 
   const [title, setTitle] = useState("");
   const [actionDate, setActionDate] = useState("");
@@ -460,6 +462,19 @@ export function TaskDetailPanel() {
         <div className="flex-1" />
         {selectedTask ? (
           <div className="ui-pane-header-actions ml-auto">
+            <IconButton
+              type="button"
+              variant="ghost"
+              title={selectedTask.starred ? "Unstar task" : "Star task"}
+              onClick={() => void updateTask(selectedTask.id, { starred: !selectedTask.starred })}
+              className={selectedTask.starred ? "text-amber-400 hover:text-amber-400/80" : undefined}
+            >
+              <Star
+                className="h-4 w-4"
+                fill={selectedTask.starred ? "currentColor" : "none"}
+                strokeWidth={selectedTask.starred ? 0 : 1.6}
+              />
+            </IconButton>
             <IconButton
               type="button"
               variant="ghost"

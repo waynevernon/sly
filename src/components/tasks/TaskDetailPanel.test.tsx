@@ -294,6 +294,59 @@ describe("TaskDetailPanel", () => {
       });
     });
   });
+
+  it("stars and unstars the task from the header toolbar", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const updateTask = vi.fn().mockResolvedValue(null);
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Star task" }));
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", { starred: true });
+    });
+
+    // Now render with the task already starred
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        updateTask,
+        selectedTask: {
+          id: "task-1",
+          title: "Follow up",
+          description: "",
+          link: "",
+          waitingFor: "",
+          createdAt: "2026-04-10T12:00:00Z",
+          actionAt: null,
+          scheduleBucket: null,
+          completedAt: null,
+          starred: true,
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Unstar task" })[0]);
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", { starred: false });
+    });
+  });
 });
 
 function formatTaskTimestampForTest(value: string): string {
