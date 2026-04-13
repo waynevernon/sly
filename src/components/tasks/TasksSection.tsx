@@ -108,7 +108,7 @@ function TaskViewButton({
 
   return (
     <div>
-      {(view === "starred" || view === "waiting") && (
+      {view === "starred" && (
         <div className="mx-3 my-1.5 border-t border-border/50" />
       )}
       <button
