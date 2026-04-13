@@ -181,8 +181,16 @@ export function GlobalTaskCaptureDialog({
 
   const canSubmit = title.trim().length > 0 && !isSaving;
   const effectiveActionDate =
-    manualScheduleBucket ? "" : manualActionDate || detectedDate?.localDate || "";
+    manualScheduleBucket ? "" : manualActionDate || "";
   const showDetectedDateChip = Boolean(detectedDate && !manualActionDate && !manualScheduleBucket);
+  const titleHighlight = useMemo(() => {
+    if (!showDetectedDateChip || !detectedDate) return null;
+    const lower = title.toLowerCase();
+    const matchedLower = detectedDate.matchedText.toLowerCase();
+    const start = lower.indexOf(matchedLower);
+    if (start === -1) return null;
+    return { start, end: start + detectedDate.matchedText.length };
+  }, [showDetectedDateChip, detectedDate, title]);
   const waitingForSuggestions = useMemo(() => {
     const counts = new Map<string, { value: string; count: number }>();
 
@@ -234,7 +242,19 @@ export function GlobalTaskCaptureDialog({
           <X className="h-4 w-4 stroke-[1.9]" />
         </button>
         <div className="flex flex-col gap-3.5">
-          <div className="pr-10">
+          <div className="pointer-events-none relative pr-10">
+            {titleHighlight && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[1.7rem] font-medium leading-tight text-transparent"
+              >
+                {title.slice(0, titleHighlight.start)}
+                <span className="rounded-sm bg-accent/12">
+                  {title.slice(titleHighlight.start, titleHighlight.end)}
+                </span>
+                {title.slice(titleHighlight.end)}
+              </div>
+            )}
             <input
               ref={titleInputRef}
               value={title}
@@ -246,20 +266,22 @@ export function GlobalTaskCaptureDialog({
                   void handleSubmit();
                 }
               }}
-              className="min-w-0 flex-1 bg-transparent text-[1.7rem] font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+              className="pointer-events-auto relative min-w-0 flex-1 bg-transparent text-[1.7rem] font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <TaskDatePicker
-              actionDate={effectiveActionDate}
-              scheduleBucket={manualScheduleBucket}
-              today={today}
-              onChange={({ actionDate, scheduleBucket }) => {
-                setManualActionDate(actionDate ?? "");
-                setManualScheduleBucket(scheduleBucket);
-              }}
-            />
+            {!showDetectedDateChip && (
+              <TaskDatePicker
+                actionDate={effectiveActionDate}
+                scheduleBucket={manualScheduleBucket}
+                today={today}
+                onChange={({ actionDate, scheduleBucket }) => {
+                  setManualActionDate(actionDate ?? "");
+                  setManualScheduleBucket(scheduleBucket);
+                }}
+              />
+            )}
             {showDetectedDateChip ? (
               <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-2.5 text-xs font-medium text-text-muted">
                 <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />

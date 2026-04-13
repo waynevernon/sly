@@ -1,11 +1,30 @@
 import * as chrono from "chrono-node";
-import type { ParsedResult } from "chrono-node";
+import type { ParsedResult, Parser } from "chrono-node";
 import type {
   Task,
   TaskMetadata,
   TaskScheduleBucket,
   TaskView,
 } from "../types/tasks";
+
+// Extend the casual parser with short aliases: "tod" → today, "tom" → tomorrow.
+// These complement the built-in "tmr"/"tmrw" aliases already handled by chrono.
+const shortAliasParser: Parser = {
+  pattern: () => /\b(tod|tom)\b/i,
+  extract: (context, match) => {
+    const word = match[1].toLowerCase();
+    const target = new Date(context.refDate);
+    if (word === "tom") target.setDate(target.getDate() + 1);
+    return {
+      year: target.getFullYear(),
+      month: target.getMonth() + 1,
+      day: target.getDate(),
+    };
+  },
+};
+
+const casualWithAliases = chrono.casual.clone();
+casualWithAliases.parsers.unshift(shortAliasParser);
 
 export const TASK_VIEW_LABELS: Record<TaskView, string> = {
   inbox: "Inbox",
@@ -223,7 +242,7 @@ export function detectTaskDateFromTitle(title: string, today: string): DetectedT
   if (!trimmedTitle) return null;
 
   const referenceDate = localDateToReference(today);
-  const matches = chrono.casual.parse(trimmedTitle, referenceDate, { forwardDate: true });
+  const matches = casualWithAliases.parse(trimmedTitle, referenceDate, { forwardDate: true });
 
   for (const match of matches) {
     const localDate = localDateString(match.start.date());

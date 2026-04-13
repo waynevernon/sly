@@ -149,6 +149,14 @@ export function TaskListPane() {
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
   const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting";
+  const inlineTitleHighlight = useMemo(() => {
+    if (!detectedDate) return null;
+    const lower = newTitle.toLowerCase();
+    const matchedLower = detectedDate.matchedText.toLowerCase();
+    const start = lower.indexOf(matchedLower);
+    if (start === -1) return null;
+    return { start, end: start + detectedDate.matchedText.length };
+  }, [detectedDate, newTitle]);
 
   const focusCreateInput = useCallback(() => {
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -521,18 +529,32 @@ export function TaskListPane() {
               <div className="rounded-[var(--ui-radius-md)] bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">
                 <div className="flex items-center gap-2.5">
                   <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={newTitle}
-                    placeholder="Task name"
-                    onChange={(event) => setNewTitle(event.target.value)}
-                    onBlur={() => void handleCommitCreate()}
-                    onKeyDown={handleCreateKeyDown}
-                    className={cn(
-                      "min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50",
+                  <div className="relative min-w-0 flex-1">
+                    {inlineTitleHighlight && (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm font-normal leading-normal text-transparent"
+                      >
+                        {newTitle.slice(0, inlineTitleHighlight.start)}
+                        <span className="rounded-sm bg-accent/12">
+                          {newTitle.slice(inlineTitleHighlight.start, inlineTitleHighlight.end)}
+                        </span>
+                        {newTitle.slice(inlineTitleHighlight.end)}
+                      </div>
                     )}
-                  />
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={newTitle}
+                      placeholder="Task name"
+                      onChange={(event) => setNewTitle(event.target.value)}
+                      onBlur={() => void handleCommitCreate()}
+                      onKeyDown={handleCreateKeyDown}
+                      className={cn(
+                        "relative min-w-0 w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50",
+                      )}
+                    />
+                  </div>
                 </div>
 
                 {detectedDate ? (

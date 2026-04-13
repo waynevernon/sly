@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskMetadata } from "../types/tasks";
-import { compareTasks, deriveView, groupByView, isOverdue, localDateString } from "./tasks";
+import { compareTasks, deriveView, detectTaskDateFromTitle, groupByView, isOverdue, localDateString } from "./tasks";
 
 const TODAY = "2026-04-09";
 
@@ -124,5 +124,31 @@ describe("localDateString", () => {
   it("formats a known date correctly", () => {
     const d = new Date(2026, 3, 9); // April 9 2026 (month is 0-indexed)
     expect(localDateString(d)).toBe("2026-04-09");
+  });
+});
+
+describe("detectTaskDateFromTitle", () => {
+  it("detects 'tod' as today", () => {
+    const result = detectTaskDateFromTitle("Call dentist tod", TODAY);
+    expect(result?.localDate).toBe(TODAY);
+    expect(result?.cleanedTitle).toBe("Call dentist");
+  });
+
+  it("detects 'tom' as tomorrow", () => {
+    const result = detectTaskDateFromTitle("Submit report tom", TODAY);
+    expect(result?.localDate).toBe("2026-04-10");
+    expect(result?.cleanedTitle).toBe("Submit report");
+  });
+
+  it("does not match 'tod' inside a longer word", () => {
+    const result = detectTaskDateFromTitle("Today is a good today", TODAY);
+    // 'today' is a full word and should still parse (built-in), not the alias
+    expect(result?.localDate).toBe(TODAY);
+  });
+
+  it("does not match 'tom' inside a longer word like 'tomorrow'", () => {
+    const result = detectTaskDateFromTitle("Do it tomorrow", TODAY);
+    expect(result?.localDate).toBe("2026-04-10");
+    expect(result?.matchedText).toBe("tomorrow");
   });
 });
