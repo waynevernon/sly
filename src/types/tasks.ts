@@ -20,6 +20,7 @@ export interface TaskMetadata {
   scheduleBucket: TaskScheduleBucket | null;
   completedAt: string | null;
   starred: boolean;
+  dueAt: string | null;
 }
 
 export interface Task extends TaskMetadata {
@@ -33,4 +34,5 @@ export interface TaskPatch {
   actionAt?: string | null;
   scheduleBucket?: TaskScheduleBucket | null;
   starred?: boolean;
+  dueAt?: string | null;
 }

@@ -51,12 +51,15 @@ export function TaskRow({
   const hasDescription = task.description.trim().length > 0;
   const hasLink = task.link.trim().length > 0;
   const hasWaitingFor = task.waitingFor.trim().length > 0;
-  const showActionDateLabel = view !== "completed" && view !== "today";
+  const showActionDateLabel = view !== "completed" && (view !== "today" || overdue);
   const secondaryLabel = task.completedAt && view === "completed"
     ? formatCompletedAt(task.completedAt)
       : actionDate && showActionDateLabel
       ? formatDate(actionDate, today)
       : null;
+  const dueDate = actionAtToLocalDate(task.dueAt);
+  const dueDateLabel = dueDate ? `Due ${formatDate(dueDate, today)}` : null;
+  const dueOverdue = !isCompleted && dueDate !== null && dueDate < today;
   const isSelected = selectionState !== "none";
   const isActive = selectionState === "active";
 
@@ -139,7 +142,7 @@ export function TaskRow({
             }}
             className={cn(
               "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-100",
-              secondaryLabel ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
+              secondaryLabel || dueDateLabel ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
               isActive
                 ? "bg-bg-emphasis"
                 : isSelected
@@ -233,14 +236,22 @@ export function TaskRow({
                   )}
                 </span>
 
-                {secondaryLabel && (
+                {(secondaryLabel || dueDateLabel) && (
                   <span
                     className={cn(
-                      "mt-0.5 block text-xs leading-none tabular-nums",
-                      overdue ? "text-[var(--color-danger)]" : "text-text-muted/60",
+                      "mt-0.5 flex items-center gap-1.5 text-xs leading-none tabular-nums",
+                      overdue && secondaryLabel ? "text-[var(--color-danger)]" : "text-text-muted/60",
                     )}
                   >
                     {secondaryLabel}
+                    {secondaryLabel && dueDateLabel && (
+                      <span className="text-text-muted/30">·</span>
+                    )}
+                    {dueDateLabel && (
+                      <span className={dueOverdue ? "text-[var(--color-danger)]" : "text-text-muted/60"}>
+                        {dueDateLabel}
+                      </span>
+                    )}
                   </span>
                 )}
               </button>

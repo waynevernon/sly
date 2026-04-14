@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const TASKS_DB_SCHEMA_VERSION: i32 = 6;
+const TASKS_DB_SCHEMA_VERSION: i32 = 7;
 
 // Public types
 
@@ -22,6 +22,7 @@ pub struct TaskMetadata {
     pub schedule_bucket: Option<String>,
     pub completed_at: Option<String>,
     pub starred: bool,
+    pub due_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +38,7 @@ pub struct Task {
     pub schedule_bucket: Option<String>,
     pub completed_at: Option<String>,
     pub starred: bool,
+    pub due_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -51,6 +53,8 @@ pub struct TaskPatch {
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub schedule_bucket: Option<Option<String>>,
     pub starred: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub due_at: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,6 +126,7 @@ struct TaskRow {
     schedule_bucket: Option<String>,
     completed_at: Option<String>,
     starred: bool,
+    due_at: Option<String>,
 }
 
 impl From<TaskRow> for Task {
@@ -137,6 +142,7 @@ impl From<TaskRow> for Task {
             schedule_bucket: row.schedule_bucket,
             completed_at: row.completed_at,
             starred: row.starred,
+            due_at: row.due_at,
         }
     }
 }
@@ -154,6 +160,7 @@ impl From<TaskRow> for TaskMetadata {
             schedule_bucket: row.schedule_bucket,
             completed_at: row.completed_at,
             starred: row.starred,
+            due_at: row.due_at,
         }
     }
 }
@@ -223,6 +230,10 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
             "ALTER TABLE tasks ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
             [],
         )?;
+    }
+
+    if !table_column_exists(conn, "tasks", "due_at")? {
+        conn.execute("ALTER TABLE tasks ADD COLUMN due_at TEXT NULL", [])?;
     }
 
     conn.execute_batch(
@@ -484,13 +495,14 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
         schedule_bucket: row.get("schedule_bucket")?,
         completed_at: row.get("completed_at")?,
         starred: row.get::<_, i64>("starred").map(|v| v != 0).unwrap_or(false),
+        due_at: row.get("due_at")?,
     })
 }
 
 fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
     conn.query_row(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at
         FROM tasks
         WHERE id = ?1
         ",
@@ -507,7 +519,7 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
     let conn = open_tasks_db(notes_root)?;
     let mut statement = conn.prepare(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at
         FROM tasks
         ORDER BY created_at DESC
         ",
@@ -550,12 +562,13 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
         schedule_bucket: None,
         completed_at: None,
         starred: false,
+        due_at: None,
     };
 
     conn.execute(
         "
-        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
         ",
         params![
             &task.id,
@@ -568,6 +581,7 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
             &task.created_at,
             &task.completed_at,
             task.starred as i64,
+            &task.due_at,
         ],
     )?;
 
@@ -609,6 +623,11 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         }
     }
 
+    let due_at = match patch.due_at {
+        Some(next) => normalize_action_at(next)?,
+        None => existing.due_at,
+    };
+
     conn.execute(
         "
         UPDATE tasks
@@ -618,7 +637,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             waiting_for = ?5,
             action_at = ?6,
             schedule_bucket = ?7,
-            starred = ?8
+            starred = ?8,
+            due_at = ?9
         WHERE id = ?1
         ",
         params![
@@ -630,6 +650,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             action_at,
             schedule_bucket,
             starred as i64,
+            due_at,
         ],
     )?;
 
@@ -644,6 +665,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         schedule_bucket,
         completed_at: existing.completed_at,
         starred,
+        due_at,
     })
 }
 
@@ -672,6 +694,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
         schedule_bucket: existing.schedule_bucket,
         completed_at,
         starred: existing.starred,
+        due_at: existing.due_at,
     })
 }
 
@@ -869,6 +892,7 @@ mod tests {
                 action_at: Some(Some("2026-04-10T17:00:00-05:00".to_string())),
                 schedule_bucket: None,
                 starred: None,
+                due_at: None,
             },
         )
         .unwrap();
@@ -916,7 +940,37 @@ mod tests {
         assert_eq!(migrated.link, "");
         assert_eq!(migrated.waiting_for, "");
         assert!(migrated.schedule_bucket.is_none());
+        assert!(migrated.due_at.is_none());
         assert_eq!(user_version, TASKS_DB_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn update_due_at_and_can_clear() {
+        let root = make_root();
+        let task = create_task(root.path(), "Has due date").unwrap();
+        assert!(task.due_at.is_none());
+
+        let updated = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                due_at: Some(Some("2026-05-01T12:00:00Z".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(updated.due_at.is_some());
+
+        let cleared = update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                due_at: Some(None),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(cleared.due_at.is_none());
     }
 
     #[test]

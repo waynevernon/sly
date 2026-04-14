@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  CheckSquare,
   Clock3,
+  ListTodo,
   ExternalLink,
   LoaderCircle,
   Star,
@@ -19,7 +19,7 @@ import {
 import { cn } from "../../lib/utils";
 import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
 import { Button, IconButton, PanelEmptyState, PopoverSurface } from "../ui";
-import { TaskDatePicker } from "./TaskDatePicker";
+import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 
 const DEBOUNCE_MS = 600;
 
@@ -39,6 +39,7 @@ export function TaskDetailPanel() {
   const [title, setTitle] = useState("");
   const [actionDate, setActionDate] = useState("");
   const [scheduleBucket, setScheduleBucket] = useState<TaskScheduleBucket | null>(null);
+  const [dueDate, setDueDate] = useState("");
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
   const [waitingForEditing, setWaitingForEditing] = useState(false);
@@ -93,6 +94,7 @@ export function TaskDetailPanel() {
     setTitle(selectedTask.title);
     setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
     setScheduleBucket(selectedTask.scheduleBucket);
+    setDueDate(actionAtToLocalDate(selectedTask.dueAt) ?? "");
     setLink(selectedTask.link);
     setWaitingFor(selectedTask.waitingFor);
     setWaitingForEditing(false);
@@ -148,6 +150,15 @@ export function TaskDetailPanel() {
         actionAt: localDateToNormalizedActionAt(next.actionDate),
         scheduleBucket: next.scheduleBucket,
       });
+      flushSave();
+    },
+    [flushSave, scheduleSave],
+  );
+
+  const commitDueDate = useCallback(
+    (date: string | null) => {
+      setDueDate(date ?? "");
+      scheduleSave({ dueAt: localDateToNormalizedActionAt(date) });
       flushSave();
     },
     [flushSave, scheduleSave],
@@ -228,7 +239,7 @@ export function TaskDetailPanel() {
     if (!selectedTaskId || !selectedTask) {
       return (
         <PanelEmptyState
-          icon={<CheckSquare />}
+          icon={<ListTodo />}
           title="Select a task"
           message="Choose a task from the list to open its details here."
         />
@@ -276,8 +287,13 @@ export function TaskDetailPanel() {
               today={today}
               onChange={commitSchedule}
             />
+            <DueDatePicker
+              dueDate={dueDate}
+              today={today}
+              onChange={commitDueDate}
+            />
             {waitingForEditing ? (
-              <div className="relative min-w-[220px] max-w-[320px] flex-1">
+              <div className="relative max-w-[320px]">
                 <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
                   <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
                   <input

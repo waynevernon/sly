@@ -1,5 +1,5 @@
 import { useDndContext, useDroppable } from "@dnd-kit/core";
-import { Archive, CalendarClock, CheckCheck, CheckSquare, Clock3, Inbox, Star, UserRound } from "lucide-react";
+import { Archive, CalendarClock, CheckCheck, Clock3, Inbox, Layers, Star, Sun } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { TASK_DRAG_TARGET_VIEWS, TASK_VIEW_ORDER, TASK_VIEW_LABELS } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
@@ -8,10 +8,10 @@ import { CountBadge } from "../ui";
 
 const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: ({ className }) => <Inbox className={className} />,
-  today: ({ className }) => <CheckSquare className={className} />,
+  today: ({ className }) => <Sun className={className} />,
   upcoming: ({ className }) => <CalendarClock className={className} />,
-  waiting: ({ className }) => <UserRound className={className} />,
-  anytime: ({ className }) => <Clock3 className={className} />,
+  waiting: ({ className }) => <Clock3 className={className} />,
+  anytime: ({ className }) => <Layers className={className} />,
   someday: ({ className }) => <Archive className={className} />,
   completed: ({ className }) => <CheckCheck className={className} />,
   starred: ({ className }) => <Star className={className} />,

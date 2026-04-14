@@ -79,8 +79,8 @@ Current release posture before 1.0:
    - stable example: `.github/updater-notes/v1.3.0.md`
    - beta example: `.github/updater-notes/v1.4.0-beta.1.md`
    - start from `.github/updater-notes/TEMPLATE.md`
-   - keep it short and user-facing because the same text appears in the in-app updater prompt
-   - two to four lines is the target; avoid long changelog-style notes here
+   - write 2–3 sentences of continuous prose with no line breaks — the same text appears verbatim in the in-app updater prompt, so it should read naturally as a short paragraph, not a bulleted list
+   - keep it user-facing and conversational; avoid changelog-style fragments
 3. Run the expected local confidence checks before tagging:
    ```bash
    npm run verify

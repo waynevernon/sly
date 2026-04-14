@@ -39,7 +39,10 @@ export function GlobalTaskCaptureDialog({
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
+  const [waitingForEditing, setWaitingForEditing] = useState(false);
   const [waitingForFocused, setWaitingForFocused] = useState(false);
+  const waitingForInputRef = useRef<HTMLInputElement>(null);
+  const waitingForPendingBlurValueRef = useRef<string | null>(null);
   const [manualActionDate, setManualActionDate] = useState("");
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
@@ -54,6 +57,7 @@ export function GlobalTaskCaptureDialog({
     setDescription("");
     setLink("");
     setWaitingFor("");
+    setWaitingForEditing(false);
     setWaitingForFocused(false);
     setManualActionDate("");
     setManualScheduleBucket(null);
@@ -222,8 +226,9 @@ export function GlobalTaskCaptureDialog({
       })
       .slice(0, 6);
   }, [waitingFor, waitingForSuggestions]);
+  const hasWaitingFor = waitingFor.trim().length > 0;
   const showWaitingForSuggestions =
-    waitingForFocused && filteredWaitingForSuggestions.length > 0;
+    waitingForEditing && waitingForFocused && filteredWaitingForSuggestions.length > 0;
 
   if (!open) return null;
 
@@ -302,40 +307,107 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
-            <div className="relative min-w-[200px] flex-1">
-              <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
-                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                <input
-                  value={waitingFor}
-                  placeholder="Waiting for…"
-                  onChange={(event) => setWaitingFor(event.target.value)}
-                  onFocus={() => setWaitingForFocused(true)}
-                  onBlur={() => setWaitingForFocused(false)}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
-                />
+            {waitingForEditing ? (
+              <div className="relative max-w-[320px]">
+                <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+                  <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                  <input
+                    ref={waitingForInputRef}
+                    type="text"
+                    value={waitingFor}
+                    placeholder="Waiting for…"
+                    onChange={(event) => setWaitingFor(event.target.value)}
+                    onFocus={() => setWaitingForFocused(true)}
+                    onBlur={(event) => {
+                      setWaitingForFocused(false);
+                      const pendingValue = waitingForPendingBlurValueRef.current;
+                      waitingForPendingBlurValueRef.current = null;
+                      const resolved = (pendingValue ?? event.currentTarget.value).trim();
+                      setWaitingFor(resolved);
+                      setWaitingForEditing(false);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        const trimmed = event.currentTarget.value.trim();
+                        waitingForPendingBlurValueRef.current = trimmed;
+                        setWaitingFor(trimmed);
+                        setWaitingForEditing(false);
+                        waitingForInputRef.current?.blur();
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setWaitingForEditing(false);
+                        setWaitingForFocused(false);
+                        waitingForInputRef.current?.blur();
+                      }
+                    }}
+                    className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setWaitingFor("");
+                      setWaitingForEditing(false);
+                      setWaitingForFocused(false);
+                    }}
+                    className="ui-focus-ring inline-flex h-5 w-5 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                    aria-label="Clear waiting for"
+                  >
+                    <X className="h-3.5 w-3.5 stroke-[1.9]" />
+                  </button>
+                </div>
+                {showWaitingForSuggestions ? (
+                  <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 w-full p-1.5">
+                    <div className="flex flex-col gap-1">
+                      {filteredWaitingForSuggestions.map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            waitingForPendingBlurValueRef.current = value;
+                            setWaitingFor(value);
+                            setWaitingForEditing(false);
+                            waitingForInputRef.current?.blur();
+                          }}
+                          className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
+                        >
+                          <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted" />
+                          <span className="truncate">{value}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverSurface>
+                ) : null}
               </div>
-              {showWaitingForSuggestions ? (
-                <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 w-full p-1.5">
-                  <div className="flex flex-col gap-1">
-                    {filteredWaitingForSuggestions.map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          setWaitingFor(value);
-                          setWaitingForFocused(false);
-                        }}
-                        className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
-                      >
-                        <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted" />
-                        <span className="truncate">{value}</span>
-                      </button>
-                    ))}
-                  </div>
-                </PopoverSurface>
-              ) : null}
-            </div>
+            ) : hasWaitingFor ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setWaitingForEditing(true);
+                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
+                }}
+                className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
+              >
+                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                <span className="truncate text-left">Waiting for {waitingFor}</span>
+              </button>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setWaitingForEditing(true);
+                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
+                }}
+                className="gap-2"
+              >
+                <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                <span>Waiting for</span>
+              </Button>
+            )}
           </div>
 
           <div className="space-y-2">

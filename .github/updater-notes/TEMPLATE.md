@@ -1,3 +1,1 @@
-Improved note editing flow
-Faster and more reliable workspace behavior
-Polish and bug fixes across the app
+This release improves X and fixes Y. It also includes Z. Update to get the latest changes.

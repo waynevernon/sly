@@ -2,10 +2,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Archive,
+  CalendarCheck,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Clock3,
+  Layers,
   RotateCcw,
   Sun,
   Sunrise,
@@ -113,8 +114,8 @@ export function TaskDatePicker({
   const formattedValue = scheduleBucket
     ? TASK_SCHEDULE_BUCKET_LABELS[scheduleBucket]
     : actionDate
-      ? formatTaskDate(actionDate, today)
-      : "Set date";
+      ? `Action  ${formatTaskDate(actionDate, today)}`
+      : "Action date";
 
   return (
     <div className={cn("relative", className)}>
@@ -153,6 +154,217 @@ export function TaskDatePicker({
             document.body,
           )
         : null}
+    </div>
+  );
+}
+
+interface DueDatePickerProps {
+  dueDate: string;
+  today: string;
+  onChange: (date: string | null) => void;
+  className?: string;
+}
+
+export function DueDatePicker({
+  dueDate,
+  today,
+  onChange,
+  className,
+}: DueDatePickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = 320;
+      const margin = 8;
+      const left = Math.min(
+        Math.max(margin, rect.left),
+        Math.max(margin, window.innerWidth - width - margin),
+      );
+      const preferredTop = rect.bottom + 8;
+      const estimatedHeight = 360;
+      const top =
+        preferredTop + estimatedHeight <= window.innerHeight || rect.top < estimatedHeight
+          ? preferredTop
+          : Math.max(margin, rect.top - estimatedHeight - 8);
+      setPopoverPosition({ left, top });
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (
+        !popoverRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    updatePosition();
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
+  const formattedValue = dueDate ? `Due  ${formatTaskDate(dueDate, today)}` : "Due date";
+
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className={cn(
+          "ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
+          dueDate
+            ? "bg-bg-muted/70 text-text hover:bg-bg-muted"
+            : "text-text-muted hover:bg-bg-muted hover:text-text",
+        )}
+      >
+        <CalendarCheck className="h-4 w-4 shrink-0 stroke-[1.7]" />
+        <span>{formattedValue}</span>
+      </button>
+
+      {isOpen && popoverPosition
+        ? createPortal(
+            <PopoverSurface
+              ref={popoverRef}
+              className="fixed z-[100] w-80 p-2.5"
+              style={{ left: popoverPosition.left, top: popoverPosition.top }}
+            >
+              <DueDatePickerPanel
+                today={today}
+                dueDate={dueDate || null}
+                onSelect={(date) => {
+                  onChange(date);
+                  setIsOpen(false);
+                }}
+              />
+            </PopoverSurface>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+function DueDatePickerPanel({
+  today,
+  dueDate,
+  onSelect,
+}: {
+  today: string;
+  dueDate: string | null;
+  onSelect: (date: string | null) => void;
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(dueDate || today));
+  const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
+  const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
+  const tomorrow = offsetDate(today, 1);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        <QuickDateButton
+          label="Today"
+          icon={<Sun className="h-3.5 w-3.5 stroke-[1.8]" />}
+          isActive={dueDate === today}
+          onClick={() => onSelect(today)}
+        />
+        <QuickDateButton
+          label="Tomorrow"
+          icon={<Sunrise className="h-3.5 w-3.5 stroke-[1.8]" />}
+          isActive={dueDate === tomorrow}
+          onClick={() => onSelect(tomorrow)}
+        />
+        {dueDate ? (
+          <QuickDateButton
+            label="Clear"
+            icon={<RotateCcw className="h-3.5 w-3.5 stroke-[1.8]" />}
+            onClick={() => onSelect(null)}
+          />
+        ) : null}
+      </div>
+
+      <div className="border-t border-border/60 pt-2">
+        <div className="flex items-center justify-between pb-1">
+          <div className="text-sm font-medium text-text">{monthLabel}</div>
+          <div className="flex items-center gap-1">
+            <IconButton
+              type="button"
+              size="xs"
+              variant="ghost"
+              title="Previous Month"
+              onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
+            >
+              <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
+            </IconButton>
+            <IconButton
+              type="button"
+              size="xs"
+              variant="ghost"
+              title="Next Month"
+              onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
+            >
+              <ChevronRight className="h-4 w-4 stroke-[1.8]" />
+            </IconButton>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {WEEKDAY_LABELS.map((label) => (
+            <div
+              key={label}
+              className="flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/65"
+            >
+              {label}
+            </div>
+          ))}
+          {weeks.flat().map((day) => {
+            const isSelected = day.date === dueDate;
+            const isToday = day.date === today;
+
+            return (
+              <button
+                key={day.date}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => onSelect(day.date)}
+                className={cn(
+                  "ui-focus-ring flex h-9 items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors",
+                  isSelected
+                    ? "bg-bg-muted text-text"
+                    : day.inCurrentMonth
+                      ? "text-text hover:bg-bg-muted"
+                      : "text-text-muted/50 hover:bg-bg-muted/70",
+                  isToday && !isSelected ? "ring-1 ring-border" : "",
+                )}
+              >
+                {day.day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -203,7 +415,7 @@ export function TaskDatePickerPanel({
         />
         <QuickDateButton
           label="Anytime"
-          icon={<Clock3 className="h-3.5 w-3.5 stroke-[1.8]" />}
+          icon={<Layers className="h-3.5 w-3.5 stroke-[1.8]" />}
           isActive={scheduleBucket === "anytime"}
           onClick={() => onSelect({ actionDate: null, scheduleBucket: "anytime" })}
         />

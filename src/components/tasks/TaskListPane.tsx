@@ -10,16 +10,17 @@ import {
   CalendarClock,
   CalendarDays,
   CheckCheck,
-  CheckSquare,
   Clock3,
   ClockArrowDown,
   ClockArrowUp,
   GripVertical,
   Inbox,
+  Layers,
   Plus,
   Star,
+  Sun,
   Trash2,
-  UserRound,
+
   X,
 } from "lucide-react";
 import { SearchIcon, SearchOffIcon } from "../icons";
@@ -89,10 +90,10 @@ const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
 
 const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: Inbox,
-  today: CheckSquare,
+  today: Sun,
   upcoming: CalendarClock,
-  waiting: UserRound,
-  anytime: Clock3,
+  waiting: Clock3,
+  anytime: Layers,
   someday: Archive,
   completed: CheckCheck,
   starred: Star,
@@ -100,10 +101,10 @@ const EMPTY_STATE_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
 
 const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
   inbox: Inbox,
-  today: CheckSquare,
+  today: Sun,
   upcoming: CalendarClock,
-  waiting: UserRound,
-  anytime: Clock3,
+  waiting: Clock3,
+  anytime: Layers,
   someday: Archive,
   completed: CheckCheck,
   starred: Star,
@@ -199,7 +200,17 @@ export function TaskListPane() {
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
   const [pendingSelectionTaskId, setPendingSelectionTaskId] = useState<string | null>(null);
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
+  const [rescheduleAnchor, setRescheduleAnchor] = useState<{ x: number; y: number } | null>(null);
+  const contextMenuPosRef = useRef<{ x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      contextMenuPosRef.current = { x: event.clientX, y: event.clientY };
+    };
+    document.addEventListener("contextmenu", handler);
+    return () => document.removeEventListener("contextmenu", handler);
+  }, []);
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -237,7 +248,7 @@ export function TaskListPane() {
   const HeaderIcon = HEADER_ICONS[selectedView];
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
-  const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting" && selectedView !== "starred";
+  const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting" && selectedView !== "starred" && selectedView !== "upcoming";
   const inlineTitleHighlight = useMemo(() => {
     if (!detectedDate) return null;
     const lower = newTitle.toLowerCase();
@@ -677,7 +688,10 @@ export function TaskListPane() {
                     <>
                       <ContextMenu.Item
                         className={menuItemClassName}
-                        onSelect={() => setRescheduleTaskIds([task.id])}
+                        onSelect={() => {
+                          setRescheduleAnchor(contextMenuPosRef.current);
+                          setRescheduleTaskIds([task.id]);
+                        }}
                       >
                         <CalendarDays className="h-4 w-4 stroke-[1.6]" />
                         Reschedule…
@@ -781,6 +795,7 @@ export function TaskListPane() {
                           <ContextMenu.Item
                             className={menuItemClassName}
                             onSelect={() => {
+                              setRescheduleAnchor(contextMenuPosRef.current);
                               setRescheduleTaskIds(selectedTaskIds);
                             }}
                           >
@@ -808,6 +823,7 @@ export function TaskListPane() {
                           <ContextMenu.Item
                             className={menuItemClassName}
                             onSelect={() => {
+                              setRescheduleAnchor(contextMenuPosRef.current);
                               setRescheduleTaskIds([task.id]);
                             }}
                           >
@@ -902,10 +918,12 @@ export function TaskListPane() {
         <TaskBulkRescheduleDialog
           today={today}
           tasks={rescheduleTasks}
-          onClose={() => setRescheduleTaskIds(null)}
+          anchor={rescheduleAnchor}
+          onClose={() => { setRescheduleTaskIds(null); setRescheduleAnchor(null); }}
           onReschedule={async (selection) => {
             await handleRescheduleTasks(rescheduleTaskIds, selection);
             setRescheduleTaskIds(null);
+            setRescheduleAnchor(null);
           }}
         />
       ) : null}
@@ -1068,6 +1086,29 @@ function BulkReschedulePicker({
     setIsOpen(initiallyOpen);
   }, [initiallyOpen]);
 
+  const computePosition = useCallback((rect: DOMRect) => {
+    const width = 320;
+    const margin = 8;
+    const minTop = 56;
+    const leftBase = align === "left" ? rect.left : rect.right - width;
+    const left = Math.min(
+      Math.max(margin, leftBase),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+    const preferredTop = rect.bottom + 8;
+    const estimatedHeight = 360;
+    const aboveTop = rect.top - estimatedHeight - 8;
+    let top: number;
+    if (preferredTop + estimatedHeight <= window.innerHeight) {
+      top = preferredTop;
+    } else if (aboveTop >= minTop) {
+      top = aboveTop;
+    } else {
+      top = Math.max(minTop, window.innerHeight - estimatedHeight - margin);
+    }
+    return { left, top };
+  }, [align]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -1075,21 +1116,7 @@ function BulkReschedulePicker({
       if (!showTrigger) return;
       const trigger = triggerRef.current;
       if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const width = 320;
-      const margin = 8;
-      const leftBase = align === "left" ? rect.left : rect.right - width;
-      const left = Math.min(
-        Math.max(margin, leftBase),
-        Math.max(margin, window.innerWidth - width - margin),
-      );
-      const preferredTop = rect.bottom + 8;
-      const estimatedHeight = 360;
-      const top =
-        preferredTop + estimatedHeight <= window.innerHeight
-          ? preferredTop
-          : Math.max(margin, rect.top - estimatedHeight - 8);
-      setPopoverPosition({ left, top });
+      setPopoverPosition(computePosition(trigger.getBoundingClientRect()));
     };
 
     const handlePointerDown = (event: PointerEvent) => {
@@ -1112,14 +1139,13 @@ function BulkReschedulePicker({
     document.addEventListener("keydown", handleEscape);
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
-    updatePosition();
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [align, isOpen, showTrigger]);
+  }, [computePosition, isOpen, showTrigger]);
 
   const applySelection = useCallback(
     async (selection: { actionDate: string | null; scheduleBucket: TaskScheduleBucket | null }) => {
@@ -1154,8 +1180,14 @@ function BulkReschedulePicker({
         <button
           ref={triggerRef}
           type="button"
-          onClick={() => setIsOpen((current) => !current)}
-          className="ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+          onClick={() => {
+            const trigger = triggerRef.current;
+            if (trigger && !isOpen) {
+              setPopoverPosition(computePosition(trigger.getBoundingClientRect()));
+            }
+            setIsOpen((current) => !current);
+          }}
+          className="ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 text-xs font-medium text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
         >
           <CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />
           <span>{isSaving ? "Rescheduling…" : triggerLabel}</span>
@@ -1190,17 +1222,20 @@ function BulkReschedulePicker({
 function TaskBulkRescheduleDialog({
   today,
   tasks,
+  anchor,
   onClose,
   onReschedule,
 }: {
   today: string;
   tasks: ReturnType<typeof useTasks>["tasks"];
+  anchor: { x: number; y: number } | null;
   onClose: () => void;
   onReschedule: (selection: {
     actionDate: string | null;
     scheduleBucket: TaskScheduleBucket | null;
   }) => Promise<void>;
 }) {
+  const [isSaving, setIsSaving] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1209,13 +1244,9 @@ function TaskBulkRescheduleDialog({
         onClose();
       }
     };
-
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onClose();
     };
-
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
     return () => {
@@ -1224,17 +1255,65 @@ function TaskBulkRescheduleDialog({
     };
   }, [onClose]);
 
+  const applySelection = useCallback(
+    async (selection: { actionDate: string | null; scheduleBucket: TaskScheduleBucket | null }) => {
+      if (isSaving) return;
+      setIsSaving(true);
+      try {
+        await onReschedule(selection);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [isSaving, onReschedule],
+  );
+
+  const panelContent = (
+    <TaskDatePickerPanel
+      today={today}
+      actionDate={null}
+      scheduleBucket={null}
+      onSelect={(selection) => void applySelection(selection)}
+    />
+  );
+
+  if (anchor) {
+    const width = 320;
+    const estimatedHeight = 360;
+    const margin = 8;
+    const minTop = 56;
+    const left = Math.min(
+      Math.max(margin, anchor.x),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+    const preferredTop = anchor.y + 8;
+    const aboveTop = anchor.y - estimatedHeight - 8;
+    let top: number;
+    if (preferredTop + estimatedHeight <= window.innerHeight) {
+      top = preferredTop;
+    } else if (aboveTop >= minTop) {
+      top = aboveTop;
+    } else {
+      top = Math.max(minTop, window.innerHeight - estimatedHeight - margin);
+    }
+
+    return createPortal(
+      <PopoverSurface
+        ref={panelRef}
+        className="fixed z-[100] w-80 p-2.5"
+        style={{ left, top }}
+      >
+        {panelContent}
+      </PopoverSurface>,
+      document.body,
+    );
+  }
+
   return (
-      <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center px-4 pt-24">
-      <div ref={panelRef} className="pointer-events-auto">
-        <BulkReschedulePicker
-          today={today}
-          tasks={tasks}
-          initiallyOpen
-          showTrigger={false}
-          onReschedule={onReschedule}
-        />
-      </div>
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center px-4 pt-24">
+      <PopoverSurface ref={panelRef} className="pointer-events-auto w-80 p-2.5">
+        {panelContent}
+      </PopoverSurface>
     </div>
   );
 }
