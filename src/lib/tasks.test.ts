@@ -18,6 +18,8 @@ function meta(
     scheduleBucket: null,
     completedAt: null,
     starred: false,
+    dueAt: null,
+    recurrence: null,
     ...overrides,
   };
 }

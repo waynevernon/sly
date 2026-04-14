@@ -31,6 +31,8 @@ function makeTask(overrides: Partial<TaskMetadata> = {}): TaskMetadata {
     scheduleBucket: null,
     completedAt: null,
     starred: false,
+    dueAt: null,
+    recurrence: null,
     ...overrides,
   };
 }

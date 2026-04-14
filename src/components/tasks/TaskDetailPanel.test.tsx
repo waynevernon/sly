@@ -32,6 +32,8 @@ function makeTasksHookValue(
         scheduleBucket: null,
         completedAt: null,
         starred: false,
+        dueAt: null,
+        recurrence: null,
       },
       {
         id: "task-2",
@@ -44,6 +46,8 @@ function makeTasksHookValue(
         scheduleBucket: null,
         completedAt: null,
         starred: false,
+        dueAt: null,
+        recurrence: null,
       },
       {
         id: "task-3",
@@ -56,6 +60,8 @@ function makeTasksHookValue(
         scheduleBucket: null,
         completedAt: null,
         starred: false,
+        dueAt: null,
+        recurrence: null,
       },
       {
         id: "task-4",
@@ -68,6 +74,8 @@ function makeTasksHookValue(
         scheduleBucket: null,
         completedAt: null,
         starred: false,
+        dueAt: null,
+        recurrence: null,
       },
     ],
     buckets: {
@@ -97,6 +105,8 @@ function makeTasksHookValue(
       scheduleBucket: null,
       completedAt: null,
       starred: false,
+      dueAt: null,
+      recurrence: null,
     },
     isLoadingTask: false,
     taskSortMode: "createdAsc",
@@ -230,6 +240,8 @@ describe("TaskDetailPanel", () => {
           scheduleBucket: null,
           completedAt: "2026-04-11T09:15:00Z",
           starred: false,
+          dueAt: null,
+          recurrence: null,
         },
       }),
     );
@@ -279,6 +291,8 @@ describe("TaskDetailPanel", () => {
         scheduleBucket: null,
         completedAt: null,
         starred: false,
+        dueAt: null,
+        recurrence: null,
       },
     });
 
@@ -331,6 +345,8 @@ describe("TaskDetailPanel", () => {
           scheduleBucket: null,
           completedAt: null,
           starred: true,
+          dueAt: null,
+          recurrence: null,
         },
       }),
     );

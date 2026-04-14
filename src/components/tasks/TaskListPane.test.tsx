@@ -64,6 +64,8 @@ function makeTasksHookValue(
       scheduleBucket: null,
       completedAt: null,
       starred: false,
+      dueAt: null,
+      recurrence: null,
     }),
     ...overrides,
   } as never;
@@ -93,6 +95,8 @@ describe("TaskListPane", () => {
       scheduleBucket: null,
       completedAt: null,
       starred: false,
+      dueAt: null,
+      recurrence: null,
     };
     const createTask = vi.fn().mockResolvedValue({
       ...createdTask,
@@ -354,6 +358,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
             {
               id: "task-today",
@@ -366,6 +372,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
           ],
           upcoming: [],
@@ -414,6 +422,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: "2026-04-09T13:00:00Z",
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
             {
               id: "task-yesterday",
@@ -426,6 +436,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: "2026-04-08T13:00:00Z",
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
             {
               id: "task-earlier",
@@ -438,6 +450,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: "2026-04-01T13:00:00Z",
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
           ],
           starred: [],
@@ -476,6 +490,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
             {
               id: "task-2",
@@ -488,6 +504,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
           ],
           today: [],
@@ -535,6 +553,8 @@ describe("TaskListPane", () => {
               scheduleBucket: null,
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
             {
               id: "task-anytime",
@@ -547,6 +567,8 @@ describe("TaskListPane", () => {
               scheduleBucket: "anytime",
               completedAt: null,
               starred: false,
+              dueAt: null,
+              recurrence: null,
             },
           ],
           anytime: [],
@@ -585,9 +607,9 @@ describe("TaskListPane", () => {
     vi.mocked(tasksContext.useTasks).mockReturnValue(
       makeTasksHookValue({
         tasks: [
-          { id: "t1", title: "Fix login bug", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
-          { id: "t2", title: "Write unit tests", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
-          { id: "t3", title: "Deploy hotfix", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+          { id: "t1", title: "Fix login bug", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false, dueAt: null, recurrence: null },
+          { id: "t2", title: "Write unit tests", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false, dueAt: null, recurrence: null },
+          { id: "t3", title: "Deploy hotfix", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false, dueAt: null, recurrence: null },
         ],
       }),
     );
@@ -610,7 +632,7 @@ describe("TaskListPane", () => {
     vi.mocked(tasksContext.useTasks).mockReturnValue(
       makeTasksHookValue({
         tasks: [
-          { id: "t1", title: "Buy groceries", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false },
+          { id: "t1", title: "Buy groceries", description: "", link: "", waitingFor: "", createdAt: "2026-04-09T10:00:00Z", actionAt: null, scheduleBucket: null, completedAt: null, starred: false, dueAt: null, recurrence: null },
         ],
       }),
     );

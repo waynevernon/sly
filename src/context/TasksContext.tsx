@@ -381,6 +381,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           scheduleBucket: task.scheduleBucket,
           completedAt: task.completedAt,
           starred: task.starred,
+          dueAt: task.dueAt,
+          recurrence: task.recurrence,
         },
       ]);
       return task;

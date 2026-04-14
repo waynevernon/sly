@@ -917,7 +917,6 @@ export function TaskListPane() {
       {rescheduleTaskIds && rescheduleTasks.length > 0 ? (
         <TaskBulkRescheduleDialog
           today={today}
-          tasks={rescheduleTasks}
           anchor={rescheduleAnchor}
           onClose={() => { setRescheduleTaskIds(null); setRescheduleAnchor(null); }}
           onReschedule={async (selection) => {
@@ -1221,13 +1220,11 @@ function BulkReschedulePicker({
 
 function TaskBulkRescheduleDialog({
   today,
-  tasks,
   anchor,
   onClose,
   onReschedule,
 }: {
   today: string;
-  tasks: ReturnType<typeof useTasks>["tasks"];
   anchor: { x: number; y: number } | null;
   onClose: () => void;
   onReschedule: (selection: {
