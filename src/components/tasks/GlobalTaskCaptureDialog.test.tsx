@@ -56,6 +56,8 @@ function makeTasksHookValue(
       scheduleBucket: null,
       completedAt: null,
       starred: false,
+      dueAt: null,
+      recurrence: null,
     }),
     updateTask: vi.fn().mockResolvedValue({
       id: "task-1",
@@ -68,6 +70,8 @@ function makeTasksHookValue(
       scheduleBucket: null,
       completedAt: null,
       starred: false,
+      dueAt: null,
+      recurrence: null,
     }),
     setCompleted: vi.fn(),
     deleteTask: vi.fn(),
@@ -95,6 +99,8 @@ describe("GlobalTaskCaptureDialog", () => {
       actionAt: null,
       scheduleBucket: null,
       completedAt: null,
+      dueAt: null,
+      recurrence: null,
     });
     const updateTask = vi.fn().mockResolvedValue({
       id: "task-1",
@@ -106,6 +112,8 @@ describe("GlobalTaskCaptureDialog", () => {
       actionAt: "2026-04-11T17:00:00.000Z",
       scheduleBucket: null,
       completedAt: null,
+      dueAt: null,
+      recurrence: null,
     });
     const selectView = vi.fn();
     const selectTask = vi.fn();
@@ -130,6 +138,7 @@ describe("GlobalTaskCaptureDialog", () => {
       "Pay rent tomorrow",
     );
     await screen.findByText("Date: Tomorrow");
+    await user.click(screen.getByRole("button", { name: "Waiting for" }));
     await user.type(screen.getByPlaceholderText("Waiting for…"), "Jordan");
     await user.type(screen.getByPlaceholderText("Add link…"), "example.com");
     await user.type(screen.getByPlaceholderText("Add description…"), "Before noon");
@@ -143,6 +152,7 @@ describe("GlobalTaskCaptureDialog", () => {
         waitingFor: "Jordan",
         actionAt: localDateToNormalizedActionAt("2026-04-11"),
         scheduleBucket: null,
+        recurrence: null,
       });
       expect(selectView).toHaveBeenCalledWith("upcoming");
       expect(selectTask).toHaveBeenCalledWith("task-1");
@@ -257,6 +267,8 @@ describe("GlobalTaskCaptureDialog", () => {
             scheduleBucket: null,
             completedAt: null,
             starred: false,
+            dueAt: null,
+            recurrence: null,
           },
           {
             id: "task-b",
@@ -269,6 +281,8 @@ describe("GlobalTaskCaptureDialog", () => {
             scheduleBucket: null,
             completedAt: null,
             starred: false,
+            dueAt: null,
+            recurrence: null,
           },
         ],
       }),
@@ -284,12 +298,12 @@ describe("GlobalTaskCaptureDialog", () => {
       </TooltipProvider>,
     );
 
+    await user.click(screen.getByRole("button", { name: "Waiting for" }));
     const input = screen.getByPlaceholderText("Waiting for…");
-    await user.click(input);
     await screen.findByRole("button", { name: "Jordan" });
     await user.type(input, "jor");
     await user.click(screen.getByRole("button", { name: "Jordan" }));
 
-    expect(screen.getByPlaceholderText("Waiting for…")).toHaveValue("Jordan");
+    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
   });
 });

@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Local, NaiveDate, TimeZone, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const TASKS_DB_SCHEMA_VERSION: i32 = 7;
+const TASKS_DB_SCHEMA_VERSION: i32 = 8;
 
 // Public types
 
@@ -23,6 +23,7 @@ pub struct TaskMetadata {
     pub completed_at: Option<String>,
     pub starred: bool,
     pub due_at: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +40,7 @@ pub struct Task {
     pub completed_at: Option<String>,
     pub starred: bool,
     pub due_at: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -55,6 +57,8 @@ pub struct TaskPatch {
     pub starred: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub due_at: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub recurrence: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +131,7 @@ struct TaskRow {
     completed_at: Option<String>,
     starred: bool,
     due_at: Option<String>,
+    recurrence: Option<String>,
 }
 
 impl From<TaskRow> for Task {
@@ -143,6 +148,7 @@ impl From<TaskRow> for Task {
             completed_at: row.completed_at,
             starred: row.starred,
             due_at: row.due_at,
+            recurrence: row.recurrence,
         }
     }
 }
@@ -161,6 +167,7 @@ impl From<TaskRow> for TaskMetadata {
             completed_at: row.completed_at,
             starred: row.starred,
             due_at: row.due_at,
+            recurrence: row.recurrence,
         }
     }
 }
@@ -234,6 +241,10 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 
     if !table_column_exists(conn, "tasks", "due_at")? {
         conn.execute("ALTER TABLE tasks ADD COLUMN due_at TEXT NULL", [])?;
+    }
+
+    if !table_column_exists(conn, "tasks", "recurrence")? {
+        conn.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NULL", [])?;
     }
 
     conn.execute_batch(
@@ -496,13 +507,14 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
         completed_at: row.get("completed_at")?,
         starred: row.get::<_, i64>("starred").map(|v| v != 0).unwrap_or(false),
         due_at: row.get("due_at")?,
+        recurrence: row.get("recurrence")?,
     })
 }
 
 fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
     conn.query_row(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence
         FROM tasks
         WHERE id = ?1
         ",
@@ -519,7 +531,7 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
     let conn = open_tasks_db(notes_root)?;
     let mut statement = conn.prepare(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence
         FROM tasks
         ORDER BY created_at DESC
         ",
@@ -563,12 +575,13 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
         completed_at: None,
         starred: false,
         due_at: None,
+        recurrence: None,
     };
 
     conn.execute(
         "
-        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
         ",
         params![
             &task.id,
@@ -582,6 +595,7 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
             &task.completed_at,
             task.starred as i64,
             &task.due_at,
+            &task.recurrence,
         ],
     )?;
 
@@ -628,6 +642,11 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         None => existing.due_at,
     };
 
+    let recurrence = match patch.recurrence {
+        Some(next) => normalize_recurrence(next)?,
+        None => existing.recurrence,
+    };
+
     conn.execute(
         "
         UPDATE tasks
@@ -638,7 +657,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             action_at = ?6,
             schedule_bucket = ?7,
             starred = ?8,
-            due_at = ?9
+            due_at = ?9,
+            recurrence = ?10
         WHERE id = ?1
         ",
         params![
@@ -651,6 +671,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             schedule_bucket,
             starred as i64,
             due_at,
+            recurrence,
         ],
     )?;
 
@@ -666,22 +687,60 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         completed_at: existing.completed_at,
         starred,
         due_at,
+        recurrence,
     })
 }
 
 pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -> Result<Task> {
-    let conn = open_tasks_db(notes_root)?;
+    let mut conn = open_tasks_db(notes_root)?;
     let existing = read_task_row(&conn, id)?;
     let completed_at = if completed { Some(now_rfc3339()) } else { None };
 
-    conn.execute(
-        "
-        UPDATE tasks
-        SET completed_at = ?2
-        WHERE id = ?1
-        ",
+    let tx = conn.transaction()?;
+
+    tx.execute(
+        "UPDATE tasks SET completed_at = ?2 WHERE id = ?1",
         params![id, completed_at],
     )?;
+
+    if completed {
+        if let Some(rule) = &existing.recurrence {
+            let today_local = Local::now().format("%Y-%m-%d").to_string();
+            let mode = recurrence_mode(rule);
+            let base_date = if mode == "schedule" {
+                action_at_to_local_date(existing.action_at.as_deref())
+                    .unwrap_or_else(|| today_local.clone())
+            } else {
+                today_local.clone()
+            };
+            let next_date = compute_next_occurrence(&base_date, rule, &today_local)?;
+            let next_action_at = local_date_to_action_at(&next_date)?;
+            let next_id = new_task_id();
+            let next_created_at = now_rfc3339();
+            tx.execute(
+                "
+                INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                ",
+                params![
+                    next_id,
+                    &existing.title,
+                    &existing.description,
+                    &existing.link,
+                    &existing.waiting_for,
+                    next_action_at,
+                    Option::<String>::None,
+                    next_created_at,
+                    Option::<String>::None,
+                    0i64,
+                    Option::<String>::None,
+                    &existing.recurrence,
+                ],
+            )?;
+        }
+    }
+
+    tx.commit()?;
 
     Ok(Task {
         id: id.to_string(),
@@ -695,7 +754,129 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
         completed_at,
         starred: existing.starred,
         due_at: existing.due_at,
+        recurrence: existing.recurrence,
     })
+}
+
+fn normalize_recurrence(value: Option<String>) -> Result<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    let parts: Vec<&str> = trimmed.split(':').collect();
+    if parts.len() < 2 {
+        return Err(anyhow!("Invalid recurrence rule: {trimmed}"));
+    }
+
+    let period = parts[0];
+    let mode = parts[1];
+
+    if !matches!(mode, "completion" | "schedule") {
+        return Err(anyhow!("Invalid recurrence mode: {mode}"));
+    }
+
+    match period {
+        "daily" | "weekday" | "weekly" | "yearly" => Ok(Some(format!("{period}:{mode}"))),
+        "monthly" => {
+            if mode == "schedule" {
+                let anchor: u8 = parts
+                    .get(2)
+                    .ok_or_else(|| anyhow!("Monthly schedule recurrence requires anchor day"))?
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid anchor day in recurrence rule: {trimmed}"))?;
+                if !(1..=31).contains(&anchor) {
+                    return Err(anyhow!("Anchor day must be 1–31, got {anchor}"));
+                }
+                Ok(Some(format!("monthly:schedule:{anchor}")))
+            } else {
+                Ok(Some("monthly:completion".to_string()))
+            }
+        }
+        _ => Err(anyhow!("Invalid recurrence period: {period}")),
+    }
+}
+
+fn recurrence_mode(rule: &str) -> &str {
+    rule.split(':').nth(1).unwrap_or("completion")
+}
+
+fn days_in_month(year: i32, month: u32) -> u32 {
+    let (next_year, next_month) = if month == 12 {
+        (year + 1, 1u32)
+    } else {
+        (year, month + 1)
+    };
+    NaiveDate::from_ymd_opt(next_year, next_month, 1)
+        .expect("valid next-month first day")
+        .pred_opt()
+        .expect("valid predecessor")
+        .day()
+}
+
+fn advance_date_monthly(date: NaiveDate, anchor_day: Option<u32>) -> NaiveDate {
+    let (next_year, next_month) = if date.month() == 12 {
+        (date.year() + 1, 1u32)
+    } else {
+        (date.year(), date.month() + 1)
+    };
+    let target_day = anchor_day.unwrap_or_else(|| date.day());
+    let last = days_in_month(next_year, next_month);
+    NaiveDate::from_ymd_opt(next_year, next_month, target_day.min(last))
+        .expect("valid monthly next date")
+}
+
+fn advance_date_yearly(date: NaiveDate) -> NaiveDate {
+    let next_year = date.year() + 1;
+    let last = days_in_month(next_year, date.month());
+    NaiveDate::from_ymd_opt(next_year, date.month(), date.day().min(last))
+        .expect("valid yearly next date")
+}
+
+fn compute_next_occurrence(base_date: &str, rule: &str, today: &str) -> Result<String> {
+    use chrono::Duration;
+
+    let parts: Vec<&str> = rule.split(':').collect();
+    if parts.len() < 2 {
+        return Err(anyhow!("Invalid recurrence rule: {rule}"));
+    }
+    let period = parts[0];
+    let anchor_day: Option<u32> = parts.get(2).and_then(|s| s.parse().ok());
+
+    let base = NaiveDate::parse_from_str(base_date, "%Y-%m-%d")
+        .map_err(|e| anyhow!("Invalid base date `{base_date}`: {e}"))?;
+    let today_nd = NaiveDate::parse_from_str(today, "%Y-%m-%d")
+        .map_err(|e| anyhow!("Invalid today `{today}`: {e}"))?;
+
+    let next = match period {
+        "daily" => base + Duration::days(1),
+        "weekday" => {
+            let mut candidate = base + Duration::days(1);
+            while matches!(
+                candidate.weekday(),
+                chrono::Weekday::Sat | chrono::Weekday::Sun
+            ) {
+                candidate += Duration::days(1);
+            }
+            candidate
+        }
+        "weekly" => base + Duration::weeks(1),
+        "monthly" => advance_date_monthly(base, anchor_day),
+        "yearly" => advance_date_yearly(base),
+        _ => return Err(anyhow!("Unknown recurrence period: {period}")),
+    };
+
+    // Floor: next occurrence must be at least tomorrow
+    let result = if next <= today_nd {
+        today_nd + Duration::days(1)
+    } else {
+        next
+    };
+
+    Ok(result.format("%Y-%m-%d").to_string())
 }
 
 pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
@@ -893,6 +1074,7 @@ mod tests {
                 schedule_bucket: None,
                 starred: None,
                 due_at: None,
+                recurrence: None,
             },
         )
         .unwrap();
@@ -941,6 +1123,7 @@ mod tests {
         assert_eq!(migrated.waiting_for, "");
         assert!(migrated.schedule_bucket.is_none());
         assert!(migrated.due_at.is_none());
+        assert!(migrated.recurrence.is_none());
         assert_eq!(user_version, TASKS_DB_SCHEMA_VERSION);
     }
 
@@ -1193,5 +1376,105 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    // --- Recurrence helper tests ---
+
+    #[test]
+    fn next_occurrence_daily_completion() {
+        // base = today, so next = tomorrow
+        let result = compute_next_occurrence("2026-01-15", "daily:completion", "2026-01-15").unwrap();
+        assert_eq!(result, "2026-01-16");
+    }
+
+    #[test]
+    fn next_occurrence_weekday_skips_weekend() {
+        // Friday → Monday
+        let result = compute_next_occurrence("2026-01-16", "weekday:schedule", "2026-01-14").unwrap();
+        assert_eq!(result, "2026-01-19");
+    }
+
+    #[test]
+    fn next_occurrence_monthly_schedule_preserves_anchor_31() {
+        // Jan 31 → Feb 28 (2026 is not a leap year)
+        let r1 = compute_next_occurrence("2026-01-31", "monthly:schedule:31", "2026-01-14").unwrap();
+        assert_eq!(r1, "2026-02-28");
+        // Feb 28 → Mar 31 (anchor is 31, March has 31 days)
+        let r2 = compute_next_occurrence("2026-02-28", "monthly:schedule:31", "2026-02-14").unwrap();
+        assert_eq!(r2, "2026-03-31");
+        // Mar 31 → Apr 30 (anchor is 31, April has 30 days)
+        let r3 = compute_next_occurrence("2026-03-31", "monthly:schedule:31", "2026-03-14").unwrap();
+        assert_eq!(r3, "2026-04-30");
+    }
+
+    #[test]
+    fn next_occurrence_floors_to_tomorrow_when_behind() {
+        // schedule mode, action_at was a month ago — result must be at least tomorrow
+        let result = compute_next_occurrence("2026-01-01", "weekly:schedule", "2026-03-01").unwrap();
+        assert_eq!(result, "2026-03-02");
+    }
+
+    #[test]
+    fn next_occurrence_yearly_handles_leap_year() {
+        // Feb 29 in a non-leap year → Feb 28
+        let result = compute_next_occurrence("2024-02-29", "yearly:schedule", "2024-03-01").unwrap();
+        assert_eq!(result, "2025-02-28");
+    }
+
+    #[test]
+    fn recurring_task_spawns_on_complete() {
+        let root = make_root();
+        let task = create_task(root.path(), "Daily standup").unwrap();
+        update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                action_at: Some(Some("2026-04-10T17:00:00Z".to_string())),
+                recurrence: Some(Some("daily:schedule".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        set_task_completed(root.path(), &task.id, true).unwrap();
+
+        let all = list_tasks(root.path()).unwrap();
+        let spawned: Vec<_> = all
+            .iter()
+            .filter(|t| t.id != task.id && t.title == "Daily standup")
+            .collect();
+        assert_eq!(spawned.len(), 1);
+        assert!(spawned[0].completed_at.is_none());
+        assert_eq!(spawned[0].recurrence.as_deref(), Some("daily:schedule"));
+    }
+
+    #[test]
+    fn non_recurring_task_does_not_spawn() {
+        let root = make_root();
+        let task = create_task(root.path(), "One-off task").unwrap();
+
+        set_task_completed(root.path(), &task.id, true).unwrap();
+
+        let all = list_tasks(root.path()).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, task.id);
+    }
+
+    #[test]
+    fn normalize_recurrence_validates_and_rejects_bad_rules() {
+        assert!(normalize_recurrence(Some("bad".to_string())).is_err());
+        assert!(normalize_recurrence(Some("daily:bad_mode".to_string())).is_err());
+        assert!(normalize_recurrence(Some("monthly:schedule".to_string())).is_err());
+        assert!(normalize_recurrence(Some("monthly:schedule:0".to_string())).is_err());
+        assert!(normalize_recurrence(Some("monthly:schedule:32".to_string())).is_err());
+        assert_eq!(
+            normalize_recurrence(Some("weekly:completion".to_string())).unwrap(),
+            Some("weekly:completion".to_string())
+        );
+        assert_eq!(
+            normalize_recurrence(Some("monthly:schedule:15".to_string())).unwrap(),
+            Some("monthly:schedule:15".to_string())
+        );
+        assert_eq!(normalize_recurrence(None).unwrap(), None);
     }
 }

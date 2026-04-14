@@ -20,6 +20,7 @@ import { cn } from "../../lib/utils";
 import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
 import { Button, IconButton, PanelEmptyState, PopoverSurface } from "../ui";
 import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
+import { RecurrencePicker } from "./RecurrencePicker";
 
 const DEBOUNCE_MS = 600;
 
@@ -40,6 +41,7 @@ export function TaskDetailPanel() {
   const [actionDate, setActionDate] = useState("");
   const [scheduleBucket, setScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [dueDate, setDueDate] = useState("");
+  const [recurrence, setRecurrence] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
   const [waitingForEditing, setWaitingForEditing] = useState(false);
@@ -95,6 +97,7 @@ export function TaskDetailPanel() {
     setActionDate(actionAtToLocalDate(selectedTask.actionAt) ?? "");
     setScheduleBucket(selectedTask.scheduleBucket);
     setDueDate(actionAtToLocalDate(selectedTask.dueAt) ?? "");
+    setRecurrence(selectedTask.recurrence);
     setLink(selectedTask.link);
     setWaitingFor(selectedTask.waitingFor);
     setWaitingForEditing(false);
@@ -159,6 +162,15 @@ export function TaskDetailPanel() {
     (date: string | null) => {
       setDueDate(date ?? "");
       scheduleSave({ dueAt: localDateToNormalizedActionAt(date) });
+      flushSave();
+    },
+    [flushSave, scheduleSave],
+  );
+
+  const commitRecurrence = useCallback(
+    (next: string | null) => {
+      setRecurrence(next);
+      scheduleSave({ recurrence: next });
       flushSave();
     },
     [flushSave, scheduleSave],
@@ -292,6 +304,13 @@ export function TaskDetailPanel() {
               today={today}
               onChange={commitDueDate}
             />
+            {actionDate ? (
+              <RecurrencePicker
+                recurrence={recurrence}
+                actionDate={actionDate}
+                onChange={commitRecurrence}
+              />
+            ) : null}
             {waitingForEditing ? (
               <div className="relative max-w-[320px]">
                 <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">

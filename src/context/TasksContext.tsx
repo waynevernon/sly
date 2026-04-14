@@ -317,19 +317,28 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const visibleTaskIdSet = new Set(visibleTaskIds);
+    const allTaskIdSet = new Set(tasks.map((t) => t.id));
+
+    // Prune multi-select to only tasks visible in the current view.
     const filteredIds = visibleTaskIds.filter((id) =>
       selectedTaskIdsRef.current.includes(id),
     );
     const activeTaskId = selectedTaskIdRef.current;
+
+    // Keep the detail panel open as long as the task still exists anywhere —
+    // even if it moved to a different view. Only clear when actually deleted.
     const nextActiveId =
-      activeTaskId && visibleTaskIdSet.has(activeTaskId)
+      activeTaskId && allTaskIdSet.has(activeTaskId)
         ? activeTaskId
         : filteredIds[0] ?? null;
-    const nextSelectionIds = nextActiveId
-      ? filteredIds.length > 0
+
+    // List selection only reflects visible tasks.
+    const nextSelectionIds =
+      filteredIds.length > 0
         ? filteredIds
-        : [nextActiveId]
-      : [];
+        : nextActiveId && visibleTaskIdSet.has(nextActiveId)
+          ? [nextActiveId]
+          : [];
 
     const selectionChanged =
       selectedTaskIdsRef.current.length !== nextSelectionIds.length ||
@@ -349,9 +358,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       selectionAnchorIdRef.current &&
       !visibleTaskIdSet.has(selectionAnchorIdRef.current)
     ) {
-      selectionAnchorIdRef.current = nextActiveId;
+      selectionAnchorIdRef.current = nextActiveId && visibleTaskIdSet.has(nextActiveId)
+        ? nextActiveId
+        : null;
     }
-  }, [visibleTaskIds]);
+  }, [visibleTaskIds, tasks]);
 
   const createTask = useCallback(async (title: string): Promise<Task | null> => {
     try {
@@ -394,6 +405,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
                 actionAt: task.actionAt,
                 scheduleBucket: task.scheduleBucket,
                 starred: task.starred,
+                dueAt: task.dueAt,
+                recurrence: task.recurrence,
               }
             : t
         )

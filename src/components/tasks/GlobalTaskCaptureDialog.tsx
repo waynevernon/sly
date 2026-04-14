@@ -12,6 +12,7 @@ import { cn } from "../../lib/utils";
 import type { TaskScheduleBucket } from "../../types/tasks";
 import { Button, DialogShell, PopoverSurface } from "../ui";
 import { TaskDatePicker } from "./TaskDatePicker";
+import { RecurrencePicker } from "./RecurrencePicker";
 
 interface GlobalTaskCaptureDialogProps {
   open: boolean;
@@ -43,6 +44,7 @@ export function GlobalTaskCaptureDialog({
   const [waitingForFocused, setWaitingForFocused] = useState(false);
   const waitingForInputRef = useRef<HTMLInputElement>(null);
   const waitingForPendingBlurValueRef = useRef<string | null>(null);
+  const [recurrence, setRecurrence] = useState<string | null>(null);
   const [manualActionDate, setManualActionDate] = useState("");
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
@@ -59,6 +61,7 @@ export function GlobalTaskCaptureDialog({
     setWaitingFor("");
     setWaitingForEditing(false);
     setWaitingForFocused(false);
+    setRecurrence(null);
     setManualActionDate("");
     setManualScheduleBucket(null);
     setDetectedDate(null);
@@ -121,6 +124,7 @@ export function GlobalTaskCaptureDialog({
         waitingFor: waitingFor.trim(),
         actionAt: localDateToNormalizedActionAt(effectiveActionDate),
         scheduleBucket: manualScheduleBucket,
+        recurrence,
       };
 
       const hasPatch =
@@ -128,7 +132,8 @@ export function GlobalTaskCaptureDialog({
         link.trim().length > 0 ||
         waitingFor.trim().length > 0 ||
         Boolean(effectiveActionDate) ||
-        Boolean(manualScheduleBucket);
+        Boolean(manualScheduleBucket) ||
+        Boolean(recurrence);
 
       const finalTask = hasPatch
         ? await updateTask(created.id, patch)
@@ -156,6 +161,7 @@ export function GlobalTaskCaptureDialog({
     manualActionDate,
     manualScheduleBucket,
     onClose,
+    recurrence,
     selectTask,
     selectView,
     title,
@@ -276,6 +282,13 @@ export function GlobalTaskCaptureDialog({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {(manualActionDate || manualScheduleBucket) && (
+              <RecurrencePicker
+                recurrence={recurrence}
+                actionDate={manualActionDate}
+                onChange={setRecurrence}
+              />
+            )}
             {!showDetectedDateChip && (
               <TaskDatePicker
                 actionDate={effectiveActionDate}

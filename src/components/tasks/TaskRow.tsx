@@ -2,7 +2,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Clock3, FileText, Link2, Star } from "lucide-react";
+import { Clock3, FileText, Link2, Repeat2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import { menuSurfaceClassName } from "../ui";
@@ -51,6 +51,7 @@ export function TaskRow({
   const hasDescription = task.description.trim().length > 0;
   const hasLink = task.link.trim().length > 0;
   const hasWaitingFor = task.waitingFor.trim().length > 0;
+  const hasRecurrence = Boolean(task.recurrence);
   const showActionDateLabel = view !== "completed" && (view !== "today" || overdue);
   const secondaryLabel = task.completedAt && view === "completed"
     ? formatCompletedAt(task.completedAt)
@@ -210,8 +211,14 @@ export function TaskRow({
                     {task.title || "Untitled"}
                   </span>
 
-                  {(hasLink || hasDescription || hasWaitingFor) && (
+                  {(hasLink || hasDescription || hasWaitingFor || hasRecurrence) && (
                     <span className="flex shrink-0 items-center gap-1 text-text-muted/40">
+                      {hasRecurrence ? (
+                        <Repeat2
+                          className="h-3.5 w-3.5 stroke-[1.8]"
+                          data-testid="task-row-recurrence-indicator"
+                        />
+                      ) : null}
                       {hasWaitingFor ? (
                         <span title={`Waiting for ${task.waitingFor}`}>
                           <Clock3

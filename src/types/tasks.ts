@@ -21,6 +21,7 @@ export interface TaskMetadata {
   completedAt: string | null;
   starred: boolean;
   dueAt: string | null;
+  recurrence: string | null;
 }
 
 export interface Task extends TaskMetadata {
@@ -35,4 +36,5 @@ export interface TaskPatch {
   scheduleBucket?: TaskScheduleBucket | null;
   starred?: boolean;
   dueAt?: string | null;
+  recurrence?: string | null;
 }

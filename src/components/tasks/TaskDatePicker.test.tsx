@@ -20,7 +20,7 @@ describe("TaskDatePicker", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Set date" }));
+    await user.click(screen.getByRole("button", { name: "Action date" }));
     await user.click(screen.getByRole("button", { name: "Next week" }));
 
     expect(onChange).toHaveBeenCalledWith({
@@ -44,7 +44,7 @@ describe("TaskDatePicker", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Today" }));
+    await user.click(screen.getByRole("button", { name: "Action Today" }));
     await user.click(screen.getByRole("button", { name: "Clear" }));
 
     expect(onChange).toHaveBeenCalledWith({
