@@ -22,7 +22,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { SearchIcon, SearchOffIcon, XIcon } from "../icons";
+import { SearchIcon, SearchOffIcon } from "../icons";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDndMonitor } from "@dnd-kit/core";
 import { useTasks } from "../../context/TasksContext";

@@ -111,7 +111,7 @@ describe("NoteList", () => {
     render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     const row = screen.getByRole("option", { name: /Alpha note/ });
-    expect(row.firstElementChild).toHaveClass("py-1.75");
+    expect(row.firstElementChild).toHaveClass("py-[var(--ui-list-item-py)]");
     expect(screen.queryByText("work/")).not.toBeInTheDocument();
     expect(screen.queryByText("planning")).not.toBeInTheDocument();
     expect(screen.queryByText("Yesterday")).not.toBeInTheDocument();
@@ -200,7 +200,7 @@ describe("NoteList", () => {
     render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     const row = screen.getByRole("option", { name: /Alpha note/ });
-    expect(row.firstElementChild).toHaveClass("py-2.25");
+    expect(row.firstElementChild).toHaveClass("py-[var(--ui-list-item-py-tall)]");
     expect(screen.getByText("planning")).toBeInTheDocument();
     expect(screen.getByText("3 days ago · work/")).toBeInTheDocument();
   });
@@ -296,7 +296,7 @@ describe("NoteList", () => {
       "aria-activedescendant",
       "note-option-work%2Fbravo",
     );
-    expect(screen.getByText("Bravo note").closest(".bg-bg-muted")).not.toHaveClass(
+    expect(screen.getByText("Bravo note").closest(".bg-bg-emphasis")).not.toHaveClass(
       "group-focus-visible/notelist:ring-1",
       "group-focus-visible/notelist:ring-text-muted",
     );
