@@ -1,11 +1,12 @@
 import {
+  type ReactNode,
   useEffect,
   useRef,
   useCallback,
   useState,
   useMemo,
 } from "react";
-import { TextSearch, WrapText } from "lucide-react";
+import { MoreHorizontal, TextSearch, WrapText } from "lucide-react";
 import {
   EditorContent,
   type Editor as TiptapEditor,
@@ -198,172 +199,239 @@ function FormatBar({
   onAddImage,
 }: FormatBarProps) {
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(9999);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   if (!editor) return null;
 
+  // Width per slot including the 4px gap that follows it in the flex container
+  const ITEM_W = 32; // 28px button + 4px gap
+  const SEP_W = 21;  // mx-2 (8+8) + 1px border + 4px gap
+  const OVF_W = 32;  // overflow button same size as regular item
+  const PADDING = 32; // px-4 each side
+
+  type Slot =
+    | { kind: "button"; key: string; toolbarEl: ReactNode; menuEl: ReactNode }
+    | { kind: "table"; key: string }
+    | { kind: "sep"; key: string };
+
+  const allSlots: Slot[] = [
+    {
+      kind: "button", key: "bold",
+      toolbarEl: <ToolbarButton key="bold" onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title={`Bold (${mod}${isMac ? "" : "+"}B)`}><BoldIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="bold" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleBold().run()}><BoldIcon className="w-4 h-4 stroke-[1.5]" />Bold</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "italic",
+      toolbarEl: <ToolbarButton key="italic" onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive("italic")} title={`Italic (${mod}${isMac ? "" : "+"}I)`}><ItalicIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="italic" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleItalic().run()}><ItalicIcon className="w-4 h-4 stroke-[1.5]" />Italic</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "strike",
+      toolbarEl: <ToolbarButton key="strike" onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive("strike")} title={`Strikethrough (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}S)`}><StrikethroughIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="strike" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleStrike().run()}><StrikethroughIcon className="w-4 h-4 stroke-[1.5]" />Strikethrough</DropdownMenu.Item>,
+    },
+    { kind: "sep", key: "sep-1" },
+    {
+      kind: "button", key: "h1",
+      toolbarEl: <ToolbarButton key="h1" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive("heading", { level: 1 })} title={`Heading 1 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}1)`}><Heading1Icon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="h1" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1Icon className="w-4 h-4 stroke-[1.5]" />Heading 1</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "h2",
+      toolbarEl: <ToolbarButton key="h2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive("heading", { level: 2 })} title={`Heading 2 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}2)`}><Heading2Icon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="h2" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2Icon className="w-4 h-4 stroke-[1.5]" />Heading 2</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "h3",
+      toolbarEl: <ToolbarButton key="h3" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive("heading", { level: 3 })} title={`Heading 3 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}3)`}><Heading3Icon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="h3" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}><Heading3Icon className="w-4 h-4 stroke-[1.5]" />Heading 3</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "h4",
+      toolbarEl: <ToolbarButton key="h4" onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} isActive={editor.isActive("heading", { level: 4 })} title={`Heading 4 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}4)`}><Heading4Icon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="h4" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}><Heading4Icon className="w-4 h-4 stroke-[1.5]" />Heading 4</DropdownMenu.Item>,
+    },
+    { kind: "sep", key: "sep-2" },
+    {
+      kind: "button", key: "bulletList",
+      toolbarEl: <ToolbarButton key="bulletList" onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive("bulletList")} title={`Bullet List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}8)`}><ListIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="bulletList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleBulletList().run()}><ListIcon className="w-4 h-4 stroke-[1.5]" />Bullet List</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "orderedList",
+      toolbarEl: <ToolbarButton key="orderedList" onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive("orderedList")} title={`Numbered List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}7)`}><ListOrderedIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="orderedList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleOrderedList().run()}><ListOrderedIcon className="w-4 h-4 stroke-[1.5]" />Numbered List</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "taskList",
+      toolbarEl: <ToolbarButton key="taskList" onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive("taskList")} title="Task List"><CheckSquareIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="taskList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleTaskList().run()}><CheckSquareIcon className="w-4 h-4 stroke-[1.5]" />Task List</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "blockquote",
+      toolbarEl: <ToolbarButton key="blockquote" onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive("blockquote")} title={`Blockquote (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}B)`}><QuoteIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="blockquote" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleBlockquote().run()}><QuoteIcon className="w-4 h-4 stroke-[1.5]" />Blockquote</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "inlineCode",
+      toolbarEl: <ToolbarButton key="inlineCode" onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive("code")} title={`Inline Code (${mod}${isMac ? "" : "+"}E)`}><InlineCodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="inlineCode" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleCode().run()}><InlineCodeIcon className="w-4 h-4 stroke-[1.5]" />Inline Code</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "codeBlock",
+      toolbarEl: <ToolbarButton key="codeBlock" onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={editor.isActive("codeBlock")} title={`Code Block (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}C)`}><CodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="codeBlock" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleCodeBlock().run()}><CodeIcon className="w-4 h-4 stroke-[1.5]" />Code Block</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "blockMath",
+      toolbarEl: <ToolbarButton key="blockMath" onClick={onAddBlockMath} isActive={editor.isActive("blockMath")} title="Block Math"><BlockMathIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="blockMath" className={menuItemClassName} onSelect={onAddBlockMath}><BlockMathIcon className="w-4 h-4 stroke-[1.5]" />Block Math</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "hRule",
+      toolbarEl: <ToolbarButton key="hRule" onClick={() => editor.chain().focus().setHorizontalRule().run()} isActive={false} title="Horizontal Rule"><SeparatorIcon /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="hRule" className={menuItemClassName} onSelect={() => editor.chain().focus().setHorizontalRule().run()}><SeparatorIcon />Horizontal Rule</DropdownMenu.Item>,
+    },
+    { kind: "sep", key: "sep-3" },
+    {
+      kind: "button", key: "link",
+      toolbarEl: <ToolbarButton key="link" onClick={onAddLink} isActive={editor.isActive("link")} title={`Add Link (${mod}${isMac ? "" : "+"}K)`}><LinkIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="link" className={menuItemClassName} onSelect={onAddLink}><LinkIcon className="w-4 h-4 stroke-[1.5]" />Add Link</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "wikilink",
+      toolbarEl: <ToolbarButton key="wikilink" onClick={() => editor.chain().focus().insertContent("[[").run()} isActive={false} title="Insert Wikilink"><BracketsIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="wikilink" className={menuItemClassName} onSelect={() => editor.chain().focus().insertContent("[[").run()}><BracketsIcon className="w-4 h-4 stroke-[1.5]" />Wikilink</DropdownMenu.Item>,
+    },
+    {
+      kind: "button", key: "image",
+      toolbarEl: <ToolbarButton key="image" onClick={onAddImage} isActive={false} title="Add Image"><ImageIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      menuEl: <DropdownMenu.Item key="image" className={menuItemClassName} onSelect={onAddImage}><ImageIcon className="w-4 h-4 stroke-[1.5]" />Image</DropdownMenu.Item>,
+    },
+    { kind: "table", key: "table" },
+  ];
+
+  // Compute overflow split
+  const totalW = allSlots.reduce((sum, s) => sum + (s.kind === "sep" ? SEP_W : ITEM_W), 0) - 4;
+  const availableW = Math.max(0, containerWidth - PADDING);
+  const allFit = totalW <= availableW;
+
+  let splitAt = allSlots.length;
+  if (!allFit) {
+    const budget = availableW - OVF_W;
+    let acc = 0;
+    splitAt = 0;
+    for (let i = 0; i < allSlots.length; i++) {
+      const w = allSlots[i].kind === "sep" ? SEP_W : ITEM_W;
+      if (acc + w > budget) break;
+      acc += w;
+      splitAt = i + 1;
+    }
+  }
+
+  const visibleSlots = allFit ? allSlots : allSlots.slice(0, splitAt);
+  const overflowSlots = allFit ? [] : allSlots.slice(splitAt);
+
+  // Strip trailing separators from visible list
+  while (visibleSlots.length > 0 && visibleSlots[visibleSlots.length - 1].kind === "sep") {
+    visibleSlots.pop();
+  }
+
   return (
-    <div className="ui-scrollbar-overlay flex items-center gap-1 px-4 overflow-x-auto">
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        isActive={editor.isActive("bold")}
-        title={`Bold (${mod}${isMac ? "" : "+"}B)`}
-      >
-        <BoldIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        isActive={editor.isActive("italic")}
-        title={`Italic (${mod}${isMac ? "" : "+"}I)`}
-      >
-        <ItalicIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-        isActive={editor.isActive("strike")}
-        title={`Strikethrough (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}S)`}
-      >
-        <StrikethroughIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-
-      <div className="w-px h-4.5 border-l border-border mx-2" />
-
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        isActive={editor.isActive("heading", { level: 1 })}
-        title={`Heading 1 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}1)`}
-      >
-        <Heading1Icon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        isActive={editor.isActive("heading", { level: 2 })}
-        title={`Heading 2 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}2)`}
-      >
-        <Heading2Icon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        isActive={editor.isActive("heading", { level: 3 })}
-        title={`Heading 3 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}3)`}
-      >
-        <Heading3Icon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
-        isActive={editor.isActive("heading", { level: 4 })}
-        title={`Heading 4 (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}4)`}
-      >
-        <Heading4Icon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-
-      <div className="w-px h-4.5 border-l border-border mx-2" />
-
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        isActive={editor.isActive("bulletList")}
-        title={`Bullet List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}8)`}
-      >
-        <ListIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        isActive={editor.isActive("orderedList")}
-        title={`Numbered List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}7)`}
-      >
-        <ListOrderedIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleTaskList().run()}
-        isActive={editor.isActive("taskList")}
-        title="Task List"
-      >
-        <CheckSquareIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        isActive={editor.isActive("blockquote")}
-        title={`Blockquote (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}B)`}
-      >
-        <QuoteIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleCode().run()}
-        isActive={editor.isActive("code")}
-        title={`Inline Code (${mod}${isMac ? "" : "+"}E)`}
-      >
-        <InlineCodeIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        isActive={editor.isActive("codeBlock")}
-        title={`Code Block (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}C)`}
-      >
-        <CodeIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={onAddBlockMath}
-        isActive={editor.isActive("blockMath")}
-        title="Block Math"
-      >
-        <BlockMathIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-        isActive={false}
-        title="Horizontal Rule"
-      >
-        <SeparatorIcon />
-      </ToolbarButton>
-
-      <div className="w-px h-4.5 border-l border-border mx-2" />
-
-      <ToolbarButton
-        onClick={onAddLink}
-        isActive={editor.isActive("link")}
-        title={`Add Link (${mod}${isMac ? "" : "+"}K)`}
-      >
-        <LinkIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().insertContent("[[").run()}
-        isActive={false}
-        title="Insert Wikilink"
-      >
-        <BracketsIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <ToolbarButton onClick={onAddImage} isActive={false} title="Add Image">
-        <ImageIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-      </ToolbarButton>
-      <DropdownMenu.Root open={tableMenuOpen} onOpenChange={setTableMenuOpen}>
-        <Tooltip content="Insert Table">
-          <DropdownMenu.Trigger asChild>
-            <ToolbarButton isActive={editor.isActive("table")}>
-              <TableIcon className="w-4.5 h-4.5 stroke-[1.5]" />
-            </ToolbarButton>
-          </DropdownMenu.Trigger>
-        </Tooltip>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            className="ui-surface-popover z-50 p-2.5"
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <GridPicker
-              onSelect={(rows, cols) => {
-                editor
-                  .chain()
-                  .focus()
-                  .insertTable({
-                    rows,
-                    cols,
-                    withHeaderRow: true,
-                  })
-                  .run();
-                setTableMenuOpen(false);
-              }}
-            />
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+    <div ref={containerRef} className="flex items-center gap-1 px-4 overflow-hidden flex-1 min-w-0">
+      {visibleSlots.map((slot) => {
+        if (slot.kind === "sep") {
+          return <div key={slot.key} className="w-px h-4.5 border-l border-border mx-2 shrink-0" />;
+        }
+        if (slot.kind === "table") {
+          return (
+            <DropdownMenu.Root key={slot.key} open={tableMenuOpen} onOpenChange={setTableMenuOpen}>
+              <Tooltip content="Insert Table">
+                <DropdownMenu.Trigger asChild>
+                  <ToolbarButton isActive={editor.isActive("table")}>
+                    <TableIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+                  </ToolbarButton>
+                </DropdownMenu.Trigger>
+              </Tooltip>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  className="ui-surface-popover z-50 p-2.5"
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                  <GridPicker
+                    onSelect={(rows, cols) => {
+                      editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+                      setTableMenuOpen(false);
+                    }}
+                  />
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          );
+        }
+        return slot.toolbarEl;
+      })}
+      {overflowSlots.length > 0 && (
+        <DropdownMenu.Root open={overflowMenuOpen} onOpenChange={setOverflowMenuOpen}>
+          <Tooltip content="More">
+            <DropdownMenu.Trigger asChild>
+              <ToolbarButton isActive={false}>
+                <MoreHorizontal className="w-4.5 h-4.5 stroke-[1.5]" />
+              </ToolbarButton>
+            </DropdownMenu.Trigger>
+          </Tooltip>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              className={`${menuSurfaceClassName} min-w-40 z-50`}
+              sideOffset={5}
+              align="start"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              {overflowSlots.map((slot, idx) => {
+                if (slot.kind === "sep") {
+                  const prevContent = overflowSlots.slice(0, idx).some(s => s.kind !== "sep");
+                  const nextContent = overflowSlots.slice(idx + 1).some(s => s.kind !== "sep");
+                  if (!prevContent || !nextContent) return null;
+                  return <DropdownMenu.Separator key={slot.key} className={menuSeparatorClassName} />;
+                }
+                if (slot.kind === "table") {
+                  return (
+                    <DropdownMenu.Sub key={slot.key}>
+                      <DropdownMenu.SubTrigger className={menuItemClassName}>
+                        <TableIcon className="w-4 h-4 stroke-[1.5]" />
+                        Insert Table
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent className="ui-surface-popover z-50 p-2.5">
+                          <GridPicker
+                            onSelect={(rows, cols) => {
+                              editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+                              setOverflowMenuOpen(false);
+                            }}
+                          />
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Sub>
+                  );
+                }
+                return slot.menuEl;
+              })}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      )}
     </div>
   );
 }
@@ -443,7 +511,6 @@ export function Editor(props: EditorProps) {
 function EditorImpl({
   paneMode = 2,
   focusMode,
-  hasPinnedRightTitlebarControl = false,
   printMode = false,
   showPinControl = true,
   onEditorReady,
@@ -1060,204 +1127,36 @@ function EditorImpl({
     >
       {!printMode && (
         <>
-          {/* Drag region with action buttons */}
+          {/* Drag region – window dragging only */}
           <div
             className={cn(
-              "h-[var(--ui-drag-region-height)] shrink-0 flex items-center justify-end px-[var(--ui-pane-padding-end)]",
+              "h-[var(--ui-drag-region-height)] shrink-0",
               !navigationVisible && "ui-titlebar-leading-offset",
-              hasPinnedRightTitlebarControl && "ui-titlebar-trailing-offset",
             )}
             data-tauri-drag-region
+          />
+
+          {/* Header: format bar on the left, note actions on the right */}
+          <div
+            className={cn(
+              "ui-pane-header px-0 border-border/80",
+              focusMode && "border-transparent",
+              hasTransitioned && `transition-[border-color] duration-[240ms]${needsPaneDelay ? " delay-200" : ""}`,
+            )}
           >
             <div
-              className={`ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-px shrink-0 transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""} ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-            >
-              {hasExternalChanges ? (
-            <Tooltip
-              content={`External changes detected (${mod}${isMac ? "" : "+"}R to refresh)`}
-            >
-              <button
-                onClick={reloadCurrentNote}
-                className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-text-muted hover:bg-bg-muted hover:text-text transition-colors font-medium"
-              >
-                <RefreshCwIcon className="w-4 h-4 stroke-[1.6]" />
-                <span>Refresh</span>
-              </button>
-            </Tooltip>
-          ) : isSaving ? (
-            <Tooltip content="Saving...">
-              <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center">
-                <LoadingSpinner size="lg" tone="subtle" />
-              </div>
-            </Tooltip>
-          ) : (
-            <Tooltip
-              content={`All changes saved${
-                currentNote ? ` • ${formatDateTime(currentNote.modified)}` : ""
-              }`}
-            >
-              <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)]">
-                <CircleCheckIcon className="w-4.5 h-4.5 mt-px stroke-[1.5] text-text-muted/40" />
-              </div>
-            </Tooltip>
-          )}
-          {showPinControl && currentNote && pinNote && unpinNote && (
-            <Tooltip content={isPinned ? "Unpin note" : "Pin note"}>
-              <IconButton
-                onClick={async () => {
-                  if (!currentNote) return;
-                  try {
-                    if (isPinned) {
-                      await unpinNote(currentNote.id);
-                      toast.success("Note unpinned");
-                    } else {
-                      await pinNote(currentNote.id);
-                      toast.success("Note pinned");
-                    }
-                    // Reload settings to update isPinned state
-                    const updatedSettings = await notesService.getSettings();
-                    setSettings(updatedSettings);
-                  } catch (error) {
-                    console.error("Failed to pin/unpin note:", error);
-                    toast.error(
-                      `Failed to ${isPinned ? "unpin" : "pin"} note: ${
-                        error instanceof Error ? error.message : "Unknown error"
-                      }`,
-                    );
-                  }
-                }}
-              >
-                <PinIcon
-                  className={cn(
-                    "w-5 h-5 stroke-[1.3]",
-                    isPinned && "fill-current",
-                  )}
-                />
-              </IconButton>
-            </Tooltip>
-          )}
-          {currentNote && (
-            <Tooltip content={`Find in note (${mod}${isMac ? "" : "+"}F)`}>
-              <IconButton onClick={openEditorSearch}>
-                <TextSearch className="w-4.25 h-4.25 stroke-[1.6]" />
-              </IconButton>
-            </Tooltip>
-          )}
-          {currentNote && (
-            <Tooltip
-              content={
-                effectiveSourceMode
-                  ? `View Formatted (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
-                  : `View Markdown Source (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
-              }
-            >
-              <IconButton onClick={toggleSourceMode}>
-                {effectiveSourceMode ? (
-                  <MarkdownOffIcon className="w-4.75 h-4.75 stroke-[1.4]" />
-                ) : (
-                  <MarkdownIcon className="w-4.75 h-4.75 stroke-[1.4]" />
-                )}
-              </IconButton>
-            </Tooltip>
-          )}
-          <DropdownMenu.Root open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
-            <Tooltip
-              content={`Export (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}C)`}
-            >
-              <DropdownMenu.Trigger asChild>
-                <IconButton>
-                  <ShareIcon className="w-4.25 h-4.25 stroke-[1.6]" />
-                </IconButton>
-              </DropdownMenu.Trigger>
-            </Tooltip>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content
-                className={`${menuSurfaceClassName} min-w-35 z-50`}
-                sideOffset={5}
-                align="end"
-                onCloseAutoFocus={(e) => {
-                  // Prevent focus returning to trigger button
-                  e.preventDefault();
-                }}
-                onKeyDown={(e) => {
-                  // Stop arrow keys from bubbling to note list navigation
-                  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                    e.stopPropagation();
-                  }
-                }}
-              >
-                <DropdownMenu.Item
-                  className={menuItemClassName}
-                  onSelect={handleCopyMarkdown}
-                >
-                  <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                  Copy Markdown
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  className={menuItemClassName}
-                  onSelect={handleCopyPlainText}
-                >
-                  <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                  Copy Plain Text
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  className={menuItemClassName}
-                  onSelect={handleCopyHtml}
-                >
-                  <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                  Copy HTML
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator className={menuSeparatorClassName} />
-                <DropdownMenu.Item
-                  className={menuItemClassName}
-                  onSelect={handleDownloadPdf}
-                >
-                  <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
-                  Print as PDF
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  className={menuItemClassName}
-                  onSelect={handleDownloadMarkdown}
-                >
-                  <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
-                  Export Markdown
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-          {onSaveToFolder && (
-            <Tooltip content="Save in Folder">
-              <IconButton
-                onClick={onSaveToFolder}
-                aria-label="Save in Folder"
-                disabled={saveToFolderDisabled}
-              >
-                {saveToFolderDisabled ? (
-                  <LoadingSpinner size="md" tone="inherit" />
-                ) : (
-                  <FolderPlusIcon className="w-4.25 h-4.25 stroke-[1.6]" />
-                )}
-              </IconButton>
-            </Tooltip>
+              className={cn(
+                "flex-1 min-w-0",
+                focusMode ? "opacity-0 pointer-events-none" : "opacity-100",
+                hasTransitioned && `transition-opacity duration-[240ms]${needsPaneDelay ? " delay-200" : ""}`,
               )}
-            </div>
-          </div>
-
-          {/* Header with format bar – border aligns with FoldersPane / NotesPane */}
-          <div className={`ui-pane-header px-0 border-border/80 ${focusMode ? "border-transparent" : ""} ${hasTransitioned ? `transition-[border-color] duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}>
-            <div
-              className={`flex-1 ${focusMode ? "opacity-0 pointer-events-none" : "opacity-100"} ${hasTransitioned ? `transition-opacity duration-[240ms] ${needsPaneDelay ? "delay-200" : ""}` : ""}`}
             >
               {effectiveSourceMode ? (
                 <div className="ui-scrollbar-overlay flex items-center gap-1 px-4 overflow-x-auto">
                   <ToolbarButton
                     onClick={() => setSourceModeWordWrap(!sourceModeWordWrap)}
                     isActive={sourceModeWordWrap}
-                    title={
-                      sourceModeWordWrap
-                        ? "Turn Word Wrap Off"
-                        : "Turn Word Wrap On"
-                    }
+                    title={sourceModeWordWrap ? "Turn Word Wrap Off" : "Turn Word Wrap On"}
                   >
                     <WrapText className="w-4.5 h-4.5 stroke-[1.5]" />
                   </ToolbarButton>
@@ -1270,6 +1169,151 @@ function EditorImpl({
                   onAddImage={handleAddImage}
                 />
               )}
+            </div>
+
+            {/* Note actions */}
+            <div
+              className={cn(
+                "flex items-center gap-px shrink-0",
+                focusMode ? "opacity-0 pointer-events-none" : "opacity-100",
+                hasTransitioned && `transition-opacity duration-[240ms]${needsPaneDelay ? " delay-200" : ""}`,
+              )}
+            >
+              <div className="w-px h-4 border-l border-border/60 mx-1 shrink-0" />
+              {hasExternalChanges ? (
+                <Tooltip content={`External changes detected (${mod}${isMac ? "" : "+"}R to refresh)`}>
+                  <button
+                    onClick={reloadCurrentNote}
+                    className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-text-muted hover:bg-bg-muted hover:text-text transition-colors font-medium"
+                  >
+                    <RefreshCwIcon className="w-4 h-4 stroke-[1.6]" />
+                    <span>Refresh</span>
+                  </button>
+                </Tooltip>
+              ) : isSaving ? (
+                <Tooltip content="Saving...">
+                  <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center">
+                    <LoadingSpinner size="lg" tone="subtle" />
+                  </div>
+                </Tooltip>
+              ) : (
+                <Tooltip content={`All changes saved${currentNote ? ` • ${formatDateTime(currentNote.modified)}` : ""}`}>
+                  <div className="h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)]">
+                    <CircleCheckIcon className="w-4.5 h-4.5 mt-px stroke-[1.5] text-text-muted/40" />
+                  </div>
+                </Tooltip>
+              )}
+              {showPinControl && currentNote && pinNote && unpinNote && (
+                <Tooltip content={isPinned ? "Unpin note" : "Pin note"}>
+                  <IconButton
+                    onClick={async () => {
+                      if (!currentNote) return;
+                      try {
+                        if (isPinned) {
+                          await unpinNote(currentNote.id);
+                          toast.success("Note unpinned");
+                        } else {
+                          await pinNote(currentNote.id);
+                          toast.success("Note pinned");
+                        }
+                        const updatedSettings = await notesService.getSettings();
+                        setSettings(updatedSettings);
+                      } catch (error) {
+                        console.error("Failed to pin/unpin note:", error);
+                        toast.error(
+                          `Failed to ${isPinned ? "unpin" : "pin"} note: ${error instanceof Error ? error.message : "Unknown error"}`,
+                        );
+                      }
+                    }}
+                  >
+                    <PinIcon className={cn("w-5 h-5 stroke-[1.3]", isPinned && "fill-current")} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {currentNote && (
+                <Tooltip content={`Find in note (${mod}${isMac ? "" : "+"}F)`}>
+                  <IconButton onClick={openEditorSearch}>
+                    <TextSearch className="w-4.25 h-4.25 stroke-[1.6]" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {currentNote && (
+                <Tooltip
+                  content={
+                    effectiveSourceMode
+                      ? `View Formatted (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
+                      : `View Markdown Source (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
+                  }
+                >
+                  <IconButton onClick={toggleSourceMode}>
+                    {effectiveSourceMode ? (
+                      <MarkdownOffIcon className="w-4.75 h-4.75 stroke-[1.4]" />
+                    ) : (
+                      <MarkdownIcon className="w-4.75 h-4.75 stroke-[1.4]" />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              )}
+              <DropdownMenu.Root open={copyMenuOpen} onOpenChange={setCopyMenuOpen}>
+                <Tooltip content={`Export (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}C)`}>
+                  <DropdownMenu.Trigger asChild>
+                    <IconButton>
+                      <ShareIcon className="w-4.25 h-4.25 stroke-[1.6]" />
+                    </IconButton>
+                  </DropdownMenu.Trigger>
+                </Tooltip>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className={`${menuSurfaceClassName} min-w-35 z-50`}
+                    sideOffset={5}
+                    align="end"
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                        e.stopPropagation();
+                      }
+                    }}
+                  >
+                    <DropdownMenu.Item className={menuItemClassName} onSelect={handleCopyMarkdown}>
+                      <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                      Copy Markdown
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={menuItemClassName} onSelect={handleCopyPlainText}>
+                      <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                      Copy Plain Text
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={menuItemClassName} onSelect={handleCopyHtml}>
+                      <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                      Copy HTML
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator className={menuSeparatorClassName} />
+                    <DropdownMenu.Item className={menuItemClassName} onSelect={handleDownloadPdf}>
+                      <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
+                      Print as PDF
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={menuItemClassName} onSelect={handleDownloadMarkdown}>
+                      <DownloadIcon className="w-4 h-4 stroke-[1.6]" />
+                      Export Markdown
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+              {onSaveToFolder && (
+                <Tooltip content="Save in Folder">
+                  <IconButton
+                    onClick={onSaveToFolder}
+                    aria-label="Save in Folder"
+                    disabled={saveToFolderDisabled}
+                  >
+                    {saveToFolderDisabled ? (
+                      <LoadingSpinner size="md" tone="inherit" />
+                    ) : (
+                      <FolderPlusIcon className="w-4.25 h-4.25 stroke-[1.6]" />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              )}
+              <div className="w-2 shrink-0" />
             </div>
           </div>
         </>
