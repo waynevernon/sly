@@ -130,7 +130,7 @@ export function TaskDatePicker({
             : "text-text-muted hover:bg-bg-muted hover:text-text",
         )}
       >
-        <CalendarDays className="h-4 w-4 shrink-0 stroke-[1.7]" />
+        <CalendarDays className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
         <span>{formattedValue}</span>
       </button>
 
@@ -240,7 +240,7 @@ export function DueDatePicker({
             : "text-text-muted hover:bg-bg-muted hover:text-text",
         )}
       >
-        <CalendarCheck className="h-4 w-4 shrink-0 stroke-[1.7]" />
+        <CalendarCheck className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
         <span>{formattedValue}</span>
       </button>
 
