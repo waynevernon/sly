@@ -117,7 +117,7 @@ vi.mock("./components/layout/WorkspaceNavigation", () => ({
     onOpenSettings,
     workspaceMode,
   }: {
-    onOpenSettings: (tab?: "general" | "editor" | "shortcuts" | "about") => void;
+    onOpenSettings: (tab?: string) => void;
     workspaceMode: "notes" | "tasks";
   }) => (
     <div>
@@ -164,11 +164,11 @@ vi.mock("./components/settings", () => ({
     initialTab,
   }: {
     onBack: () => void;
-    initialTab?: "general" | "editor" | "extensions" | "shortcuts" | "about";
+    initialTab?: string;
   }) => (
     <div>
       <div>settings-page</div>
-      <div>settings-tab:{initialTab ?? "general"}</div>
+      <div>settings-tab:{initialTab ?? "notes"}</div>
       <button onClick={onBack}>back</button>
     </div>
   ),

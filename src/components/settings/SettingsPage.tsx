@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import {
   ArrowLeftIcon,
-  FolderIcon,
+  NoteIcon,
+  CheckSquareIcon,
   SwatchIcon,
   KeyboardIcon,
   InfoIcon,
 } from "../icons";
 import { Button, IconButton } from "../ui";
 import { GeneralSettingsSection } from "./GeneralSettingsSection";
+import { TasksSettingsSection } from "./TasksSettingsSection";
 import { AppearanceSettingsSection } from "./EditorSettingsSection";
 import { ExtensionsSettingsSection } from "./ExtensionsSettingsSection";
 import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
@@ -24,7 +26,7 @@ interface SettingsPageProps {
   onRefreshAiProviders: () => Promise<void>;
 }
 
-export type SettingsTab = "general" | "editor" | "extensions" | "shortcuts" | "about";
+export type SettingsTab = "notes" | "tasks" | "editor" | "extensions" | "shortcuts" | "about";
 
 const tabs: {
   id: SettingsTab;
@@ -33,34 +35,40 @@ const tabs: {
   shortcutLabel: string;
 }[] = [
   {
-    id: "general",
-    label: "General",
-    icon: FolderIcon,
+    id: "notes",
+    label: "Notes",
+    icon: NoteIcon,
     shortcutLabel: shortcut(mod, alt, "1"),
+  },
+  {
+    id: "tasks",
+    label: "Tasks",
+    icon: CheckSquareIcon,
+    shortcutLabel: shortcut(mod, alt, "2"),
   },
   {
     id: "editor",
     label: "Appearance",
     icon: SwatchIcon,
-    shortcutLabel: shortcut(mod, alt, "2"),
+    shortcutLabel: shortcut(mod, alt, "3"),
   },
   {
     id: "extensions",
     label: "Assistant & CLI",
     icon: Sparkles,
-    shortcutLabel: shortcut(mod, alt, "3"),
+    shortcutLabel: shortcut(mod, alt, "4"),
   },
   {
     id: "shortcuts",
     label: "Shortcuts",
     icon: KeyboardIcon,
-    shortcutLabel: shortcut(mod, alt, "4"),
+    shortcutLabel: shortcut(mod, alt, "5"),
   },
   {
     id: "about",
     label: "About",
     icon: InfoIcon,
-    shortcutLabel: shortcut(mod, alt, "5"),
+    shortcutLabel: shortcut(mod, alt, "6"),
   },
 ];
 
@@ -71,7 +79,7 @@ export function SettingsPage({
   aiProvidersLoading,
   onRefreshAiProviders,
 }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "notes");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Reset scroll position when tab changes
@@ -90,17 +98,20 @@ export function SettingsPage({
 
       if (e.code === "Digit1") {
         e.preventDefault();
-        setActiveTab("general");
+        setActiveTab("notes");
       } else if (e.code === "Digit2") {
         e.preventDefault();
-        setActiveTab("editor");
+        setActiveTab("tasks");
       } else if (e.code === "Digit3") {
         e.preventDefault();
-        setActiveTab("extensions");
+        setActiveTab("editor");
       } else if (e.code === "Digit4") {
         e.preventDefault();
-        setActiveTab("shortcuts");
+        setActiveTab("extensions");
       } else if (e.code === "Digit5") {
+        e.preventDefault();
+        setActiveTab("shortcuts");
+      } else if (e.code === "Digit6") {
         e.preventDefault();
         setActiveTab("about");
       }
@@ -165,7 +176,8 @@ export function SettingsPage({
           className="ui-scrollbar-overlay flex-1 overflow-auto scrollbar-gutter-stable mr-px"
         >
           <div className="w-full max-w-[56rem] mx-auto px-8 pb-8">
-            {activeTab === "general" && <GeneralSettingsSection />}
+            {activeTab === "notes" && <GeneralSettingsSection />}
+            {activeTab === "tasks" && <TasksSettingsSection />}
             {activeTab === "editor" && <AppearanceSettingsSection />}
             {activeTab === "extensions" && (
               <ExtensionsSettingsSection

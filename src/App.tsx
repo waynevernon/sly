@@ -250,7 +250,7 @@ interface WorkspaceMainProps {
   currentAssistantSelection: AssistantSelectionSnapshot | null;
   assistantProps: RightPanelAssistantProps;
   workspaceEditorData: WorkspaceEditorData;
-  onOpenSettings: (tab?: "general" | "editor" | "shortcuts" | "about") => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   onEditorSourceModeChange: (sourceMode: boolean) => void;
   onRegisterScrollContainer: (container: HTMLDivElement | null) => void;
   onRegisterFlushPendingSave: (
@@ -646,7 +646,7 @@ function AppContent() {
   const [settingsKey, setSettingsKey] = useState(0);
 
   const openSettings = useCallback(
-    (tab?: "general" | "editor" | "shortcuts" | "about") => {
+    (tab?: SettingsTab) => {
       const validTab = typeof tab === "string" ? tab : undefined;
       setPaletteOpen(false);
       setSettingsInitialTab(validTab);
