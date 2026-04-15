@@ -496,7 +496,7 @@ export function GlobalTaskCaptureDialog({
                 className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
               >
                 <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                <span className="truncate text-left"><span className="text-text-muted/50">Waiting for</span> {waitingFor}</span>
+                <span className="truncate text-left">Waiting for {waitingFor}</span>
               </button>
             ) : (
               <Button
