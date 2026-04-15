@@ -846,6 +846,7 @@ function AppContent() {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
     let unlistenOpenSettingsAbout: (() => void) | undefined;
+    let unlistenCheckForUpdates: (() => void) | undefined;
     let unlistenShowNotesMode: (() => void) | undefined;
     let unlistenShowTasksMode: (() => void) | undefined;
     let unlistenCycleLeftPanes: (() => void) | undefined;
@@ -865,6 +866,13 @@ function AppContent() {
     }).then((fn) => {
       if (cancelled) fn();
       else unlistenOpenSettingsAbout = fn;
+    });
+
+    listen("check-for-updates", () => {
+      void showUpdateToast();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenCheckForUpdates = fn;
     });
 
     listen("show-notes-mode", () => {
@@ -916,6 +924,7 @@ function AppContent() {
       cancelled = true;
       unlistenOpenSettings?.();
       unlistenOpenSettingsAbout?.();
+      unlistenCheckForUpdates?.();
       unlistenShowNotesMode?.();
       unlistenShowTasksMode?.();
       unlistenCycleLeftPanes?.();

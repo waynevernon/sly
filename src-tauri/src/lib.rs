@@ -42,6 +42,7 @@ const MENU_VIEW_3_PANE_ID: &str = "view-pane-3";
 const MENU_TOGGLE_OUTLINE_PANEL_ID: &str = "view-toggle-outline-panel";
 const MENU_FOCUS_MODE_ID: &str = "view-focus-mode";
 const MENU_ABOUT_ID: &str = "app-about";
+const MENU_CHECK_FOR_UPDATES_ID: &str = "app-check-for-updates";
 const MENU_VIEW_GITHUB_ID: &str = "help-view-github";
 const MENU_REPORT_ISSUE_ID: &str = "help-report-issue";
 
@@ -5428,6 +5429,8 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
     let about_item = MenuItemBuilder::with_id(MENU_ABOUT_ID, "About Sly").build(app)?;
+    let check_for_updates_item =
+        MenuItemBuilder::with_id(MENU_CHECK_FOR_UPDATES_ID, "Check for Updates…").build(app)?;
     let github_item = MenuItemBuilder::with_id(MENU_VIEW_GITHUB_ID, "View on GitHub").build(app)?;
     let report_issue_item =
         MenuItemBuilder::with_id(MENU_REPORT_ISSUE_ID, "Report an Issue").build(app)?;
@@ -5439,6 +5442,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &about_item,
+            &check_for_updates_item,
             &PredefinedMenuItem::separator(app)?,
             &settings_item,
             &PredefinedMenuItem::separator(app)?,
@@ -5529,6 +5533,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &about_item,
+            &check_for_updates_item,
             &PredefinedMenuItem::separator(app)?,
             &github_item,
             &report_issue_item,
@@ -5614,6 +5619,10 @@ fn handle_app_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         MENU_ABOUT_ID => {
             focus_main_window(app);
             let _ = app.emit_to("main", "open-settings-about", ());
+        }
+        MENU_CHECK_FOR_UPDATES_ID => {
+            focus_main_window(app);
+            let _ = app.emit_to("main", "check-for-updates", ());
         }
         MENU_VIEW_GITHUB_ID => {
             open_external_url(REPOSITORY_URL);
