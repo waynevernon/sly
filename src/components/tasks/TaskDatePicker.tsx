@@ -114,7 +114,7 @@ export function TaskDatePicker({
   const formattedValue = scheduleBucket
     ? TASK_SCHEDULE_BUCKET_LABELS[scheduleBucket]
     : actionDate
-      ? `Action  ${formatTaskDate(actionDate, today)}`
+      ? `Action ${formatTaskDate(actionDate, today)}`
       : "Action date";
 
   return (
@@ -225,7 +225,7 @@ export function DueDatePicker({
     };
   }, [isOpen]);
 
-  const formattedValue = dueDate ? `Due  ${formatTaskDate(dueDate, today)}` : "Due date";
+  const formattedValue = dueDate ? `Due ${formatTaskDate(dueDate, today)}` : "Due date";
 
   return (
     <div className={cn("relative", className)}>

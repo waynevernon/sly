@@ -311,56 +311,89 @@ export function TaskDetailPanel() {
                 onChange={commitRecurrence}
               />
             ) : null}
-            {waitingForEditing ? (
-              <div className="relative max-w-[320px]">
-                <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
-                  <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                  <input
-                    ref={waitingForInputRef}
-                    type="text"
-                    value={waitingFor}
-                    placeholder="Waiting for…"
-                    onChange={(event) => handleWaitingForChange(event.target.value)}
-                    onFocus={() => setWaitingForFocused(true)}
-                    onBlur={(event) => {
-                      setWaitingForFocused(false);
-                      const pendingValue = waitingForPendingBlurValueRef.current;
-                      waitingForPendingBlurValueRef.current = null;
-                      commitWaitingFor(pendingValue ?? event.currentTarget.value);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        commitWaitingFor(event.currentTarget.value, { blur: true });
-                      } else if (event.key === "Escape") {
-                        event.preventDefault();
-                        setWaitingFor(selectedTask?.waitingFor ?? "");
+            {!hasWaitingFor && !waitingForEditing && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setWaitingForEditing(true);
+                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
+                }}
+                className="gap-2"
+              >
+                <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                <span>Waiting for</span>
+              </Button>
+            )}
+          </div>
+
+          {(hasWaitingFor || waitingForEditing) && (
+            <>
+              <div />
+              <div className="relative">
+                {waitingForEditing ? (
+                  <div className="flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
+                    <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                    <input
+                      ref={waitingForInputRef}
+                      type="text"
+                      value={waitingFor}
+                      placeholder="Waiting for…"
+                      onChange={(event) => handleWaitingForChange(event.target.value)}
+                      onFocus={() => setWaitingForFocused(true)}
+                      onBlur={(event) => {
+                        setWaitingForFocused(false);
+                        const pendingValue = waitingForPendingBlurValueRef.current;
+                        waitingForPendingBlurValueRef.current = null;
+                        commitWaitingFor(pendingValue ?? event.currentTarget.value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitWaitingFor(event.currentTarget.value, { blur: true });
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          setWaitingFor(selectedTask?.waitingFor ?? "");
+                          setWaitingForEditing(false);
+                          setWaitingForFocused(false);
+                          waitingForInputRef.current?.blur();
+                        }
+                      }}
+                      className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
+                    />
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setWaitingFor("");
                         setWaitingForEditing(false);
                         setWaitingForFocused(false);
-                        waitingForInputRef.current?.blur();
-                      }
-                    }}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
-                  />
+                        scheduleSave({ waitingFor: "" });
+                        flushSave();
+                      }}
+                      className="ui-focus-ring inline-flex h-5 w-5 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                      aria-label="Clear waiting for"
+                    >
+                      <X className="h-3.5 w-3.5 stroke-[1.9]" />
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
-                      setWaitingFor("");
-                      setWaitingForEditing(false);
-                      setWaitingForFocused(false);
-                      scheduleSave({ waitingFor: "" });
-                      flushSave();
+                      setWaitingForEditing(true);
+                      requestAnimationFrame(() => waitingForInputRef.current?.focus());
                     }}
-                    className="ui-focus-ring inline-flex h-5 w-5 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
-                    aria-label="Clear waiting for"
+                    className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
                   >
-                    <X className="h-3.5 w-3.5 stroke-[1.9]" />
+                    <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
+                    <span className="truncate text-left">Waiting for {waitingFor}</span>
                   </button>
-                </div>
+                )}
 
                 {showWaitingForSuggestions ? (
-                  <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 w-full p-1.5">
+                  <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 min-w-[200px] p-1.5">
                     <div className="flex flex-col gap-1">
                       {filteredWaitingForSuggestions.map((value) => (
                         <button
@@ -380,51 +413,21 @@ export function TaskDetailPanel() {
                   </PopoverSurface>
                 ) : null}
               </div>
-            ) : hasWaitingFor ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setWaitingForEditing(true);
-                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
-                }}
-                className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
-              >
-                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                <span className="truncate text-left">Waiting for {waitingFor}</span>
-              </button>
-            ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setWaitingForEditing(true);
-                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
-                }}
-                className="gap-2"
-              >
-                <Clock3 className="h-4 w-4 stroke-[1.7]" />
-                <span>Waiting for</span>
-              </Button>
-            )}
-          </div>
+            </>
+          )}
 
           <div />
           <div className="border-t border-border/40" />
 
           <div />
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-text-muted/70">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-text-muted/70">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-text-muted">
-                Created
-              </span>
+              <span>Created</span>
               <span>{formatTaskTimestamp(selectedTask.createdAt)}</span>
             </div>
             {selectedTask.completedAt ? (
               <div className="flex items-center gap-2">
-                <span className="font-medium text-text-muted">
-                  Completed
-                </span>
+                <span>Completed</span>
                 <span>{formatTaskTimestamp(selectedTask.completedAt)}</span>
               </div>
             ) : null}
@@ -434,9 +437,9 @@ export function TaskDetailPanel() {
           <div className="border-t border-border/40" />
 
           <div />
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium text-text-muted">
+              <div className="text-sm text-text-muted">
                 Link
               </div>
               <button
@@ -447,9 +450,9 @@ export function TaskDetailPanel() {
                 aria-hidden={!openableLink}
                 tabIndex={openableLink ? 0 : -1}
                 className={cn(
-                  "ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs transition-colors",
+                  "ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs text-text-muted transition-colors",
                   openableLink
-                    ? "text-text-muted hover:bg-bg-muted hover:text-text"
+                    ? "hover:bg-bg-muted hover:text-text"
                     : "pointer-events-none invisible",
                 )}
               >
@@ -468,12 +471,11 @@ export function TaskDetailPanel() {
           </div>
 
           <div />
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-medium text-text-muted">
+              <div className="text-sm text-text-muted">
                 Description
               </div>
-              <div className="h-[28px] px-2 py-1 invisible" aria-hidden="true" />
             </div>
             <textarea
               value={description}

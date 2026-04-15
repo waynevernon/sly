@@ -40,6 +40,7 @@ interface TasksContextValue {
   selectTask: (id: string | null) => void;
   toggleTaskSelection: (id: string) => void;
   selectTaskRange: (id: string) => void;
+  selectAllVisibleTasks: () => void;
   clearTaskSelection: () => void;
   createTask: (title: string) => Promise<Task | null>;
   updateTask: (id: string, patch: TaskPatch) => Promise<Task | null>;
@@ -302,6 +303,15 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     });
   }, [setSelectionState, visibleTaskIds]);
 
+  const selectAllVisibleTasks = useCallback(() => {
+    if (visibleTaskIds.length === 0) return;
+    const lastId = visibleTaskIds[visibleTaskIds.length - 1];
+    setSelectionState(visibleTaskIds, {
+      activeId: lastId,
+      anchorId: visibleTaskIds[0],
+    });
+  }, [setSelectionState, visibleTaskIds]);
+
   const clearTaskSelection = useCallback(() => {
     const activeTaskId = selectedTaskIdRef.current;
     if (activeTaskId && visibleTaskIds.includes(activeTaskId)) {
@@ -475,6 +485,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       selectTask,
       toggleTaskSelection,
       selectTaskRange,
+      selectAllVisibleTasks,
       clearTaskSelection,
       createTask,
       updateTask,
@@ -501,6 +512,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       selectTask,
       toggleTaskSelection,
       selectTaskRange,
+      selectAllVisibleTasks,
       clearTaskSelection,
       createTask,
       updateTask,
@@ -532,6 +544,7 @@ const TASKS_NOOP: TasksContextValue = {
   selectTask: () => {},
   toggleTaskSelection: () => {},
   selectTaskRange: () => {},
+  selectAllVisibleTasks: () => {},
   clearTaskSelection: () => {},
   createTask: async () => null,
   updateTask: async () => null,

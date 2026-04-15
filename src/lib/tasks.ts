@@ -74,6 +74,13 @@ export interface DetectedTaskDate {
   signature: string;
 }
 
+export interface DetectedTaskUrl {
+  cleanedTitle: string;
+  matchedText: string;
+  signature: string;
+  url: string;
+}
+
 /**
  * Derive which primary horizon view a task belongs to.
  * Priority (first match wins):
@@ -334,6 +341,38 @@ export function detectTaskDateFromTitle(title: string, today: string): DetectedT
   }
 
   return null;
+}
+
+export function detectTaskUrlFromTitle(title: string): DetectedTaskUrl | null {
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+
+  const urlRegex = /https?:\/\/\S+/g;
+  const match = urlRegex.exec(trimmed);
+  if (!match) return null;
+
+  // Trim trailing punctuation that is unlikely to be part of the URL.
+  const matchedText = match[0].replace(/[.,;:!?)\]}>]+$/, "");
+  if (!matchedText) return null;
+
+  const before = trimmed.slice(0, match.index).trimEnd();
+  const after = trimmed.slice(match.index + matchedText.length).trimStart();
+
+  let cleanedTitle = before && after ? `${before} ${after}` : before || after;
+  cleanedTitle = cleanedTitle
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*[-,:|]\s*$/g, "")
+    .replace(/^\s*[-,:|]\s*/g, "")
+    .trim();
+
+  if (!cleanedTitle) return null;
+
+  return {
+    cleanedTitle,
+    matchedText,
+    signature: `url:${matchedText.toLowerCase()}:${cleanedTitle.toLowerCase()}`,
+    url: matchedText,
+  };
 }
 
 export function activeCountForView(

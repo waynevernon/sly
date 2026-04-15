@@ -32,7 +32,7 @@ import type { RightPanelAssistantProps } from "./components/layout/RightPanelAss
 import { Editor } from "./components/editor/Editor";
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
 import { GlobalTaskCaptureDialog } from "./components/tasks/GlobalTaskCaptureDialog";
-import { TasksProvider } from "./context/TasksContext";
+import { TasksProvider, useTasks } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
@@ -457,6 +457,7 @@ function AppContent() {
     syncNotesFolder,
     unpinNote,
   } = useNotesActions();
+  const { selectAllVisibleTasks } = useTasks();
   const {
     interfaceZoom,
     setInterfaceZoom,
@@ -1300,6 +1301,9 @@ function AppContent() {
       const isInNoteList =
         !!targetElement?.closest("[data-note-list]") ||
         !!document.activeElement?.closest("[data-note-list]");
+      const isInTaskList =
+        !!targetElement?.closest("[data-task-list]") ||
+        !!document.activeElement?.closest("[data-task-list]");
       const isEditorEmpty =
         isInEditor && currentNoteRef.current?.content.trim() === "";
 
@@ -1486,6 +1490,17 @@ function AppContent() {
         return;
       }
 
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "a" &&
+        !isInInput &&
+        isInTaskList
+      ) {
+        e.preventDefault();
+        selectAllVisibleTasks();
+        return;
+      }
+
       // Delete current note (note list focused, or editor on empty note)
       if (
         (selectedNoteIdKbRef.current || selectedNoteIdsKbRef.current.length > 0) &&
@@ -1629,6 +1644,7 @@ function AppContent() {
     selectNoteRange,
     clearNoteSelection,
     selectAllVisibleNotes,
+    selectAllVisibleTasks,
     setPaneMode,
     toggleRightPanel,
     openSettings,

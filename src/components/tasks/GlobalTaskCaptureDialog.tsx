@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, Clock3, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
   detectTaskDateFromTitle,
+  detectTaskUrlFromTitle,
   deriveView,
   localDateToNormalizedActionAt,
   TASK_VIEW_LABELS,
@@ -21,6 +22,25 @@ interface GlobalTaskCaptureDialogProps {
 }
 
 const CAPTURE_DATE_DEBOUNCE_MS = 350;
+
+function renderTitleHighlights(
+  text: string,
+  highlights: Array<{ start: number; end: number }>,
+) {
+  const segments: ReactNode[] = [];
+  let cursor = 0;
+  for (const { start, end } of highlights) {
+    if (start > cursor) segments.push(text.slice(cursor, start));
+    segments.push(
+      <span key={start} className="rounded-[var(--ui-radius-sm)] bg-accent/12">
+        {text.slice(start, end)}
+      </span>,
+    );
+    cursor = end;
+  }
+  if (cursor < text.length) segments.push(text.slice(cursor));
+  return segments;
+}
 
 export function GlobalTaskCaptureDialog({
   open,
@@ -49,8 +69,26 @@ export function GlobalTaskCaptureDialog({
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
+  const [detectedUrl, setDetectedUrl] = useState<ReturnType<typeof detectTaskUrlFromTitle>>(null);
+  const [ignoredUrlSignature, setIgnoredUrlSignature] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleOverlayRef = useRef<HTMLSpanElement>(null);
+  // Tracks the URL that was auto-populated into the link field so we can
+  // distinguish it from a value the user typed manually.
+  const autoPopulatedLinkRef = useRef<string | null>(null);
+  // Mirror of link state kept in a ref so the URL detection effect can read
+  // it without adding link to its own dependency array (which would cause a
+  // circular loop when the effect auto-populates link).
+  const linkRef = useRef(link);
+  linkRef.current = link;
+
+  const syncTitleOverlayScroll = useCallback(() => {
+    if (titleOverlayRef.current && titleInputRef.current) {
+      titleOverlayRef.current.style.transform =
+        `translateX(-${titleInputRef.current.scrollLeft}px)`;
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -66,6 +104,9 @@ export function GlobalTaskCaptureDialog({
     setManualScheduleBucket(null);
     setDetectedDate(null);
     setIgnoredDetectionSignature(null);
+    setDetectedUrl(null);
+    setIgnoredUrlSignature(null);
+    autoPopulatedLinkRef.current = null;
     setIsSaving(false);
     titleInputRef.current?.focus();
     titleInputRef.current?.select();
@@ -92,18 +133,67 @@ export function GlobalTaskCaptureDialog({
     return () => window.clearTimeout(timer);
   }, [ignoredDetectionSignature, open, title, today]);
 
+  useEffect(() => {
+    if (!open || !title.trim()) {
+      setDetectedUrl(null);
+      return;
+    }
+
+    // If the link field has content the user typed themselves, don't interfere.
+    const currentLink = linkRef.current;
+    if (currentLink.trim() && currentLink !== autoPopulatedLinkRef.current) {
+      setDetectedUrl(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const nextDetection = detectTaskUrlFromTitle(title);
+
+      if (!nextDetection || nextDetection.signature === ignoredUrlSignature) {
+        setDetectedUrl(null);
+        // URL was removed from the title — clear the link field if we put it there.
+        if (autoPopulatedLinkRef.current && linkRef.current === autoPopulatedLinkRef.current) {
+          setLink("");
+          autoPopulatedLinkRef.current = null;
+        }
+        return;
+      }
+
+      setDetectedUrl(nextDetection);
+      // Auto-populate the link field only when it differs (avoids re-render loops).
+      if (nextDetection.url !== linkRef.current) {
+        setLink(nextDetection.url);
+        autoPopulatedLinkRef.current = nextDetection.url;
+      }
+    }, CAPTURE_DATE_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  // link intentionally omitted — we read it via linkRef to avoid a circular loop.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ignoredUrlSignature, open, title]);
+
   const handleClose = useCallback(() => {
     if (isSaving) return;
     onClose();
   }, [isSaving, onClose]);
 
   const handleSubmit = useCallback(async () => {
-    const nextDetection = detectTaskDateFromTitle(title, today);
+    // Strip the URL from the title if detection is still active (not ignored by
+    // the user clearing/editing the link field).
+    const nextUrlDetection = detectTaskUrlFromTitle(title);
+    const activeUrlDetection =
+      nextUrlDetection && nextUrlDetection.signature !== ignoredUrlSignature
+        ? nextUrlDetection
+        : null;
+    const titleAfterUrl = activeUrlDetection ? activeUrlDetection.cleanedTitle : title;
+    // link is already correct — auto-populated by the detection effect or typed manually.
+
+    const nextDetection = detectTaskDateFromTitle(titleAfterUrl, today);
     const activeDetection =
       nextDetection && nextDetection.signature !== ignoredDetectionSignature
         ? nextDetection
         : null;
-    const trimmedTitle = (activeDetection?.cleanedTitle ?? title).trim();
+    const trimmedTitle = (activeDetection?.cleanedTitle ?? titleAfterUrl).trim();
     if (!trimmedTitle || isSaving) {
       return;
     }
@@ -156,6 +246,7 @@ export function GlobalTaskCaptureDialog({
     createTask,
     description,
     ignoredDetectionSignature,
+    ignoredUrlSignature,
     isSaving,
     link,
     manualActionDate,
@@ -193,14 +284,26 @@ export function GlobalTaskCaptureDialog({
   const effectiveActionDate =
     manualScheduleBucket ? "" : manualActionDate || "";
   const showDetectedDateChip = Boolean(detectedDate && !manualActionDate && !manualScheduleBucket);
-  const titleHighlight = useMemo(() => {
-    if (!showDetectedDateChip || !detectedDate) return null;
+  const titleHighlights = useMemo(() => {
+    const ranges: Array<{ start: number; end: number }> = [];
     const lower = title.toLowerCase();
-    const matchedLower = detectedDate.matchedText.toLowerCase();
-    const start = lower.indexOf(matchedLower);
-    if (start === -1) return null;
-    return { start, end: start + detectedDate.matchedText.length };
-  }, [showDetectedDateChip, detectedDate, title]);
+
+    if (showDetectedDateChip && detectedDate) {
+      const start = lower.indexOf(detectedDate.matchedText.toLowerCase());
+      if (start !== -1) {
+        ranges.push({ start, end: start + detectedDate.matchedText.length });
+      }
+    }
+
+    if (detectedUrl) {
+      const start = lower.indexOf(detectedUrl.matchedText.toLowerCase());
+      if (start !== -1) {
+        ranges.push({ start, end: start + detectedUrl.matchedText.length });
+      }
+    }
+
+    return ranges.sort((a, b) => a.start - b.start);
+  }, [showDetectedDateChip, detectedDate, detectedUrl, title]);
   const waitingForSuggestions = useMemo(() => {
     const counts = new Map<string, { value: string; count: number }>();
 
@@ -254,16 +357,26 @@ export function GlobalTaskCaptureDialog({
         </button>
         <div className="flex flex-col gap-4">
           <div className="pointer-events-none relative pr-10">
-            {titleHighlight && (
+            {titleHighlights.length > 0 && (
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[1.7rem] font-medium leading-tight text-transparent"
               >
-                {title.slice(0, titleHighlight.start)}
-                <span className="rounded-[var(--ui-radius-sm)] bg-accent/12">
-                  {title.slice(titleHighlight.start, titleHighlight.end)}
+                <span
+                  ref={(el) => {
+                    titleOverlayRef.current = el;
+                    if (el) {
+                      requestAnimationFrame(() => {
+                        if (titleInputRef.current && el) {
+                          el.style.transform = `translateX(-${titleInputRef.current.scrollLeft}px)`;
+                        }
+                      });
+                    }
+                  }}
+                  className="inline-block"
+                >
+                  {renderTitleHighlights(title, titleHighlights)}
                 </span>
-                {title.slice(titleHighlight.end)}
               </div>
             )}
             <input
@@ -271,6 +384,7 @@ export function GlobalTaskCaptureDialog({
               value={title}
               placeholder="What needs doing?"
               onChange={(event) => setTitle(event.target.value)}
+              onScroll={syncTitleOverlayScroll}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -282,13 +396,6 @@ export function GlobalTaskCaptureDialog({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(manualActionDate || manualScheduleBucket) && (
-              <RecurrencePicker
-                recurrence={recurrence}
-                actionDate={manualActionDate}
-                onChange={setRecurrence}
-              />
-            )}
             {!showDetectedDateChip && (
               <TaskDatePicker
                 actionDate={effectiveActionDate}
@@ -320,6 +427,13 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
+            {(manualActionDate || manualScheduleBucket) && (
+              <RecurrencePicker
+                recurrence={recurrence}
+                actionDate={manualActionDate}
+                onChange={setRecurrence}
+              />
+            )}
             {waitingForEditing ? (
               <div className="relative max-w-[320px]">
                 <div className="flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
@@ -430,7 +544,19 @@ export function GlobalTaskCaptureDialog({
             <input
               value={link}
               placeholder="Add link…"
-              onChange={(event) => setLink(event.target.value)}
+              onChange={(event) => {
+                const newVal = event.target.value;
+                setLink(newVal);
+                // If the user edits the field (value differs from what we auto-set),
+                // treat it as a manual override and stop auto-populating.
+                if (newVal !== autoPopulatedLinkRef.current) {
+                  autoPopulatedLinkRef.current = null;
+                  if (detectedUrl) {
+                    setIgnoredUrlSignature(detectedUrl.signature);
+                    setDetectedUrl(null);
+                  }
+                }
+              }}
               className="w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
             />
           </div>

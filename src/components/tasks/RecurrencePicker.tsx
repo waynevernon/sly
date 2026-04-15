@@ -182,7 +182,7 @@ export function RecurrencePicker({ recurrence, actionDate, onChange }: Recurrenc
           ref={triggerRef}
           type="button"
           onClick={handleOpen}
-          className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted/70 transition-colors hover:bg-bg-muted hover:text-text-muted"
+          className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
         >
           <Repeat2 className="h-4 w-4 shrink-0 stroke-[1.7]" />
           <span>Repeat</span>

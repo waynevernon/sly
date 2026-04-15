@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { Fragment, type ReactNode, useRef, useState, useCallback, useEffect, useMemo } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { createPortal } from "react-dom";
 import {
@@ -9,6 +9,7 @@ import {
   CalendarArrowUp,
   CalendarClock,
   CalendarDays,
+  Link2,
   CheckCheck,
   Clock3,
   ClockArrowDown,
@@ -30,6 +31,7 @@ import { useTasks } from "../../context/TasksContext";
 import {
   actionAtToLocalDate,
   detectTaskDateFromTitle,
+  detectTaskUrlFromTitle,
   localDateString,
   localDateToNormalizedActionAt,
   taskScheduleSelectionFromView,
@@ -171,6 +173,25 @@ const MANUAL_SORT_ITEM: SortMenuItem<TaskSortMode> = {
 
 const CREATE_DATE_DEBOUNCE_MS = 350;
 
+function renderInlineTitleHighlights(
+  text: string,
+  highlights: Array<{ start: number; end: number }>,
+) {
+  const segments: ReactNode[] = [];
+  let cursor = 0;
+  for (const { start, end } of highlights) {
+    if (start > cursor) segments.push(text.slice(cursor, start));
+    segments.push(
+      <span key={start} className="rounded-sm bg-accent/12">
+        {text.slice(start, end)}
+      </span>,
+    );
+    cursor = end;
+  }
+  if (cursor < text.length) segments.push(text.slice(cursor));
+  return segments;
+}
+
 export function TaskListPane() {
   const {
     tasks: allTasks,
@@ -196,13 +217,24 @@ export function TaskListPane() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newStarred, setNewStarred] = useState(false);
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
+  const [detectedUrl, setDetectedUrl] = useState<ReturnType<typeof detectTaskUrlFromTitle>>(null);
+  const [ignoredUrlSignature, setIgnoredUrlSignature] = useState<string | null>(null);
   const [pendingSelectionTaskId, setPendingSelectionTaskId] = useState<string | null>(null);
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
   const [rescheduleAnchor, setRescheduleAnchor] = useState<{ x: number; y: number } | null>(null);
   const contextMenuPosRef = useRef<{ x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inlineOverlayRef = useRef<HTMLSpanElement>(null);
+
+  const syncInlineOverlayScroll = useCallback(() => {
+    if (inlineOverlayRef.current && inputRef.current) {
+      inlineOverlayRef.current.style.transform =
+        `translateX(-${inputRef.current.scrollLeft}px)`;
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -249,14 +281,22 @@ export function TaskListPane() {
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
   const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting" && selectedView !== "starred" && selectedView !== "upcoming";
-  const inlineTitleHighlight = useMemo(() => {
-    if (!detectedDate) return null;
+  const inlineTitleHighlights = useMemo(() => {
+    const ranges: Array<{ start: number; end: number }> = [];
     const lower = newTitle.toLowerCase();
-    const matchedLower = detectedDate.matchedText.toLowerCase();
-    const start = lower.indexOf(matchedLower);
-    if (start === -1) return null;
-    return { start, end: start + detectedDate.matchedText.length };
-  }, [detectedDate, newTitle]);
+
+    if (detectedDate) {
+      const start = lower.indexOf(detectedDate.matchedText.toLowerCase());
+      if (start !== -1) ranges.push({ start, end: start + detectedDate.matchedText.length });
+    }
+
+    if (detectedUrl) {
+      const start = lower.indexOf(detectedUrl.matchedText.toLowerCase());
+      if (start !== -1) ranges.push({ start, end: start + detectedUrl.matchedText.length });
+    }
+
+    return ranges.sort((a, b) => a.start - b.start);
+  }, [detectedDate, detectedUrl, newTitle]);
 
   const focusCreateInput = useCallback(() => {
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -265,8 +305,11 @@ export function TaskListPane() {
   const handleStartCreate = useCallback(() => {
     setIsCreating(true);
     setNewTitle("");
+    setNewStarred(false);
     setDetectedDate(null);
     setIgnoredDetectionSignature(null);
+    setDetectedUrl(null);
+    setIgnoredUrlSignature(null);
     focusCreateInput();
   }, [focusCreateInput]);
 
@@ -294,6 +337,29 @@ export function TaskListPane() {
   }, [ignoredDetectionSignature, isCreating, newTitle, today]);
 
   useEffect(() => {
+    if (!isCreating) {
+      setDetectedUrl(null);
+      return;
+    }
+
+    if (!newTitle.trim()) {
+      setDetectedUrl(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const nextDetection = detectTaskUrlFromTitle(newTitle);
+      if (!nextDetection || nextDetection.signature === ignoredUrlSignature) {
+        setDetectedUrl(null);
+        return;
+      }
+      setDetectedUrl(nextDetection);
+    }, CREATE_DATE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [ignoredUrlSignature, isCreating, newTitle]);
+
+  useEffect(() => {
     if (!pendingSelectionTaskId) {
       return;
     }
@@ -310,12 +376,21 @@ export function TaskListPane() {
     continueCapturing?: boolean;
   }) => {
     const continueCapturing = options?.continueCapturing ?? false;
-    const nextDetection = detectTaskDateFromTitle(newTitle, today);
+
+    // URL extraction runs first so date detection operates on the cleaned title.
+    const nextUrlDetection = detectTaskUrlFromTitle(newTitle);
+    const activeUrlDetection =
+      nextUrlDetection && nextUrlDetection.signature !== ignoredUrlSignature
+        ? nextUrlDetection
+        : null;
+    const titleAfterUrl = activeUrlDetection ? activeUrlDetection.cleanedTitle : newTitle;
+
+    const nextDetection = detectTaskDateFromTitle(titleAfterUrl, today);
     const activeDetection =
       nextDetection && nextDetection.signature !== ignoredDetectionSignature
         ? nextDetection
         : null;
-    const title = (activeDetection?.cleanedTitle ?? newTitle).trim();
+    const title = (activeDetection?.cleanedTitle ?? titleAfterUrl).trim();
     if (!title) {
       if (continueCapturing) {
         focusCreateInput();
@@ -327,8 +402,18 @@ export function TaskListPane() {
 
     const task = await createTask(title);
     setNewTitle("");
+    setNewStarred(false);
     setDetectedDate(null);
     setIgnoredDetectionSignature(null);
+    setDetectedUrl(null);
+    setIgnoredUrlSignature(null);
+
+    if (task && (activeUrlDetection || newStarred)) {
+      await updateTask(task.id, {
+        ...(activeUrlDetection ? { link: activeUrlDetection.url } : {}),
+        ...(newStarred ? { starred: true } : {}),
+      });
+    }
 
     if (task && activeDetection && !task.actionAt) {
       await updateTask(task.id, {
@@ -357,6 +442,8 @@ export function TaskListPane() {
     createTask,
     focusCreateInput,
     ignoredDetectionSignature,
+    ignoredUrlSignature,
+    newStarred,
     newTitle,
     selectedView,
     today,
@@ -371,8 +458,11 @@ export function TaskListPane() {
       } else if (event.key === "Escape") {
         setIsCreating(false);
         setNewTitle("");
+        setNewStarred(false);
         setDetectedDate(null);
         setIgnoredDetectionSignature(null);
+        setDetectedUrl(null);
+        setIgnoredUrlSignature(null);
       }
     },
     [handleCommitCreate],
@@ -614,7 +704,7 @@ export function TaskListPane() {
         )}
       </div>
 
-      <div className="ui-scrollbar-overlay flex-1 overflow-y-auto">
+      <div data-task-list className="ui-scrollbar-overlay flex-1 overflow-y-auto">
         {searchOpen && (
           <div className="sticky top-0 z-10 px-4 pt-2 pb-2 bg-bg border-b border-border animate-slide-down">
             <div className="relative">
@@ -861,16 +951,26 @@ export function TaskListPane() {
                 <div className="flex items-center gap-2.5">
                   <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
                   <div className="relative min-w-0 flex-1">
-                    {inlineTitleHighlight && (
+                    {inlineTitleHighlights.length > 0 && (
                       <div
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm font-medium leading-normal text-transparent"
                       >
-                        {newTitle.slice(0, inlineTitleHighlight.start)}
-                        <span className="rounded-sm bg-accent/12">
-                          {newTitle.slice(inlineTitleHighlight.start, inlineTitleHighlight.end)}
+                        <span
+                          ref={(el) => {
+                            inlineOverlayRef.current = el;
+                            if (el) {
+                              requestAnimationFrame(() => {
+                                if (inputRef.current && el) {
+                                  el.style.transform = `translateX(-${inputRef.current.scrollLeft}px)`;
+                                }
+                              });
+                            }
+                          }}
+                          className="inline-block"
+                        >
+                          {renderInlineTitleHighlights(newTitle, inlineTitleHighlights)}
                         </span>
-                        {newTitle.slice(inlineTitleHighlight.end)}
                       </div>
                     )}
                     <input
@@ -879,6 +979,7 @@ export function TaskListPane() {
                       value={newTitle}
                       placeholder="Task name"
                       onChange={(event) => setNewTitle(event.target.value)}
+                      onScroll={syncInlineOverlayScroll}
                       onBlur={() => void handleCommitCreate()}
                       onKeyDown={handleCreateKeyDown}
                       className={cn(
@@ -886,27 +987,67 @@ export function TaskListPane() {
                       )}
                     />
                   </div>
+                  <button
+                    type="button"
+                    aria-label={newStarred ? "Unstar task" : "Star task"}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setNewStarred((s) => !s)}
+                    className={cn(
+                      "mt-0.5 shrink-0 rounded transition-colors outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
+                      newStarred
+                        ? "text-amber-400"
+                        : "text-text-muted/30 hover:text-text-muted",
+                    )}
+                  >
+                    <Star
+                      className="h-3.5 w-3.5"
+                      fill={newStarred ? "currentColor" : "none"}
+                      strokeWidth={1.5}
+                    />
+                  </button>
                 </div>
 
-                {detectedDate ? (
-                  <div className="mt-2 flex items-center pl-6.5">
-                    <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
-                      <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                      <span>Date: {detectedDate.label}</span>
-                      <button
-                        type="button"
-                        aria-label="Dismiss detected date"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          setIgnoredDetectionSignature(detectedDate.signature);
-                          setDetectedDate(null);
-                          inputRef.current?.focus();
-                        }}
-                        className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-                      >
-                        <X className="h-3 w-3 stroke-[2]" />
-                      </button>
-                    </div>
+                {(detectedDate || detectedUrl) ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-6.5">
+                    {detectedDate ? (
+                      <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                        <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                        <span>Date: {detectedDate.label}</span>
+                        <button
+                          type="button"
+                          aria-label="Dismiss detected date"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setIgnoredDetectionSignature(detectedDate.signature);
+                            setDetectedDate(null);
+                            inputRef.current?.focus();
+                          }}
+                          className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                        >
+                          <X className="h-3 w-3 stroke-[2]" />
+                        </button>
+                      </div>
+                    ) : null}
+                    {detectedUrl ? (
+                      <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                        <Link2 className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                        <span className="max-w-[200px] truncate">Link: {detectedUrl.url}</span>
+                        <button
+                          type="button"
+                          aria-label="Dismiss detected link"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setIgnoredUrlSignature(detectedUrl.signature);
+                            setDetectedUrl(null);
+                            inputRef.current?.focus();
+                          }}
+                          className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                        >
+                          <X className="h-3 w-3 stroke-[2]" />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

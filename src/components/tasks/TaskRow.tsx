@@ -276,7 +276,7 @@ export function TaskRow({
                 "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
                 task.starred
                   ? "text-amber-400"
-                  : "text-transparent group-hover:text-text-muted/30 hover:!text-text-muted/60",
+                  : "text-transparent group-hover:text-text-muted/30 hover:!text-text-muted",
               )}
             >
               <Star
