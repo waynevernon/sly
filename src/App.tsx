@@ -9,7 +9,7 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { CheckSquare, FileText, PanelLeft, PanelRight } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   NotesProvider,
@@ -238,6 +238,8 @@ function PreviewFallback() {
 interface WorkspaceMainProps {
   paneMode: PaneMode;
   workspaceMode: WorkspaceMode;
+  onShowNotes: () => void;
+  onShowTasks: () => void;
   focusMode: boolean;
   showRightPanel: boolean;
   rightPanelWidth: number;
@@ -262,6 +264,8 @@ interface WorkspaceMainProps {
 const WorkspaceMain = memo(function WorkspaceMain({
   paneMode,
   workspaceMode,
+  onShowNotes,
+  onShowTasks,
   focusMode,
   showRightPanel,
   rightPanelWidth,
@@ -305,6 +309,8 @@ const WorkspaceMain = memo(function WorkspaceMain({
         paneMode={focusMode ? 1 : paneMode}
         workspaceMode={workspaceMode}
         onOpenSettings={onOpenSettings}
+        onShowNotes={onShowNotes}
+        onShowTasks={onShowTasks}
       />
       <div className="flex min-w-0 flex-1">
         {isTasksModeActive ? (
@@ -347,10 +353,6 @@ function TitlebarPaneSwitch({
   nextPaneMode,
   rightPanelVisible,
   onToggleRightPanel,
-  tasksEnabled = false,
-  isTasksModeActive = false,
-  onShowNotes,
-  onShowTasks,
   showRightPanelToggle = true,
 }: {
   paneMode: PaneMode;
@@ -358,10 +360,6 @@ function TitlebarPaneSwitch({
   nextPaneMode: PaneMode;
   rightPanelVisible: boolean;
   onToggleRightPanel: () => void;
-  tasksEnabled?: boolean;
-  isTasksModeActive?: boolean;
-  onShowNotes?: () => void;
-  onShowTasks?: () => void;
   showRightPanelToggle?: boolean;
 }) {
   return (
@@ -375,34 +373,6 @@ function TitlebarPaneSwitch({
           >
             <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
-          {tasksEnabled && onShowNotes && onShowTasks && (
-            <div className="ui-mode-toggle">
-              <button
-                type="button"
-                aria-pressed={!isTasksModeActive}
-                onClick={onShowNotes}
-                title={`Notes (${shortcut(mod, "1")})`}
-                className={`ui-focus-ring ui-mode-toggle-item ${
-                  isTasksModeActive ? "" : "ui-mode-toggle-item-active"
-                }`}
-              >
-                <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
-                <span>Notes</span>
-              </button>
-              <button
-                type="button"
-                aria-pressed={isTasksModeActive}
-                onClick={onShowTasks}
-                title={`Tasks (${shortcut(mod, "2")})`}
-                className={`ui-focus-ring ui-mode-toggle-item ${
-                  isTasksModeActive ? "ui-mode-toggle-item-active" : ""
-                }`}
-              >
-                <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
-                <span>Tasks</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
       {showRightPanelToggle && (
@@ -1761,10 +1731,6 @@ function AppContent() {
             }
             rightPanelVisible={rightPanelVisible}
             onToggleRightPanel={toggleRightPanel}
-            tasksEnabled={tasksEnabled}
-            isTasksModeActive={isTasksModeActive}
-            onShowNotes={showNotesMode}
-            onShowTasks={showTasksMode}
             showRightPanelToggle={!isTasksModeActive}
           />
         )}
@@ -1781,6 +1747,8 @@ function AppContent() {
           <WorkspaceMain
             paneMode={paneMode}
             workspaceMode={workspaceMode}
+            onShowNotes={showNotesMode}
+            onShowTasks={showTasksMode}
             focusMode={focusMode}
             showRightPanel={showRightPanel}
             rightPanelWidth={rightPanelWidth}

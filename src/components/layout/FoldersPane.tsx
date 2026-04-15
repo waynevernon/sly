@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ, Check, FileText } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, Check, CheckSquare, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
@@ -34,32 +34,61 @@ const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
 interface FoldersPaneProps {
   onOpenSettings?: () => void;
   pendingFolderPath?: string | null;
+  onShowNotes?: () => void;
+  onShowTasks?: () => void;
 }
 
 export function FoldersPane({
   onOpenSettings,
   pendingFolderPath = null,
+  onShowNotes,
+  onShowTasks,
 }: FoldersPaneProps) {
   const {
     folderSortMode,
     showPinnedNotes,
     showRecentNotes,
     showNoteCounts,
+    settings,
     setFolderSortMode,
     setNoteListViewOptions,
     setShowPinnedNotes,
     setShowRecentNotes,
   } = useNotes();
+  const tasksEnabled = settings?.tasksEnabled ?? false;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="h-full bg-bg-secondary flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <FileText className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
-          <div className="font-medium text-base text-text">Notes</div>
-        </div>
+        {tasksEnabled && onShowNotes && onShowTasks ? (
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              aria-pressed={true}
+              onClick={onShowNotes}
+              className="ui-focus-ring flex items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text outline-none"
+            >
+              <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+              Notes
+            </button>
+            <button
+              type="button"
+              aria-pressed={false}
+              onClick={onShowTasks}
+              title="Tasks"
+              className="ui-focus-ring flex h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+            >
+              <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <FileText className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
+            <div className="font-medium text-base text-text">Notes</div>
+          </div>
+        )}
         <div className="ui-pane-header-actions">
           <SortMenuButton
             title="Sort Folders"

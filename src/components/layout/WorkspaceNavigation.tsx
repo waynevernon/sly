@@ -35,6 +35,8 @@ interface WorkspaceNavigationProps {
   paneMode: PaneMode;
   workspaceMode: "notes" | "tasks";
   onOpenSettings?: () => void;
+  onShowNotes?: () => void;
+  onShowTasks?: () => void;
 }
 
 const ITEM_DRAG_CURSOR_INSET_X = 12;
@@ -87,6 +89,8 @@ export function WorkspaceNavigation({
   paneMode,
   workspaceMode,
   onOpenSettings,
+  onShowNotes,
+  onShowTasks,
 }: WorkspaceNavigationProps) {
   const {
     moveFolder,
@@ -423,11 +427,17 @@ export function WorkspaceNavigation({
             )}
           >
             {isTasksModeActive ? (
-              <TaskNavigationPane onOpenSettings={onOpenSettings} />
+              <TaskNavigationPane
+                onOpenSettings={onOpenSettings}
+                onShowNotes={onShowNotes}
+                onShowTasks={onShowTasks}
+              />
             ) : (
               <FoldersPane
                 onOpenSettings={onOpenSettings}
                 pendingFolderPath={pendingFolderPath}
+                onShowNotes={onShowNotes}
+                onShowTasks={onShowTasks}
               />
             )}
           </div>
