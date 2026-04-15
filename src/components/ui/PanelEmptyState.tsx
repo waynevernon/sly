@@ -33,18 +33,18 @@ export function PanelEmptyState({
           <div className="w-full min-w-0 overflow-hidden text-center">
             {title ? <h2 className="truncate text-sm font-medium text-text">{title}</h2> : null}
             {message ? (
-              <p className={cn("text-sm text-text-muted", title ? "mt-1" : "")}>
+              <p className={cn("mx-auto max-w-[14rem] text-sm text-text-muted", title ? "mt-1" : "")}>
                 {message}
               </p>
             ) : null}
           </div>
         ) : null}
+        {action ? (
+          <div className="mt-4 flex justify-center">
+            {action}
+          </div>
+        ) : null}
       </div>
-      {action ? (
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 flex justify-center pt-20">
-          <div className="pointer-events-auto">{action}</div>
-        </div>
-      ) : null}
     </div>
   );
 }
