@@ -831,7 +831,7 @@ export function TaskListPane() {
               <div className="flex flex-col gap-1">
                 {section.label ? (
                   <div className="flex items-center justify-between gap-2 px-2.5 pt-1 pb-0.5">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
+                    <div className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
                       {section.label}
                     </div>
                     {selectedView === "today" && section.id === "overdue" ? (

@@ -246,7 +246,7 @@ export function TaskRow({
                 {(secondaryLabel || dueDateLabel) && (
                   <span
                     className={cn(
-                      "mt-0.5 flex items-center gap-1.5 text-xs leading-none tabular-nums",
+                      "mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-xs leading-none tabular-nums",
                       overdue && secondaryLabel ? "text-[var(--color-danger)]" : "text-text-muted/60",
                     )}
                   >

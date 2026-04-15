@@ -32,7 +32,7 @@ export function TaskNavigationPane({
               type="button"
               aria-pressed={true}
               onClick={onShowTasks}
-              className="ui-focus-ring flex items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
+              className="ui-focus-ring flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
             >
               <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
               Tasks
@@ -41,7 +41,7 @@ export function TaskNavigationPane({
         ) : (
           <div className="flex items-center gap-1.5 min-w-0">
             <CheckSquare className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
-            <div className="font-medium text-base text-text">Tasks</div>
+            <div className="min-w-0 truncate font-medium text-base text-text">Tasks</div>
           </div>
         )}
       </div>

@@ -31,7 +31,7 @@ export function PanelEmptyState({
         ) : null}
         {title ? <h2 className="text-sm font-medium text-text">{title}</h2> : null}
         {message ? (
-          <p className={cn("text-sm text-text-muted", title ? "mt-1 max-w-[24rem]" : "")}>
+          <p className={cn("text-sm text-text-muted max-w-[24rem]", title ? "mt-1" : "")}>
             {message}
           </p>
         ) : null}
