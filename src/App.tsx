@@ -869,7 +869,7 @@ function AppContent() {
     });
 
     listen("check-for-updates", () => {
-      void showUpdateToast();
+      void showUpdateToast({ manual: true });
     }).then((fn) => {
       if (cancelled) fn();
       else unlistenCheckForUpdates = fn;
@@ -1803,7 +1803,8 @@ function AppContent() {
 }
 
 // Shared update check — used by startup and manual "Check for Updates"
-async function showUpdateToast(): Promise<"update" | "no-update" | "error"> {
+async function showUpdateToast(options?: { manual?: boolean }): Promise<"update" | "no-update" | "error"> {
+  const manual = options?.manual ?? false;
   try {
     const update = await checkForUpdate();
     if (update) {
@@ -1814,6 +1815,9 @@ async function showUpdateToast(): Promise<"update" | "no-update" | "error"> {
       });
       return "update";
     }
+    if (manual) {
+      toast.success("You're on the latest version!");
+    }
     return "no-update";
   } catch (err) {
     // Network errors and 404s (no release published yet) are not real failures
@@ -1823,6 +1827,9 @@ async function showUpdateToast(): Promise<"update" | "no-update" | "error"> {
       msg.includes("network") ||
       msg.includes("Could not fetch")
     ) {
+      if (manual) {
+        toast.success("You're on the latest version!");
+      }
       return "no-update";
     }
     console.error("Update check failed:", err);

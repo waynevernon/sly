@@ -23,11 +23,9 @@ export function AboutSettingsSection() {
 
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
-    const result = await showUpdateToast();
+    const result = await showUpdateToast({ manual: true });
     setCheckingUpdate(false);
-    if (result === "no-update") {
-      toast.success("You're on the latest version!");
-    } else if (result === "error") {
+    if (result === "error") {
       toast.error("Could not check for updates. Try again later.");
     }
   };
