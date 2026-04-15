@@ -146,7 +146,7 @@ export function ShortcutsSettingsSection() {
         <p className="text-sm text-text-muted mb-4">
           Browse keyboard shortcuts or switch to the markdown guide.
         </p>
-        <div className="flex gap-2 p-1 rounded-[10px] border border-border w-fit">
+        <div className="flex gap-2 p-1 rounded-[var(--ui-radius-lg)] border border-border w-fit">
           <Button
             onClick={() => setActiveTab("shortcuts")}
             variant={activeTab === "shortcuts" ? "primary" : "ghost"}

@@ -182,7 +182,7 @@ function renderInlineTitleHighlights(
   for (const { start, end } of highlights) {
     if (start > cursor) segments.push(text.slice(cursor, start));
     segments.push(
-      <span key={start} className="rounded-sm bg-accent/12">
+      <span key={start} className="rounded-[var(--ui-radius-sm)] bg-accent/12">
         {text.slice(start, end)}
       </span>,
     );

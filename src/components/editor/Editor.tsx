@@ -219,7 +219,9 @@ function FormatBar({
   const ITEM_W = 32; // 28px button + 4px gap
   const SEP_W = 21;  // mx-2 (8+8) + 1px border + 4px gap
   const OVF_W = 32;  // overflow button same size as regular item
-  const PADDING = 32; // px-4 each side
+  // ResizeObserver contentRect.width is already the inner content area (excludes
+  // the px-4 padding), so no additional padding offset is needed here.
+  const PADDING = 0;
 
   type Slot =
     | { kind: "button"; key: string; toolbarEl: ReactNode; menuEl: ReactNode }

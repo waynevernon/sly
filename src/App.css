@@ -1132,7 +1132,7 @@ html.dark {
   font-family: var(--font-mono);
   background-color: var(--color-bg-muted);
   color: var(--color-text);
-  border-radius: 0.5rem;
+  border-radius: var(--ui-radius-md);
   padding: 0.75rem 1rem;
   overflow-x: auto;
 }
@@ -1161,7 +1161,7 @@ html.dark {
   display: block;
   margin: 0.75rem 0;
   padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: var(--ui-radius-md);
   overflow-x: auto;
   max-width: 100%;
 }
@@ -1194,7 +1194,7 @@ html.dark {
   background-color: var(--color-bg-muted);
   color: var(--color-text-muted);
   border: 1px dashed var(--color-border);
-  border-radius: 0.5rem;
+  border-radius: var(--ui-radius-md);
   padding: 0.75rem 1rem;
   white-space: pre-wrap;
   overflow-x: auto;
@@ -1370,7 +1370,7 @@ table.not-prose {
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--color-border-solid);
-  border-radius: 6px;
+  border-radius: var(--ui-radius-sm);
   border-collapse: separate;
   border-spacing: 0;
   margin-top: 1em;

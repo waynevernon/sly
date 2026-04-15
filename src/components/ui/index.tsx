@@ -199,7 +199,7 @@ export function ListItem({
   return (
     <div
       className={cn(
-        "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-md",
+        "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-[var(--ui-radius-md)]",
         "focus:outline-none focus-visible:outline-none",
         hasSecondaryRow ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
         isActive
@@ -310,7 +310,7 @@ export function CommandItem({
       role="button"
       tabIndex={-1}
       className={cn(
-        "w-full text-left px-3 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer",
+        "w-full text-left px-3 py-2 rounded-[var(--ui-radius-md)] flex items-center justify-between transition-colors cursor-pointer",
         isSelected ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted"
       )}
     >
@@ -320,7 +320,7 @@ export function CommandItem({
             className={cn(
               "shrink-0 flex items-center justify-center text-text-muted",
               variant === "note" &&
-                "w-9 h-9 rounded-md bg-bg-emphasis flex items-center justify-center"
+                "w-9 h-9 rounded-[var(--ui-radius-md)] bg-bg-emphasis flex items-center justify-center"
             )}
           >
             {iconText ? (
@@ -342,7 +342,7 @@ export function CommandItem({
       {shortcut && (
         <kbd
           className={cn(
-            "text-xs px-2 py-0.5 rounded-md ml-2",
+            "text-xs px-2 py-0.5 rounded-[var(--ui-radius-sm)] ml-2",
             isSelected ? "bg-bg-muted text-text" : "bg-bg-muted text-text-muted"
           )}
         >

@@ -485,7 +485,7 @@ export function WorkspaceNavigation({
         style={{ width: "max-content", height: "max-content" }}
       >
         {dragLabel && (
-          <div className="flex items-center gap-2 rounded-md border border-border/80 bg-bg-secondary/95 px-2.5 py-1.5 text-sm leading-none text-text shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2 rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/95 px-2.5 py-1.5 text-sm leading-none text-text shadow-lg backdrop-blur-sm">
             {(() => {
               const dragFolderAppearance = getFolderAppearance(
                 folderAppearances,

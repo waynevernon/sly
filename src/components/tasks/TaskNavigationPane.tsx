@@ -18,13 +18,13 @@ export function TaskNavigationPane({
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         {onShowNotes && onShowTasks ? (
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-1 min-w-0 -ml-2">
             <button
               type="button"
               aria-pressed={false}
               onClick={onShowNotes}
               title="Notes"
-              className="ui-focus-ring flex h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+              className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
             >
               <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
             </button>
@@ -32,7 +32,7 @@ export function TaskNavigationPane({
               type="button"
               aria-pressed={true}
               onClick={onShowTasks}
-              className="ui-focus-ring flex items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text outline-none"
+              className="ui-focus-ring flex items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
             >
               <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
               Tasks

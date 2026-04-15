@@ -117,7 +117,7 @@ function TaskViewButton({
         aria-pressed={isSelected}
         onClick={onSelect}
         className={cn(
-          "ui-focus-ring flex w-full items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200",
+          "ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200",
           isTaskDropOver
             ? "bg-accent/10 text-text ring-1 ring-inset ring-accent/35"
             : isSelected

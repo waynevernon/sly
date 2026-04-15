@@ -91,7 +91,7 @@ function SuggestionListInner<T>(
           tabIndex={-1}
           onClick={() => command(item)}
           className={cn(
-            "w-full text-left p-2 rounded-md transition-colors cursor-pointer",
+            "w-full text-left p-2 rounded-[var(--ui-radius-md)] transition-colors cursor-pointer",
             selectedIndex === index
               ? "bg-bg-muted text-text"
               : "text-text hover:bg-bg-muted",

@@ -198,7 +198,7 @@ function InlineFolderRow({
 
   return (
     <div
-      className={`rounded-md ${
+      className={`rounded-[var(--ui-radius-md)] ${
         isSelected ? "bg-bg-muted ring-1 ring-text-muted/20" : "bg-bg-muted/70"
       }`}
     >
@@ -212,7 +212,7 @@ function InlineFolderRow({
           <button
             type="button"
             onClick={onOpenIconPicker}
-            className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
+            className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted/80 transition-colors hover:bg-bg hover:text-text"
             aria-label="Customize folder style"
             style={iconStyle}
           >
@@ -328,7 +328,7 @@ const FolderItem = memo(function FolderItem({
     },
   });
 
-  const rowClassName = `rounded-md transition-[background-color,box-shadow,opacity] duration-200 ${
+  const rowClassName = `rounded-[var(--ui-radius-md)] transition-[background-color,box-shadow,opacity] duration-200 ${
     isOver && isContainerDropActive
       ? "bg-accent/12 ring-1 ring-accent/60"
       : selectedFolderPath === folder.path
@@ -435,7 +435,7 @@ const FolderItem = memo(function FolderItem({
                   event.stopPropagation();
                   onToggleCollapse(folder.path);
                 }}
-                className="ml-2 h-5 w-5 rounded-sm text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+                className="ml-2 h-5 w-5 rounded-[var(--ui-radius-sm)] text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
                 aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
               >
                 {isCollapsed ? (
@@ -455,7 +455,7 @@ const FolderItem = memo(function FolderItem({
               onClick={(event) => {
                 event.stopPropagation();
               }}
-              className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-md text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
+              className="flex h-6 w-6 -my-0.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted/80 transition-colors hover:bg-bg hover:text-text cursor-grab active:cursor-grabbing"
               aria-label={`Move ${folder.name}`}
               style={folderIconStyle}
             >
@@ -1347,7 +1347,7 @@ export function FolderTreeView({
                 focusTree();
                 selectPinnedNotes();
               }}
-              className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "pinned"
                   ? "bg-bg-muted"
                   : "hover:bg-bg-muted/80"
@@ -1381,7 +1381,7 @@ export function FolderTreeView({
                 focusTree();
                 selectRecentNotes();
               }}
-              className={`w-full flex items-center gap-3 rounded-md pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "recent"
                   ? "bg-bg-muted"
                   : "hover:bg-bg-muted/80"
@@ -1416,7 +1416,7 @@ export function FolderTreeView({
               id={getVirtualFolderOptionId("all")}
               role="option"
               aria-selected={selectedScope.type === "all"}
-              className={`rounded-md transition-[background-color,box-shadow] duration-200 ${
+              className={`rounded-[var(--ui-radius-md)] transition-[background-color,box-shadow] duration-200 ${
                 isOverRoot && isContainerDropActive
                   ? "bg-accent/12 ring-1 ring-accent/60"
                   : selectedScope.type === "all"

@@ -183,7 +183,7 @@ export function EditorWidthHandles({ containerRef }: EditorWidthHandlesProps) {
       {/* Width indicator during drag */}
       {isDragging && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-text text-text-inverse text-xs font-medium px-2.5 py-1 rounded-md shadow-lg whitespace-nowrap">
+          <div className="bg-text text-text-inverse text-xs font-medium px-2.5 py-1 rounded-[var(--ui-radius-md)] shadow-lg whitespace-nowrap">
             {snappedPreset
               ? `${snappedPreset.charAt(0).toUpperCase() + snappedPreset.slice(1)} (${Math.round(dragWidth)}px)`
               : `${Math.round(dragWidth)}px`}
