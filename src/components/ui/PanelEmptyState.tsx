@@ -39,12 +39,12 @@ export function PanelEmptyState({
             ) : null}
           </div>
         ) : null}
-        {action ? (
-          <div className="mt-4 flex justify-center">
-            {action}
-          </div>
-        ) : null}
       </div>
+      {action ? (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 flex justify-center overflow-hidden px-4 pt-20">
+          <div className="pointer-events-auto">{action}</div>
+        </div>
+      ) : null}
     </div>
   );
 }
