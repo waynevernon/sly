@@ -637,7 +637,7 @@ export function NoteList({
 
   if (isLoading && items.length === 0) {
     return (
-      <div className="p-4 text-center text-text-muted select-none">
+      <div className="overflow-hidden p-4 text-center text-text-muted select-none">
         Loading...
       </div>
     );

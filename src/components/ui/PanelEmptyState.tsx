@@ -23,17 +23,21 @@ export function PanelEmptyState({
         className,
       )}
     >
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-6">
         {icon ? (
           <div className="mb-3 text-text-muted [&_svg]:h-7 [&_svg]:w-7 [&_svg]:stroke-[1.6] [&_svg_*]:stroke-[1.6]">
             {icon}
           </div>
         ) : null}
-        {title ? <h2 className="text-sm font-medium text-text">{title}</h2> : null}
-        {message ? (
-          <p className={cn("text-sm text-text-muted max-w-[24rem]", title ? "mt-1" : "")}>
-            {message}
-          </p>
+        {(title || message) ? (
+          <div className="w-full min-w-0 overflow-hidden text-center">
+            {title ? <h2 className="truncate text-sm font-medium text-text">{title}</h2> : null}
+            {message ? (
+              <p className={cn("text-sm text-text-muted", title ? "mt-1" : "")}>
+                {message}
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
       {action ? (
