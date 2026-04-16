@@ -168,8 +168,6 @@ export function GlobalTaskCaptureDialog({
     }, CAPTURE_DATE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  // link intentionally omitted — we read it via linkRef to avoid a circular loop.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ignoredUrlSignature, open, title]);
 
   const handleClose = useCallback(() => {

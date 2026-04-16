@@ -116,13 +116,19 @@ vi.mock("./components/layout/WorkspaceNavigation", () => ({
   WorkspaceNavigation: ({
     onOpenSettings,
     workspaceMode,
+    onShowNotes,
+    onShowTasks,
   }: {
     onOpenSettings: (tab?: string) => void;
     workspaceMode: "notes" | "tasks";
+    onShowNotes?: () => void;
+    onShowTasks?: () => void;
   }) => (
     <div>
       <div>workspace-navigation:{workspaceMode}</div>
       <button onClick={() => onOpenSettings()}>open settings</button>
+      {onShowNotes && <button onClick={onShowNotes}>Notes</button>}
+      {onShowTasks && <button onClick={onShowTasks}>Tasks</button>}
     </div>
   ),
 }));
