@@ -327,7 +327,7 @@ The settings UI currently covers:
 - `Cmd+R` - Reload current note
 - `Cmd+,` - Open settings
 - `Cmd+Opt+1/2/3/4/5` - Switch settings tabs
-- `Cmd+1/2/3` - Switch pane layout
+- `Cmd+Shift+J/K/L` - Switch pane layout
 - `Cmd+\` - Toggle sidebar
 - `Cmd+B/I` - Bold/Italic
 - `Cmd+=` - Zoom in

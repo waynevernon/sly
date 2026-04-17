@@ -1362,10 +1362,16 @@ function AppContent() {
         return;
       }
 
-      // Cmd/Ctrl+Alt+1/2/3 - Set pane layout
-      if ((e.metaKey || e.ctrlKey) && e.altKey && ["1", "2", "3"].includes(e.key)) {
+      // Cmd/Ctrl+Shift+J/K/L - Set pane layout
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        ["j", "k", "l"].includes(e.key.toLowerCase())
+      ) {
         e.preventDefault();
-        const requestedPaneMode = Number(e.key) as PaneMode;
+        const requestedPaneMode =
+          e.key.toLowerCase() === "j" ? 1 : e.key.toLowerCase() === "k" ? 2 : 3;
         const nextPaneMode =
           isTasksModeActiveRef.current && requestedPaneMode === 1
             ? 2

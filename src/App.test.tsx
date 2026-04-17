@@ -357,15 +357,15 @@ describe("App", () => {
     });
   });
 
-  it("switches to a 2-pane layout with Cmd/Ctrl+Alt+2", () => {
+  it("switches to a 2-pane layout with Cmd/Ctrl+Shift+K", () => {
     render(<App />);
 
-    fireEvent.keyDown(window, { key: "2", metaKey: true, altKey: true });
+    fireEvent.keyDown(window, { key: "k", metaKey: true, shiftKey: true });
 
     expect(themeState.setPaneMode).toHaveBeenCalledWith(2);
   });
 
-  it("maps Cmd/Ctrl+Alt+1 to 2-pane layout while in task mode", () => {
+  it("maps Cmd/Ctrl+Shift+J to 2-pane layout while in task mode", () => {
     notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
@@ -373,7 +373,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
     expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "1", metaKey: true, altKey: true });
+    fireEvent.keyDown(window, { key: "j", metaKey: true, shiftKey: true });
 
     expect(themeState.setPaneMode).toHaveBeenCalledWith(2);
   });
