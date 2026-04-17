@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Sparkles } from "lucide-react";
+import { CheckSquare, Sparkles } from "lucide-react";
 import {
   ArrowLeftIcon,
   NoteIcon,
-  CheckSquareIcon,
   SwatchIcon,
   KeyboardIcon,
   InfoIcon,
@@ -43,7 +42,7 @@ const tabs: {
   {
     id: "tasks",
     label: "Tasks",
-    icon: CheckSquareIcon,
+    icon: CheckSquare,
     shortcutLabel: shortcut(mod, alt, "2"),
   },
   {
