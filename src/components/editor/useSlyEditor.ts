@@ -14,7 +14,6 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { lowlight } from "./lowlight";
 import { CodeBlockView } from "./CodeBlockView";
-import { AdjacentListNormalizer } from "./AdjacentListNormalizer";
 import { Frontmatter } from "./Frontmatter";
 import { Emoji } from "./Emoji";
 import { EmojiSuggestion } from "./EmojiSuggestion";
@@ -203,7 +202,6 @@ export function useSlyEditor({
       }),
       Frontmatter,
       Emoji,
-      AdjacentListNormalizer,
       Markdown.configure({}),
       PersistedSelectionHighlight,
       SearchHighlight.configure({

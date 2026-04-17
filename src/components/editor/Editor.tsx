@@ -23,6 +23,7 @@ import { useBlockMathPopover } from "./useBlockMathPopover";
 import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
 import { useEditorSearch } from "./useEditorSearch";
 import { isAllowedUrlScheme, normalizeUrl } from "./linkUtils";
+import { shouldParseMarkdownPaste } from "./markdownPaste";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -733,26 +734,20 @@ function EditorImpl({
       const text = clipboardData.getData("text/plain");
       if (!text) return false;
 
-      const markdownPatterns =
-        /^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^\s*>\s|```|^\s*\[.*\]\(.*\)|^\s*!\[|\*\*.*\*\*|__.*__|~~.*~~|^\s*[-*_]{3,}\s*$|^\|.+\||\$\$[\s\S]+?\$\$/m;
-      if (!markdownPatterns.test(text)) {
+      const html = clipboardData.getData("text/html");
+      if (!shouldParseMarkdownPaste({ html, text })) {
         return false;
       }
 
       const currentEditor = editorRef.current;
       if (!currentEditor) return false;
 
-      const manager = currentEditor.storage.markdown?.manager;
-      if (manager && typeof manager.parse === "function") {
-        try {
-          const parsed = manager.parse(text);
-          if (parsed) {
-            currentEditor.commands.insertContent(parsed);
-            return true;
-          }
-        } catch {
-          // Fall back to default paste behavior.
+      try {
+        if (currentEditor.commands.insertContent(text)) {
+          return true;
         }
+      } catch {
+        // Fall back to default paste behavior.
       }
 
       return false;
