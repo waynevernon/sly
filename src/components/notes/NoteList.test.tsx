@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoteList, type NoteListItem } from "./NoteList";
 
@@ -300,5 +300,35 @@ describe("NoteList", () => {
       "group-focus-visible/notelist:ring-1",
       "group-focus-visible/notelist:ring-text-muted",
     );
+  });
+
+  it("lets the rename popover fill from the note name with a dedicated action", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const renameNote = vi.fn().mockResolvedValue({ id: "work/Alpha note" });
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        renameNote,
+      }),
+    );
+
+    render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
+
+    const row = screen.getByRole("option", { name: /Alpha note/ });
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename File…" }));
+
+    const useNoteNameButton = screen.getByRole("button", { name: "Use note name: Alpha note" });
+    fireEvent.click(useNoteNameButton);
+
+    expect(screen.getByDisplayValue("Alpha note")).toBeInTheDocument();
+    expect(renameNote).not.toHaveBeenCalled();
+
+    const input = screen.getByDisplayValue("Alpha note");
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(renameNote).toHaveBeenCalledWith("work/alpha", "Alpha note");
   });
 });

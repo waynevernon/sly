@@ -23,11 +23,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button,
   Checkbox,
-  Input,
   ListItem,
   PanelEmptyState,
+  PopoverTextEditor,
   destructiveMenuItemClassName,
   menuItemClassName,
   menuSeparatorClassName,
@@ -232,7 +231,12 @@ interface NoteItemWithMenuProps extends Omit<NoteItemProps, "optionId"> {
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
-  onRenameFile: (id: string) => void;
+  isRenameOpen: boolean;
+  renameSuggestion: string | null;
+  onOpenRenameFile: (id: string) => void;
+  onRenameFileOpenChange: (id: string, open: boolean) => void;
+  onRenameFileSubmit: (id: string, newName: string) => Promise<void | boolean>;
+  isRenamingFile: boolean;
   onOpenInNewWindow: (id: string) => void;
   onDelete: (ids: string[]) => void;
   onClearSelection: () => void;
@@ -253,7 +257,12 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onPin,
   onUnpin,
   onDuplicate,
-  onRenameFile,
+  isRenameOpen,
+  renameSuggestion,
+  onOpenRenameFile,
+  onRenameFileOpenChange,
+  onRenameFileSubmit,
+  isRenamingFile,
   onOpenInNewWindow,
   onDelete,
   onClearSelection,
@@ -296,109 +305,133 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   });
 
   return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <div
-          ref={setNodeRef}
-          {...attributes}
-          {...listeners}
-          className={isDragging ? "opacity-40" : ""}
-          onContextMenu={() => {
-            onFocusList();
-            if (!isPartOfBatchSelection) {
-              onSelect(id, {
-                shiftKey: false,
-                metaKey: false,
-                ctrlKey: false,
-              });
-            }
-          }}
-        >
-          <NoteItem
-            optionId={getNoteOptionId(id)}
-            id={id}
-            title={title}
-            preview={preview}
-            modified={modified}
-            created={created}
-            selectionState={selectionState}
-            isPinned={isPinned}
-            onSelect={onSelect}
-            noteListDateMode={noteListDateMode}
-            noteListPreviewLines={noteListPreviewLines}
-            showNoteListFilename={showNoteListFilename}
-            showNoteListFolderPath={showNoteListFolderPath}
-          />
-        </div>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content
-          className={`${menuSurfaceClassName} min-w-44 z-50`}
-        >
-          {isPartOfBatchSelection ? (
-            <>
-              <ContextMenu.Item
-                className={destructiveMenuItemClassName}
-                onSelect={() => onDelete(selectedNoteIds)}
-              >
-                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
-                Delete Selected Notes
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={onClearSelection}
-              >
-                <XIcon className="w-4 h-4 stroke-[1.6]" />
-                Clear Selection
-              </ContextMenu.Item>
-            </>
-          ) : (
-            <>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={() => onOpenInNewWindow(id)}
-              >
-                <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
-                Open in New Window
-              </ContextMenu.Item>
-              <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
-                <PinIcon className="w-4 h-4 stroke-[1.6]" />
-                {isPinned ? "Unpin" : "Pin"}
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={() => onDuplicate(id)}
-              >
-                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                Duplicate
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={() => onRenameFile(id)}
-              >
-                <PencilIcon className="w-4 h-4 stroke-[1.6]" />
-                Rename File…
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={menuItemClassName}
-                onSelect={handleCopyFilepath}
-              >
-                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                Copy Filepath
-              </ContextMenu.Item>
-              <ContextMenu.Separator className={menuSeparatorClassName} />
-              <ContextMenu.Item
-                className={destructiveMenuItemClassName}
-                onSelect={() => onDelete([id])}
-              >
-                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
-                Delete
-              </ContextMenu.Item>
-            </>
-          )}
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+    <PopoverTextEditor
+      open={isRenameOpen}
+      onOpenChange={(open) => onRenameFileOpenChange(id, open)}
+      value={getNoteLeaf(id)}
+      onSubmit={(value) => onRenameFileSubmit(id, value)}
+      title="Rename file"
+      placeholder="Untitled"
+      icon={<PencilIcon className="w-4 h-4 stroke-[1.6]" />}
+      isSubmitting={isRenamingFile}
+      className="w-full"
+      renderAuxiliaryContent={({ draft, setDraft }) =>
+        renameSuggestion && renameSuggestion !== draft ? (
+          <button
+            type="button"
+            onClick={() => setDraft(renameSuggestion)}
+            className="max-w-full truncate text-left text-xs text-text-muted underline decoration-text-muted/50 underline-offset-2 transition-colors hover:text-text hover:decoration-text"
+          >
+            Use note name: <span className="font-medium">{renameSuggestion}</span>
+          </button>
+        ) : null
+      }
+      renderTrigger={() => (
+        <ContextMenu.Root>
+          <ContextMenu.Trigger asChild>
+            <div
+              ref={setNodeRef}
+              {...attributes}
+              {...listeners}
+              className={isDragging ? "opacity-40" : ""}
+              onContextMenu={() => {
+                onFocusList();
+                if (!isPartOfBatchSelection) {
+                  onSelect(id, {
+                    shiftKey: false,
+                    metaKey: false,
+                    ctrlKey: false,
+                  });
+                }
+              }}
+            >
+              <NoteItem
+                optionId={getNoteOptionId(id)}
+                id={id}
+                title={title}
+                preview={preview}
+                modified={modified}
+                created={created}
+                selectionState={selectionState}
+                isPinned={isPinned}
+                onSelect={onSelect}
+                noteListDateMode={noteListDateMode}
+                noteListPreviewLines={noteListPreviewLines}
+                showNoteListFilename={showNoteListFilename}
+                showNoteListFolderPath={showNoteListFolderPath}
+              />
+            </div>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content
+              className={`${menuSurfaceClassName} min-w-44 z-50`}
+            >
+              {isPartOfBatchSelection ? (
+                <>
+                  <ContextMenu.Item
+                    className={destructiveMenuItemClassName}
+                    onSelect={() => onDelete(selectedNoteIds)}
+                  >
+                    <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                    Delete Selected Notes
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={menuItemClassName}
+                    onSelect={onClearSelection}
+                  >
+                    <XIcon className="w-4 h-4 stroke-[1.6]" />
+                    Clear Selection
+                  </ContextMenu.Item>
+                </>
+              ) : (
+                <>
+                  <ContextMenu.Item
+                    className={menuItemClassName}
+                    onSelect={() => onOpenInNewWindow(id)}
+                  >
+                    <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
+                    Open in New Window
+                  </ContextMenu.Item>
+                  <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
+                    <PinIcon className="w-4 h-4 stroke-[1.6]" />
+                    {isPinned ? "Unpin" : "Pin"}
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={menuItemClassName}
+                    onSelect={() => onDuplicate(id)}
+                  >
+                    <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                    Duplicate
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={menuItemClassName}
+                    onSelect={() => onOpenRenameFile(id)}
+                  >
+                    <PencilIcon className="w-4 h-4 stroke-[1.6]" />
+                    Rename File…
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={menuItemClassName}
+                    onSelect={handleCopyFilepath}
+                  >
+                    <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                    Copy Filepath
+                  </ContextMenu.Item>
+                  <ContextMenu.Separator className={menuSeparatorClassName} />
+                  <ContextMenu.Item
+                    className={destructiveMenuItemClassName}
+                    onSelect={() => onDelete([id])}
+                  >
+                    <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                    Delete
+                  </ContextMenu.Item>
+                </>
+              )}
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
+      )}
+    />
   );
 });
 
@@ -436,7 +469,6 @@ export function NoteList({
     renameNote,
     pinNote,
     unpinNote,
-    notes,
     isLoading,
     noteListDateMode,
     noteListPreviewLines,
@@ -449,14 +481,10 @@ export function NoteList({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteIdsToDelete, setNoteIdsToDelete] = useState<string[]>([]);
   const [dontAskAgain, setDontAskAgain] = useState(false);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [noteIdToRename, setNoteIdToRename] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [suggestedName, setSuggestedName] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const pinnedIds = useMemo(
     () => new Set(settings.pinnedNoteIds || []),
@@ -547,57 +575,57 @@ export function NoteList({
     [confirmDeletions, focusList, runDelete],
   );
 
-  const openRenameDialog = useCallback(
+  const openRenameEditor = useCallback(
     (noteId: string) => {
       focusList();
-      const baseName = getNoteLeaf(noteId);
-      const note = notes.find((n) => n.id === noteId);
-      const suggested = note ? sanitizeNoteFilename(note.title) : null;
       setNoteIdToRename(noteId);
-      setRenameValue(baseName);
-      setSuggestedName(suggested !== baseName ? suggested : null);
-      setRenameDialogOpen(true);
     },
-    [focusList, notes],
+    [focusList],
   );
 
-  const closeRenameDialog = useCallback(() => {
+  const closeRenameEditor = useCallback(() => {
     if (isRenaming) return;
-    setRenameDialogOpen(false);
     setNoteIdToRename(null);
-    setRenameValue("");
-    setSuggestedName(null);
-  }, [isRenaming]);
+    focusList();
+  }, [focusList, isRenaming]);
 
-  const handleRenameConfirm = useCallback(async () => {
-    if (!noteIdToRename) return;
-
-    const trimmed = renameValue.trim();
-    if (!trimmed) {
-      closeRenameDialog();
+  const handleRenameOpenChange = useCallback((noteId: string, open: boolean) => {
+    if (open) {
+      openRenameEditor(noteId);
       return;
     }
 
-    const currentLeaf = getNoteLeaf(noteIdToRename);
+    if (noteIdToRename === noteId) {
+      closeRenameEditor();
+    }
+  }, [closeRenameEditor, noteIdToRename, openRenameEditor]);
+
+  const handleRenameSubmit = useCallback(async (noteId: string, nextValue: string) => {
+    const trimmed = nextValue.trim();
+    if (!trimmed) {
+      return true;
+    }
+
+    const currentLeaf = getNoteLeaf(noteId);
     if (trimmed === currentLeaf || trimmed === `${currentLeaf}.md`) {
-      closeRenameDialog();
-      return;
+      return true;
     }
 
     try {
       setIsRenaming(true);
-      await renameNote(noteIdToRename, trimmed);
-      setRenameDialogOpen(false);
+      await renameNote(noteId, trimmed);
       setNoteIdToRename(null);
-      setRenameValue("");
+      focusList();
       toast.success("Filename updated");
+      return true;
     } catch (error) {
       console.error("Failed to rename note file:", error);
       toast.error("Failed to rename file");
+      return false;
     } finally {
       setIsRenaming(false);
     }
-  }, [closeRenameDialog, noteIdToRename, renameNote, renameValue]);
+  }, [focusList, renameNote]);
 
   useEffect(() => {
     const handleFocusNoteList = () => {
@@ -608,17 +636,6 @@ export function NoteList({
     return () =>
       window.removeEventListener("focus-note-list", handleFocusNoteList);
   }, [focusList]);
-
-  useEffect(() => {
-    if (!renameDialogOpen) return;
-
-    const frame = requestAnimationFrame(() => {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [renameDialogOpen]);
 
   useEffect(() => {
     const handleRequestDelete = (event: Event) => {
@@ -702,7 +719,16 @@ export function NoteList({
               onPin={pinNote}
               onUnpin={unpinNote}
               onDuplicate={duplicateNote}
-              onRenameFile={openRenameDialog}
+              isRenameOpen={noteIdToRename === item.id}
+              renameSuggestion={(() => {
+                const baseName = getNoteLeaf(item.id);
+                const suggested = sanitizeNoteFilename(item.title);
+                return suggested && suggested !== baseName ? suggested : null;
+              })()}
+              onOpenRenameFile={openRenameEditor}
+              onRenameFileOpenChange={handleRenameOpenChange}
+              onRenameFileSubmit={handleRenameSubmit}
+              isRenamingFile={isRenaming && noteIdToRename === item.id}
               onOpenInNewWindow={(noteId) => {
                 void notesService
                   .openNoteWindow(noteId)
@@ -749,61 +775,6 @@ export function NoteList({
             <AlertDialogAction onClick={handleDeleteConfirm}>
               {deleteDialogCopy.actionLabel}
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={renameDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeRenameDialog();
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rename file</AlertDialogTitle>
-            <AlertDialogDescription>
-              Choose a new file name. The `.md` extension is kept automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex flex-col gap-3">
-            <Input
-              ref={renameInputRef}
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value)}
-              placeholder="Untitled"
-              disabled={isRenaming}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void handleRenameConfirm();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className={`self-start text-xs text-text-muted hover:text-text underline underline-offset-2 decoration-text-muted/50 hover:decoration-text text-left transition-colors truncate max-w-full ${suggestedName && suggestedName !== renameValue ? "visible" : "invisible pointer-events-none"}`}
-              onClick={() => suggestedName && setRenameValue(suggestedName)}
-            >
-              Use title: <span className="font-medium">{suggestedName ?? ""}</span>
-            </button>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRenaming}>Cancel</AlertDialogCancel>
-            <Button
-              onClick={handleRenameConfirm}
-              disabled={
-                isRenaming ||
-                !renameValue.trim() ||
-                (noteIdToRename !== null &&
-                  (renameValue.trim() === getNoteLeaf(noteIdToRename) ||
-                    renameValue.trim() === `${getNoteLeaf(noteIdToRename)}.md`))
-              }
-            >
-              {isRenaming ? "Renaming..." : "Rename"}
-            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

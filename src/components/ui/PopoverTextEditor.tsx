@@ -8,7 +8,7 @@ interface PopoverTextEditorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   value: string;
-  onSubmit: (value: string) => void;
+  onSubmit: (value: string) => void | boolean | Promise<void | boolean>;
   title: string;
   placeholder: string;
   icon: React.ReactNode;
@@ -19,6 +19,11 @@ interface PopoverTextEditorProps {
   popoverClassName?: string;
   inputClassName?: string;
   maxSuggestions?: number;
+  isSubmitting?: boolean;
+  renderAuxiliaryContent?: (controls: {
+    draft: string;
+    setDraft: React.Dispatch<React.SetStateAction<string>>;
+  }) => React.ReactNode;
 }
 
 export function PopoverTextEditor({
@@ -36,6 +41,8 @@ export function PopoverTextEditor({
   popoverClassName,
   inputClassName,
   maxSuggestions = 6,
+  isSubmitting = false,
+  renderAuxiliaryContent,
 }: PopoverTextEditorProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -57,17 +64,26 @@ export function PopoverTextEditor({
   }, [draft, maxSuggestions, suggestions]);
 
   const commitAndClose = React.useCallback(
-    (nextValue = draft) => {
-      onSubmit(nextValue.trim());
-      onOpenChange(false);
+    async (nextValue = draft) => {
+      if (isSubmitting) return;
+
+      try {
+        const shouldClose = await onSubmit(nextValue.trim());
+        if (shouldClose !== false) {
+          onOpenChange(false);
+        }
+      } catch {
+        // Keep the editor open when submit fails so callers can surface recovery.
+      }
     },
-    [draft, onOpenChange, onSubmit],
+    [draft, isSubmitting, onOpenChange, onSubmit],
   );
 
   const cancelAndClose = React.useCallback(() => {
+    if (isSubmitting) return;
     setDraft(value);
     onOpenChange(false);
-  }, [onOpenChange, value]);
+  }, [isSubmitting, onOpenChange, value]);
 
   React.useEffect(() => {
     if (!open) {
@@ -91,12 +107,14 @@ export function PopoverTextEditor({
     if (!open) return;
 
     const handlePointerDown = (event: PointerEvent) => {
+      if (isSubmitting) return;
+
       const target = event.target as Node;
       if (rootRef.current?.contains(target)) {
         return;
       }
 
-      commitAndClose();
+      void commitAndClose();
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -113,7 +131,7 @@ export function PopoverTextEditor({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [cancelAndClose, commitAndClose, open]);
+  }, [cancelAndClose, commitAndClose, isSubmitting, open]);
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
@@ -135,16 +153,16 @@ export function PopoverTextEditor({
     if (event.key === "Enter") {
       event.preventDefault();
       if (activeIndex >= 0 && activeIndex < filteredSuggestions.length) {
-        commitAndClose(filteredSuggestions[activeIndex]);
+        void commitAndClose(filteredSuggestions[activeIndex]);
         return;
       }
 
-      commitAndClose();
+      void commitAndClose();
       return;
     }
 
     if (event.key === "Tab") {
-      commitAndClose();
+      void commitAndClose();
     }
   };
 
@@ -170,6 +188,7 @@ export function PopoverTextEditor({
             <button
               type="button"
               onClick={cancelAndClose}
+              disabled={isSubmitting}
               className="ui-focus-ring inline-flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
               aria-label={`Close ${title.toLocaleLowerCase()}`}
             >
@@ -184,11 +203,17 @@ export function PopoverTextEditor({
               placeholder={placeholder}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleInputKeyDown}
+              disabled={isSubmitting}
               className={cn(
                 "h-11 border-border/70 bg-bg px-3 text-base text-text placeholder:text-text-muted",
                 inputClassName,
               )}
             />
+            {renderAuxiliaryContent ? (
+              <div className="mt-2.5">
+                {renderAuxiliaryContent({ draft, setDraft })}
+              </div>
+            ) : null}
           </div>
 
           {filteredSuggestions.length > 0 ? (
@@ -203,7 +228,8 @@ export function PopoverTextEditor({
                       type="button"
                       onMouseEnter={() => setActiveIndex(index)}
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => commitAndClose(suggestion)}
+                      onClick={() => void commitAndClose(suggestion)}
+                      disabled={isSubmitting}
                       className={cn(
                         "ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-1.5 text-left text-sm text-text transition-colors",
                         isActive ? "bg-bg-muted" : "hover:bg-bg-muted",
