@@ -553,7 +553,7 @@ export function NotesPane() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
                               </DropdownMenu.ItemIndicator>
                             </span>
-                            <span>Modified Time</span>
+                            <span>Modified</span>
                           </DropdownMenu.RadioItem>
                           <DropdownMenu.RadioItem
                             value="created"
@@ -564,7 +564,7 @@ export function NotesPane() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
                               </DropdownMenu.ItemIndicator>
                             </span>
-                            <span>Created Time</span>
+                            <span>Created</span>
                           </DropdownMenu.RadioItem>
                           <DropdownMenu.RadioItem
                             value="off"
