@@ -953,12 +953,43 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const setCollapsedFolders = useCallback(
     async (paths: string[]) => {
-      await persistSettings((currentSettings) => ({
+      const currentSettings = settingsRef.current;
+      const nextSettings: Settings = {
         ...currentSettings,
         collapsedFolders: sanitizeCollapsedFolders(paths),
-      }));
+      };
+      const patch = buildSettingsPatch(currentSettings, nextSettings);
+
+      if (isSettingsPatchEmpty(patch)) {
+        return;
+      }
+
+      settingsMutationVersionRef.current += 1;
+      const mutationVersion = settingsMutationVersionRef.current;
+      applySettings(nextSettings);
+
+      const runPersist = settingsWriteQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            await notesService.patchSettings(patch);
+          } catch (error) {
+            // Restore canonical settings only if this failed write is still the latest one.
+            if (mutationVersion === settingsMutationVersionRef.current) {
+              await refreshSettings();
+            }
+            throw error;
+          }
+        });
+
+      settingsWriteQueueRef.current = runPersist.then(
+        () => undefined,
+        () => undefined,
+      );
+
+      await runPersist;
     },
-    [persistSettings],
+    [applySettings, refreshSettings],
   );
 
   // Debounced refresh - coalesces rapid saves into a single refresh

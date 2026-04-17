@@ -299,6 +299,8 @@ describe("NotesContext", () => {
       secondSave = result.current.setCollapsedFolders(["journal"]);
     });
 
+    expect(result.current.settings.collapsedFolders).toEqual(["journal"]);
+
     await waitFor(() => {
       expect(notesService.patchSettings).toHaveBeenCalledTimes(1);
     });
