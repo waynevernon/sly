@@ -273,6 +273,106 @@ describe("NotesContext", () => {
     expect(result.current.showNoteListPreview).toBe(false);
   });
 
+  it("serializes collapsed folder writes so older saves cannot overwrite newer state", async () => {
+    const firstPatch = createDeferred<void>();
+    const secondPatch = createDeferred<void>();
+
+    vi.mocked(notesService.getSettings).mockResolvedValueOnce(createSettings({
+      collapsedFolders: ["docs"],
+    }));
+    vi.mocked(notesService.patchSettings)
+      .mockReturnValueOnce(firstPatch.promise)
+      .mockReturnValueOnce(secondPatch.promise);
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    vi.mocked(notesService.patchSettings).mockClear();
+
+    let firstSave!: Promise<Settings>;
+    let secondSave!: Promise<Settings>;
+    act(() => {
+      firstSave = result.current.setCollapsedFolders(["docs", "journal"]);
+      secondSave = result.current.setCollapsedFolders(["journal"]);
+    });
+
+    await waitFor(() => {
+      expect(notesService.patchSettings).toHaveBeenCalledTimes(1);
+    });
+    expect(notesService.patchSettings).toHaveBeenNthCalledWith(1, {
+      collapsedFolders: ["docs", "journal"],
+    });
+
+    firstPatch.resolve();
+    await act(async () => {
+      await firstSave;
+    });
+
+    await waitFor(() => {
+      expect(notesService.patchSettings).toHaveBeenCalledTimes(2);
+    });
+    expect(notesService.patchSettings).toHaveBeenNthCalledWith(2, {
+      collapsedFolders: ["journal"],
+    });
+
+    secondPatch.resolve();
+    await act(async () => {
+      await secondSave;
+    });
+
+    expect(result.current.settings.collapsedFolders).toEqual(["journal"]);
+  });
+
+  it("ignores stale settings refreshes after a newer collapse-state save", async () => {
+    const staleRefresh = createDeferred<Settings>();
+
+    vi.mocked(notesService.getSettings)
+      .mockResolvedValueOnce(createSettings({
+        collapsedFolders: ["docs"],
+      }))
+      .mockReturnValueOnce(staleRefresh.promise);
+    vi.mocked(notesService.renameFolder).mockResolvedValue();
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    vi.mocked(notesService.getSettings).mockClear();
+
+    let renamePromise!: Promise<void>;
+    act(() => {
+      renamePromise = result.current.renameFolder("docs", "archive");
+    });
+
+    await waitFor(() => {
+      expect(notesService.renameFolder).toHaveBeenCalledWith("docs", "archive");
+    });
+    await waitFor(() => {
+      expect(notesService.getSettings).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      await result.current.setCollapsedFolders([]);
+    });
+
+    expect(result.current.settings.collapsedFolders).toEqual([]);
+
+    staleRefresh.resolve(createSettings({
+      collapsedFolders: ["archive"],
+    }));
+
+    await act(async () => {
+      await renamePromise;
+    });
+
+    expect(result.current.settings.collapsedFolders).toEqual([]);
+  });
+
   it("keeps folder scope direct-only unless notes from subfolders is enabled", async () => {
     vi.mocked(notesService.listNotes).mockResolvedValue([
       {

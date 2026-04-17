@@ -582,8 +582,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // Tracks the ID of a newly created note so Editor can focus its title.
   const pendingNewNoteIdRef = useRef<string | null>(null);
   const noteIdRedirectsRef = useRef<Map<string, string>>(new Map());
+  const notesFolderRef = useRef<string | null>(notesFolder);
+  notesFolderRef.current = notesFolder;
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
+  const settingsWriteQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const settingsMutationVersionRef = useRef(0);
+  const settingsRefreshRequestIdRef = useRef(0);
   const windowRefreshTimeoutRef = useRef<number | null>(null);
   const folderLoadRequestIdRef = useRef(0);
   const folderRevealVersionRef = useRef(0);
@@ -694,8 +699,22 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const refreshSettings = useCallback(async () => {
+  const refreshSettings = useCallback(async (
+    targetNotesFolder: string | null = notesFolderRef.current,
+  ) => {
+      const requestId = ++settingsRefreshRequestIdRef.current;
+      const mutationVersionAtStart = settingsMutationVersionRef.current;
+      const requestedNotesFolder = targetNotesFolder;
       const nextSettings = await notesService.getSettings();
+
+      if (
+        requestId !== settingsRefreshRequestIdRef.current ||
+        mutationVersionAtStart !== settingsMutationVersionRef.current ||
+        requestedNotesFolder !== notesFolderRef.current
+      ) {
+        return settingsRef.current;
+      }
+
       const appliedSettings = applySettings(nextSettings);
       refreshRecentScopeNoteIds(appliedSettings.recentNoteIds);
       return appliedSettings;
@@ -703,27 +722,39 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const persistSettings = useCallback(
     async (updater: (currentSettings: Settings) => Settings) => {
-      const currentSettings = settingsRef.current;
-      const nextSettings = updater(currentSettings);
-      const patch = buildSettingsPatch(currentSettings, nextSettings);
+      const runPersist = settingsWriteQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const currentSettings = settingsRef.current;
+          const nextSettings = updater(currentSettings);
+          const patch = buildSettingsPatch(currentSettings, nextSettings);
 
-      if (!isSettingsPatchEmpty(patch)) {
-        await notesService.patchSettings(patch);
-      }
+          if (!isSettingsPatchEmpty(patch)) {
+            settingsMutationVersionRef.current += 1;
+            await notesService.patchSettings(patch);
+          }
 
-      const appliedSettings = applySettings(nextSettings);
+          const appliedSettings = applySettings(nextSettings);
 
-      if (
-        selectedScopeRef.current.type === "recent" &&
-        !haveSameNoteIdMembers(
-          recentScopeNoteIds,
-          appliedSettings.recentNoteIds,
-        )
-      ) {
-        refreshRecentScopeNoteIds(appliedSettings.recentNoteIds);
-      }
+          if (
+            selectedScopeRef.current.type === "recent" &&
+            !haveSameNoteIdMembers(
+              recentScopeNoteIds,
+              appliedSettings.recentNoteIds,
+            )
+          ) {
+            refreshRecentScopeNoteIds(appliedSettings.recentNoteIds);
+          }
 
-      return appliedSettings;
+          return appliedSettings;
+        });
+
+      settingsWriteQueueRef.current = runPersist.then(
+        () => undefined,
+        () => undefined,
+      );
+
+      return runPersist;
     },
     [applySettings, recentScopeNoteIds, refreshRecentScopeNoteIds],
   );
@@ -2040,6 +2071,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const setNotesFolder = useCallback(async (path: string) => {
     try {
       await notesService.setNotesFolder(path);
+      notesFolderRef.current = path;
       setNotesFolderState(path);
       setKnownFolders([]);
       setHasLoadedFolders(false);
@@ -2052,7 +2084,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       // Start file watcher after setting folder
       await notesService.startFileWatcher();
       await refreshKnownFolders(path);
-      await refreshSettings();
+      await refreshSettings(path);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to set notes folder"
@@ -2064,6 +2096,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // Used when the CLI sets the notes folder and emits an event.
   const syncNotesFolder = useCallback(async (path: string) => {
     try {
+      notesFolderRef.current = path;
       setNotesFolderState(path);
       setKnownFolders([]);
       setHasLoadedFolders(false);
@@ -2077,7 +2110,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setNotes(notesList);
       await refreshKnownFolders(path);
       await notesService.startFileWatcher();
-      await refreshSettings();
+      await refreshSettings(path);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to sync notes folder"
@@ -2090,6 +2123,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     async function init() {
       try {
         const folder = await notesService.getNotesFolder();
+        notesFolderRef.current = folder;
         setNotesFolderState(folder);
         if (folder) {
           const [notesList, folders] = await Promise.all([
@@ -2099,7 +2133,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
           setNotes(notesList);
           setKnownFolders(folders);
           setHasLoadedFolders(true);
-          await refreshSettings();
+          await refreshSettings(folder);
           // Start file watcher
           await notesService.startFileWatcher();
         } else {
