@@ -560,7 +560,10 @@ export function TaskListPane() {
       );
       if (!inSameSection) return;
 
-      const currentOrder = viewOrder ?? tasks.map((t) => t.id);
+      // Reorder against the full visible manual order, not just the persisted
+      // subset. New or moved-in tasks can be missing from viewOrder until the
+      // user reorders them, and using the rendered order keeps drag/drop stable.
+      const currentOrder = tasks.map((t) => t.id);
       const activeIndex = currentOrder.indexOf(activeTaskId);
       const overIndex = currentOrder.indexOf(overTaskId);
       if (activeIndex === -1 || overIndex === -1) return;
@@ -1483,4 +1486,3 @@ function startOfWeek(date: string): string {
   currentDate.setDate(currentDate.getDate() - currentDate.getDay());
   return localDateString(currentDate);
 }
-

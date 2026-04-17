@@ -247,6 +247,75 @@ describe("TaskListPane", () => {
     });
   });
 
+  it("reorders tasks that are missing from the persisted manual order", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    const dndKit = await import("@dnd-kit/core");
+    const setTaskViewOrder = vi.fn();
+    const firstTask = {
+      id: "task-1",
+      title: "First task",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    };
+    const secondTask = {
+      id: "task-2",
+      title: "Second task",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T11:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    };
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "inbox",
+        taskSortMode: "manual",
+        buckets: {
+          inbox: [firstTask, secondTask],
+          today: [],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [],
+          starred: [],
+        },
+        taskViewOrders: { inbox: ["task-1"] },
+        setTaskViewOrder,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    const monitor = vi.mocked(dndKit.useDndMonitor).mock.calls.at(-1)?.[0];
+    expect(monitor).toBeDefined();
+
+    monitor?.onDragEnd?.({
+      active: { data: { current: { type: "task", id: "task-2" } } },
+      over: { data: { current: { type: "task", id: "task-1" } } },
+    } as never);
+
+    expect(setTaskViewOrder).toHaveBeenCalledWith("inbox", ["task-2", "task-1"]);
+  });
+
   it("creates a task with the detected date removed from the title and assigned to actionAt", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");
