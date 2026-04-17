@@ -16,6 +16,10 @@ vi.mock("../../services/notes", () => ({
   setAiWorkingDirectory: vi.fn(),
 }));
 
+vi.mock("./GitSettingsSection", () => ({
+  GitSettingsSection: () => <div data-testid="git-settings-section" />,
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

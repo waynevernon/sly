@@ -13,6 +13,7 @@ import { AI_PROVIDER_ORDER, type AiProvider } from "../../services/ai";
 import * as cliService from "../../services/cli";
 import type { CliStatus } from "../../services/cli";
 import * as notesService from "../../services/notes";
+import { GitSettingsSection } from "./GitSettingsSection";
 
 type CliState = {
   status: CliStatus | null;
@@ -225,6 +226,10 @@ export function ExtensionsSettingsSection({
 
   return (
     <div className="space-y-10 pt-8 pb-10">
+      <GitSettingsSection />
+
+      <div className="ui-settings-separator" />
+
       {/* AI Providers */}
       <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">AI Providers</h2>

@@ -305,7 +305,8 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    const monitor = vi.mocked(dndKit.useDndMonitor).mock.calls.at(-1)?.[0];
+    const dndMonitorCalls = vi.mocked(dndKit.useDndMonitor).mock.calls;
+    const monitor = dndMonitorCalls[dndMonitorCalls.length - 1]?.[0];
     expect(monitor).toBeDefined();
 
     monitor?.onDragEnd?.({

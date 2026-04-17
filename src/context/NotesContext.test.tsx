@@ -292,8 +292,8 @@ describe("NotesContext", () => {
 
     vi.mocked(notesService.patchSettings).mockClear();
 
-    let firstSave!: Promise<Settings>;
-    let secondSave!: Promise<Settings>;
+    let firstSave!: Promise<void>;
+    let secondSave!: Promise<void>;
     act(() => {
       firstSave = result.current.setCollapsedFolders(["docs", "journal"]);
       secondSave = result.current.setCollapsedFolders(["journal"]);
