@@ -838,7 +838,12 @@ export function FolderTreeView({
 
   const focusTree = useCallback(() => {
     requestAnimationFrame(() => {
-      treeRef.current?.focus();
+      const tree = treeRef.current;
+      if (!tree || document.activeElement === tree) {
+        return;
+      }
+
+      tree.focus({ preventScroll: true });
     });
   }, []);
 
