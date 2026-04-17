@@ -138,8 +138,8 @@ describe("GlobalTaskCaptureDialog", () => {
       "Pay rent tomorrow",
     );
     await screen.findByText("Date: Tomorrow");
-    await user.click(screen.getByRole("button", { name: "Waiting for" }));
-    await user.type(screen.getByPlaceholderText("Waiting for…"), "Jordan");
+    await user.click(screen.getByRole("button", { name: "Waiting" }));
+    await user.type(screen.getByPlaceholderText("Waiting…"), "Jordan");
     await user.type(screen.getByPlaceholderText("Add link…"), "example.com");
     await user.type(screen.getByPlaceholderText("Add description…"), "Before noon");
     await user.click(screen.getByRole("button", { name: "Create Task" }));
@@ -298,12 +298,12 @@ describe("GlobalTaskCaptureDialog", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Waiting for" }));
-    const input = screen.getByPlaceholderText("Waiting for…");
+    await user.click(screen.getByRole("button", { name: "Waiting" }));
+    const input = screen.getByPlaceholderText("Waiting…");
     await screen.findByRole("button", { name: "Jordan" });
     await user.type(input, "jor");
     await user.click(screen.getByRole("button", { name: "Jordan" }));
 
-    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Waiting Jordan/i })).toBeInTheDocument();
   });
 });

@@ -2,7 +2,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Clock3, FileText, Link2, Repeat2, Star } from "lucide-react";
+import { CheckCheck, Clock3, FileText, Flag, Link2, Repeat2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import { menuSurfaceClassName } from "../ui";
@@ -52,14 +52,15 @@ export function TaskRow({
   const hasLink = task.link.trim().length > 0;
   const hasWaitingFor = task.waitingFor.trim().length > 0;
   const hasRecurrence = Boolean(task.recurrence);
+  const isCompletedViewItem = Boolean(task.completedAt && view === "completed");
   const showActionDateLabel = view !== "completed" && (view !== "today" || overdue);
-  const secondaryLabel = task.completedAt && view === "completed"
+  const secondaryLabel = isCompletedViewItem
     ? formatCompletedAt(task.completedAt)
       : actionDate && showActionDateLabel
       ? formatDate(actionDate, today)
       : null;
   const dueDate = actionAtToLocalDate(task.dueAt);
-  const dueDateLabel = dueDate ? `Due ${formatDate(dueDate, today)}` : null;
+  const dueDateLabel = dueDate ? formatDate(dueDate, today) : null;
   const dueOverdue = !isCompleted && dueDate !== null && dueDate < today;
   const isSelected = selectionState !== "none";
   const isActive = selectionState === "active";
@@ -220,7 +221,7 @@ export function TaskRow({
                         />
                       ) : null}
                       {hasWaitingFor ? (
-                        <span title={`Waiting for ${task.waitingFor}`}>
+                        <span title={`Waiting: ${task.waitingFor}`}>
                           <Clock3
                             className="h-3.5 w-3.5 stroke-[1.8]"
                             data-testid="task-row-waiting-indicator"
@@ -250,13 +251,28 @@ export function TaskRow({
                       overdue && secondaryLabel ? "text-[var(--color-danger)]" : "text-text-muted/60",
                     )}
                   >
-                    {secondaryLabel}
+                    {secondaryLabel && (
+                      isCompletedViewItem ? (
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <CheckCheck className="h-3.25 w-3.25 shrink-0 stroke-[1.9]" />
+                          <span>{secondaryLabel}</span>
+                        </span>
+                      ) : (
+                        secondaryLabel
+                      )
+                    )}
                     {secondaryLabel && dueDateLabel && (
                       <span className="text-text-muted/30">·</span>
                     )}
                     {dueDateLabel && (
-                      <span className={dueOverdue ? "text-[var(--color-danger)]" : "text-text-muted/60"}>
-                        {dueDateLabel}
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1",
+                          dueOverdue ? "text-[var(--color-danger)]" : "text-text-muted/60",
+                        )}
+                      >
+                        <Flag className="h-3 w-3 shrink-0 stroke-[1.9]" />
+                        <span>{dueDateLabel}</span>
                       </span>
                     )}
                   </span>
@@ -313,7 +329,7 @@ function formatCompletedAt(iso: string): string {
   const date = iso.split("T")[0];
   const [y, m, d] = date.split("-").map(Number);
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `Completed ${names[m - 1]} ${d}, ${y}`;
+  return `${names[m - 1]} ${d}, ${y}`;
 }
 
 function offsetDate(date: string, days: number): string {

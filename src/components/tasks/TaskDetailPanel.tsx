@@ -7,8 +7,6 @@ import {
   LoaderCircle,
   Star,
   Trash2,
-  UserRound,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
@@ -18,7 +16,7 @@ import {
 } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
 import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
-import { Button, IconButton, PanelEmptyState, PopoverSurface } from "../ui";
+import { Button, IconButton, PanelEmptyState, PopoverTextEditor } from "../ui";
 import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
 
@@ -44,15 +42,12 @@ export function TaskDetailPanel() {
   const [recurrence, setRecurrence] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const [waitingFor, setWaitingFor] = useState("");
-  const [waitingForEditing, setWaitingForEditing] = useState(false);
-  const [waitingForFocused, setWaitingForFocused] = useState(false);
+  const [waitingEditorOpen, setWaitingEditorOpen] = useState(false);
   const [description, setDescription] = useState("");
 
   const taskIdRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<TaskPatch>({});
-  const waitingForInputRef = useRef<HTMLInputElement>(null);
-  const waitingForPendingBlurValueRef = useRef<string | null>(null);
 
   const scheduleSave = useCallback(
     (patch: TaskPatch) => {
@@ -100,8 +95,7 @@ export function TaskDetailPanel() {
     setRecurrence(selectedTask.recurrence);
     setLink(selectedTask.link);
     setWaitingFor(selectedTask.waitingFor);
-    setWaitingForEditing(false);
-    setWaitingForFocused(false);
+    setWaitingEditorOpen(false);
     setDescription(selectedTask.description);
     pendingPatchRef.current = {};
   }, [flushSave, selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -121,28 +115,15 @@ export function TaskDetailPanel() {
     scheduleSave({ link: event.target.value });
   };
 
-  const handleWaitingForChange = (nextValue: string) => {
-    setWaitingFor(nextValue);
-    scheduleSave({ waitingFor: nextValue });
-  };
-
   const commitWaitingFor = useCallback(
-    (nextValue?: string, options?: { blur?: boolean }) => {
-      const resolvedValue = nextValue ?? waitingFor;
-      const normalizedValue = resolvedValue.trim();
-      const shouldBlur = options?.blur ?? false;
-
+    (nextValue: string) => {
+      const normalizedValue = nextValue.trim();
       setWaitingFor(normalizedValue);
-      setWaitingForEditing(false);
-      setWaitingForFocused(false);
+      setWaitingEditorOpen(false);
       scheduleSave({ waitingFor: normalizedValue });
       flushSave();
-      if (shouldBlur) {
-        waitingForPendingBlurValueRef.current = normalizedValue;
-        waitingForInputRef.current?.blur();
-      }
     },
-    [flushSave, scheduleSave, waitingFor],
+    [flushSave, scheduleSave],
   );
 
   const commitSchedule = useCallback(
@@ -210,20 +191,7 @@ export function TaskDetailPanel() {
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
       .map((entry) => entry.value);
   }, [selectedTask?.id, tasks]);
-  const filteredWaitingForSuggestions = useMemo(() => {
-    const query = waitingFor.trim().toLocaleLowerCase();
-    return waitingForSuggestions
-      .filter((value) => {
-        const normalized = value.toLocaleLowerCase();
-        if (!query) return true;
-        if (normalized === query) return false;
-        return normalized.includes(query);
-      })
-      .slice(0, 6);
-  }, [waitingFor, waitingForSuggestions]);
   const hasWaitingFor = waitingFor.trim().length > 0;
-  const showWaitingForSuggestions =
-    waitingForEditing && waitingForFocused && filteredWaitingForSuggestions.length > 0;
   const isCompleted = Boolean(selectedTask?.completedAt);
   const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
 
@@ -311,121 +279,39 @@ export function TaskDetailPanel() {
                 onChange={commitRecurrence}
               />
             ) : null}
-          </div>
-
-          <div />
-          <div className="relative">
-            {waitingForEditing ? (
-              <div className="flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text">
-                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                <input
-                  ref={waitingForInputRef}
-                  type="text"
-                  value={waitingFor}
-                  placeholder="Waiting for…"
-                  onChange={(event) => handleWaitingForChange(event.target.value)}
-                  onFocus={() => setWaitingForFocused(true)}
-                  onBlur={(event) => {
-                    setWaitingForFocused(false);
-                    const pendingValue = waitingForPendingBlurValueRef.current;
-                    waitingForPendingBlurValueRef.current = null;
-                    commitWaitingFor(pendingValue ?? event.currentTarget.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      commitWaitingFor(event.currentTarget.value, { blur: true });
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      setWaitingFor(selectedTask?.waitingFor ?? "");
-                      setWaitingForEditing(false);
-                      setWaitingForFocused(false);
-                      waitingForInputRef.current?.blur();
-                    }
-                  }}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
-                />
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    setWaitingFor("");
-                    setWaitingForEditing(false);
-                    setWaitingForFocused(false);
-                    scheduleSave({ waitingFor: "" });
-                    flushSave();
-                  }}
-                  className="ui-focus-ring inline-flex h-5 w-5 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
-                  aria-label="Clear waiting for"
-                >
-                  <X className="h-3.5 w-3.5 stroke-[1.9]" />
-                </button>
-              </div>
-            ) : hasWaitingFor ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setWaitingForEditing(true);
-                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
-                }}
-                className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
-              >
-                <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
-                <span className="truncate text-left">Waiting for {waitingFor}</span>
-              </button>
-            ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setWaitingForEditing(true);
-                  requestAnimationFrame(() => waitingForInputRef.current?.focus());
-                }}
-                className="gap-2"
-              >
-                <Clock3 className="h-4 w-4 stroke-[1.7]" />
-                <span>Waiting for</span>
-              </Button>
-            )}
-
-            {showWaitingForSuggestions ? (
-              <PopoverSurface className="absolute left-0 top-[calc(100%+8px)] z-20 min-w-[200px] p-1.5">
-                <div className="flex flex-col gap-1">
-                  {filteredWaitingForSuggestions.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        commitWaitingFor(value, { blur: true });
-                      }}
-                      className="ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-2 text-left text-sm text-text transition-colors hover:bg-bg-muted"
-                    >
-                      <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted" />
-                      <span className="truncate">{value}</span>
-                    </button>
-                  ))}
-                </div>
-              </PopoverSurface>
-            ) : null}
-          </div>
-
-          <div />
-          <div className="border-t border-border/40" />
-
-          <div />
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-text-muted/50">Created</span>
-              <span className="text-text-muted">{formatTaskTimestamp(selectedTask.createdAt)}</span>
-            </div>
-            {selectedTask.completedAt ? (
-              <div className="flex items-center gap-2">
-                <span className="text-text-muted/50">Completed</span>
-                <span className="text-text-muted">{formatTaskTimestamp(selectedTask.completedAt)}</span>
-              </div>
-            ) : null}
+            <PopoverTextEditor
+              open={waitingEditorOpen}
+              onOpenChange={setWaitingEditorOpen}
+              value={waitingFor}
+              onSubmit={commitWaitingFor}
+              title="Waiting"
+              placeholder="Waiting…"
+              icon={<Clock3 className="h-4 w-4 stroke-[1.7]" />}
+              suggestions={waitingForSuggestions}
+              renderTrigger={({ openEditor }) =>
+                hasWaitingFor ? (
+                  <button
+                    type="button"
+                    onClick={openEditor}
+                    className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
+                  >
+                    <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
+                    <span className="truncate text-left">{waitingFor}</span>
+                  </button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={openEditor}
+                    className="gap-2"
+                  >
+                    <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                    <span>Waiting</span>
+                  </Button>
+                )
+              }
+            />
           </div>
 
           <div />
@@ -480,6 +366,20 @@ export function TaskDetailPanel() {
               rows={12}
               className="min-h-[320px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
             />
+          </div>
+
+          <div />
+          <div className="border-t border-border/40" />
+
+          <div />
+          <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted/50">
+            <span>Created {formatTaskTimestamp(selectedTask.createdAt)}</span>
+            {selectedTask.completedAt ? (
+              <>
+                <span className="text-text-muted/30">·</span>
+                <span>Completed {formatTaskTimestamp(selectedTask.completedAt)}</span>
+              </>
+            ) : null}
           </div>
         </div>
       </div>

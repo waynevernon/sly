@@ -74,6 +74,27 @@ describe("TaskRow", () => {
     expect(screen.getByTestId("task-row-waiting-indicator")).toBeInTheDocument();
   });
 
+  it("shows a flag icon beside the due date in the secondary row", () => {
+    renderRow({
+      task: makeTask({ dueAt: "2026-04-11T12:00:00.000Z" }),
+    });
+
+    expect(screen.getByText("Tomorrow")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-flag")).not.toBeNull();
+    expect(screen.queryByText(/^Due /)).toBeNull();
+  });
+
+  it("shows a check icon beside the completed date in the completed view", () => {
+    renderRow({
+      view: "completed",
+      task: makeTask({ completedAt: "2026-04-12T12:00:00Z" }),
+    });
+
+    expect(screen.getByText("Apr 12, 2026")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-check-check")).not.toBeNull();
+    expect(screen.queryByText(/^Completed /)).toBeNull();
+  });
+
   it("hides indicators when neither link nor description is present", () => {
     renderRow();
 

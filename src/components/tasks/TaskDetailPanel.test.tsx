@@ -148,9 +148,9 @@ describe("TaskDetailPanel", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Waiting for" }));
+    await user.click(screen.getByRole("button", { name: "Waiting" }));
 
-    const input = await screen.findByPlaceholderText("Waiting for…");
+    const input = await screen.findByPlaceholderText("Waiting…");
     await user.type(input, "jo");
 
     expect(await screen.findByRole("button", { name: /Jordan/i })).toBeInTheDocument();
@@ -160,8 +160,8 @@ describe("TaskDetailPanel", () => {
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
     });
-    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jordan" })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Waiting…")).not.toBeInTheDocument();
   });
 
   it("commits and collapses the waiting-for field on Enter", async () => {
@@ -179,15 +179,15 @@ describe("TaskDetailPanel", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Waiting for" }));
-    const input = await screen.findByPlaceholderText("Waiting for…");
+    await user.click(screen.getByRole("button", { name: "Waiting" }));
+    const input = await screen.findByPlaceholderText("Waiting…");
     await user.type(input, "Jordan{enter}");
 
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
     });
-    expect(screen.getByRole("button", { name: /Waiting for Jordan/i })).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jordan" })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Waiting…")).not.toBeInTheDocument();
   });
 
   it("collapses back to the idle button when blurred empty", async () => {
@@ -199,15 +199,15 @@ describe("TaskDetailPanel", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Waiting for" }));
-    const input = await screen.findByPlaceholderText("Waiting for…");
+    await user.click(screen.getByRole("button", { name: "Waiting" }));
+    const input = await screen.findByPlaceholderText("Waiting…");
     await user.click(input);
     await user.tab();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Waiting for" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Waiting" })).toBeInTheDocument();
     });
-    expect(screen.queryByPlaceholderText("Waiting for…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Waiting…")).not.toBeInTheDocument();
   });
 
   it("shows the created timestamp and omits completed when the task is still open", () => {
@@ -217,9 +217,11 @@ describe("TaskDetailPanel", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(screen.getByText(/Created/)).toBeInTheDocument();
     expect(
-      screen.getByText(formatTaskTimestampForTest("2026-04-10T12:00:00Z")),
+      screen.getByText(
+        new RegExp(`Created\\s+${escapeRegExp(formatTaskTimestampForTest("2026-04-10T12:00:00Z"))}`),
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   });
@@ -252,9 +254,11 @@ describe("TaskDetailPanel", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText(/Completed/)).toBeInTheDocument();
     expect(
-      screen.getByText(formatTaskTimestampForTest("2026-04-11T09:15:00Z")),
+      screen.getByText(
+        new RegExp(`Completed\\s+${escapeRegExp(formatTaskTimestampForTest("2026-04-11T09:15:00Z"))}`),
+      ),
     ).toBeInTheDocument();
   });
 
@@ -373,4 +377,8 @@ function formatTaskTimestampForTest(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

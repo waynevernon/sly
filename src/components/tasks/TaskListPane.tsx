@@ -51,6 +51,7 @@ import {
 import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
 import { TaskDatePickerPanel } from "./TaskDatePicker";
 import { TaskRow } from "./TaskRow";
+import { isMac, mod, shift } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { compareTasks, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
@@ -115,7 +116,7 @@ const HEADER_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
 const BASE_TASK_SORT_ITEMS: SortMenuItem<TaskSortMode>[] = [
   {
     key: "action",
-    label: "Action Date",
+    label: "Action",
     isActive: (value) => value === "actionAsc" || value === "actionDesc",
     getNextValue: (value) =>
       value === "actionAsc" ? "actionDesc" : value === "actionDesc" ? "actionAsc" : "actionAsc",
@@ -669,7 +670,7 @@ export function TaskListPane() {
             {!isSearching && (
               <SortMenuButton
                 title="Sort Tasks"
-                menuTitle={TASK_VIEW_LABELS[selectedView]}
+                menuTitle={`Sort ${TASK_VIEW_LABELS[selectedView]}`}
                 value={taskSortMode}
                 items={(() => {
                   const base = selectedView === "completed"
@@ -816,7 +817,13 @@ export function TaskListPane() {
                   size="md"
                   onClick={handleStartCreate}
                 >
-                  New Task
+                  New Task{" "}
+                  <span className="ml-1 text-text-muted">
+                    {mod}
+                    {isMac ? "" : "+"}
+                    {shift}
+                    {isMac ? "" : "+"}N
+                  </span>
                 </Button>
               ) : undefined}
             />

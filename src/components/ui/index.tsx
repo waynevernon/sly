@@ -31,6 +31,7 @@ export { Toaster } from "./Toaster";
 export { DialogShell } from "./DialogShell";
 export { PanelEmptyState } from "./PanelEmptyState";
 export { PopoverSurface } from "./PopoverSurface";
+export { PopoverTextEditor } from "./PopoverTextEditor";
 export { StatusPanel } from "./StatusPanel";
 export {
   MenuSurface,

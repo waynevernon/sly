@@ -2,10 +2,10 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Archive,
-  CalendarCheck,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Flag,
   Layers,
   RotateCcw,
   Sun,
@@ -114,8 +114,8 @@ export function TaskDatePicker({
   const formattedValue = scheduleBucket
     ? TASK_SCHEDULE_BUCKET_LABELS[scheduleBucket]
     : actionDate
-      ? `Action ${formatTaskDate(actionDate, today)}`
-      : "Action date";
+      ? formatTaskDate(actionDate, today)
+      : "Action";
 
   return (
     <div className={cn("relative", className)}>
@@ -225,7 +225,7 @@ export function DueDatePicker({
     };
   }, [isOpen]);
 
-  const formattedValue = dueDate ? `Due ${formatTaskDate(dueDate, today)}` : "Due date";
+  const formattedValue = dueDate ? formatTaskDate(dueDate, today) : "Due";
 
   return (
     <div className={cn("relative", className)}>
@@ -240,7 +240,7 @@ export function DueDatePicker({
             : "text-text-muted hover:bg-bg-muted hover:text-text",
         )}
       >
-        <CalendarCheck className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
+        <Flag className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
         <span>{formattedValue}</span>
       </button>
 
