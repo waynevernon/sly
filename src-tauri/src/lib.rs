@@ -5414,13 +5414,13 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .accelerator("CmdOrCtrl+\\")
             .build(app)?;
     let one_pane_item = MenuItemBuilder::with_id(MENU_VIEW_1_PANE_ID, "1 Pane")
-        .accelerator("CmdOrCtrl+Alt+1")
+        .accelerator("CmdOrCtrl+Shift+J")
         .build(app)?;
     let two_pane_item = MenuItemBuilder::with_id(MENU_VIEW_2_PANE_ID, "2 Panes")
-        .accelerator("CmdOrCtrl+Alt+2")
+        .accelerator("CmdOrCtrl+Shift+K")
         .build(app)?;
     let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
-        .accelerator("CmdOrCtrl+Alt+3")
+        .accelerator("CmdOrCtrl+Shift+L")
         .build(app)?;
     let right_pane_item = MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Right Pane")
         .accelerator("CmdOrCtrl+Alt+4")

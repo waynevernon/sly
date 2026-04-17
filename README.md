@@ -79,7 +79,7 @@ Sly is designed to stay usable from the keyboard. A few of the core shortcuts:
 | `Cmd/Ctrl+Shift+M` | Toggle markdown source mode |
 | `Cmd/Ctrl+Shift+Enter` | Toggle focus mode |
 | `Cmd/Ctrl+,` | Open settings |
-| `Cmd/Ctrl+1`, `2`, `3` | Switch pane layout |
+| `Cmd/Ctrl+Shift+J`, `K`, `L` | Switch to 1, 2, or 3 panes |
 | `Cmd/Ctrl+\\` | Cycle workspace layout |
 | `Cmd/Ctrl+=`, `-`, `0` | Zoom in, out, reset |
 

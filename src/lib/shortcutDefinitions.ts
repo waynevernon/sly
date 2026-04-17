@@ -88,17 +88,17 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, alt, "1"],
+    keys: [mod, shift, "J"],
     description: "Switch to 1-pane view (notes mode only)",
     category: "Navigation",
   },
   {
-    keys: [mod, alt, "2"],
+    keys: [mod, shift, "K"],
     description: "Switch to 2-pane view",
     category: "Navigation",
   },
   {
-    keys: [mod, alt, "3"],
+    keys: [mod, shift, "L"],
     description: "Switch to 3-pane view",
     category: "Navigation",
   },
