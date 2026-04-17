@@ -54,7 +54,7 @@ const tabs: {
   },
   {
     id: "extensions",
-    label: "Assistant & CLI",
+    label: "Integrations",
     icon: Sparkles,
     shortcutLabel: shortcut(mod, alt, "4"),
   },
