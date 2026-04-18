@@ -1,21 +1,55 @@
+import { useCallback, useEffect, useState } from "react";
 import { useNotes } from "../../context/NotesContext";
-import { getTaskQuickAddShortcutLabel } from "../../lib/taskQuickAddShortcut";
+import {
+  acceleratorToLabel,
+  captureAcceleratorFromEvent,
+  getDefaultAccelerator,
+  getTaskQuickAddShortcutLabel,
+} from "../../lib/taskQuickAddShortcut";
 import { isMac } from "../../lib/platform";
 import { Button } from "../ui";
 
 export function TasksSettingsSection() {
   const { settings, setTasksEnabled, setTaskQuickAddShortcut } = useNotes();
   const configuredShortcut = settings?.taskQuickAddShortcut ?? null;
-  const shortcutOptions = [
-    {
-      value: null,
-      label: `Default (${getTaskQuickAddShortcutLabel(null)})`,
-    },
-    {
-      value: "disabled" as const,
-      label: "Off",
-    },
-  ];
+  const [isRecording, setIsRecording] = useState(false);
+
+  const isDisabled = configuredShortcut === "disabled";
+  const isDefault = configuredShortcut === null;
+  const currentLabel = isDisabled ? "Off" : getTaskQuickAddShortcutLabel(configuredShortcut);
+  const effectiveAccelerator = configuredShortcut ?? getDefaultAccelerator();
+  const showConflictWarning =
+    isMac && !isDisabled && effectiveAccelerator === "Control+Space";
+
+  const stopRecording = useCallback(() => {
+    setIsRecording(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        stopRecording();
+        return;
+      }
+
+      const accelerator = captureAcceleratorFromEvent(event);
+      if (accelerator) {
+        event.preventDefault();
+        event.stopPropagation();
+        void setTaskQuickAddShortcut(accelerator);
+        stopRecording();
+      } else if (event.key !== "Shift" && event.key !== "CapsLock") {
+        // Non-modifier key with no strong modifier — swallow it so nothing fires
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [isRecording, setTaskQuickAddShortcut, stopRecording]);
 
   return (
     <div className="space-y-10 pt-8 pb-10">
@@ -54,29 +88,66 @@ export function TasksSettingsSection() {
             When Sly is already running, this shortcut brings the app forward and opens the
             existing quick task add dialog.
           </p>
-          {isMac ? (
+          {showConflictWarning ? (
             <p className="text-xs text-text-muted max-w-xl">
               <code className="font-mono text-[11px]">Control+Space</code> can conflict with
-              macOS input-source shortcuts. If it does, turn it off here or free it in System
+              macOS input-source shortcuts. If it does, change it here or free it in System
               Settings.
             </p>
           ) : null}
         </div>
-        <div className="ui-settings-toggle-group flex-wrap">
-          {shortcutOptions.map((option) => {
-            const isSelected = configuredShortcut === option.value;
-            return (
+
+        {isRecording ? (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 h-[var(--ui-control-height-compact)] px-3 rounded-md border border-accent bg-accent/10 text-xs text-accent animate-pulse min-w-32">
+              Press shortcut keys&hellip;
+            </div>
+            <Button size="xs" variant="ghost" onClick={stopRecording}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            {isDisabled ? (
               <Button
-                key={option.value ?? "default"}
-                onClick={() => void setTaskQuickAddShortcut(option.value)}
-                variant={isSelected ? "primary" : "ghost"}
                 size="xs"
+                variant="default"
+                onClick={() => void setTaskQuickAddShortcut(null)}
               >
-                {option.label}
+                Enable
               </Button>
-            );
-          })}
-        </div>
+            ) : (
+              <>
+                <button
+                  className="inline-flex items-center gap-1.5 h-[var(--ui-control-height-compact)] px-2.5 rounded-md border border-border bg-bg-muted hover:bg-bg-emphasis text-xs font-mono cursor-pointer transition-colors"
+                  onClick={() => setIsRecording(true)}
+                  title="Click to change shortcut"
+                >
+                  {currentLabel}
+                  <span className="text-text-muted text-[10px] font-sans not-italic">
+                    ✎
+                  </span>
+                </button>
+                {!isDefault && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => void setTaskQuickAddShortcut(null)}
+                  >
+                    Reset to {acceleratorToLabel(getDefaultAccelerator())}
+                  </Button>
+                )}
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => void setTaskQuickAddShortcut("disabled")}
+                >
+                  Disable
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );
