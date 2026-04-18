@@ -1,5 +1,16 @@
 import { alt, mod, shift } from "./platform";
 
+export const CYCLE_WORKSPACE_LAYOUT_KEYS = [mod, shift, "["] as const;
+export const TOGGLE_RIGHT_PANE_KEYS = [mod, shift, "]"] as const;
+export const SETTINGS_TAB_SHORTCUT_KEYS = {
+  notes: [mod, alt, "1"],
+  tasks: [mod, alt, "2"],
+  editor: [mod, alt, "3"],
+  extensions: [mod, alt, "4"],
+  shortcuts: [mod, alt, "5"],
+  about: [mod, alt, "6"],
+} as const;
+
 export interface ShortcutDefinition {
   keys: string[];
   description: string;
@@ -83,7 +94,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, shift, "["],
+    keys: [...CYCLE_WORKSPACE_LAYOUT_KEYS],
     description: "Cycle workspace layout",
     category: "Navigation",
   },
@@ -103,7 +114,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, shift, "]"],
+    keys: [...TOGGLE_RIGHT_PANE_KEYS],
     description: "Toggle Right Pane",
     category: "Navigation",
   },
@@ -143,27 +154,32 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, alt, "1"],
-    description: "Go to General settings tab",
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.notes],
+    description: "Go to Notes settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, alt, "2"],
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.tasks],
+    description: "Go to Tasks settings tab",
+    category: "Settings",
+  },
+  {
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.editor],
     description: "Go to Appearance settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, alt, "3"],
-    description: "Go to Assistant & CLI settings tab",
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.extensions],
+    description: "Go to Integrations settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, alt, "4"],
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.shortcuts],
     description: "Go to Shortcuts settings tab",
     category: "Settings",
   },
   {
-    keys: [mod, alt, "5"],
+    keys: [...SETTINGS_TAB_SHORTCUT_KEYS.about],
     description: "Go to About settings tab",
     category: "Settings",
   },

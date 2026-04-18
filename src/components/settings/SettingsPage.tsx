@@ -14,7 +14,8 @@ import { AppearanceSettingsSection } from "./EditorSettingsSection";
 import { ExtensionsSettingsSection } from "./ExtensionsSettingsSection";
 import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
 import { AboutSettingsSection } from "./AboutSettingsSection";
-import { alt, isMac, mod, shortcut } from "../../lib/platform";
+import { isMac, mod, shortcut } from "../../lib/platform";
+import { SETTINGS_TAB_SHORTCUT_KEYS } from "../../lib/shortcutDefinitions";
 import type { AiProvider } from "../../services/ai";
 
 interface SettingsPageProps {
@@ -37,37 +38,37 @@ const tabs: {
     id: "notes",
     label: "Notes",
     icon: NoteIcon,
-    shortcutLabel: shortcut(mod, alt, "1"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.notes),
   },
   {
     id: "tasks",
     label: "Tasks",
     icon: CheckSquare,
-    shortcutLabel: shortcut(mod, alt, "2"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.tasks),
   },
   {
     id: "editor",
     label: "Appearance",
     icon: SwatchIcon,
-    shortcutLabel: shortcut(mod, alt, "3"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.editor),
   },
   {
     id: "extensions",
     label: "Integrations",
     icon: Sparkles,
-    shortcutLabel: shortcut(mod, alt, "4"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.extensions),
   },
   {
     id: "shortcuts",
     label: "Shortcuts",
     icon: KeyboardIcon,
-    shortcutLabel: shortcut(mod, alt, "5"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.shortcuts),
   },
   {
     id: "about",
     label: "About",
     icon: InfoIcon,
-    shortcutLabel: shortcut(mod, alt, "6"),
+    shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.about),
   },
 ];
 
