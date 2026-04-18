@@ -16,7 +16,13 @@ import {
 } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
 import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
-import { Button, IconButton, PanelEmptyState, PopoverTextEditor } from "../ui";
+import {
+  Button,
+  IconButton,
+  PanelEmptyState,
+  PopoverTextEditor,
+  Tooltip,
+} from "../ui";
 import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
 
@@ -350,15 +356,17 @@ export function TaskDetailPanel() {
                 className="w-full bg-transparent pr-8 text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
               />
               {openableLink ? (
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => void handleOpenLink()}
-                  aria-label="Open link"
-                  className="ui-focus-ring absolute top-1/2 right-0 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                </button>
+                <Tooltip content="Open link">
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => void handleOpenLink()}
+                    aria-label="Open link"
+                    className="ui-focus-ring absolute top-1/2 right-0 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>
@@ -398,7 +406,7 @@ export function TaskDetailPanel() {
               <IconButton
                 type="button"
                 variant="ghost"
-                title="Delete Task"
+                title="Delete task"
                 onClick={() => void handleDelete()}
                 className="h-6.5 w-6.5 text-text-muted/70 hover:text-text"
               >

@@ -262,6 +262,40 @@ describe("TaskDetailPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a tooltip for the open link action", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedTask: {
+          id: "task-1",
+          title: "Follow up",
+          description: "",
+          link: "https://example.com",
+          waitingFor: "",
+          createdAt: "2026-04-10T12:00:00Z",
+          actionAt: null,
+          scheduleBucket: null,
+          completedAt: null,
+          starred: false,
+          dueAt: null,
+          recurrence: null,
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "Open link" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Open link");
+  });
+
   it("flushes a pending edit before switching to a different task", async () => {
     const tasksContext = await import("../../context/TasksContext");
     const updateTask = vi.fn().mockResolvedValue(null);

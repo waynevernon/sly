@@ -385,7 +385,8 @@ function TitlebarPaneSwitch({
               onClick={onToggleRightPanel}
               title={`${
                 rightPanelVisible ? "Hide" : "Show"
-              } Right Pane (${shortcut(mod, alt, "4")})`}
+              } right pane (${shortcut(mod, alt, "4")})`}
+              aria-label={rightPanelVisible ? "Hide right pane" : "Show right pane"}
               className="shrink-0"
             >
               <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -1443,7 +1444,13 @@ function AppContent() {
           setPaneMode(2);
         }
         requestAnimationFrame(() => {
-          window.dispatchEvent(new CustomEvent("open-notes-search"));
+          window.dispatchEvent(
+            new CustomEvent(
+              isTasksModeActiveRef.current
+                ? "open-tasks-search"
+                : "open-notes-search",
+            ),
+          );
         });
         return;
       }

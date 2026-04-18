@@ -134,7 +134,7 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Search Notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search notes" }));
     const input = screen.getByPlaceholderText("Search notes...");
 
     fireEvent.change(input, { target: { value: "alp" } });
@@ -330,7 +330,7 @@ describe("NotesPane", () => {
       </TooltipProvider>,
     );
 
-    const sortButton = screen.getByRole("button", { name: "Note List Options" });
+    const sortButton = screen.getByRole("button", { name: "Note list options" });
 
     await user.click(sortButton);
     expect(screen.getByText("Sort This Folder")).toBeInTheDocument();
@@ -366,7 +366,7 @@ describe("NotesPane", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: "Note List Options" }),
+      screen.getByRole("button", { name: "Note list options" }),
     );
 
     expect(screen.getByText("Sort Notes")).toBeInTheDocument();
@@ -410,7 +410,7 @@ describe("NotesPane", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: "Note List Options" }),
+      screen.getByRole("button", { name: "Note list options" }),
     );
 
     expect(screen.queryByText("Recent View")).not.toBeInTheDocument();
@@ -439,7 +439,7 @@ describe("NotesPane", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: "Note List Options" }),
+      screen.getByRole("button", { name: "Note list options" }),
     );
 
     expect(screen.getByText("Sort Pinned")).toBeInTheDocument();

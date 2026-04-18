@@ -313,7 +313,7 @@ function DueDatePickerPanel({
               type="button"
               size="xs"
               variant="ghost"
-              title="Previous Month"
+              title="Previous month"
               onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
             >
               <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
@@ -322,7 +322,7 @@ function DueDatePickerPanel({
               type="button"
               size="xs"
               variant="ghost"
-              title="Next Month"
+              title="Next month"
               onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
             >
               <ChevronRight className="h-4 w-4 stroke-[1.8]" />
@@ -442,7 +442,7 @@ export function TaskDatePickerPanel({
               type="button"
               size="xs"
               variant="ghost"
-              title="Previous Month"
+              title="Previous month"
               onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
             >
               <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
@@ -451,7 +451,7 @@ export function TaskDatePickerPanel({
               type="button"
               size="xs"
               variant="ghost"
-              title="Next Month"
+              title="Next month"
               onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
             >
               <ChevronRight className="h-4 w-4 stroke-[1.8]" />

@@ -63,7 +63,7 @@ describe("FoldersPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Sort Folders" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
 
     expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.queryByRole("menuitemradio", { name: /Manual/i })).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("FoldersPane", () => {
     expect(pinnedToggle).toHaveAttribute("data-state", "checked");
 
     await user.click(pinnedToggle);
-    await user.click(screen.getByRole("button", { name: "Sort Folders" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
 
     const toggle = screen.getByRole("menuitemcheckbox", {
       name: /Recent/i,
@@ -82,7 +82,7 @@ describe("FoldersPane", () => {
     expect(toggle).toHaveAttribute("data-state", "checked");
 
     await user.click(toggle);
-    await user.click(screen.getByRole("button", { name: "Sort Folders" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
     await user.click(screen.getByRole("menuitemcheckbox", { name: /Note Count/i }));
 
     expect(setShowPinnedNotes).toHaveBeenCalledWith(false);

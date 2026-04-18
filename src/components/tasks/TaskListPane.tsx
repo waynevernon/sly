@@ -535,6 +535,16 @@ export function TaskListPane() {
   }, [searchOpen]);
 
   useEffect(() => {
+    const handleOpenSearch = () => {
+      setSearchOpen(true);
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    };
+
+    window.addEventListener("open-tasks-search", handleOpenSearch);
+    return () => window.removeEventListener("open-tasks-search", handleOpenSearch);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
@@ -652,14 +662,14 @@ export function TaskListPane() {
             <IconButton
               type="button"
               variant="ghost"
-              title="Delete Selected Tasks"
+              title="Delete selected tasks"
               onClick={() => void handleDeleteTasks(selectedTaskIds)}
             >
               <Trash2 className="h-4 w-4 stroke-[1.6]" />
             </IconButton>
             <IconButton
               type="button"
-              title="Clear Selection"
+              title="Clear selection"
               onClick={clearTaskSelection}
             >
               <X className="h-4 w-4 stroke-[1.6]" />
@@ -669,7 +679,7 @@ export function TaskListPane() {
           <div className="ui-pane-header-actions ml-auto">
             {!isSearching && (
               <SortMenuButton
-                title="Sort Tasks"
+                title="Sort tasks"
                 menuTitle={`Sort ${TASK_VIEW_LABELS[selectedView]}`}
                 value={taskSortMode}
                 items={(() => {
@@ -685,7 +695,8 @@ export function TaskListPane() {
             )}
             <IconButton
               type="button"
-              title="Search Tasks"
+              title={`Search tasks (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}F)`}
+              aria-label="Search tasks"
               onClick={toggleSearch}
             >
               {searchOpen ? (
@@ -697,7 +708,8 @@ export function TaskListPane() {
             {canInlineCreate && !isSearching && (
               <IconButton
                 type="button"
-                title="New Task"
+                title={`New task (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}N)`}
+                aria-label="New task"
                 variant="ghost"
                 onClick={handleStartCreate}
               >

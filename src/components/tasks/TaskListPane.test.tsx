@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt, taskScheduleSelectionFromView } from "../../lib/tasks";
 import { TooltipProvider } from "../ui";
@@ -114,7 +114,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
 
     const input = screen.getByPlaceholderText("Task name");
     await user.type(input, "First task{enter}");
@@ -178,7 +178,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Today task{enter}");
 
     await waitFor(() => {
@@ -219,7 +219,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Anytime task{enter}");
 
     await waitFor(() => {
@@ -239,7 +239,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
 
     await waitFor(() => {
@@ -353,7 +353,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow{enter}");
 
     await waitFor(() => {
@@ -391,7 +391,7 @@ describe("TaskListPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getAllByRole("button", { name: "New Task" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
     await waitFor(() => {
       expect(screen.getByText("Date: Tomorrow")).toBeInTheDocument();
@@ -597,8 +597,8 @@ describe("TaskListPane", () => {
 
     expect(screen.getByText("2 selected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reschedule" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete Selected Tasks" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Clear Selection" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete selected tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear selection" })).toBeInTheDocument();
   });
 
   it("shows waiting tasks in a dedicated waiting view with grouped sections", async () => {
@@ -657,7 +657,7 @@ describe("TaskListPane", () => {
 
     expect(screen.getByText("Overdue")).toBeInTheDocument();
     expect(screen.getByText("Anytime")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "New Task" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New task" })).not.toBeInTheDocument();
   });
 
   it("opens the search input when the search button is clicked", async () => {
@@ -666,7 +666,19 @@ describe("TaskListPane", () => {
 
     expect(screen.queryByPlaceholderText("Search tasks…")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.click(screen.getByRole("button", { name: "Search tasks" }));
+    expect(screen.getByPlaceholderText("Search tasks…")).toBeInTheDocument();
+  });
+
+  it("opens the search input when the global task search event is dispatched", () => {
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    expect(screen.queryByPlaceholderText("Search tasks…")).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("open-tasks-search"));
+    });
+
     expect(screen.getByPlaceholderText("Search tasks…")).toBeInTheDocument();
   });
 
@@ -686,7 +698,7 @@ describe("TaskListPane", () => {
 
     render(<TooltipProvider><TaskListPane /></TooltipProvider>);
 
-    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.click(screen.getByRole("button", { name: "Search tasks" }));
     await user.type(screen.getByPlaceholderText("Search tasks…"), "fix");
 
     // "Fix login bug" and "Deploy hotfix" match; "Write unit tests" does not
@@ -709,7 +721,7 @@ describe("TaskListPane", () => {
 
     render(<TooltipProvider><TaskListPane /></TooltipProvider>);
 
-    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.click(screen.getByRole("button", { name: "Search tasks" }));
     await user.type(screen.getByPlaceholderText("Search tasks…"), "zzznomatch");
 
     await waitFor(() => {
@@ -721,7 +733,7 @@ describe("TaskListPane", () => {
     const user = userEvent.setup();
     render(<TooltipProvider><TaskListPane /></TooltipProvider>);
 
-    await user.click(screen.getByRole("button", { name: "Search Tasks" }));
+    await user.click(screen.getByRole("button", { name: "Search tasks" }));
     const input = screen.getByPlaceholderText("Search tasks…");
     await user.click(input);
 

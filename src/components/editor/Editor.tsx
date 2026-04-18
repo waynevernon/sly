@@ -258,17 +258,17 @@ function FormatBar({
     { kind: "sep", key: "sep-2" },
     {
       kind: "button", key: "bulletList",
-      toolbarEl: <ToolbarButton key="bulletList" onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive("bulletList")} title={`Bullet List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}8)`}><ListIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="bulletList" onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive("bulletList")} title={`Bullet list (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}8)`}><ListIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="bulletList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleBulletList().run()}><ListIcon className="w-4 h-4 stroke-[1.5]" />Bullet List</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "orderedList",
-      toolbarEl: <ToolbarButton key="orderedList" onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive("orderedList")} title={`Numbered List (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}7)`}><ListOrderedIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="orderedList" onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive("orderedList")} title={`Numbered list (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}7)`}><ListOrderedIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="orderedList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleOrderedList().run()}><ListOrderedIcon className="w-4 h-4 stroke-[1.5]" />Numbered List</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "taskList",
-      toolbarEl: <ToolbarButton key="taskList" onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive("taskList")} title="Task List"><CheckSquareIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="taskList" onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive("taskList")} title="Task list"><CheckSquareIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="taskList" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleTaskList().run()}><CheckSquareIcon className="w-4 h-4 stroke-[1.5]" />Task List</DropdownMenu.Item>,
     },
     {
@@ -278,38 +278,38 @@ function FormatBar({
     },
     {
       kind: "button", key: "inlineCode",
-      toolbarEl: <ToolbarButton key="inlineCode" onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive("code")} title={`Inline Code (${mod}${isMac ? "" : "+"}E)`}><InlineCodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="inlineCode" onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive("code")} title={`Inline code (${mod}${isMac ? "" : "+"}E)`}><InlineCodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="inlineCode" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleCode().run()}><InlineCodeIcon className="w-4 h-4 stroke-[1.5]" />Inline Code</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "codeBlock",
-      toolbarEl: <ToolbarButton key="codeBlock" onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={editor.isActive("codeBlock")} title={`Code Block (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}C)`}><CodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="codeBlock" onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={editor.isActive("codeBlock")} title={`Code block (${mod}${isMac ? "" : "+"}${alt}${isMac ? "" : "+"}C)`}><CodeIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="codeBlock" className={menuItemClassName} onSelect={() => editor.chain().focus().toggleCodeBlock().run()}><CodeIcon className="w-4 h-4 stroke-[1.5]" />Code Block</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "blockMath",
-      toolbarEl: <ToolbarButton key="blockMath" onClick={onAddBlockMath} isActive={editor.isActive("blockMath")} title="Block Math"><BlockMathIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="blockMath" onClick={onAddBlockMath} isActive={editor.isActive("blockMath")} title="Block math"><BlockMathIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="blockMath" className={menuItemClassName} onSelect={onAddBlockMath}><BlockMathIcon className="w-4 h-4 stroke-[1.5]" />Block Math</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "hRule",
-      toolbarEl: <ToolbarButton key="hRule" onClick={() => editor.chain().focus().setHorizontalRule().run()} isActive={false} title="Horizontal Rule"><SeparatorIcon /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="hRule" onClick={() => editor.chain().focus().setHorizontalRule().run()} isActive={false} title="Horizontal rule"><SeparatorIcon /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="hRule" className={menuItemClassName} onSelect={() => editor.chain().focus().setHorizontalRule().run()}><SeparatorIcon />Horizontal Rule</DropdownMenu.Item>,
     },
     { kind: "sep", key: "sep-3" },
     {
       kind: "button", key: "link",
-      toolbarEl: <ToolbarButton key="link" onClick={onAddLink} isActive={editor.isActive("link")} title={`Add Link (${mod}${isMac ? "" : "+"}K)`}><LinkIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="link" onClick={onAddLink} isActive={editor.isActive("link")} title={`Add link (${mod}${isMac ? "" : "+"}K)`}><LinkIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="link" className={menuItemClassName} onSelect={onAddLink}><LinkIcon className="w-4 h-4 stroke-[1.5]" />Add Link</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "wikilink",
-      toolbarEl: <ToolbarButton key="wikilink" onClick={() => editor.chain().focus().insertContent("[[").run()} isActive={false} title="Insert Wikilink"><BracketsIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="wikilink" onClick={() => editor.chain().focus().insertContent("[[").run()} isActive={false} title="Insert wikilink"><BracketsIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="wikilink" className={menuItemClassName} onSelect={() => editor.chain().focus().insertContent("[[").run()}><BracketsIcon className="w-4 h-4 stroke-[1.5]" />Wikilink</DropdownMenu.Item>,
     },
     {
       kind: "button", key: "image",
-      toolbarEl: <ToolbarButton key="image" onClick={onAddImage} isActive={false} title="Add Image"><ImageIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
+      toolbarEl: <ToolbarButton key="image" onClick={onAddImage} isActive={false} title="Add image"><ImageIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
       menuEl: <DropdownMenu.Item key="image" className={menuItemClassName} onSelect={onAddImage}><ImageIcon className="w-4 h-4 stroke-[1.5]" />Image</DropdownMenu.Item>,
     },
     { kind: "table", key: "table" },
@@ -438,7 +438,7 @@ function FormatBar({
         if (slot.kind === "table") {
           return (
             <DropdownMenu.Root key={slot.key} open={tableMenuOpen} onOpenChange={setTableMenuOpen}>
-              <Tooltip content="Insert Table">
+              <Tooltip content="Insert table">
                 <DropdownMenu.Trigger asChild>
                   <ToolbarButton isActive={editor.isActive("table")}>
                     <TableIcon className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -1315,8 +1315,8 @@ function EditorImpl({
                 <Tooltip
                   content={
                     effectiveSourceMode
-                      ? `View Formatted (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
-                      : `View Markdown Source (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
+                      ? `View formatted (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
+                      : `View markdown source (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}M)`
                   }
                 >
                   <IconButton onClick={toggleSourceMode}>
@@ -1373,10 +1373,10 @@ function EditorImpl({
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
               {onSaveToFolder && (
-                <Tooltip content="Save in Folder">
+                <Tooltip content="Save in folder">
                   <IconButton
                     onClick={onSaveToFolder}
-                    aria-label="Save in Folder"
+                    aria-label="Save in folder"
                     disabled={saveToFolderDisabled}
                   >
                     {saveToFolderDisabled ? (

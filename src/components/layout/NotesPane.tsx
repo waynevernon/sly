@@ -51,6 +51,7 @@ import {
   resolveFolderAppearanceIconColor,
   resolveFolderAppearanceTextColor,
 } from "../../lib/folderIcons";
+import { isMac, mod, shift } from "../../lib/platform";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
 import type { NoteSortMode } from "../../types/note";
 
@@ -394,14 +395,14 @@ export function NotesPane() {
                     }),
                   );
                 }}
-                title="Delete Selected Notes"
+                title="Delete selected notes"
                 variant="ghost"
               >
                 <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />
               </IconButton>
               <IconButton
                 onClick={clearNoteSelection}
-                title="Clear Selection"
+                title="Clear selection"
               >
                 <XIcon className="w-4.5 h-4.5 stroke-[1.5]" />
               </IconButton>
@@ -410,7 +411,7 @@ export function NotesPane() {
             <>
               {!searchQuery.trim() && (
                 <SortMenuButton
-                  title="Note List Options"
+                  title="Note list options"
                   menuTitle={sortMenuTitle}
                   showMenuHeader={showSortItems}
                   value={noteSortMode}
@@ -617,7 +618,8 @@ export function NotesPane() {
               )}
               <IconButton
                 onClick={toggleSearch}
-                title="Search Notes"
+                title={`Search notes (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}F)`}
+                aria-label="Search notes"
               >
                 {searchOpen ? (
                   <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
@@ -630,7 +632,8 @@ export function NotesPane() {
                 onClick={() => {
                   void createNote();
                 }}
-                title="New Note"
+                title={`New note (${mod}${isMac ? "" : "+"}N)`}
+                aria-label="New note"
               >
                 <FilePlusCorner className="w-4.75 h-4.75 stroke-[1.5]" />
               </IconButton>

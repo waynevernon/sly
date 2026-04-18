@@ -91,7 +91,7 @@ export function FoldersPane({
         )}
         <div className="ui-pane-header-actions">
           <SortMenuButton
-            title="Sort Folders"
+            title="Sort folders"
             value={folderSortMode}
             items={folderSortItems}
             onChange={(nextMode) => {
@@ -150,7 +150,7 @@ export function FoldersPane({
           </SortMenuButton>
           <IconButton
             variant="ghost"
-            title="New Folder"
+            title="New folder"
             onClick={() => {
               window.dispatchEvent(new CustomEvent("create-new-folder"));
             }}
