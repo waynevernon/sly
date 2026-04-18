@@ -42,7 +42,7 @@ describe("FoldersPane", () => {
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
   });
 
-  it("shows the pinned, recent, and note count toggles in the filter menu", async () => {
+  it("shows the pinned, recent, and note count toggles in the folders view menu", async () => {
     const user = userEvent.setup();
     const notesContext = await import("../../context/NotesContext");
     const setShowPinnedNotes = vi.fn();
@@ -63,9 +63,9 @@ describe("FoldersPane", () => {
       </TooltipProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Folder view options" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
 
-    expect(screen.getByText("Sections")).toBeInTheDocument();
+    expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.queryByRole("menuitemradio", { name: /Manual/i })).not.toBeInTheDocument();
 
     const pinnedToggle = screen.getByRole("menuitemcheckbox", {
@@ -74,7 +74,7 @@ describe("FoldersPane", () => {
     expect(pinnedToggle).toHaveAttribute("data-state", "checked");
 
     await user.click(pinnedToggle);
-    await user.click(screen.getByRole("button", { name: "Folder view options" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
 
     const toggle = screen.getByRole("menuitemcheckbox", {
       name: /Recent/i,
@@ -82,7 +82,7 @@ describe("FoldersPane", () => {
     expect(toggle).toHaveAttribute("data-state", "checked");
 
     await user.click(toggle);
-    await user.click(screen.getByRole("button", { name: "Folder view options" }));
+    await user.click(screen.getByRole("button", { name: "Sort folders" }));
     await user.click(screen.getByRole("menuitemcheckbox", { name: /Note Count/i }));
 
     expect(setShowPinnedNotes).toHaveBeenCalledWith(false);
