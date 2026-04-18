@@ -505,7 +505,10 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
         action_at: row.get("action_at")?,
         schedule_bucket: row.get("schedule_bucket")?,
         completed_at: row.get("completed_at")?,
-        starred: row.get::<_, i64>("starred").map(|v| v != 0).unwrap_or(false),
+        starred: row
+            .get::<_, i64>("starred")
+            .map(|v| v != 0)
+            .unwrap_or(false),
         due_at: row.get("due_at")?,
         recurrence: row.get("recurrence")?,
     })
@@ -888,16 +891,19 @@ pub(crate) fn delete_task(notes_root: &Path, id: &str) -> Result<()> {
 
 pub(crate) fn get_task_view_order(notes_root: &Path, view: &str) -> Result<Vec<String>> {
     let conn = open_tasks_db(notes_root)?;
-    let mut stmt = conn.prepare(
-        "SELECT task_id FROM task_view_order WHERE view = ?1 ORDER BY position ASC",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT task_id FROM task_view_order WHERE view = ?1 ORDER BY position ASC")?;
     let ids = stmt
         .query_map([view], |row| row.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(ids)
 }
 
-pub(crate) fn set_task_view_order(notes_root: &Path, view: &str, task_ids: &[String]) -> Result<()> {
+pub(crate) fn set_task_view_order(
+    notes_root: &Path,
+    view: &str,
+    task_ids: &[String],
+) -> Result<()> {
     let conn = open_tasks_db(notes_root)?;
     conn.execute("DELETE FROM task_view_order WHERE view = ?1", [view])?;
     for (i, id) in task_ids.iter().enumerate() {
@@ -1383,41 +1389,48 @@ mod tests {
     #[test]
     fn next_occurrence_daily_completion() {
         // base = today, so next = tomorrow
-        let result = compute_next_occurrence("2026-01-15", "daily:completion", "2026-01-15").unwrap();
+        let result =
+            compute_next_occurrence("2026-01-15", "daily:completion", "2026-01-15").unwrap();
         assert_eq!(result, "2026-01-16");
     }
 
     #[test]
     fn next_occurrence_weekday_skips_weekend() {
         // Friday → Monday
-        let result = compute_next_occurrence("2026-01-16", "weekday:schedule", "2026-01-14").unwrap();
+        let result =
+            compute_next_occurrence("2026-01-16", "weekday:schedule", "2026-01-14").unwrap();
         assert_eq!(result, "2026-01-19");
     }
 
     #[test]
     fn next_occurrence_monthly_schedule_preserves_anchor_31() {
         // Jan 31 → Feb 28 (2026 is not a leap year)
-        let r1 = compute_next_occurrence("2026-01-31", "monthly:schedule:31", "2026-01-14").unwrap();
+        let r1 =
+            compute_next_occurrence("2026-01-31", "monthly:schedule:31", "2026-01-14").unwrap();
         assert_eq!(r1, "2026-02-28");
         // Feb 28 → Mar 31 (anchor is 31, March has 31 days)
-        let r2 = compute_next_occurrence("2026-02-28", "monthly:schedule:31", "2026-02-14").unwrap();
+        let r2 =
+            compute_next_occurrence("2026-02-28", "monthly:schedule:31", "2026-02-14").unwrap();
         assert_eq!(r2, "2026-03-31");
         // Mar 31 → Apr 30 (anchor is 31, April has 30 days)
-        let r3 = compute_next_occurrence("2026-03-31", "monthly:schedule:31", "2026-03-14").unwrap();
+        let r3 =
+            compute_next_occurrence("2026-03-31", "monthly:schedule:31", "2026-03-14").unwrap();
         assert_eq!(r3, "2026-04-30");
     }
 
     #[test]
     fn next_occurrence_floors_to_tomorrow_when_behind() {
         // schedule mode, action_at was a month ago — result must be at least tomorrow
-        let result = compute_next_occurrence("2026-01-01", "weekly:schedule", "2026-03-01").unwrap();
+        let result =
+            compute_next_occurrence("2026-01-01", "weekly:schedule", "2026-03-01").unwrap();
         assert_eq!(result, "2026-03-02");
     }
 
     #[test]
     fn next_occurrence_yearly_handles_leap_year() {
         // Feb 29 in a non-leap year → Feb 28
-        let result = compute_next_occurrence("2024-02-29", "yearly:schedule", "2024-03-01").unwrap();
+        let result =
+            compute_next_occurrence("2024-02-29", "yearly:schedule", "2024-03-01").unwrap();
         assert_eq!(result, "2025-02-28");
     }
 
