@@ -347,6 +347,50 @@ describe("TaskDetailPanel", () => {
     });
   });
 
+  it("keeps showing the previous task while the next task is loading", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    let currentValue = makeTasksHookValue();
+
+    vi.mocked(tasksContext.useTasks).mockImplementation(() => currentValue);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Follow up")).toBeInTheDocument();
+
+    currentValue = makeTasksHookValue({
+      selectedTaskId: "task-2",
+      selectedTaskIds: ["task-2"],
+      isLoadingTask: true,
+      selectedTask: {
+        id: "task-1",
+        title: "Follow up",
+        description: "",
+        link: "",
+        waitingFor: "",
+        createdAt: "2026-04-10T12:00:00Z",
+        actionAt: null,
+        scheduleBucket: null,
+        completedAt: null,
+        starred: false,
+        dueAt: null,
+        recurrence: null,
+      },
+    });
+
+    rerender(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Follow up")).toBeInTheDocument();
+    expect(screen.queryByText("Loading task")).not.toBeInTheDocument();
+  });
+
   it("stars and unstars the task from the inline title action", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");

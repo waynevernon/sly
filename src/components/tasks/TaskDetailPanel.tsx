@@ -4,7 +4,6 @@ import {
   Clock3,
   ListTodo,
   ExternalLink,
-  LoaderCircle,
   Star,
   Trash2,
 } from "lucide-react";
@@ -39,7 +38,6 @@ export function TaskDetailPanel() {
   const {
     selectedTask,
     selectedTaskId,
-    isLoadingTask,
     tasks,
     updateTask,
     deleteTask,
@@ -206,7 +204,7 @@ export function TaskDetailPanel() {
   }, [selectedTask?.id, tasks]);
   const hasWaitingFor = waitingFor.trim().length > 0;
   const isCompleted = Boolean(selectedTask?.completedAt);
-  const showEmptyState = (isLoadingTask && selectedTaskId) || !selectedTaskId || !selectedTask;
+  const showEmptyState = !selectedTaskId || !selectedTask;
 
   const handleOpenLink = useCallback(async () => {
     if (!openableLink) return;
@@ -219,16 +217,6 @@ export function TaskDetailPanel() {
   }, [openableLink]);
 
   const renderBody = () => {
-    if (isLoadingTask && selectedTaskId) {
-      return (
-        <PanelEmptyState
-          icon={<LoaderCircle className="animate-spin" />}
-          title="Loading task"
-          message="Opening task details."
-        />
-      );
-    }
-
     if (!selectedTaskId || !selectedTask) {
       return (
         <PanelEmptyState
