@@ -1,4 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { lowlight } from "../editor/lowlight";
 import { useTheme } from "../../context/ThemeContext";
 import {
   CODE_FONT_PRESET_IDS,
@@ -21,6 +22,28 @@ import type {
   ThemeMode,
 } from "../../types/note";
 import { EyeIcon, MinusIcon, PlusIcon } from "../icons";
+
+type HastNode = { type: string; value?: string; tagName?: string; properties?: { className?: string[] }; children?: HastNode[] };
+
+function hastToReact(nodes: HastNode[]): ReactNode[] {
+  return nodes.map((node, i) => {
+    if (node.type === "text") return node.value;
+    if (node.type === "element") {
+      const cls = node.properties?.className?.join(" ");
+      return <span key={i} className={cls}>{hastToReact(node.children ?? [])}</span>;
+    }
+    return null;
+  });
+}
+
+const PREVIEW_CODE = `function buildGreatDay() {
+  while (sly.hasEnergy()) {
+    walk();
+    train();
+    if (field.hasDisc()) sprint();
+  }
+  settle();
+}`;
 
 const textDirectionOptions: { value: TextDirection; label: string }[] = [
   { value: "auto", label: "Auto" },
@@ -577,14 +600,7 @@ export function AppearanceSettingsSection() {
 
               <pre>
                 <code>
-                  {`function buildGreatDay() {
-  while (sly.hasEnergy()) {
-    walk();
-    train();
-    if (field.hasDisc()) sprint();
-  }
-  settle();
-}`}
+                  {hastToReact(lowlight.highlight("javascript", PREVIEW_CODE).children as HastNode[])}
                 </code>
               </pre>
 
