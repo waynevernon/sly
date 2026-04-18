@@ -1,8 +1,9 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Input } from "./Input";
-import { PopoverSurface } from "./PopoverSurface";
+import { MenuSurface } from "./MenuSurface";
 
 interface PopoverTextEditorProps {
   open: boolean;
@@ -45,9 +46,16 @@ export function PopoverTextEditor({
   renderAuxiliaryContent,
 }: PopoverTextEditorProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+  const popoverRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [draft, setDraft] = React.useState(value);
   const [activeIndex, setActiveIndex] = React.useState(-1);
+  const [position, setPosition] = React.useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const filteredSuggestions = React.useMemo(() => {
     const query = draft.trim().toLocaleLowerCase();
@@ -89,6 +97,7 @@ export function PopoverTextEditor({
     if (!open) {
       setDraft(value);
       setActiveIndex(-1);
+      setPosition(null);
       return;
     }
 
@@ -106,11 +115,44 @@ export function PopoverTextEditor({
   React.useEffect(() => {
     if (!open) return;
 
+    const updatePosition = () => {
+      const triggerRect = triggerRef.current?.getBoundingClientRect();
+      if (!triggerRect) return;
+
+      const width = Math.min(384, Math.max(240, window.innerWidth - 32));
+      const left = Math.min(
+        Math.max(16, triggerRect.left),
+        Math.max(16, window.innerWidth - width - 16),
+      );
+
+      setPosition({
+        top: triggerRect.bottom + 8,
+        left,
+        width,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
     const handlePointerDown = (event: PointerEvent) => {
       if (isSubmitting) return;
 
       const target = event.target as Node;
-      if (rootRef.current?.contains(target)) {
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) {
         return;
       }
 
@@ -168,85 +210,97 @@ export function PopoverTextEditor({
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      {renderTrigger({
-        open,
-        openEditor: () => onOpenChange(true),
-      })}
+      <div ref={triggerRef}>
+        {renderTrigger({
+          open,
+          openEditor: () => onOpenChange(true),
+        })}
+      </div>
 
-      {open ? (
-        <PopoverSurface
-          className={cn(
-            "absolute left-0 top-[calc(100%+8px)] z-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden p-0",
-            popoverClassName,
-          )}
-        >
-          <div className="flex items-center justify-between px-3.5 py-2.5">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
-              <span className="shrink-0">{icon}</span>
-              <span className="truncate">{title}</span>
-            </div>
-            <button
-              type="button"
-              onClick={cancelAndClose}
-              disabled={isSubmitting}
-              className="ui-focus-ring inline-flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-              aria-label={`Close ${title.toLocaleLowerCase()}`}
-            >
-              <X className="h-3.5 w-3.5 stroke-[1.7]" />
-            </button>
-          </div>
-
-          <div className="border-t border-border/50 px-3.5 py-3">
-            <Input
-              ref={inputRef}
-              value={draft}
-              placeholder={placeholder}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleInputKeyDown}
-              disabled={isSubmitting}
+      {open && position && typeof document !== "undefined"
+        ? createPortal(
+            <MenuSurface
+              ref={popoverRef}
+              style={{
+                position: "fixed",
+                top: position.top,
+                left: position.left,
+                width: position.width,
+              }}
               className={cn(
-                "h-11 border-border/70 bg-bg px-3 text-base text-text placeholder:text-text-muted",
-                inputClassName,
+                "z-50 animate-slide-down overflow-hidden p-0",
+                popoverClassName,
               )}
-            />
-            {renderAuxiliaryContent ? (
-              <div className="mt-2.5">
-                {renderAuxiliaryContent({ draft, setDraft })}
+            >
+              <div className="flex items-center justify-between px-3.5 py-2.5">
+                <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
+                  <span className="shrink-0">{icon}</span>
+                  <span className="truncate">{title}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelAndClose}
+                  disabled={isSubmitting}
+                  className="ui-focus-ring inline-flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                  aria-label={`Close ${title.toLocaleLowerCase()}`}
+                >
+                  <X className="h-3.5 w-3.5 stroke-[1.7]" />
+                </button>
               </div>
-            ) : null}
-          </div>
 
-          {filteredSuggestions.length > 0 ? (
-            <div className="border-t border-border/50 p-1.5">
-              <div className="flex flex-col gap-1">
-                {filteredSuggestions.map((suggestion, index) => {
-                  const isActive = index === activeIndex;
-
-                  return (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onMouseEnter={() => setActiveIndex(index)}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => void commitAndClose(suggestion)}
-                      disabled={isSubmitting}
-                      className={cn(
-                        "ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-1.5 text-left text-sm text-text transition-colors",
-                        isActive ? "bg-bg-muted" : "hover:bg-bg-muted",
-                      )}
-                    >
-                      {suggestionIcon ? (
-                        <span className="shrink-0 text-text-muted">{suggestionIcon}</span>
-                      ) : null}
-                      <span className="truncate">{suggestion}</span>
-                    </button>
-                  );
-                })}
+              <div className="border-t border-border/50 px-3.5 py-3">
+                <Input
+                  ref={inputRef}
+                  value={draft}
+                  placeholder={placeholder}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  disabled={isSubmitting}
+                  className={cn(
+                    "h-11 border-border/70 bg-bg px-3 text-base text-text placeholder:text-text-muted",
+                    inputClassName,
+                  )}
+                />
+                {renderAuxiliaryContent ? (
+                  <div className="mt-2.5">
+                    {renderAuxiliaryContent({ draft, setDraft })}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ) : null}
-        </PopoverSurface>
-      ) : null}
+
+              {filteredSuggestions.length > 0 ? (
+                <div className="border-t border-border/50 p-1.5">
+                  <div className="flex flex-col gap-1">
+                    {filteredSuggestions.map((suggestion, index) => {
+                      const isActive = index === activeIndex;
+
+                      return (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => void commitAndClose(suggestion)}
+                          disabled={isSubmitting}
+                          className={cn(
+                            "ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-1.5 text-left text-sm text-text transition-colors",
+                            isActive ? "bg-bg-muted" : "hover:bg-bg-muted",
+                          )}
+                        >
+                          {suggestionIcon ? (
+                            <span className="shrink-0 text-text-muted">{suggestionIcon}</span>
+                          ) : null}
+                          <span className="truncate">{suggestion}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </MenuSurface>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

@@ -319,36 +319,30 @@ export function TaskDetailPanel() {
 
           <div />
           <div className="space-y-1">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-text-muted">
-                Link
-              </div>
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleOpenLink()}
-                disabled={!openableLink}
-                aria-hidden={!openableLink}
-                tabIndex={openableLink ? 0 : -1}
-                className={cn(
-                  "ui-focus-ring inline-flex items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 py-1 text-xs text-text-muted transition-colors",
-                  openableLink
-                    ? "hover:bg-bg-muted hover:text-text"
-                    : "pointer-events-none invisible",
-                )}
-              >
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>Open Link</span>
-              </button>
+            <div className="text-sm text-text-muted">
+              Link
             </div>
-            <input
-              type="text"
-              value={link}
-              placeholder="Add link…"
-              onChange={handleLinkChange}
-              onBlur={flushSave}
-              className="w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={link}
+                placeholder="Add link…"
+                onChange={handleLinkChange}
+                onBlur={flushSave}
+                className="w-full bg-transparent pr-8 text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              />
+              {openableLink ? (
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => void handleOpenLink()}
+                  aria-label="Open link"
+                  className="ui-focus-ring absolute top-1/2 right-0 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div />
