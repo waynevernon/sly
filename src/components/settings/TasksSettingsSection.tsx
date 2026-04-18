@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNotes } from "../../context/NotesContext";
 import {
-  acceleratorToLabel,
   captureAcceleratorFromEvent,
   getDefaultAccelerator,
   getTaskQuickAddShortcutLabel,
