@@ -28,6 +28,10 @@ import { shouldParseMarkdownPaste } from "./markdownPaste";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
 import { computeFormatBarLayout } from "./formatBarLayout";
+import {
+  MarkdownSourceEditor,
+  type MarkdownSourceEditorHandle,
+} from "./MarkdownSourceEditor";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -671,6 +675,7 @@ function EditorImpl({
     setSourceModeWordWrap,
     textDirection,
   } = useTheme();
+  const [sourceModeSyntaxHighlight, setSourceModeSyntaxHighlight] = useState(true);
   const [editorReady, setEditorReady] = useState(false);
   // Force re-render when selection changes to update toolbar active states
   const [, setSelectionKey] = useState(0);
@@ -689,7 +694,7 @@ function EditorImpl({
   const navigationVisible = effectivePaneMode > 1;
   const needsPaneDelay = focusMode && paneMode > 1;
 
-  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const sourceEditorRef = useRef<MarkdownSourceEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<TiptapEditor | null>(null);
   const currentNoteIdRef = useRef<string | null>(null);
@@ -747,8 +752,7 @@ function EditorImpl({
     renameNote,
     saveNote,
     scrollContainerRef,
-    sourceTextareaLayoutKey: sourceModeWordWrap,
-    sourceTextareaRef,
+    sourceEditorRef,
   });
 
   const { closeLinkPopover, handleAddLink } = useLinkPopover({
@@ -1234,6 +1238,19 @@ function EditorImpl({
                   >
                     <WrapText className="w-4.5 h-4.5 stroke-[1.5]" />
                   </ToolbarButton>
+                  <ToolbarButton
+                    onClick={() =>
+                      setSourceModeSyntaxHighlight((enabled) => !enabled)
+                    }
+                    isActive={sourceModeSyntaxHighlight}
+                    title={
+                      sourceModeSyntaxHighlight
+                        ? "Turn Syntax Highlighting Off"
+                        : "Turn Syntax Highlighting On"
+                    }
+                  >
+                    <CodeIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+                  </ToolbarButton>
                 </div>
               ) : (
                 <FormatBar
@@ -1409,27 +1426,26 @@ function EditorImpl({
           dir={textDirection}
         >
           {effectiveSourceMode ? (
-            /* Markdown source textarea */
+            /* Markdown source editor */
             <div className="h-full">
-              <textarea
-                ref={sourceTextareaRef}
-                value={sourceContent}
-                onChange={(e) => handleSourceChange(e.target.value)}
-                dir={textDirection}
-                wrap={sourceModeWordWrap ? "soft" : "off"}
-                className="block w-full resize-none overflow-hidden bg-transparent px-6 pt-8 pb-24 text-text outline-none"
+              <div
+                className="min-h-full px-6 pt-8 pb-24"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",
                   minHeight: "100%",
                   marginLeft: "auto",
                   marginRight: "auto",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "var(--editor-base-font-size)",
-                  lineHeight: "var(--editor-line-height)",
-                  tabSize: 2,
                 }}
-                spellCheck={false}
-              />
+              >
+                <MarkdownSourceEditor
+                  ref={sourceEditorRef}
+                  value={sourceContent}
+                  onChange={handleSourceChange}
+                  textDirection={textDirection}
+                  wordWrap={sourceModeWordWrap}
+                  syntaxHighlightingEnabled={sourceModeSyntaxHighlight}
+                />
+              </div>
             </div>
           ) : (
             <>

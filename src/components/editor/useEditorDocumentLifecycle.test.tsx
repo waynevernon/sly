@@ -76,7 +76,7 @@ describe("useEditorDocumentLifecycle", () => {
         saveNote,
         notesFolder: null,
         scrollContainerRef: { current: null },
-        sourceTextareaRef: { current: null },
+        sourceEditorRef: { current: null },
       }),
     );
 
@@ -153,7 +153,7 @@ describe("useEditorDocumentLifecycle", () => {
           saveNote,
           notesFolder: null,
           scrollContainerRef: { current: null },
-          sourceTextareaRef: { current: null },
+          sourceEditorRef: { current: null },
         }),
       {
         initialProps: {

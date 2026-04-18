@@ -18,6 +18,7 @@ import {
   toDisplayDocumentAssetPaths,
   toStoredDocumentAssetPaths,
 } from "../../lib/assetPaths";
+import type { MarkdownSourceEditorHandle } from "./MarkdownSourceEditor";
 
 interface DocumentNote {
   id: string;
@@ -43,8 +44,7 @@ interface UseEditorDocumentLifecycleOptions {
   saveNote: (content: string, noteId?: string) => Promise<void>;
   notesFolder: string | null;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
-  sourceTextareaLayoutKey?: unknown;
-  sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
+  sourceEditorRef: MutableRefObject<MarkdownSourceEditorHandle | null>;
 }
 
 function isDuplicateDraftTitle(title: string): boolean {
@@ -112,8 +112,7 @@ export function useEditorDocumentLifecycle({
   saveNote,
   notesFolder,
   scrollContainerRef,
-  sourceTextareaLayoutKey,
-  sourceTextareaRef,
+  sourceEditorRef,
 }: UseEditorDocumentLifecycleOptions) {
   const [isSaving, setIsSaving] = useState(false);
   const [sourceMode, setSourceMode] = useState(false);
@@ -163,19 +162,6 @@ export function useEditorDocumentLifecycle({
     },
     [notesFolder],
   );
-
-  const syncSourceTextareaHeight = useCallback(() => {
-    const textarea = sourceTextareaRef.current;
-    const scrollContainer = scrollContainerRef.current;
-    if (!textarea || !scrollContainer) return;
-
-    textarea.style.height = "0px";
-    const nextHeight = Math.max(
-      textarea.scrollHeight,
-      scrollContainer.clientHeight,
-    );
-    textarea.style.height = `${nextHeight}px`;
-  }, [scrollContainerRef, sourceTextareaRef]);
 
   const saveImmediately = useCallback(
     async (noteId: string, content: string) => {
@@ -317,16 +303,14 @@ export function useEditorDocumentLifecycle({
       return;
     }
 
-    const textarea = sourceTextareaRef.current ??
-      (container?.querySelector("textarea") as HTMLTextAreaElement | null);
     let topBlockIndex = 0;
     let cursorBlockIndex = 0;
+    const sourceEditor = sourceEditorRef.current;
 
-    if (textarea) {
+    if (sourceEditor) {
       const blockOffsets = getMarkdownBlockOffsets(sourceContent);
-      const lineHeight =
-        Number.parseFloat(getComputedStyle(textarea).lineHeight) || 20;
-      const topLine = Math.floor(textarea.scrollTop / lineHeight);
+      const lineHeight = sourceEditor.getLineHeight();
+      const topLine = Math.floor((container?.scrollTop ?? 0) / lineHeight);
       const lines = sourceContent.split("\n");
       let charOffset = 0;
 
@@ -336,7 +320,9 @@ export function useEditorDocumentLifecycle({
 
       for (let i = 0; i < blockOffsets.length; i++) {
         if (blockOffsets[i] <= charOffset) topBlockIndex = i;
-        if (blockOffsets[i] <= textarea.selectionStart) cursorBlockIndex = i;
+        if (blockOffsets[i] <= sourceEditor.getSelectionStart()) {
+          cursorBlockIndex = i;
+        }
       }
     }
 
@@ -361,7 +347,7 @@ export function useEditorDocumentLifecycle({
     parseEditorContent,
     scrollContainerRef,
     sourceContent,
-    sourceTextareaRef,
+    sourceEditorRef,
   ]);
 
   const handleSourceChange = useCallback(
@@ -412,11 +398,8 @@ export function useEditorDocumentLifecycle({
     const container = scrollContainerRef.current;
 
     if (sourceMode) {
-      const textarea = sourceTextareaRef.current ??
-        (container?.querySelector("textarea") as HTMLTextAreaElement | null);
-      if (!textarea) return () => {};
-
-      syncSourceTextareaHeight();
+      const sourceEditor = sourceEditorRef.current;
+      if (!sourceEditor || !container) return () => {};
 
       const md = transition.md ?? "";
       const blockOffsets = getMarkdownBlockOffsets(md);
@@ -425,15 +408,13 @@ export function useEditorDocumentLifecycle({
           ? blockOffsets[transition.cursorBlockIndex]
           : md.length;
 
-      textarea.setSelectionRange(cursorPos, cursorPos);
-      textarea.focus();
+      sourceEditor.setSelectionStart(cursorPos);
+      sourceEditor.focus();
 
       if (transition.topBlockIndex < blockOffsets.length) {
         const charOffset = blockOffsets[transition.topBlockIndex];
         const linesBefore = md.slice(0, charOffset).split("\n").length - 1;
-        const lineHeight =
-          Number.parseFloat(getComputedStyle(textarea).lineHeight) || 20;
-        textarea.scrollTop = linesBefore * lineHeight;
+        container.scrollTop = linesBefore * sourceEditor.getLineHeight();
       }
     } else if (currentEditor) {
       rafId = requestAnimationFrame(() => {
@@ -469,37 +450,7 @@ export function useEditorDocumentLifecycle({
     editorRef,
     scrollContainerRef,
     sourceMode,
-    sourceTextareaRef,
-    syncSourceTextareaHeight,
-  ]);
-
-  useEffect(() => {
-    if (!sourceMode) return;
-
-    syncSourceTextareaHeight();
-
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      syncSourceTextareaHeight();
-    });
-
-    resizeObserver.observe(scrollContainer);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [scrollContainerRef, sourceMode, syncSourceTextareaHeight]);
-
-  useEffect(() => {
-    if (!sourceMode) return;
-    syncSourceTextareaHeight();
-  }, [
-    sourceContent,
-    sourceMode,
-    sourceTextareaLayoutKey,
-    syncSourceTextareaHeight,
+    sourceEditorRef,
   ]);
 
   useEffect(() => {
