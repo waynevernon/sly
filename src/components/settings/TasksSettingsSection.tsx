@@ -81,15 +81,15 @@ export function TasksSettingsSection() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-4 border-t border-border/60 pt-6">
+      <section className="flex items-start justify-between gap-6 border-t border-border/60 pt-6">
         <div className="flex flex-col gap-0.75">
-          <h3 className="text-base font-medium">Global Quick Add Shortcut</h3>
-          <p className="text-sm text-text-muted max-w-xl">
+          <h2 className="text-xl font-medium">Global Quick Add Shortcut</h2>
+          <p className="text-sm text-text-muted max-w-lg">
             When Sly is already running, this shortcut brings the app forward and opens the
-            existing quick task add dialog.
+            quick task add dialog.
           </p>
           {showConflictWarning ? (
-            <p className="text-xs text-text-muted max-w-xl">
+            <p className="text-xs text-text-muted max-w-lg mt-1">
               <code className="font-mono text-[11px]">Control+Space</code> can conflict with
               macOS input-source shortcuts. If it does, change it here or free it in System
               Settings.
@@ -97,57 +97,48 @@ export function TasksSettingsSection() {
           ) : null}
         </div>
 
-        {isRecording ? (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 h-[var(--ui-control-height-compact)] px-3 rounded-md border border-accent bg-accent/10 text-xs text-accent animate-pulse min-w-32">
-              Press shortcut keys&hellip;
-            </div>
-            <Button size="xs" variant="ghost" onClick={stopRecording}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            {isDisabled ? (
-              <Button
-                size="xs"
-                variant="default"
-                onClick={() => void setTaskQuickAddShortcut(null)}
-              >
-                Enable
+        <div className="flex items-center gap-2 shrink-0">
+          {isRecording ? (
+            <>
+              <div className="flex items-center h-[var(--ui-control-height-sm)] px-3 rounded-md border border-accent bg-accent/10 text-xs text-accent animate-pulse min-w-32">
+                Press shortcut keys&hellip;
+              </div>
+              <Button size="xs" variant="ghost" onClick={stopRecording}>
+                Cancel
               </Button>
-            ) : (
-              <>
-                <button
-                  className="inline-flex items-center gap-1.5 h-[var(--ui-control-height-compact)] px-2.5 rounded-md border border-border bg-bg-muted hover:bg-bg-emphasis text-xs font-mono cursor-pointer transition-colors"
-                  onClick={() => setIsRecording(true)}
-                  title="Click to change shortcut"
-                >
-                  {currentLabel}
-                  <span className="text-text-muted text-[10px] font-sans not-italic">
-                    ✎
-                  </span>
-                </button>
-                {!isDefault && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => void setTaskQuickAddShortcut(null)}
-                  >
-                    Reset to {acceleratorToLabel(getDefaultAccelerator())}
-                  </Button>
-                )}
+            </>
+          ) : isDisabled ? (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => void setTaskQuickAddShortcut(null)}
+            >
+              Enable
+            </Button>
+          ) : (
+            <>
+              <Button size="xs" variant="outline" onClick={() => setIsRecording(true)}>
+                {currentLabel}
+              </Button>
+              {!isDefault && (
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={() => void setTaskQuickAddShortcut("disabled")}
+                  onClick={() => void setTaskQuickAddShortcut(null)}
                 >
-                  Disable
+                  Reset
                 </Button>
-              </>
-            )}
-          </div>
-        )}
+              )}
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => void setTaskQuickAddShortcut("disabled")}
+              >
+                Disable
+              </Button>
+            </>
+          )}
+        </div>
       </section>
     </div>
   );
