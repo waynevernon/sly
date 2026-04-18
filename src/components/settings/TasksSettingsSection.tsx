@@ -1,39 +1,21 @@
 import { useNotes } from "../../context/NotesContext";
-import {
-  DEFAULT_TASK_QUICK_ADD_SHORTCUT,
-  getTaskQuickAddShortcutLabel,
-} from "../../lib/taskQuickAddShortcut";
+import { getTaskQuickAddShortcutLabel } from "../../lib/taskQuickAddShortcut";
 import { isMac } from "../../lib/platform";
 import { Button } from "../ui";
 
 export function TasksSettingsSection() {
   const { settings, setTasksEnabled, setTaskQuickAddShortcut } = useNotes();
   const configuredShortcut = settings?.taskQuickAddShortcut ?? null;
-  const shortcutOptions = isMac
-    ? [
-        {
-          value: null,
-          label: `Default (${getTaskQuickAddShortcutLabel(null)})`,
-        },
-        {
-          value: "command-shift-n" as const,
-          label: getTaskQuickAddShortcutLabel("command-shift-n"),
-        },
-        {
-          value: "disabled" as const,
-          label: "Off",
-        },
-      ]
-    : [
-        {
-          value: null,
-          label: `Default (${getTaskQuickAddShortcutLabel(DEFAULT_TASK_QUICK_ADD_SHORTCUT)})`,
-        },
-        {
-          value: "disabled" as const,
-          label: "Off",
-        },
-      ];
+  const shortcutOptions = [
+    {
+      value: null,
+      label: `Default (${getTaskQuickAddShortcutLabel(null)})`,
+    },
+    {
+      value: "disabled" as const,
+      label: "Off",
+    },
+  ];
 
   return (
     <div className="space-y-10 pt-8 pb-10">
@@ -75,8 +57,8 @@ export function TasksSettingsSection() {
           {isMac ? (
             <p className="text-xs text-text-muted max-w-xl">
               <code className="font-mono text-[11px]">Control+Space</code> can conflict with
-              macOS input-source shortcuts. If it does, pick the alternate shortcut here or free
-              it in System Settings.
+              macOS input-source shortcuts. If it does, turn it off here or free it in System
+              Settings.
             </p>
           ) : null}
         </div>
