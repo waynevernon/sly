@@ -83,7 +83,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, "\\"],
+    keys: [mod, shift, "["],
     description: "Cycle workspace layout",
     category: "Navigation",
   },
@@ -103,7 +103,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Navigation",
   },
   {
-    keys: [mod, alt, "4"],
+    keys: [mod, shift, "]"],
     description: "Toggle Right Pane",
     category: "Navigation",
   },

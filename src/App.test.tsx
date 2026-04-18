@@ -534,22 +534,32 @@ describe("App", () => {
     expect(tasksState.deleteTask).toHaveBeenNthCalledWith(2, "task-2");
   });
 
-  it("toggles the right pane with Cmd/Ctrl+Alt+4", () => {
+  it("toggles the right pane with Cmd/Ctrl+Shift+]", () => {
     render(<App />);
 
-    fireEvent.keyDown(window, { key: "4", metaKey: true, altKey: true });
+    fireEvent.keyDown(window, {
+      key: "}",
+      code: "BracketRight",
+      metaKey: true,
+      shiftKey: true,
+    });
 
     expect(themeState.setRightPanelVisible).toHaveBeenCalledWith(false);
   });
 
-  it("does not toggle the right pane with Cmd/Ctrl+Alt+4 in task mode", () => {
+  it("does not toggle the right pane with Cmd/Ctrl+Shift+] in task mode", () => {
     notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
 
-    fireEvent.keyDown(window, { key: "4", metaKey: true, altKey: true });
+    fireEvent.keyDown(window, {
+      key: "}",
+      code: "BracketRight",
+      metaKey: true,
+      shiftKey: true,
+    });
 
     expect(themeState.setRightPanelVisible).not.toHaveBeenCalled();
   });
@@ -577,7 +587,12 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
-    fireEvent.keyDown(window, { key: "\\", metaKey: true });
+    fireEvent.keyDown(window, {
+      key: "{",
+      code: "BracketLeft",
+      metaKey: true,
+      shiftKey: true,
+    });
 
     expect(themeState.setPaneMode).toHaveBeenCalledWith(3);
   });

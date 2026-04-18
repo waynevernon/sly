@@ -5550,7 +5550,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let cycle_left_panes_item =
         MenuItemBuilder::with_id(MENU_CYCLE_LEFT_PANES_ID, "Cycle Left Panes")
-            .accelerator("CmdOrCtrl+\\")
+            .accelerator("CmdOrCtrl+Shift+[")
             .build(app)?;
     let one_pane_item = MenuItemBuilder::with_id(MENU_VIEW_1_PANE_ID, "1 Pane")
         .accelerator("CmdOrCtrl+Shift+J")
@@ -5563,7 +5563,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let right_pane_item =
         MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Right Pane")
-            .accelerator("CmdOrCtrl+Alt+4")
+            .accelerator("CmdOrCtrl+Shift+]")
             .build(app)?;
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")

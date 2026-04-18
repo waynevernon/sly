@@ -51,7 +51,7 @@ import type {
   AssistantThreadState,
   AssistantTurn,
 } from "./types/assistant";
-import { alt, isMac, mod, shortcut } from "./lib/platform";
+import { alt, isMac, mod, shift, shortcut } from "./lib/platform";
 import { matchesInAppTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
@@ -369,7 +369,7 @@ function TitlebarPaneSwitch({
         <div className="ui-titlebar-control-cluster titlebar-no-drag flex items-center gap-2">
           <IconButton
             onClick={onCyclePaneMode}
-            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(nextPaneMode)} (${mod}${isMac ? "" : "+"}\\)`}
+            title={`Workspace layout: ${formatPaneModeLabel(paneMode)}. Next: ${formatPaneModeLabel(nextPaneMode)} (${shortcut(mod, shift, "[")})`}
             className="shrink-0"
           >
             <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />
@@ -386,7 +386,7 @@ function TitlebarPaneSwitch({
               onClick={onToggleRightPanel}
               title={`${
                 rightPanelVisible ? "Hide" : "Show"
-              } right pane (${shortcut(mod, alt, "4")})`}
+              } right pane (${shortcut(mod, shift, "]")})`}
               aria-label={rightPanelVisible ? "Hide right pane" : "Show right pane"}
               className="shrink-0"
             >
@@ -1376,8 +1376,13 @@ function AppContent() {
         return;
       }
 
-      // Cmd/Ctrl+Alt+4 - Toggle right pane
-      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === "4") {
+      // Cmd/Ctrl+Shift+] - Toggle right pane
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        e.code === "BracketRight"
+      ) {
         e.preventDefault();
         toggleRightPanel();
         return;
@@ -1492,8 +1497,13 @@ function AppContent() {
         return;
       }
 
-      // Cmd+\ - Cycle pane layout
-      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+      // Cmd/Ctrl+Shift+[ - Cycle left pane layout
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        e.code === "BracketLeft"
+      ) {
         e.preventDefault();
         cycleWorkspacePaneMode();
         return;
