@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   useState,
@@ -26,6 +27,7 @@ import { isAllowedUrlScheme, normalizeUrl } from "./linkUtils";
 import { shouldParseMarkdownPaste } from "./markdownPaste";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
+import { computeFormatBarLayout } from "./formatBarLayout";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useOptionalNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -202,34 +204,21 @@ function FormatBar({
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(9999);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  if (!editor) return null;
-
-  // Width per slot including the 4px gap that follows it in the flex container
-  const ITEM_W = 32; // 28px button + 4px gap
-  const SEP_W = 21;  // mx-2 (8+8) + 1px border + 4px gap
-  const OVF_W = 32;  // overflow button same size as regular item
-  // ResizeObserver contentRect.width is already the inner content area (excludes
-  // the px-4 padding), so no additional padding offset is needed here.
-  const PADDING = 0;
+  const measureRowRef = useRef<HTMLDivElement>(null);
+  const overflowMeasureRef = useRef<HTMLDivElement>(null);
+  const [layoutMetrics, setLayoutMetrics] = useState<{
+    availableWidth: number;
+    gap: number;
+    overflowTriggerWidth: number;
+    slotWidths: Record<string, number>;
+  } | null>(null);
 
   type Slot =
     | { kind: "button"; key: string; toolbarEl: ReactNode; menuEl: ReactNode }
     | { kind: "table"; key: string }
     | { kind: "sep"; key: string };
 
-  const allSlots: Slot[] = [
+  const allSlots: Slot[] = editor ? [
     {
       kind: "button", key: "bold",
       toolbarEl: <ToolbarButton key="bold" onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title={`Bold (${mod}${isMac ? "" : "+"}B)`}><BoldIcon className="w-4.5 h-4.5 stroke-[1.5]" /></ToolbarButton>,
@@ -324,25 +313,81 @@ function FormatBar({
       menuEl: <DropdownMenu.Item key="image" className={menuItemClassName} onSelect={onAddImage}><ImageIcon className="w-4 h-4 stroke-[1.5]" />Image</DropdownMenu.Item>,
     },
     { kind: "table", key: "table" },
-  ];
+  ] : [];
+
+  useLayoutEffect(() => {
+    const containerEl = containerRef.current;
+    const measureRowEl = measureRowRef.current;
+    const overflowMeasureEl = overflowMeasureRef.current;
+    if (!containerEl || !measureRowEl || !overflowMeasureEl) return;
+
+    const updateLayoutMetrics = () => {
+      const containerStyles = window.getComputedStyle(containerEl);
+      const availableWidth = Math.max(
+        0,
+        containerEl.clientWidth
+          - Number.parseFloat(containerStyles.paddingLeft || "0")
+          - Number.parseFloat(containerStyles.paddingRight || "0"),
+      );
+      const measureStyles = window.getComputedStyle(measureRowEl);
+      const gap = Number.parseFloat(measureStyles.columnGap || measureStyles.gap || "0");
+      const slotWidths: Record<string, number> = {};
+
+      Array.from(measureRowEl.children).forEach((child) => {
+        if (!(child instanceof HTMLElement)) return;
+        const slotKey = child.dataset.slotKey;
+        if (!slotKey) return;
+        slotWidths[slotKey] = child.offsetWidth;
+      });
+
+      setLayoutMetrics((previous) => {
+        const overflowTriggerWidth = overflowMeasureEl.offsetWidth;
+
+        if (
+          previous &&
+          previous.availableWidth === availableWidth &&
+          previous.gap === gap &&
+          previous.overflowTriggerWidth === overflowTriggerWidth &&
+          Object.keys(previous.slotWidths).length === Object.keys(slotWidths).length &&
+          Object.entries(slotWidths).every(
+            ([key, width]) => previous.slotWidths[key] === width,
+          )
+        ) {
+          return previous;
+        }
+
+        return {
+          availableWidth,
+          gap,
+          overflowTriggerWidth,
+          slotWidths,
+        };
+      });
+    };
+
+    updateLayoutMetrics();
+
+    const observer = new ResizeObserver(() => {
+      updateLayoutMetrics();
+    });
+
+    observer.observe(containerEl);
+    observer.observe(measureRowEl);
+    observer.observe(overflowMeasureEl);
+
+    return () => observer.disconnect();
+  }, [allSlots.length]);
 
   // Compute overflow split
-  const totalW = allSlots.reduce((sum, s) => sum + (s.kind === "sep" ? SEP_W : ITEM_W), 0) - 4;
-  const availableW = Math.max(0, containerWidth - PADDING);
-  const allFit = totalW <= availableW;
-
-  let splitAt = allSlots.length;
-  if (!allFit) {
-    const budget = availableW - OVF_W;
-    let acc = 0;
-    splitAt = 0;
-    for (let i = 0; i < allSlots.length; i++) {
-      const w = allSlots[i].kind === "sep" ? SEP_W : ITEM_W;
-      if (acc + w > budget) break;
-      acc += w;
-      splitAt = i + 1;
-    }
-  }
+  const { allFit, splitAt } = layoutMetrics
+    ? computeFormatBarLayout({
+        slots: allSlots,
+        slotWidths: layoutMetrics.slotWidths,
+        availableWidth: layoutMetrics.availableWidth,
+        overflowTriggerWidth: layoutMetrics.overflowTriggerWidth,
+        gap: layoutMetrics.gap,
+      })
+    : { allFit: true, splitAt: allSlots.length };
 
   const visibleSlots = allFit ? allSlots : allSlots.slice(0, splitAt);
   const overflowSlots = allFit ? [] : allSlots.slice(splitAt);
@@ -352,8 +397,40 @@ function FormatBar({
     visibleSlots.pop();
   }
 
+  if (!editor) return null;
+
   return (
-    <div ref={containerRef} className="flex items-center gap-1 px-4 overflow-hidden flex-1 min-w-0">
+    <div ref={containerRef} className="relative flex items-center gap-1 px-4 overflow-hidden flex-1 min-w-0">
+      <div
+        ref={measureRowRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0 top-0 invisible flex w-max items-center gap-1 px-4"
+      >
+        {allSlots.map((slot) => (
+          <div key={slot.key} data-slot-key={slot.key} className="shrink-0">
+            {slot.kind === "sep" ? (
+              <div className="w-px h-4.5 border-l border-border mx-2 shrink-0" />
+            ) : (
+              <ToolbarButton isActive={false}>
+                {slot.kind === "table" ? (
+                  <TableIcon className="w-4.5 h-4.5 stroke-[1.5]" />
+                ) : (
+                  <MoreHorizontal className="w-4.5 h-4.5 stroke-[1.5] opacity-0" />
+                )}
+              </ToolbarButton>
+            )}
+          </div>
+        ))}
+      </div>
+      <div
+        ref={overflowMeasureRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0 top-0 invisible"
+      >
+        <ToolbarButton isActive={false}>
+          <MoreHorizontal className="w-4.5 h-4.5 stroke-[1.5]" />
+        </ToolbarButton>
+      </div>
       {visibleSlots.map((slot) => {
         if (slot.kind === "sep") {
           return <div key={slot.key} className="w-px h-4.5 border-l border-border mx-2 shrink-0" />;
