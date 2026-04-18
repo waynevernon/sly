@@ -6949,7 +6949,7 @@ mod tests {
         );
         assert_eq!(
             settings.task_quick_add_shortcut.as_deref(),
-            Some("command-shift-n")
+            Some("CommandOrControl+Shift+N")
         );
     }
 
