@@ -55,7 +55,7 @@ export function TaskRow({
   const isCompletedViewItem = Boolean(task.completedAt && view === "completed");
   const showActionDateLabel = view !== "completed" && (view !== "today" || overdue);
   const secondaryLabel = isCompletedViewItem
-    ? formatCompletedAt(task.completedAt)
+    ? formatCompletedAt(task.completedAt ?? "")
       : actionDate && showActionDateLabel
       ? formatDate(actionDate, today)
       : null;
