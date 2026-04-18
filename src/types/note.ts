@@ -146,10 +146,7 @@ export type FolderColorId =
 export type FolderIconSpec =
   | { kind: "lucide"; name: string }
   | { kind: "emoji"; shortcode: string };
-export type TaskQuickAddShortcut =
-  | "control-space"
-  | "command-shift-n"
-  | "disabled";
+export type TaskQuickAddShortcut = string;
 export interface FolderAppearance {
   icon?: FolderIconSpec;
   colorId?: FolderColorId;

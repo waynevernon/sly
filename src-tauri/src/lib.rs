@@ -168,10 +168,94 @@ fn default_true() -> bool {
 
 pub(crate) fn normalize_task_quick_add_shortcut_value(value: &str) -> Option<String> {
     let trimmed = value.trim();
-    match trimmed {
-        "control-space" | "command-shift-n" | "disabled" => Some(trimmed.to_string()),
-        _ => None,
+
+    if trimmed == "disabled" {
+        return Some("disabled".to_string());
     }
+
+    // Migrate old slug-style values to Tauri accelerator format
+    match trimmed {
+        "control-space" => return Some("Control+Space".to_string()),
+        "command-shift-n" => return Some("CommandOrControl+Shift+N".to_string()),
+        _ => {}
+    }
+
+    if is_valid_accelerator(trimmed) {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
+}
+
+const VALID_MODIFIER_NAMES: &[&str] = &[
+    "Control",
+    "Ctrl",
+    "Shift",
+    "Alt",
+    "Option",
+    "Meta",
+    "Super",
+    "Command",
+    "Cmd",
+    "CommandOrControl",
+    "CmdOrCtrl",
+];
+
+const VALID_SPECIAL_KEY_NAMES: &[&str] = &[
+    "Space", "Return", "Enter", "Tab", "Escape", "Esc", "Backspace", "Delete", "Left", "Right",
+    "Up", "Down", "Home", "End", "PageUp", "PageDown", "F1", "F2", "F3", "F4", "F5", "F6", "F7",
+    "F8", "F9", "F10", "F11", "F12",
+];
+
+fn is_valid_key_name(key: &str) -> bool {
+    if key.len() == 1 {
+        let c = key.chars().next().unwrap_or('\0');
+        if c.is_ascii_uppercase() || c.is_ascii_digit() {
+            return true;
+        }
+    }
+    VALID_SPECIAL_KEY_NAMES.contains(&key)
+}
+
+fn is_valid_accelerator(s: &str) -> bool {
+    let parts: Vec<&str> = s.split('+').collect();
+    if parts.len() < 2 {
+        return false;
+    }
+    let (modifier_parts, key_slice) = parts.split_at(parts.len() - 1);
+    let key = key_slice[0];
+
+    if modifier_parts.is_empty() {
+        return false;
+    }
+
+    for &m in modifier_parts {
+        if !VALID_MODIFIER_NAMES.contains(&m) {
+            return false;
+        }
+    }
+
+    // Require at least one strong modifier (not only Shift)
+    let has_strong_modifier = modifier_parts.iter().any(|&m| {
+        matches!(
+            m,
+            "Control"
+                | "Ctrl"
+                | "Alt"
+                | "Option"
+                | "Meta"
+                | "Super"
+                | "Command"
+                | "Cmd"
+                | "CommandOrControl"
+                | "CmdOrCtrl"
+        )
+    });
+    if !has_strong_modifier {
+        return false;
+    }
+
+    is_valid_key_name(key)
 }
 
 fn default_note_base_font_size() -> f32 {
@@ -5638,16 +5722,15 @@ fn resolve_task_quick_add_shortcut_accelerator(settings: &Settings) -> Option<St
         return None;
     }
 
-    match settings
+    let normalized = settings
         .task_quick_add_shortcut
         .as_deref()
-        .and_then(normalize_task_quick_add_shortcut_value)
-        .as_deref()
-    {
+        .and_then(normalize_task_quick_add_shortcut_value);
+
+    match normalized.as_deref() {
         Some("disabled") => None,
-        Some("control-space") => Some("Control+Space".to_string()),
-        Some("command-shift-n") => Some("CommandOrControl+Shift+N".to_string()),
-        _ => Some(default_task_quick_add_shortcut().to_string()),
+        Some(accelerator) => Some(accelerator.to_string()),
+        None => Some(default_task_quick_add_shortcut().to_string()),
     }
 }
 
@@ -6866,7 +6949,7 @@ mod tests {
         );
         assert_eq!(
             settings.task_quick_add_shortcut.as_deref(),
-            Some("command-shift-n")
+            Some("CommandOrControl+Shift+N")
         );
     }
 
