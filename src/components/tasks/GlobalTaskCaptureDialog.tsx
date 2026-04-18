@@ -341,11 +341,11 @@ export function GlobalTaskCaptureDialog({
       onBackdropClick={handleClose}
       panelClassName="max-w-xl"
     >
-      <div className="relative mx-auto w-full max-w-[34rem] px-6 py-5 sm:px-7">
+      <div className="relative mx-auto w-full max-w-[34rem] px-4 py-5 sm:px-5">
         <button
           type="button"
           onClick={handleClose}
-          className="ui-focus-ring absolute right-6 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-7"
+          className="ui-focus-ring absolute right-4 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-5"
           aria-label="Close task capture"
         >
           <X className="h-4.5 w-4.5 stroke-[1.5]" />
