@@ -4,7 +4,9 @@ import { ctrl, isMac, mod, shift, shortcut } from "./platform";
 export const DEFAULT_TASK_QUICK_ADD_SHORTCUT: Exclude<
   TaskQuickAddShortcut,
   "disabled"
-> = isMac ? "control-space" : "command-shift-n";
+> = "control-space";
+
+export const IN_APP_TASK_QUICK_ADD_SHORTCUT_LABEL = shortcut(mod, shift, "N");
 
 export function resolveTaskQuickAddShortcut(
   value: TaskQuickAddShortcut | null | undefined,
@@ -44,26 +46,7 @@ export function getTaskQuickAddShortcutLabel(
   return shortcut(mod, shift, "N");
 }
 
-export function matchesTaskQuickAddShortcut(
-  event: KeyboardEvent,
-  value: TaskQuickAddShortcut | null | undefined,
-): boolean {
-  const resolved = resolveTaskQuickAddShortcut(value);
-
-  if (resolved === "disabled") {
-    return false;
-  }
-
-  if (resolved === "control-space") {
-    return (
-      event.ctrlKey &&
-      !event.metaKey &&
-      !event.altKey &&
-      !event.shiftKey &&
-      event.code === "Space"
-    );
-  }
-
+export function matchesInAppTaskQuickAddShortcut(event: KeyboardEvent): boolean {
   return (
     (isMac ? event.metaKey : event.ctrlKey) &&
     !event.altKey &&

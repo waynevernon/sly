@@ -1,5 +1,4 @@
-import { alt, ctrl, mod, shift } from "./platform";
-import { resolveTaskQuickAddShortcut } from "./taskQuickAddShortcut";
+import { alt, mod, shift } from "./platform";
 
 export interface ShortcutDefinition {
   keys: string[];
@@ -39,11 +38,8 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Notes",
   },
   {
-    keys:
-      resolveTaskQuickAddShortcut(null) === "control-space"
-        ? [ctrl, "Space"]
-        : [mod, shift, "N"],
-    description: "Open quick task capture (configurable in Tasks settings)",
+    keys: [mod, shift, "N"],
+    description: "Open quick task capture",
     category: "Tasks",
   },
   {

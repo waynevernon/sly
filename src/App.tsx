@@ -52,7 +52,7 @@ import type {
   AssistantTurn,
 } from "./types/assistant";
 import { alt, isMac, mod, shortcut } from "./lib/platform";
-import { matchesTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
+import { matchesInAppTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
   applyLineReplacement,
@@ -499,7 +499,6 @@ function AppContent() {
   const isTasksModeActiveRef = useRef(isTasksModeActive);
   isTasksModeActiveRef.current = isTasksModeActive;
   const tasksEnabled = settings?.tasksEnabled ?? false;
-  const taskQuickAddShortcut = settings?.taskQuickAddShortcut ?? null;
   const showRightPanel =
     rightPanelVisible &&
     !focusMode &&
@@ -1372,7 +1371,7 @@ function AppContent() {
         return;
       }
 
-      if (matchesTaskQuickAddShortcut(e, taskQuickAddShortcut)) {
+      if (matchesInAppTaskQuickAddShortcut(e)) {
         e.preventDefault();
         openTaskCapture();
         return;
@@ -1670,7 +1669,6 @@ function AppContent() {
     showNotesMode,
     showTasksMode,
     tasksEnabled,
-    taskQuickAddShortcut,
     toggleFocusMode,
     setInterfaceZoom,
   ]);
