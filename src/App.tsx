@@ -51,7 +51,7 @@ import type {
   AssistantThreadState,
   AssistantTurn,
 } from "./types/assistant";
-import { alt, isMac, mod, shift, shortcut } from "./lib/platform";
+import { isMac, mod, shift, shortcut } from "./lib/platform";
 import { matchesInAppTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
