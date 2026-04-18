@@ -1,18 +1,13 @@
 import { useRef } from "react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ, Check, CheckSquare, FileText } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, CheckSquare, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import { FolderPlusIcon } from "../icons";
-import {
-  IconButton,
-  menuItemClassName,
-  menuLabelClassName,
-  menuSeparatorClassName,
-} from "../ui";
+import { IconButton } from "../ui";
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
+import { FolderFilterMenu } from "./FolderFilterMenu";
 
 const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
   key: "name",
@@ -46,14 +41,8 @@ export function FoldersPane({
 }: FoldersPaneProps) {
   const {
     folderSortMode,
-    showPinnedNotes,
-    showRecentNotes,
-    showNoteCounts,
     settings,
     setFolderSortMode,
-    setNoteListViewOptions,
-    setShowPinnedNotes,
-    setShowRecentNotes,
   } = useNotes();
   const tasksEnabled = settings?.tasksEnabled ?? false;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +79,7 @@ export function FoldersPane({
           </div>
         )}
         <div className="ui-pane-header-actions">
+          <FolderFilterMenu />
           <SortMenuButton
             title="Sort folders"
             value={folderSortMode}
@@ -97,57 +87,7 @@ export function FoldersPane({
             onChange={(nextMode) => {
               void setFolderSortMode(nextMode);
             }}
-          >
-            <DropdownMenu.Separator className={menuSeparatorClassName} />
-            <DropdownMenu.Label className={menuLabelClassName}>
-              View
-            </DropdownMenu.Label>
-            <DropdownMenu.Separator className={menuSeparatorClassName} />
-            <DropdownMenu.CheckboxItem
-              checked={showPinnedNotes}
-              className={menuItemClassName}
-              onCheckedChange={(checked) => {
-                void setShowPinnedNotes(checked === true);
-              }}
-            >
-              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="h-3 w-3 stroke-[2.2]" />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              <span>Pinned</span>
-            </DropdownMenu.CheckboxItem>
-            <DropdownMenu.CheckboxItem
-              checked={showRecentNotes}
-              className={menuItemClassName}
-              onCheckedChange={(checked) => {
-                void setShowRecentNotes(checked === true);
-              }}
-            >
-              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="h-3 w-3 stroke-[2.2]" />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              <span>Recent</span>
-            </DropdownMenu.CheckboxItem>
-            <DropdownMenu.CheckboxItem
-              checked={showNoteCounts}
-              className={menuItemClassName}
-              onCheckedChange={(checked) => {
-                void setNoteListViewOptions({
-                  showNoteCounts: checked === true,
-                });
-              }}
-            >
-              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="h-3 w-3 stroke-[2.2]" />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              <span>Note Count</span>
-            </DropdownMenu.CheckboxItem>
-          </SortMenuButton>
+          />
           <IconButton
             variant="ghost"
             title="New folder"
