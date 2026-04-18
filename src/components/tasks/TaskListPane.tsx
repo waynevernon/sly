@@ -608,6 +608,13 @@ export function TaskListPane() {
     [selectTask, selectTaskRange, toggleTaskSelection],
   );
 
+  const handleCompleteTasks = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id) => setCompleted(id, true)));
+    },
+    [setCompleted],
+  );
+
   const handleDeleteTasks = useCallback(
     async (ids: string[]) => {
       await Promise.all(ids.map((id) => deleteTask(id)));
@@ -659,6 +666,14 @@ export function TaskListPane() {
                 await handleRescheduleTasks(selectedTaskIds, selection);
               }}
             />
+            <IconButton
+              type="button"
+              variant="ghost"
+              title="Mark selected tasks complete"
+              onClick={() => void handleCompleteTasks(selectedTaskIds)}
+            >
+              <CheckCheck className="h-4 w-4 stroke-[1.6]" />
+            </IconButton>
             <IconButton
               type="button"
               variant="ghost"
@@ -791,26 +806,63 @@ export function TaskListPane() {
                   onToggleStar={() => void updateTask(task.id, { starred: !task.starred })}
                   onRename={(title) => void updateTask(task.id, { title })}
                   contextMenu={
-                    <>
-                      <ContextMenu.Item
-                        className={menuItemClassName}
-                        onSelect={() => {
-                          setRescheduleAnchor(contextMenuPosRef.current);
-                          setRescheduleTaskIds([task.id]);
-                        }}
-                      >
-                        <CalendarDays className="h-4 w-4 stroke-[1.6]" />
-                        Reschedule…
-                      </ContextMenu.Item>
-                      <ContextMenu.Separator className={menuSeparatorClassName} />
-                      <ContextMenu.Item
-                        className={destructiveMenuItemClassName}
-                        onSelect={() => void handleDeleteTasks([task.id])}
-                      >
-                        <Trash2 className="h-4 w-4 stroke-[1.6]" />
-                        Delete
-                      </ContextMenu.Item>
-                    </>
+                    hasBatchSelection && selectedTaskIdSet.has(task.id) ? (
+                      <>
+                        <ContextMenu.Item
+                          className={menuItemClassName}
+                          onSelect={() => {
+                            setRescheduleAnchor(contextMenuPosRef.current);
+                            setRescheduleTaskIds(selectedTaskIds);
+                          }}
+                        >
+                          <CalendarDays className="h-4 w-4 stroke-[1.6]" />
+                          Reschedule Selected Tasks…
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          className={menuItemClassName}
+                          onSelect={() => void handleCompleteTasks(selectedTaskIds)}
+                        >
+                          <CheckCheck className="h-4 w-4 stroke-[1.6]" />
+                          Mark Selected Tasks Complete
+                        </ContextMenu.Item>
+                        <ContextMenu.Separator className={menuSeparatorClassName} />
+                        <ContextMenu.Item
+                          className={destructiveMenuItemClassName}
+                          onSelect={() => void handleDeleteTasks(selectedTaskIds)}
+                        >
+                          <Trash2 className="h-4 w-4 stroke-[1.6]" />
+                          Delete Selected Tasks
+                        </ContextMenu.Item>
+                        <ContextMenu.Item
+                          className={menuItemClassName}
+                          onSelect={clearTaskSelection}
+                        >
+                          <X className="h-4 w-4 stroke-[1.6]" />
+                          Clear Selection
+                        </ContextMenu.Item>
+                      </>
+                    ) : (
+                      <>
+                        <ContextMenu.Item
+                          className={menuItemClassName}
+                          onSelect={() => {
+                            setRescheduleAnchor(contextMenuPosRef.current);
+                            setRescheduleTaskIds([task.id]);
+                          }}
+                        >
+                          <CalendarDays className="h-4 w-4 stroke-[1.6]" />
+                          Reschedule…
+                        </ContextMenu.Item>
+                        <ContextMenu.Separator className={menuSeparatorClassName} />
+                        <ContextMenu.Item
+                          className={destructiveMenuItemClassName}
+                          onSelect={() => void handleDeleteTasks([task.id])}
+                        >
+                          <Trash2 className="h-4 w-4 stroke-[1.6]" />
+                          Delete
+                        </ContextMenu.Item>
+                      </>
+                    )
                   }
                 />
               ))}
@@ -913,6 +965,13 @@ export function TaskListPane() {
                           >
                             <CalendarDays className="h-4 w-4 stroke-[1.6]" />
                             Reschedule Selected Tasks…
+                          </ContextMenu.Item>
+                          <ContextMenu.Item
+                            className={menuItemClassName}
+                            onSelect={() => void handleCompleteTasks(selectedTaskIds)}
+                          >
+                            <CheckCheck className="h-4 w-4 stroke-[1.6]" />
+                            Mark Selected Tasks Complete
                           </ContextMenu.Item>
                           <ContextMenu.Separator className={menuSeparatorClassName} />
                           <ContextMenu.Item
