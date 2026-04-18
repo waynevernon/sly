@@ -288,11 +288,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_folder_note_sort_modes_field(object, "folderNoteSortModes");
     normalize_string_enum_field(object, "folderSortMode", &["nameAsc", "nameDesc"]);
     normalize_optional_bool_field(object, "tasksEnabled");
-    normalize_optional_string_enum_field(
-        object,
-        "taskQuickAddShortcut",
-        &["control-space", "command-shift-n", "disabled"],
-    );
+    normalize_optional_string_field(object, "taskQuickAddShortcut");
 }
 
 fn ensure_object_value(value: Value) -> Value {
@@ -335,22 +331,6 @@ fn normalize_bool_field(object: &mut Map<String, Value>, key: &str) {
 fn normalize_optional_string_field(object: &mut Map<String, Value>, key: &str) {
     let should_remove = match object.get(key) {
         Some(Value::String(_)) | Some(Value::Null) | None => false,
-        Some(_) => true,
-    };
-
-    if should_remove {
-        object.remove(key);
-    }
-}
-
-fn normalize_optional_string_enum_field(
-    object: &mut Map<String, Value>,
-    key: &str,
-    allowed: &[&str],
-) {
-    let should_remove = match object.get(key) {
-        Some(Value::String(value)) => !allowed.contains(&value.as_str()),
-        Some(Value::Null) | None => false,
         Some(_) => true,
     };
 

@@ -202,9 +202,34 @@ const VALID_MODIFIER_NAMES: &[&str] = &[
 ];
 
 const VALID_SPECIAL_KEY_NAMES: &[&str] = &[
-    "Space", "Return", "Enter", "Tab", "Escape", "Esc", "Backspace", "Delete", "Left", "Right",
-    "Up", "Down", "Home", "End", "PageUp", "PageDown", "F1", "F2", "F3", "F4", "F5", "F6", "F7",
-    "F8", "F9", "F10", "F11", "F12",
+    "Space",
+    "Return",
+    "Enter",
+    "Tab",
+    "Escape",
+    "Esc",
+    "Backspace",
+    "Delete",
+    "Left",
+    "Right",
+    "Up",
+    "Down",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
 ];
 
 fn is_valid_key_name(key: &str) -> bool {
@@ -6951,6 +6976,43 @@ mod tests {
             settings.task_quick_add_shortcut.as_deref(),
             Some("CommandOrControl+Shift+N")
         );
+    }
+
+    #[test]
+    fn load_settings_preserves_custom_task_shortcut_values() {
+        let path = temp_file_path("workspace-settings-custom-task-shortcut");
+        std::fs::write(
+            &path,
+            r#"{
+  "schemaVersion": 1,
+  "showNoteCounts": true,
+  "showNotesFromSubfolders": false,
+  "noteListDateMode": "modified",
+  "showNoteListFilename": true,
+  "showNoteListFolderPath": false,
+  "showNoteListPreview": true,
+  "noteListPreviewLines": 2,
+  "noteSortMode": "modifiedDesc",
+  "folderSortMode": "nameAsc",
+  "taskQuickAddShortcut": "Alt+Shift+F12"
+}"#,
+        )
+        .unwrap();
+
+        let settings = persistence::workspace_settings::load_settings_from_path(&path);
+        assert_eq!(
+            settings.task_quick_add_shortcut.as_deref(),
+            Some("Alt+Shift+F12")
+        );
+
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            rewritten["taskQuickAddShortcut"],
+            serde_json::json!("Alt+Shift+F12")
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
