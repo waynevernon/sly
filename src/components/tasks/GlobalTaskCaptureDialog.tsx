@@ -339,18 +339,18 @@ export function GlobalTaskCaptureDialog({
   return (
     <DialogShell
       onBackdropClick={handleClose}
-      panelClassName="max-w-xl"
+      panelClassName="max-w-md"
     >
-      <div className="relative mx-auto w-full max-w-[34rem] px-4 py-5 sm:px-5">
+      <div className="relative w-full px-4 py-4">
         <button
           type="button"
           onClick={handleClose}
-          className="ui-focus-ring absolute right-4 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-5"
+          className="ui-focus-ring absolute right-4 top-4 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
           aria-label="Close task capture"
         >
           <X className="h-4.5 w-4.5 stroke-[1.5]" />
         </button>
-        <div className="mx-auto flex w-full max-w-[30rem] flex-col gap-4">
+        <div className="flex w-full flex-col gap-4">
           <div className="pointer-events-none relative min-w-0 w-full pr-10">
             {titleHighlights.length > 0 && (
               <div
