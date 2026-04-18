@@ -306,29 +306,11 @@ function DueDatePickerPanel({
       </div>
 
       <div className="border-t border-border/60 pt-2">
-        <div className="flex items-center justify-between pb-1">
-          <div className="pl-2.5 text-sm font-medium text-text">{monthLabel}</div>
-          <div className="flex items-center gap-1">
-            <IconButton
-              type="button"
-              size="xs"
-              variant="ghost"
-              title="Previous month"
-              onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-            >
-              <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-            </IconButton>
-            <IconButton
-              type="button"
-              size="xs"
-              variant="ghost"
-              title="Next month"
-              onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-            >
-              <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-            </IconButton>
-          </div>
-        </div>
+        <CalendarMonthHeader
+          monthLabel={monthLabel}
+          onPrevious={() => setVisibleMonth((month) => addMonths(month, -1))}
+          onNext={() => setVisibleMonth((month) => addMonths(month, 1))}
+        />
 
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAY_LABELS.map((label) => (
@@ -435,29 +417,11 @@ export function TaskDatePickerPanel({
       </div>
 
       <div className="border-t border-border/60 pt-2">
-        <div className="flex items-center justify-between pb-1">
-          <div className="pl-2.5 text-sm font-medium text-text">{monthLabel}</div>
-          <div className="flex items-center gap-1">
-            <IconButton
-              type="button"
-              size="xs"
-              variant="ghost"
-              title="Previous month"
-              onClick={() => setVisibleMonth((month) => addMonths(month, -1))}
-            >
-              <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
-            </IconButton>
-            <IconButton
-              type="button"
-              size="xs"
-              variant="ghost"
-              title="Next month"
-              onClick={() => setVisibleMonth((month) => addMonths(month, 1))}
-            >
-              <ChevronRight className="h-4 w-4 stroke-[1.8]" />
-            </IconButton>
-          </div>
-        </div>
+        <CalendarMonthHeader
+          monthLabel={monthLabel}
+          onPrevious={() => setVisibleMonth((month) => addMonths(month, -1))}
+          onNext={() => setVisibleMonth((month) => addMonths(month, 1))}
+        />
 
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAY_LABELS.map((label) => (
@@ -523,6 +487,42 @@ function QuickDateButton({
       <span className="shrink-0 text-current">{icon}</span>
       {label}
     </button>
+  );
+}
+
+function CalendarMonthHeader({
+  monthLabel,
+  onPrevious,
+  onNext,
+}: {
+  monthLabel: string;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-7 items-center gap-1 pb-1">
+      <div className="col-span-5 pl-2 text-sm font-medium text-text">{monthLabel}</div>
+      <div className="col-span-2 flex items-center justify-end gap-1">
+        <IconButton
+          type="button"
+          size="xs"
+          variant="ghost"
+          title="Previous month"
+          onClick={onPrevious}
+        >
+          <ChevronLeft className="h-4 w-4 stroke-[1.8]" />
+        </IconButton>
+        <IconButton
+          type="button"
+          size="xs"
+          variant="ghost"
+          title="Next month"
+          onClick={onNext}
+        >
+          <ChevronRight className="h-4 w-4 stroke-[1.8]" />
+        </IconButton>
+      </div>
+    </div>
   );
 }
 
