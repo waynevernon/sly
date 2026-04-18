@@ -81,6 +81,13 @@ const themeState = {
   setRightPanelTab: vi.fn(),
 };
 
+const tasksState = {
+  deleteTask: vi.fn().mockResolvedValue(undefined),
+  selectAllVisibleTasks: vi.fn(),
+  selectedTaskId: "task-1",
+  selectedTaskIds: ["task-1", "task-2"],
+};
+
 vi.mock("@tauri-apps/api/event", () => ({
   listen: listenMock,
 }));
@@ -116,7 +123,7 @@ vi.mock("./context/GitContext", () => ({
 
 vi.mock("./context/TasksContext", () => ({
   TasksProvider: ({ children }: PropsWithChildren) => children,
-  useTasks: () => ({}),
+  useTasks: () => tasksState,
 }));
 
 const editorListeners = {
@@ -156,6 +163,11 @@ vi.mock("./components/layout/WorkspaceNavigation", () => ({
       <button onClick={() => onOpenSettings()}>open settings</button>
       {onShowNotes && <button onClick={onShowNotes}>Notes</button>}
       {onShowTasks && <button onClick={onShowTasks}>Tasks</button>}
+      {workspaceMode === "tasks" ? (
+        <div data-task-list>
+          <button>task-list-focus</button>
+        </div>
+      ) : null}
     </div>
   ),
 }));
@@ -184,7 +196,12 @@ vi.mock("./components/editor/Editor", () => ({
 }));
 
 vi.mock("./components/tasks/TaskDetailPanel", () => ({
-  TaskDetailPanel: () => <div>task-detail-panel</div>,
+  TaskDetailPanel: () => (
+    <div data-task-detail-panel>
+      <div>task-detail-panel</div>
+      <button>task-detail-focus</button>
+    </div>
+  ),
 }));
 
 vi.mock("./components/layout/FolderPicker", () => ({
@@ -267,6 +284,8 @@ describe("App", () => {
     themeState.rightPanelVisible = true;
     themeState.rightPanelTab = "outline";
     notesDataState.settings.tasksEnabled = false;
+    tasksState.selectedTaskId = "task-1";
+    tasksState.selectedTaskIds = ["task-1", "task-2"];
     tauriEventListeners.clear();
   });
 
@@ -495,6 +514,24 @@ describe("App", () => {
 
     expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
     expect(screen.getByText("editor")).toBeInTheDocument();
+  });
+
+  it("deletes selected tasks with Cmd/Ctrl+Delete from the task list", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+
+    const focusTarget = screen.getByRole("button", { name: "task-list-focus" });
+    focusTarget.focus();
+    fireEvent.keyDown(focusTarget, { key: "Backspace", metaKey: true });
+
+    await waitFor(() => {
+      expect(tasksState.deleteTask).toHaveBeenCalledTimes(2);
+    });
+    expect(tasksState.deleteTask).toHaveBeenNthCalledWith(1, "task-1");
+    expect(tasksState.deleteTask).toHaveBeenNthCalledWith(2, "task-2");
   });
 
   it("toggles the right pane with Cmd/Ctrl+Alt+4", () => {

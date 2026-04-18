@@ -429,7 +429,12 @@ function AppContent() {
     syncNotesFolder,
     unpinNote,
   } = useNotesActions();
-  const { selectAllVisibleTasks } = useTasks();
+  const {
+    deleteTask,
+    selectAllVisibleTasks,
+    selectedTaskId,
+    selectedTaskIds,
+  } = useTasks();
   const {
     interfaceZoom,
     setInterfaceZoom,
@@ -495,6 +500,10 @@ function AppContent() {
   selectedNoteIdKbRef.current = selectedNoteId;
   const selectedNoteIdsKbRef = useRef(selectedNoteIds);
   selectedNoteIdsKbRef.current = selectedNoteIds;
+  const selectedTaskIdKbRef = useRef(selectedTaskId);
+  selectedTaskIdKbRef.current = selectedTaskId;
+  const selectedTaskIdsKbRef = useRef(selectedTaskIds);
+  selectedTaskIdsKbRef.current = selectedTaskIds;
   const isTasksModeActive = workspaceMode === "tasks";
   const isTasksModeActiveRef = useRef(isTasksModeActive);
   isTasksModeActiveRef.current = isTasksModeActive;
@@ -1315,6 +1324,9 @@ function AppContent() {
       const isInTaskList =
         !!targetElement?.closest("[data-task-list]") ||
         !!document.activeElement?.closest("[data-task-list]");
+      const isInTaskDetail =
+        !!targetElement?.closest("[data-task-detail-panel]") ||
+        !!document.activeElement?.closest("[data-task-detail-panel]");
       const isEditorEmpty =
         isInEditor && currentNoteRef.current?.content.trim() === "";
 
@@ -1538,6 +1550,24 @@ function AppContent() {
         return;
       }
 
+      if (
+        (selectedTaskIdKbRef.current || selectedTaskIdsKbRef.current.length > 0) &&
+        !isInInput &&
+        (e.key === "Delete" ||
+          (e.key === "Backspace" && (e.metaKey || e.ctrlKey))) &&
+        (isInTaskList || isInTaskDetail)
+      ) {
+        e.preventDefault();
+        const taskIds = Array.from(
+          new Set([
+            ...selectedTaskIdsKbRef.current,
+            ...(selectedTaskIdKbRef.current ? [selectedTaskIdKbRef.current] : []),
+          ]),
+        );
+        void Promise.all(taskIds.map((id) => deleteTask(id)));
+        return;
+      }
+
       // Cmd+D - Duplicate current note
       if (
         (e.metaKey || e.ctrlKey) &&
@@ -1662,6 +1692,7 @@ function AppContent() {
     clearNoteSelection,
     selectAllVisibleNotes,
     selectAllVisibleTasks,
+    deleteTask,
     setPaneMode,
     toggleRightPanel,
     openSettings,

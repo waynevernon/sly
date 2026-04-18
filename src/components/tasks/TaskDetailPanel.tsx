@@ -428,7 +428,10 @@ export function TaskDetailPanel() {
   };
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-bg">
+    <div
+      data-task-detail-panel
+      className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-bg"
+    >
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="flex-1" />
