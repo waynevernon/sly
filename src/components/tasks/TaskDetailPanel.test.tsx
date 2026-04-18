@@ -160,7 +160,7 @@ describe("TaskDetailPanel", () => {
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
     });
-    expect(screen.getByRole("button", { name: "Jordan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Waiting Jordan" })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Waiting…")).not.toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("TaskDetailPanel", () => {
     await waitFor(() => {
       expect(updateTask).toHaveBeenCalledWith("task-1", { waitingFor: "Jordan" });
     });
-    expect(screen.getByRole("button", { name: "Jordan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Waiting Jordan" })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Waiting…")).not.toBeInTheDocument();
   });
 

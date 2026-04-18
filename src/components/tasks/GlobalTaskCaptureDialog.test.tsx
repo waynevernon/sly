@@ -207,6 +207,68 @@ describe("GlobalTaskCaptureDialog", () => {
     expect(updateTask).not.toHaveBeenCalled();
   });
 
+  it("includes a due date when selected during quick capture", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Send invoice",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-10T12:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      dueAt: null,
+      recurrence: null,
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Send invoice",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-10T12:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      dueAt: "2026-04-11T17:00:00.000Z",
+      recurrence: null,
+    });
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ createTask, updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <GlobalTaskCaptureDialog
+          open
+          workspaceMode="notes"
+          onClose={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.type(screen.getByPlaceholderText("What needs doing?"), "Send invoice");
+    await user.click(screen.getByRole("button", { name: "Due" }));
+    await user.click(await screen.findByRole("button", { name: "Tomorrow" }));
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        description: "",
+        link: "",
+        waitingFor: "",
+        actionAt: null,
+        scheduleBucket: null,
+        recurrence: null,
+        dueAt: localDateToNormalizedActionAt("2026-04-11"),
+      });
+    });
+  });
+
   it("creates without changing task selection in notes mode", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");

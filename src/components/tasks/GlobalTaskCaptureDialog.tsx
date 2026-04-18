@@ -12,8 +12,15 @@ import {
 import { cn } from "../../lib/utils";
 import type { TaskScheduleBucket } from "../../types/tasks";
 import { Button, DialogShell, PopoverTextEditor } from "../ui";
-import { TaskDatePicker } from "./TaskDatePicker";
+import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
+import {
+  TASK_DETAIL_DIVIDER_CLASS,
+  TASK_DETAIL_FIELD_INPUT_CLASS,
+  TASK_DETAIL_FILLED_TRIGGER_CLASS,
+  TASK_DETAIL_LABEL_CLASS,
+  TASK_DETAIL_SECTION_CLASS,
+} from "./taskDetailSurface";
 
 interface GlobalTaskCaptureDialogProps {
   open: boolean;
@@ -64,6 +71,7 @@ export function GlobalTaskCaptureDialog({
   const [recurrence, setRecurrence] = useState<string | null>(null);
   const [manualActionDate, setManualActionDate] = useState("");
   const [manualScheduleBucket, setManualScheduleBucket] = useState<TaskScheduleBucket | null>(null);
+  const [manualDueDate, setManualDueDate] = useState("");
   const [detectedDate, setDetectedDate] = useState<ReturnType<typeof detectTaskDateFromTitle>>(null);
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
   const [detectedUrl, setDetectedUrl] = useState<ReturnType<typeof detectTaskUrlFromTitle>>(null);
@@ -98,6 +106,7 @@ export function GlobalTaskCaptureDialog({
     setRecurrence(null);
     setManualActionDate("");
     setManualScheduleBucket(null);
+    setManualDueDate("");
     setDetectedDate(null);
     setIgnoredDetectionSignature(null);
     setDetectedUrl(null);
@@ -209,6 +218,9 @@ export function GlobalTaskCaptureDialog({
         actionAt: localDateToNormalizedActionAt(effectiveActionDate),
         scheduleBucket: manualScheduleBucket,
         recurrence,
+        ...(manualDueDate
+          ? { dueAt: localDateToNormalizedActionAt(manualDueDate) }
+          : {}),
       };
 
       const hasPatch =
@@ -217,7 +229,8 @@ export function GlobalTaskCaptureDialog({
         waitingFor.trim().length > 0 ||
         Boolean(effectiveActionDate) ||
         Boolean(manualScheduleBucket) ||
-        Boolean(recurrence);
+        Boolean(recurrence) ||
+        Boolean(manualDueDate);
 
       const finalTask = hasPatch
         ? await updateTask(created.id, patch)
@@ -244,6 +257,7 @@ export function GlobalTaskCaptureDialog({
     isSaving,
     link,
     manualActionDate,
+    manualDueDate,
     manualScheduleBucket,
     onClose,
     recurrence,
@@ -327,21 +341,21 @@ export function GlobalTaskCaptureDialog({
       onBackdropClick={handleClose}
       panelClassName="max-w-xl"
     >
-      <div className="relative mx-auto w-full max-w-[38rem] px-6 py-5">
+      <div className="relative mx-auto w-full max-w-[34rem] px-6 py-5 sm:px-7">
         <button
           type="button"
           onClick={handleClose}
-          className="ui-focus-ring absolute right-6 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+          className="ui-focus-ring absolute right-6 top-5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text sm:right-7"
           aria-label="Close task capture"
         >
           <X className="h-4.5 w-4.5 stroke-[1.5]" />
         </button>
-        <div className="flex flex-col gap-4">
-          <div className="pointer-events-none relative pr-10">
+        <div className="mx-auto flex w-full max-w-[30rem] flex-col gap-4">
+          <div className="pointer-events-none relative min-w-0 w-full pr-10">
             {titleHighlights.length > 0 && (
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[1.7rem] font-medium leading-tight text-transparent"
+                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[1.55rem] font-medium leading-tight text-transparent"
               >
                 <span
                   ref={(el) => {
@@ -372,11 +386,11 @@ export function GlobalTaskCaptureDialog({
                   void handleSubmit();
                 }
               }}
-              className="pointer-events-auto relative min-w-0 flex-1 bg-transparent text-[1.7rem] font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+              className="pointer-events-auto relative min-w-0 w-full bg-transparent text-[1.55rem] font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2">
             {!showDetectedDateChip && (
               <TaskDatePicker
                 actionDate={effectiveActionDate}
@@ -408,6 +422,11 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
+            <DueDatePicker
+              dueDate={manualDueDate}
+              today={today}
+              onChange={(date) => setManualDueDate(date ?? "")}
+            />
             {(manualActionDate || manualScheduleBucket) && (
               <RecurrencePicker
                 recurrence={recurrence}
@@ -415,44 +434,46 @@ export function GlobalTaskCaptureDialog({
                 onChange={setRecurrence}
               />
             )}
+            <PopoverTextEditor
+              open={waitingEditorOpen}
+              onOpenChange={setWaitingEditorOpen}
+              value={waitingFor}
+              onSubmit={setWaitingFor}
+              title="Waiting"
+              placeholder="Waiting…"
+              icon={<Clock3 className="h-4 w-4 stroke-[1.7]" />}
+              suggestions={waitingForSuggestions}
+              renderTrigger={({ openEditor }) =>
+                hasWaitingFor ? (
+                  <button
+                    type="button"
+                    onClick={openEditor}
+                    aria-label={`Waiting ${waitingFor}`}
+                    className={TASK_DETAIL_FILLED_TRIGGER_CLASS}
+                  >
+                    <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
+                    <span className="truncate text-left">{waitingFor}</span>
+                  </button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={openEditor}
+                    className="gap-2"
+                  >
+                    <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                    <span>Waiting</span>
+                  </Button>
+                )
+              }
+            />
           </div>
 
-          <PopoverTextEditor
-            open={waitingEditorOpen}
-            onOpenChange={setWaitingEditorOpen}
-            value={waitingFor}
-            onSubmit={setWaitingFor}
-            title="Waiting"
-            placeholder="Waiting…"
-            icon={<Clock3 className="h-4 w-4 stroke-[1.7]" />}
-            suggestions={waitingForSuggestions}
-            renderTrigger={({ openEditor }) =>
-              hasWaitingFor ? (
-                <button
-                  type="button"
-                  onClick={openEditor}
-                  className="ui-focus-ring inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
-                >
-                  <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted" />
-                  <span className="truncate text-left">{waitingFor}</span>
-                </button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={openEditor}
-                  className="gap-2"
-                >
-                  <Clock3 className="h-4 w-4 stroke-[1.7]" />
-                  <span>Waiting</span>
-                </Button>
-              )
-            }
-          />
+          <div className={cn("w-full", TASK_DETAIL_DIVIDER_CLASS)} />
 
-          <div className="space-y-2">
-            <div className="text-[11px] font-medium text-text-muted">
+          <div className={cn("w-full", TASK_DETAIL_SECTION_CLASS)}>
+            <div className={TASK_DETAIL_LABEL_CLASS}>
               Link
             </div>
             <input
@@ -471,33 +492,33 @@ export function GlobalTaskCaptureDialog({
                   }
                 }
               }}
-              className="w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              className={TASK_DETAIL_FIELD_INPUT_CLASS}
             />
           </div>
 
-          <div className="border-t border-border/40" />
+          <div className={cn("w-full", TASK_DETAIL_DIVIDER_CLASS)} />
 
-          <div className="space-y-2">
-            <div className="text-[11px] font-medium text-text-muted">
+          <div className={cn("w-full", TASK_DETAIL_SECTION_CLASS)}>
+            <div className={TASK_DETAIL_LABEL_CLASS}>
               Description
             </div>
             <textarea
               value={description}
               placeholder="Add description…"
               onChange={(event) => setDescription(event.target.value)}
-              rows={2}
-              className="min-h-[72px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              rows={3}
+              className={`min-h-[104px] resize-none ${TASK_DETAIL_FIELD_INPUT_CLASS}`}
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
+          <div className={cn("flex w-full items-center justify-end gap-2 pt-2", TASK_DETAIL_DIVIDER_CLASS)}>
             <Button
               type="button"
               variant="ghost"
               size="md"
               onClick={handleClose}
               disabled={isSaving}
-              className={cn("text-text-muted hover:text-text")}
+              className="text-text-muted hover:text-text"
             >
               Cancel
             </Button>

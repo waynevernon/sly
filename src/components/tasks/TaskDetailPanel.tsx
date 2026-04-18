@@ -25,6 +25,13 @@ import {
 } from "../ui";
 import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
+import {
+  TASK_DETAIL_DIVIDER_CLASS,
+  TASK_DETAIL_FIELD_INPUT_CLASS,
+  TASK_DETAIL_FILLED_TRIGGER_CLASS,
+  TASK_DETAIL_LABEL_CLASS,
+  TASK_DETAIL_SECTION_CLASS,
+} from "./taskDetailSurface";
 
 const DEBOUNCE_MS = 600;
 
@@ -317,7 +324,8 @@ export function TaskDetailPanel() {
                   <button
                     type="button"
                     onClick={openEditor}
-                    className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
+                    aria-label={`Waiting ${waitingFor}`}
+                    className={TASK_DETAIL_FILLED_TRIGGER_CLASS}
                   >
                     <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
                     <span className="truncate text-left">{waitingFor}</span>
@@ -339,11 +347,11 @@ export function TaskDetailPanel() {
           </div>
 
           <div />
-          <div className="border-t border-border/40" />
+          <div className={TASK_DETAIL_DIVIDER_CLASS} />
 
           <div />
-          <div className="space-y-1">
-            <div className="text-sm text-text-muted">
+          <div className={TASK_DETAIL_SECTION_CLASS}>
+            <div className={TASK_DETAIL_LABEL_CLASS}>
               Link
             </div>
             <div className="relative">
@@ -353,7 +361,7 @@ export function TaskDetailPanel() {
                 placeholder="Add link…"
                 onChange={handleLinkChange}
                 onBlur={flushSave}
-                className="w-full bg-transparent pr-8 text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+                className={`${TASK_DETAIL_FIELD_INPUT_CLASS} pr-8`}
               />
               {openableLink ? (
                 <Tooltip content="Open link">
@@ -372,9 +380,9 @@ export function TaskDetailPanel() {
           </div>
 
           <div />
-          <div className="space-y-1">
+          <div className={TASK_DETAIL_SECTION_CLASS}>
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-text-muted">
+              <div className={TASK_DETAIL_LABEL_CLASS}>
                 Description
               </div>
             </div>
@@ -384,12 +392,12 @@ export function TaskDetailPanel() {
               onChange={handleDescriptionChange}
               onBlur={flushSave}
               rows={12}
-              className="min-h-[320px] w-full resize-none bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40"
+              className={`min-h-[320px] resize-none ${TASK_DETAIL_FIELD_INPUT_CLASS}`}
             />
           </div>
 
           <div />
-          <div className="border-t border-border/40" />
+          <div className={TASK_DETAIL_DIVIDER_CLASS} />
 
           <div />
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted/50">
