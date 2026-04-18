@@ -21,6 +21,8 @@ use tauri::menu::{
 use tauri::webview::WebviewWindowBuilder;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl};
 use tauri_plugin_clipboard_manager::ClipboardExt;
+#[cfg(desktop)]
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
@@ -45,6 +47,8 @@ const MENU_ABOUT_ID: &str = "app-about";
 const MENU_CHECK_FOR_UPDATES_ID: &str = "app-check-for-updates";
 const MENU_VIEW_GITHUB_ID: &str = "help-view-github";
 const MENU_REPORT_ISSUE_ID: &str = "help-report-issue";
+const OPEN_GLOBAL_TASK_CAPTURE_EVENT: &str = "open-global-task-capture";
+const TASK_QUICK_ADD_SHORTCUT_ERROR_EVENT: &str = "task-quick-add-shortcut-error";
 
 const REPOSITORY_URL: &str = "https://github.com/waynevernon/sly";
 const ISSUES_URL: &str = "https://github.com/waynevernon/sly/issues";
@@ -160,6 +164,14 @@ fn default_pane_mode() -> i32 {
 
 fn default_true() -> bool {
     true
+}
+
+pub(crate) fn normalize_task_quick_add_shortcut_value(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    match trimmed {
+        "control-space" | "command-shift-n" | "disabled" => Some(trimmed.to_string()),
+        _ => None,
+    }
 }
 
 fn default_note_base_font_size() -> f32 {
@@ -458,6 +470,12 @@ pub struct Settings {
         default
     )]
     pub tasks_enabled: Option<bool>,
+    #[serde(
+        rename = "taskQuickAddShortcut",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub task_quick_add_shortcut: Option<String>,
 }
 
 impl Default for Settings {
@@ -484,6 +502,7 @@ impl Default for Settings {
             folder_note_sort_modes: None,
             folder_sort_mode: FolderSortMode::default(),
             tasks_enabled: None,
+            task_quick_add_shortcut: None,
         }
     }
 }
@@ -531,6 +550,8 @@ pub struct SettingsPatch {
     pub folder_sort_mode: Option<FolderSortMode>,
     #[serde(default)]
     pub tasks_enabled: Option<Option<bool>>,
+    #[serde(default)]
+    pub task_quick_add_shortcut: Option<Option<String>>,
 }
 
 // Search result
@@ -786,6 +807,7 @@ pub struct AppState {
     pub note_windows: Mutex<HashMap<String, String>>,
     pub search_index: Mutex<Option<SearchIndex>>,
     pub debounce_map: Arc<Mutex<HashMap<PathBuf, Instant>>>,
+    pub registered_task_quick_add_shortcut: Mutex<Option<String>>,
 }
 
 impl Default for AppState {
@@ -800,6 +822,7 @@ impl Default for AppState {
             note_windows: Mutex::new(HashMap::new()),
             search_index: Mutex::new(None),
             debounce_map: Arc::new(Mutex::new(HashMap::new())),
+            registered_task_quick_add_shortcut: Mutex::new(None),
         }
     }
 }
@@ -1902,6 +1925,11 @@ fn initialize_notes_folder(
             .write()
             .expect("cache root write lock");
         *cache_root = None;
+    }
+
+    if let Err(error) = sync_task_quick_add_shortcut(app, state) {
+        eprintln!("Failed to sync task quick add shortcut: {error}");
+        let _ = app.emit_to("main", TASK_QUICK_ADD_SHORTCUT_ERROR_EVENT, error);
     }
 
     Ok(normalized_path)
@@ -3158,13 +3186,29 @@ fn update_appearance_settings(
 }
 
 #[tauri::command]
-fn patch_settings(patch: SettingsPatch, state: State<AppState>) -> Result<(), String> {
+fn patch_settings(
+    patch: SettingsPatch,
+    app: AppHandle,
+    state: State<AppState>,
+) -> Result<(), String> {
     let folder = {
         let app_config = state.app_config.read().expect("app_config read lock");
         app_config
             .notes_folder
             .clone()
             .ok_or("Notes folder not set")?
+    };
+
+    let should_resync_task_quick_add_shortcut = {
+        let settings = state.settings.read().expect("settings read lock");
+        patch.tasks_enabled.is_some()
+            || patch.task_quick_add_shortcut.is_some()
+            || resolve_task_quick_add_shortcut_accelerator(&settings)
+                != resolve_task_quick_add_shortcut_accelerator(&{
+                    let mut next_settings = settings.clone();
+                    apply_settings_patch(&mut next_settings, patch.clone());
+                    next_settings
+                })
     };
 
     let next_settings = {
@@ -3174,6 +3218,14 @@ fn patch_settings(patch: SettingsPatch, state: State<AppState>) -> Result<(), St
     };
 
     save_settings(&folder, &next_settings).map_err(|e| e.to_string())?;
+
+    if should_resync_task_quick_add_shortcut {
+        if let Err(error) = sync_task_quick_add_shortcut(&app, &state) {
+            eprintln!("Failed to sync task quick add shortcut: {error}");
+            let _ = app.emit_to("main", TASK_QUICK_ADD_SHORTCUT_ERROR_EVENT, error);
+        }
+    }
+
     Ok(())
 }
 
@@ -3611,7 +3663,10 @@ fn setup_file_watcher(
                     if let Some(filename) = path.file_name() {
                         let name = filename.to_string_lossy();
                         if (name == "tasks.db" || name == "tasks.db-wal")
-                            && path.parent().map(|p| p.file_name().is_some_and(|n| n == ".sly")).unwrap_or(false)
+                            && path
+                                .parent()
+                                .map(|p| p.file_name().is_some_and(|n| n == ".sly"))
+                                .unwrap_or(false)
                         {
                             let _ = app_handle.emit("tasks-changed", ());
                             continue;
@@ -5422,9 +5477,10 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let three_pane_item = MenuItemBuilder::with_id(MENU_VIEW_3_PANE_ID, "3 Panes")
         .accelerator("CmdOrCtrl+Shift+L")
         .build(app)?;
-    let right_pane_item = MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Right Pane")
-        .accelerator("CmdOrCtrl+Alt+4")
-        .build(app)?;
+    let right_pane_item =
+        MenuItemBuilder::with_id(MENU_TOGGLE_OUTLINE_PANEL_ID, "Toggle Right Pane")
+            .accelerator("CmdOrCtrl+Alt+4")
+            .build(app)?;
     let focus_mode_item = MenuItemBuilder::with_id(MENU_FOCUS_MODE_ID, "Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Enter")
         .build(app)?;
@@ -5568,6 +5624,87 @@ fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
 }
 
 #[cfg(target_os = "macos")]
+fn default_task_quick_add_shortcut() -> &'static str {
+    "Control+Space"
+}
+
+#[cfg(not(target_os = "macos"))]
+fn default_task_quick_add_shortcut() -> &'static str {
+    "CommandOrControl+Shift+N"
+}
+
+fn resolve_task_quick_add_shortcut_accelerator(settings: &Settings) -> Option<String> {
+    if settings.tasks_enabled != Some(true) {
+        return None;
+    }
+
+    match settings
+        .task_quick_add_shortcut
+        .as_deref()
+        .and_then(normalize_task_quick_add_shortcut_value)
+        .as_deref()
+    {
+        Some("disabled") => None,
+        Some("control-space") => Some("Control+Space".to_string()),
+        Some("command-shift-n") => Some("CommandOrControl+Shift+N".to_string()),
+        _ => Some(default_task_quick_add_shortcut().to_string()),
+    }
+}
+
+#[cfg(desktop)]
+fn sync_task_quick_add_shortcut<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+) -> Result<(), String> {
+    let has_notes_folder = state
+        .app_config
+        .read()
+        .expect("app_config read lock")
+        .notes_folder
+        .is_some();
+    let next_shortcut = if has_notes_folder {
+        let settings = state.settings.read().expect("settings read lock");
+        resolve_task_quick_add_shortcut_accelerator(&settings)
+    } else {
+        None
+    };
+
+    let mut registered_shortcut = state
+        .registered_task_quick_add_shortcut
+        .lock()
+        .expect("task quick add shortcut mutex");
+
+    if *registered_shortcut == next_shortcut {
+        return Ok(());
+    }
+
+    if let Some(current) = registered_shortcut.as_deref() {
+        app.global_shortcut()
+            .unregister(current)
+            .map_err(|error| error.to_string())?;
+    }
+
+    *registered_shortcut = None;
+
+    if let Some(next) = next_shortcut {
+        app.global_shortcut()
+            .register(next.as_str())
+            .map_err(|error| error.to_string())?;
+        *registered_shortcut = Some(next);
+    }
+
+    Ok(())
+}
+
+#[cfg(not(desktop))]
+fn sync_task_quick_add_shortcut<R: Runtime>(
+    _app: &AppHandle<R>,
+    _state: &AppState,
+) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn should_hide_window_on_close(window_label: &str) -> bool {
     window_label == "main"
 }
@@ -5641,7 +5778,7 @@ pub fn run() {
         std::process::exit(code);
     }
 
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .menu(build_app_menu)
         .on_menu_event(handle_app_menu_event)
         // Single-instance: forward CLI args from subsequent launches to the running instance
@@ -5652,7 +5789,21 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(
+        tauri_plugin_global_shortcut::Builder::new()
+            .with_handler(|app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    focus_main_window(app);
+                    let _ = app.emit_to("main", OPEN_GLOBAL_TASK_CAPTURE_EVENT, ());
+                }
+            })
+            .build(),
+    );
+
+    let app = builder
         .setup(move |app| {
             // Load app config on startup (contains notes folder path)
             let mut app_config = load_app_config(app.handle());
@@ -5717,6 +5868,7 @@ pub fn run() {
                 note_windows: Mutex::new(HashMap::new()),
                 search_index: Mutex::new(search_index),
                 debounce_map: Arc::new(Mutex::new(HashMap::new())),
+                registered_task_quick_add_shortcut: Mutex::new(None),
             };
             app.manage(state);
 
@@ -5767,6 +5919,12 @@ pub fn run() {
                     //   for onboarding, even if a preview is also showing).
                     let _ = main_window.show();
                 }
+            }
+
+            if let Err(error) =
+                sync_task_quick_add_shortcut(app.handle(), app.state::<AppState>().inner())
+            {
+                eprintln!("Failed to register task quick add shortcut: {error}");
             }
 
             Ok(())
@@ -6299,7 +6457,8 @@ mod tests {
     "bad": "invalid"
   },
   "noteListPreviewLines": 9,
-  "folderSortMode": "legacy"
+  "folderSortMode": "legacy",
+  "taskQuickAddShortcut": "not-real"
 }"#,
         )
         .unwrap();
@@ -6332,6 +6491,7 @@ mod tests {
         );
         assert_eq!(rewritten["noteListPreviewLines"], serde_json::json!(3));
         assert_eq!(rewritten["folderSortMode"], serde_json::json!("nameAsc"));
+        assert!(rewritten.get("taskQuickAddShortcut").is_none());
 
         let _ = std::fs::remove_file(path);
     }
@@ -6653,6 +6813,7 @@ mod tests {
             )])),
             folder_sort_mode: FolderSortMode::NameDesc,
             tasks_enabled: None,
+            task_quick_add_shortcut: None,
         };
 
         apply_settings_patch(
@@ -6674,6 +6835,7 @@ mod tests {
                     "daily".to_string(),
                     NoteSortMode::TitleDesc,
                 )]))),
+                task_quick_add_shortcut: Some(Some(" command-shift-n ".to_string())),
                 ..SettingsPatch::default()
             },
         );
@@ -6701,6 +6863,10 @@ mod tests {
                 "daily".to_string(),
                 NoteSortMode::TitleDesc,
             )]))
+        );
+        assert_eq!(
+            settings.task_quick_add_shortcut.as_deref(),
+            Some("command-shift-n")
         );
     }
 
@@ -6734,6 +6900,7 @@ mod tests {
         assert_eq!(settings.note_sort_mode, NoteSortMode::ModifiedDesc);
         assert_eq!(settings.folder_note_sort_modes, None);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
+        assert_eq!(settings.task_quick_add_shortcut, None);
     }
 
     #[test]
