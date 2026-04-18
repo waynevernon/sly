@@ -307,7 +307,7 @@ function DueDatePickerPanel({
 
       <div className="border-t border-border/60 pt-2">
         <div className="flex items-center justify-between pb-1">
-          <div className="text-sm font-medium text-text">{monthLabel}</div>
+          <div className="pl-2.5 text-sm font-medium text-text">{monthLabel}</div>
           <div className="flex items-center gap-1">
             <IconButton
               type="button"
@@ -436,7 +436,7 @@ export function TaskDatePickerPanel({
 
       <div className="border-t border-border/60 pt-2">
         <div className="flex items-center justify-between pb-1">
-          <div className="text-sm font-medium text-text">{monthLabel}</div>
+          <div className="pl-2.5 text-sm font-medium text-text">{monthLabel}</div>
           <div className="flex items-center gap-1">
             <IconButton
               type="button"
