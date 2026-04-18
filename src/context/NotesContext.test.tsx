@@ -706,7 +706,7 @@ describe("NotesContext", () => {
     });
   });
 
-  it("tracks recent notes in most-recent-first order and caps the list at five", async () => {
+  it("tracks recent notes in most-recent-first order and caps the list at ten", async () => {
     vi.mocked(notesService.listNotes).mockResolvedValue([
       { id: "alpha", title: "Alpha", preview: "", modified: 6, created: 6 },
       { id: "beta", title: "Beta", preview: "", modified: 5, created: 5 },
@@ -743,10 +743,11 @@ describe("NotesContext", () => {
         "gamma",
         "delta",
         "epsilon",
+        "zeta",
       ]);
     });
     expect(notesService.patchSettings).toHaveBeenLastCalledWith({
-      recentNoteIds: ["alpha", "beta", "gamma", "delta", "epsilon"],
+      recentNoteIds: ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
     });
 
     await act(async () => {
@@ -760,10 +761,11 @@ describe("NotesContext", () => {
         "beta",
         "delta",
         "epsilon",
+        "zeta",
       ]);
     });
     expect(notesService.patchSettings).toHaveBeenLastCalledWith({
-      recentNoteIds: ["gamma", "alpha", "beta", "delta", "epsilon"],
+      recentNoteIds: ["gamma", "alpha", "beta", "delta", "epsilon", "zeta"],
     });
   });
 

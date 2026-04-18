@@ -149,7 +149,7 @@ function getParentPath(path: string): string | null {
   return lastSlash > 0 ? path.substring(0, lastSlash) : null;
 }
 
-const RECENT_NOTES_LIMIT = 5;
+const RECENT_NOTES_LIMIT = 10;
 const DEFAULT_SETTINGS: Settings = {
   schemaVersion: 1,
   showNoteCounts: true,
