@@ -74,6 +74,15 @@ describe("TaskRow", () => {
     expect(screen.getByTestId("task-row-waiting-indicator")).toBeInTheDocument();
   });
 
+  it("shows a calendar icon beside the action date in the secondary row", () => {
+    renderRow({
+      task: makeTask({ actionAt: "2026-04-11T12:00:00.000Z" }),
+    });
+
+    expect(screen.getByText("Tomorrow")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-calendar-days")).not.toBeNull();
+  });
+
   it("shows a flag icon beside the due date in the secondary row", () => {
     renderRow({
       task: makeTask({ dueAt: "2026-04-11T12:00:00.000Z" }),

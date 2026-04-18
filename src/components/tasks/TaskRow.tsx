@@ -2,7 +2,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { CheckCheck, Clock3, FileText, Flag, Link2, Repeat2, Star } from "lucide-react";
+import { CalendarDays, CheckCheck, Clock3, FileText, Flag, Link2, Repeat2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
 import { menuSurfaceClassName } from "../ui";
@@ -258,7 +258,10 @@ export function TaskRow({
                           <span>{secondaryLabel}</span>
                         </span>
                       ) : (
-                        secondaryLabel
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <CalendarDays className="h-3.25 w-3.25 shrink-0 stroke-[1.9]" />
+                          <span>{secondaryLabel}</span>
+                        </span>
                       )
                     )}
                     {secondaryLabel && dueDateLabel && (
