@@ -3308,32 +3308,53 @@ fn patch_settings(
             .ok_or("Notes folder not set")?
     };
 
-    let should_resync_task_quick_add_shortcut = {
+    let (should_resync_task_quick_add_shortcut, next_settings) = {
         let settings = state.settings.read().expect("settings read lock");
-        patch.tasks_enabled.is_some()
-            || patch.task_quick_add_shortcut.is_some()
-            || resolve_task_quick_add_shortcut_accelerator(&settings)
-                != resolve_task_quick_add_shortcut_accelerator(&{
-                    let mut next_settings = settings.clone();
-                    apply_settings_patch(&mut next_settings, patch.clone());
-                    next_settings
-                })
-    };
+        let mut next_settings = settings.clone();
+        apply_settings_patch(&mut next_settings, patch.clone());
 
-    let next_settings = {
-        let mut settings = state.settings.write().expect("settings write lock");
-        apply_settings_patch(&mut settings, patch);
-        settings.clone()
+        (
+            patch.tasks_enabled.is_some()
+                || patch.task_quick_add_shortcut.is_some()
+                || resolve_task_quick_add_shortcut_accelerator(&settings)
+                    != resolve_task_quick_add_shortcut_accelerator(&next_settings),
+            next_settings,
+        )
     };
-
-    save_settings(&folder, &next_settings).map_err(|e| e.to_string())?;
 
     if should_resync_task_quick_add_shortcut {
-        if let Err(error) = sync_task_quick_add_shortcut(&app, &state) {
-            eprintln!("Failed to sync task quick add shortcut: {error}");
-            let _ = app.emit_to("main", TASK_QUICK_ADD_SHORTCUT_ERROR_EVENT, error);
+        let next_shortcut = resolve_task_quick_add_shortcut_accelerator(&next_settings);
+        let mut registered_shortcut = state
+            .registered_task_quick_add_shortcut
+            .lock()
+            .expect("task quick add shortcut mutex");
+        if let Err(error) = replace_registered_task_quick_add_shortcut(
+            registered_shortcut.as_deref(),
+            next_shortcut.as_deref(),
+            |shortcut| {
+                app.global_shortcut()
+                    .register(shortcut)
+                    .map_err(|register_error| register_error.to_string())
+            },
+            |shortcut| {
+                app.global_shortcut()
+                    .unregister(shortcut)
+                    .map_err(|unregister_error| unregister_error.to_string())
+            },
+        ) {
+            let _ = app.emit_to("main", TASK_QUICK_ADD_SHORTCUT_ERROR_EVENT, error.clone());
+            return Err(error);
+        } else {
+            *registered_shortcut = next_shortcut;
         }
     }
+
+    {
+        let mut settings = state.settings.write().expect("settings write lock");
+        *settings = next_settings.clone();
+    }
+
+    save_settings(&folder, &next_settings).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -5759,6 +5780,37 @@ fn resolve_task_quick_add_shortcut_accelerator(settings: &Settings) -> Option<St
     }
 }
 
+fn replace_registered_task_quick_add_shortcut(
+    current_shortcut: Option<&str>,
+    next_shortcut: Option<&str>,
+    mut register: impl FnMut(&str) -> Result<(), String>,
+    mut unregister: impl FnMut(&str) -> Result<(), String>,
+) -> Result<Option<String>, String> {
+    if current_shortcut == next_shortcut {
+        return Ok(current_shortcut.map(str::to_string));
+    }
+
+    match (current_shortcut, next_shortcut) {
+        (Some(current), Some(next)) => {
+            register(next)?;
+            if let Err(error) = unregister(current) {
+                let _ = unregister(next);
+                return Err(error);
+            }
+            Ok(Some(next.to_string()))
+        }
+        (Some(current), None) => {
+            unregister(current)?;
+            Ok(None)
+        }
+        (None, Some(next)) => {
+            register(next)?;
+            Ok(Some(next.to_string()))
+        }
+        (None, None) => Ok(None),
+    }
+}
+
 #[cfg(desktop)]
 fn sync_task_quick_add_shortcut<R: Runtime>(
     app: &AppHandle<R>,
@@ -5782,24 +5834,20 @@ fn sync_task_quick_add_shortcut<R: Runtime>(
         .lock()
         .expect("task quick add shortcut mutex");
 
-    if *registered_shortcut == next_shortcut {
-        return Ok(());
-    }
-
-    if let Some(current) = registered_shortcut.as_deref() {
-        app.global_shortcut()
-            .unregister(current)
-            .map_err(|error| error.to_string())?;
-    }
-
-    *registered_shortcut = None;
-
-    if let Some(next) = next_shortcut {
-        app.global_shortcut()
-            .register(next.as_str())
-            .map_err(|error| error.to_string())?;
-        *registered_shortcut = Some(next);
-    }
+    *registered_shortcut = replace_registered_task_quick_add_shortcut(
+        registered_shortcut.as_deref(),
+        next_shortcut.as_deref(),
+        |shortcut| {
+            app.global_shortcut()
+                .register(shortcut)
+                .map_err(|error| error.to_string())
+        },
+        |shortcut| {
+            app.global_shortcut()
+                .unregister(shortcut)
+                .map_err(|error| error.to_string())
+        },
+    )?;
 
     Ok(())
 }
@@ -7013,6 +7061,61 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn replacing_registered_task_shortcut_keeps_current_binding_when_next_registration_fails() {
+        let operations = std::cell::RefCell::new(Vec::new());
+        let result = replace_registered_task_quick_add_shortcut(
+            Some("Control+Space"),
+            Some("Alt+Shift+F12"),
+            |shortcut| {
+                operations.borrow_mut().push(format!("register:{shortcut}"));
+                Err("already registered".to_string())
+            },
+            |shortcut| {
+                operations
+                    .borrow_mut()
+                    .push(format!("unregister:{shortcut}"));
+                Ok(())
+            },
+        );
+
+        assert_eq!(result.unwrap_err(), "already registered");
+        assert_eq!(operations.into_inner(), vec!["register:Alt+Shift+F12"]);
+    }
+
+    #[test]
+    fn replacing_registered_task_shortcut_rolls_back_new_binding_if_old_unregistration_fails() {
+        let operations = std::cell::RefCell::new(Vec::new());
+        let result = replace_registered_task_quick_add_shortcut(
+            Some("Control+Space"),
+            Some("Alt+Shift+F12"),
+            |shortcut| {
+                operations.borrow_mut().push(format!("register:{shortcut}"));
+                Ok(())
+            },
+            |shortcut| {
+                operations
+                    .borrow_mut()
+                    .push(format!("unregister:{shortcut}"));
+                if shortcut == "Control+Space" {
+                    Err("failed to unregister current shortcut".to_string())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+
+        assert_eq!(result.unwrap_err(), "failed to unregister current shortcut");
+        assert_eq!(
+            operations.into_inner(),
+            vec![
+                "register:Alt+Shift+F12",
+                "unregister:Control+Space",
+                "unregister:Alt+Shift+F12"
+            ]
+        );
     }
 
     #[test]
