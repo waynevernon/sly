@@ -250,14 +250,32 @@ export function TaskDetailPanel() {
             )}
           </button>
 
-          <input
-            type="text"
-            value={title}
-            placeholder="Task name"
-            onChange={handleTitleChange}
-            onBlur={flushSave}
-            className="min-w-0 bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
-          />
+          <div className="flex min-w-0 items-start gap-3">
+            <input
+              type="text"
+              value={title}
+              placeholder="Task name"
+              onChange={handleTitleChange}
+              onBlur={flushSave}
+              className="min-w-0 flex-1 bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+            />
+            <IconButton
+              type="button"
+              variant="ghost"
+              title={selectedTask.starred ? "Unstar task" : "Star task"}
+              onClick={() => void updateTask(selectedTask.id, { starred: !selectedTask.starred })}
+              className={cn(
+                "mt-0.5 shrink-0",
+                selectedTask.starred ? "text-amber-400 hover:text-amber-400/80" : undefined,
+              )}
+            >
+              <Star
+                className="h-4.5 w-4.5"
+                fill={selectedTask.starred ? "currentColor" : "none"}
+                strokeWidth={selectedTask.starred ? 0 : 1.5}
+              />
+            </IconButton>
+          </div>
 
           <div />
           <div className="flex flex-wrap items-center gap-2">
@@ -367,13 +385,26 @@ export function TaskDetailPanel() {
 
           <div />
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted/50">
-            <span>Created {formatTaskTimestamp(selectedTask.createdAt)}</span>
-            {selectedTask.completedAt ? (
-              <>
-                <span className="text-text-muted/30">·</span>
-                <span>Completed {formatTaskTimestamp(selectedTask.completedAt)}</span>
-              </>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span>Created {formatTaskTimestamp(selectedTask.createdAt)}</span>
+              {selectedTask.completedAt ? (
+                <>
+                  <span className="text-text-muted/30">·</span>
+                  <span>Completed {formatTaskTimestamp(selectedTask.completedAt)}</span>
+                </>
+              ) : null}
+            </div>
+            <div className="ml-auto">
+              <IconButton
+                type="button"
+                variant="ghost"
+                title="Delete Task"
+                onClick={() => void handleDelete()}
+                className="h-6.5 w-6.5 text-text-muted/70 hover:text-text"
+              >
+                <Trash2 className="h-4 w-4 stroke-[1.5]" />
+              </IconButton>
+            </div>
           </div>
         </div>
       </div>
@@ -385,31 +416,6 @@ export function TaskDetailPanel() {
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="flex-1" />
-        {selectedTask ? (
-          <div className="ui-pane-header-actions ml-auto">
-            <IconButton
-              type="button"
-              variant="ghost"
-              title={selectedTask.starred ? "Unstar task" : "Star task"}
-              onClick={() => void updateTask(selectedTask.id, { starred: !selectedTask.starred })}
-              className={selectedTask.starred ? "text-amber-400 hover:text-amber-400/80" : undefined}
-            >
-              <Star
-                className="h-4.5 w-4.5"
-                fill={selectedTask.starred ? "currentColor" : "none"}
-                strokeWidth={selectedTask.starred ? 0 : 1.5}
-              />
-            </IconButton>
-            <IconButton
-              type="button"
-              variant="ghost"
-              title="Delete Task"
-              onClick={() => void handleDelete()}
-            >
-              <Trash2 className="h-4.5 w-4.5 stroke-[1.5]" />
-            </IconButton>
-          </div>
-        ) : null}
       </div>
 
       <div className="ui-scrollbar-overlay flex-1 overflow-y-auto">

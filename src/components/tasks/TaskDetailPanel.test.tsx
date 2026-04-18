@@ -313,7 +313,7 @@ describe("TaskDetailPanel", () => {
     });
   });
 
-  it("stars and unstars the task from the header toolbar", async () => {
+  it("stars and unstars the task from the inline title action", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");
     const updateTask = vi.fn().mockResolvedValue(null);
