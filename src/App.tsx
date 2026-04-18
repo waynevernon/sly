@@ -52,6 +52,7 @@ import type {
   AssistantTurn,
 } from "./types/assistant";
 import { alt, isMac, mod, shortcut } from "./lib/platform";
+import { matchesTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
   applyLineReplacement,
@@ -498,6 +499,7 @@ function AppContent() {
   const isTasksModeActiveRef = useRef(isTasksModeActive);
   isTasksModeActiveRef.current = isTasksModeActive;
   const tasksEnabled = settings?.tasksEnabled ?? false;
+  const taskQuickAddShortcut = settings?.taskQuickAddShortcut ?? null;
   const showRightPanel =
     rightPanelVisible &&
     !focusMode &&
@@ -843,6 +845,17 @@ function AppContent() {
     setWorkspaceMode("tasks");
   }, [clearNoteSelection, setPaneMode]);
 
+  const openTaskCapture = useCallback(() => {
+    if (!tasksEnabled) {
+      toast("Enable tasks in Settings to capture tasks.");
+      return;
+    }
+
+    setPaletteOpen(false);
+    setView("notes");
+    setTaskCaptureOpen(true);
+  }, [tasksEnabled]);
+
   useEffect(() => {
     let cancelled = false;
     let unlistenOpenSettings: (() => void) | undefined;
@@ -854,6 +867,8 @@ function AppContent() {
     let unlistenSetPaneMode: (() => void) | undefined;
     let unlistenToggleFocusMode: (() => void) | undefined;
     let unlistenToggleRightPanel: (() => void) | undefined;
+    let unlistenOpenGlobalTaskCapture: (() => void) | undefined;
+    let unlistenTaskQuickAddShortcutError: (() => void) | undefined;
 
     listen("open-settings", () => {
       openSettings();
@@ -921,6 +936,20 @@ function AppContent() {
       else unlistenToggleRightPanel = fn;
     });
 
+    listen("open-global-task-capture", () => {
+      openTaskCapture();
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenOpenGlobalTaskCapture = fn;
+    });
+
+    listen<string>("task-quick-add-shortcut-error", (event) => {
+      toast.error(event.payload);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlistenTaskQuickAddShortcutError = fn;
+    });
+
     return () => {
       cancelled = true;
       unlistenOpenSettings?.();
@@ -932,9 +961,12 @@ function AppContent() {
       unlistenSetPaneMode?.();
       unlistenToggleFocusMode?.();
       unlistenToggleRightPanel?.();
+      unlistenOpenGlobalTaskCapture?.();
+      unlistenTaskQuickAddShortcutError?.();
     };
   }, [
     applyPaneModeSelection,
+    openTaskCapture,
     openSettings,
     showNotesMode,
     showTasksMode,
@@ -1340,6 +1372,12 @@ function AppContent() {
         return;
       }
 
+      if (matchesTaskQuickAddShortcut(e, taskQuickAddShortcut)) {
+        e.preventDefault();
+        openTaskCapture();
+        return;
+      }
+
       // Block all other shortcuts when in settings view
       if (viewRef.current === "settings") {
         return;
@@ -1378,18 +1416,6 @@ function AppContent() {
             ? 2
             : requestedPaneMode;
         applyPaneModeSelection(nextPaneMode);
-        return;
-      }
-
-      // Cmd/Ctrl+Shift+N - Global task capture
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        if (!tasksEnabled) {
-          toast("Enable tasks in Settings to capture tasks.");
-          return;
-        }
-        setPaletteOpen(false);
-        setTaskCaptureOpen(true);
         return;
       }
 
@@ -1640,9 +1666,11 @@ function AppContent() {
     setPaneMode,
     toggleRightPanel,
     openSettings,
+    openTaskCapture,
     showNotesMode,
     showTasksMode,
     tasksEnabled,
+    taskQuickAddShortcut,
     toggleFocusMode,
     setInterfaceZoom,
   ]);

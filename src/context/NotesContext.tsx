@@ -22,6 +22,7 @@ import {
   type NoteSortMode,
   type Settings,
   type SettingsPatch,
+  type TaskQuickAddShortcut,
 } from "../types/note";
 import * as notesService from "../services/notes";
 import type {
@@ -130,6 +131,9 @@ interface NotesActionsContextValue {
   setShowPinnedNotes: (showPinnedNotes: boolean) => Promise<void>;
   setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
   setTasksEnabled: (enabled: boolean) => Promise<void>;
+  setTaskQuickAddShortcut: (
+    shortcut: TaskQuickAddShortcut | null,
+  ) => Promise<void>;
 }
 
 const NotesDataContext = createContext<NotesDataContextValue | null>(null);
@@ -519,6 +523,11 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   assignField("noteSortMode", current.noteSortMode, next.noteSortMode);
   assignField("folderSortMode", current.folderSortMode, next.folderSortMode);
   assignField("tasksEnabled", current.tasksEnabled, next.tasksEnabled);
+  assignField(
+    "taskQuickAddShortcut",
+    current.taskQuickAddShortcut,
+    next.taskQuickAddShortcut,
+  );
 
   return patch;
 }
@@ -916,6 +925,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       await persistSettings((currentSettings) => ({
         ...currentSettings,
         tasksEnabled: enabled,
+      }));
+    },
+    [persistSettings],
+  );
+
+  const setTaskQuickAddShortcut = useCallback(
+    async (taskQuickAddShortcut: TaskQuickAddShortcut | null) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        taskQuickAddShortcut,
       }));
     },
     [persistSettings],
@@ -2507,6 +2526,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setShowPinnedNotes,
       setShowRecentNotes,
       setTasksEnabled,
+      setTaskQuickAddShortcut,
     }),
     [
       selectNote,
@@ -2548,6 +2568,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setShowPinnedNotes,
       setShowRecentNotes,
       setTasksEnabled,
+      setTaskQuickAddShortcut,
     ]
   );
 

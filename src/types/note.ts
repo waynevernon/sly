@@ -146,6 +146,10 @@ export type FolderColorId =
 export type FolderIconSpec =
   | { kind: "lucide"; name: string }
   | { kind: "emoji"; shortcode: string };
+export type TaskQuickAddShortcut =
+  | "control-space"
+  | "command-shift-n"
+  | "disabled";
 export interface FolderAppearance {
   icon?: FolderIconSpec;
   colorId?: FolderColorId;
@@ -212,6 +216,7 @@ export interface Settings {
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode: FolderSortMode;
   tasksEnabled?: boolean | null;
+  taskQuickAddShortcut?: TaskQuickAddShortcut | null;
 }
 
 export interface SettingsPatch {
@@ -235,6 +240,7 @@ export interface SettingsPatch {
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode?: FolderSortMode;
   tasksEnabled?: boolean | null;
+  taskQuickAddShortcut?: TaskQuickAddShortcut | null;
 }
 
 export interface FolderNode {

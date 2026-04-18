@@ -3,6 +3,33 @@ import { useEffect, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
+const { tauriEventListeners, listenMock } = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(event: { payload: unknown }) => void>>();
+  return {
+    tauriEventListeners: listeners,
+    listenMock: vi.fn(
+      (event: string, callback: (event: { payload: unknown }) => void) => {
+        const callbacks = listeners.get(event) ?? new Set();
+        callbacks.add(callback);
+        listeners.set(event, callbacks);
+
+        return Promise.resolve(() => {
+          callbacks.delete(callback);
+          if (callbacks.size === 0) {
+            listeners.delete(event);
+          }
+        });
+      },
+    ),
+  };
+});
+
+function emitTauriEvent(event: string, payload?: unknown) {
+  for (const callback of tauriEventListeners.get(event) ?? []) {
+    callback({ payload });
+  }
+}
+
 const notesDataState = {
   notesFolder: "/notes",
   isLoading: false,
@@ -55,7 +82,7 @@ const themeState = {
 };
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
+  listen: listenMock,
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -240,6 +267,7 @@ describe("App", () => {
     themeState.rightPanelVisible = true;
     themeState.rightPanelTab = "outline";
     notesDataState.settings.tasksEnabled = false;
+    tauriEventListeners.clear();
   });
 
   afterEach(() => {
@@ -308,7 +336,17 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.keyDown(window, { key: "N", metaKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: "N", ctrlKey: true, shiftKey: true });
+
+    expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
+  });
+
+  it("opens the global task capture dialog from the desktop shortcut event", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    emitTauriEvent("open-global-task-capture");
 
     expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
   });

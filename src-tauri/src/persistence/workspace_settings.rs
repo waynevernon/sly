@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    default_note_list_preview_lines, FolderAppearance, FolderIconSpec, NoteSortMode, Settings,
-    SettingsPatch,
+    default_note_list_preview_lines, normalize_task_quick_add_shortcut_value, FolderAppearance,
+    FolderIconSpec, NoteSortMode, Settings, SettingsPatch,
 };
 
 const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 1;
@@ -120,6 +120,9 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(tasks_enabled) = patch.tasks_enabled {
         settings.tasks_enabled = tasks_enabled;
     }
+    if let Some(task_quick_add_shortcut) = patch.task_quick_add_shortcut {
+        settings.task_quick_add_shortcut = task_quick_add_shortcut;
+    }
     canonicalize_settings(settings);
 }
 
@@ -188,6 +191,20 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
         } else if trimmed != ollama_model {
             settings.ollama_model = Some(trimmed.to_string());
             changed = true;
+        }
+    }
+
+    if let Some(task_quick_add_shortcut) = settings.task_quick_add_shortcut.take() {
+        match normalize_task_quick_add_shortcut_value(&task_quick_add_shortcut) {
+            Some(normalized) => {
+                if normalized != task_quick_add_shortcut {
+                    changed = true;
+                }
+                settings.task_quick_add_shortcut = Some(normalized);
+            }
+            None => {
+                changed = true;
+            }
         }
     }
 
@@ -271,6 +288,11 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_folder_note_sort_modes_field(object, "folderNoteSortModes");
     normalize_string_enum_field(object, "folderSortMode", &["nameAsc", "nameDesc"]);
     normalize_optional_bool_field(object, "tasksEnabled");
+    normalize_optional_string_enum_field(
+        object,
+        "taskQuickAddShortcut",
+        &["control-space", "command-shift-n", "disabled"],
+    );
 }
 
 fn ensure_object_value(value: Value) -> Value {
@@ -313,6 +335,22 @@ fn normalize_bool_field(object: &mut Map<String, Value>, key: &str) {
 fn normalize_optional_string_field(object: &mut Map<String, Value>, key: &str) {
     let should_remove = match object.get(key) {
         Some(Value::String(_)) | Some(Value::Null) | None => false,
+        Some(_) => true,
+    };
+
+    if should_remove {
+        object.remove(key);
+    }
+}
+
+fn normalize_optional_string_enum_field(
+    object: &mut Map<String, Value>,
+    key: &str,
+    allowed: &[&str],
+) {
+    let should_remove = match object.get(key) {
+        Some(Value::String(value)) => !allowed.contains(&value.as_str()),
+        Some(Value::Null) | None => false,
         Some(_) => true,
     };
 

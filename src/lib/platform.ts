@@ -10,6 +10,7 @@ export const isMac =
 
 /** Modifier key symbol/label */
 export const mod = isMac ? "⌘" : "Ctrl";
+export const ctrl = isMac ? "⌃" : "Ctrl";
 export const alt = isMac ? "⌥" : "Alt";
 export const shift = isMac ? "⇧" : "Shift";
 
