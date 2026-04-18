@@ -608,6 +608,13 @@ export function TaskListPane() {
     [selectTask, selectTaskRange, toggleTaskSelection],
   );
 
+  const handleCompleteTasks = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id) => setCompleted(id, true)));
+    },
+    [setCompleted],
+  );
+
   const handleDeleteTasks = useCallback(
     async (ids: string[]) => {
       await Promise.all(ids.map((id) => deleteTask(id)));
@@ -659,6 +666,14 @@ export function TaskListPane() {
                 await handleRescheduleTasks(selectedTaskIds, selection);
               }}
             />
+            <IconButton
+              type="button"
+              variant="ghost"
+              title="Mark selected tasks complete"
+              onClick={() => void handleCompleteTasks(selectedTaskIds)}
+            >
+              <CheckCheck className="h-4 w-4 stroke-[1.6]" />
+            </IconButton>
             <IconButton
               type="button"
               variant="ghost"
