@@ -3,11 +3,11 @@
 </p>
 
 # Sly
-Sly is an editor-first markdown notes app for macOS, Windows, and Linux. It keeps your notes on disk as plain markdown files, stays fast on real folders, and adds optional AI and Git workflows without turning your notes into a cloud product.
+Sly is an editor-first markdown notes app for macOS. It keeps your notes on disk as plain markdown files, stays fast on real folders, and adds optional AI and Git workflows without turning your notes into a cloud product.
 
 Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project created by Eric Li.
 
-![macOS](https://img.shields.io/badge/platform-macOS-lightgrey) ![Windows](https://img.shields.io/badge/platform-Windows-blue) ![Linux](https://img.shields.io/badge/platform-Linux-orange)
+![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
 
 [Releases](https://github.com/waynevernon/sly/releases) · [Report an Issue](https://github.com/waynevernon/sly/issues)
 
@@ -25,12 +25,6 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 - Built-in Git workflows for notes on disk. Initialize a repo, inspect status, commit changes, configure remotes, and push without leaving the app.
 - Deep workspace customization. Choose from a growing set of theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
 - Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms to launch notes and manage tasks, and get in-app update checks through the Tauri updater.
-
-## Platform Status
-
-- macOS is the primary day-to-day development and validation target.
-- Windows and Linux release artifacts are produced, but they are not yet manually validated for every release.
-- If you run Sly on Windows or Linux, treat those builds as early support until release validation is more consistent.
 
 ## Installation
 
@@ -53,18 +47,6 @@ brew install --cask waynevernon/sly/sly@beta
 The beta channel follows whichever published release is newer between the latest stable and latest beta, so stable promotions flow through automatically. Homebrew stable and beta installs conflict by design, so install one channel or the other.
 
 If you prefer a direct install, download the latest DMG from the [Releases](https://github.com/waynevernon/sly/releases) page, open it, and drag Sly to Applications.
-
-### Windows
-
-Download the latest `.exe` installer from the [Releases](https://github.com/waynevernon/sly/releases) page and run it. WebView2 will be downloaded automatically if needed.
-
-Windows builds are not yet manually validated for every release.
-
-### Linux
-
-Download the latest `.AppImage` or `.deb` from the [Releases](https://github.com/waynevernon/sly/releases) page.
-
-Linux builds are not yet manually validated for every release.
 
 ## Keyboard Shortcuts
 
@@ -191,9 +173,10 @@ sly task complete 0195d9f1
 
 ### Requirements
 
+- macOS
 - Node.js 18+
 - Rust stable
-- Platform prerequisites for Tauri v2
+- Xcode command line tools
 
 ### Local development
 
