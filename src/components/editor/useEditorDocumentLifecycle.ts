@@ -31,6 +31,7 @@ interface UseEditorDocumentLifecycleOptions {
   consumePendingNewNote?: (id: string) => boolean;
   currentNote: DocumentNote | null;
   currentNoteIdRef: MutableRefObject<string | null>;
+  onDocumentTitleChange?: (title: string) => void;
   editorReady: boolean;
   editorRef: MutableRefObject<TiptapEditor | null>;
   focusAndSelectTitle: (editor: TiptapEditor) => boolean;
@@ -101,6 +102,7 @@ export function useEditorDocumentLifecycle({
   consumePendingNewNote,
   currentNote,
   currentNoteIdRef,
+  onDocumentTitleChange,
   editorReady,
   editorRef,
   focusAndSelectTitle,
@@ -177,6 +179,20 @@ export function useEditorDocumentLifecycle({
   );
 
   const flushPendingSave = useCallback(async () => {
+    const sourceNoteId =
+      currentNoteIdRef.current ?? currentNote?.id ?? loadedNoteIdRef.current;
+    if (sourceTimeoutRef.current && sourceNoteId) {
+      clearTimeout(sourceTimeoutRef.current);
+      sourceTimeoutRef.current = null;
+      setIsSaving(true);
+      try {
+        lastSaveRef.current = { noteId: sourceNoteId, content: sourceContent };
+        await saveNote(sourceContent, sourceNoteId);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
@@ -187,7 +203,15 @@ export function useEditorDocumentLifecycle({
       const markdown = getMarkdown(editorRef.current);
       await saveImmediately(loadedNoteIdRef.current, markdown);
     }
-  }, [editorRef, getMarkdown, saveImmediately]);
+  }, [
+    currentNote?.id,
+    currentNoteIdRef,
+    editorRef,
+    getMarkdown,
+    saveImmediately,
+    saveNote,
+    sourceContent,
+  ]);
 
   const finalizeProvisionalFilename = useCallback(async () => {
     const noteId = provisionalFilenameNoteIdRef.current;
@@ -353,6 +377,7 @@ export function useEditorDocumentLifecycle({
   const handleSourceChange = useCallback(
     (value: string) => {
       setSourceContent(value);
+      onDocumentTitleChange?.(deriveNoteTitleFromMarkdown(value));
       if (sourceTimeoutRef.current) {
         clearTimeout(sourceTimeoutRef.current);
       }
@@ -372,7 +397,7 @@ export function useEditorDocumentLifecycle({
         }
       }, 300);
     },
-    [currentNote, currentNoteIdRef, saveNote],
+    [currentNote, currentNoteIdRef, onDocumentTitleChange, saveNote],
   );
 
   useEffect(() => {
@@ -457,6 +482,8 @@ export function useEditorDocumentLifecycle({
     if (!editorReady || !currentNote) {
       return;
     }
+
+    onDocumentTitleChange?.(currentNote.title);
 
     const currentEditor = editorRef.current;
     if (!currentEditor) {
@@ -594,6 +621,7 @@ export function useEditorDocumentLifecycle({
     editorRef,
     flushPendingSave,
     focusAndSelectTitle,
+    onDocumentTitleChange,
     parseEditorContent,
     reloadVersion,
     scrollContainerRef,

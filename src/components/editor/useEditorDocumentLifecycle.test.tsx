@@ -195,6 +195,41 @@ describe("useEditorDocumentLifecycle", () => {
     });
   });
 
+  it("flushes pending source-mode saves before returning", async () => {
+    const saveNote = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useEditorDocumentLifecycle({
+        currentNote: {
+          id: "alpha",
+          title: "Alpha",
+          content: "# Alpha\n",
+          modified: 1,
+        },
+        currentNoteIdRef: { current: "alpha" },
+        editorReady: false,
+        editorRef: { current: null },
+        focusAndSelectTitle: vi.fn(() => false),
+        printMode: false,
+        reloadVersion: 0,
+        saveNote,
+        notesFolder: null,
+        scrollContainerRef: { current: null },
+        sourceEditorRef: { current: null },
+      }),
+    );
+
+    act(() => {
+      result.current.handleSourceChange("# Renamed\nBody");
+    });
+
+    await act(async () => {
+      await result.current.flushPendingSave();
+    });
+
+    expect(saveNote).toHaveBeenCalledWith("# Renamed\nBody", "alpha");
+  });
+
   it("tracks headings and fenced code blocks when mapping markdown blocks", () => {
     const markdown = "Intro\n# Heading\n\n```ts\nconst answer = 42;\n```\n\nTail\n";
 

@@ -111,6 +111,7 @@ export interface UseSlyEditorOptions {
   isLoadingRef: MutableRefObject<boolean>;
   katexMacros: Record<string, string>;
   onCreate?: (editor: TiptapEditor) => void;
+  onDocumentChange?: (editor: TiptapEditor) => void;
   provisionalFilenameNoteIdRef: MutableRefObject<string | null>;
   scheduleSave: () => void;
   selectionIsInsideH1: (editor: TiptapEditor) => boolean;
@@ -128,6 +129,7 @@ export function useSlyEditor({
   isLoadingRef,
   katexMacros,
   onCreate,
+  onDocumentChange,
   provisionalFilenameNoteIdRef,
   scheduleSave,
   selectionIsInsideH1,
@@ -229,7 +231,7 @@ export function useSlyEditor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-lg dark:prose-invert max-w-3xl mx-auto focus:outline-none min-h-full px-6 pt-8 pb-24",
+          "prose prose-lg dark:prose-invert max-w-none focus:outline-none min-h-full",
       },
       clipboardTextSerializer: (slice) => {
         const fallback = slice.content.textBetween(0, slice.content.size, "\n\n");
@@ -258,6 +260,9 @@ export function useSlyEditor({
     },
     onUpdate: () => {
       if (isLoadingRef.current) return;
+      if (editorRef.current) {
+        onDocumentChange?.(editorRef.current);
+      }
       scheduleSave();
     },
     onSelectionUpdate: () => {

@@ -57,6 +57,20 @@ export function getNoteLeaf(noteId: string): string {
   return segments[segments.length - 1] ?? noteId;
 }
 
+export function getFilenameSyncSuggestion(
+  noteId: string,
+  documentTitle: string,
+): string | null {
+  const trimmedTitle = documentTitle.trim();
+  if (isEffectivelyEmpty(trimmedTitle)) {
+    return null;
+  }
+
+  return sanitizeNoteFilename(trimmedTitle) === getNoteLeaf(noteId)
+    ? null
+    : trimmedTitle;
+}
+
 export function isDefaultPlaceholderNoteId(noteId: string): boolean {
   return /^Untitled(?:-\d+)?$/.test(getNoteLeaf(noteId));
 }

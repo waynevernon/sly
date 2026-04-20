@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveNoteTitleFromMarkdown,
+  getFilenameSyncSuggestion,
   isDefaultPlaceholderNoteId,
   isDefaultPlaceholderTitle,
   sanitizeNoteFilename,
@@ -31,5 +32,13 @@ describe("noteIdentity", () => {
     expect(isDefaultPlaceholderTitle("Untitled")).toBe(true);
     expect(isDefaultPlaceholderTitle("Untitled 2")).toBe(true);
     expect(isDefaultPlaceholderTitle("Untitled Copy")).toBe(false);
+  });
+
+  it("only suggests syncing the filename when the sanitized first line differs", () => {
+    expect(getFilenameSyncSuggestion("Daily--note", "Daily:/note")).toBeNull();
+    expect(getFilenameSyncSuggestion("Daily note", "Project kickoff")).toBe(
+      "Project kickoff",
+    );
+    expect(getFilenameSyncSuggestion("Daily note", "   ")).toBeNull();
   });
 });

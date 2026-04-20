@@ -91,6 +91,7 @@ import {
   FolderPlusIcon,
   NoteIcon,
 } from "../icons";
+import { EditorFilenameField } from "./EditorFilenameField";
 
 function formatDateTime(timestamp: number): string {
   const date = new Date(timestamp * 1000);
@@ -141,6 +142,34 @@ function selectionIsInsideH1(editor: TiptapEditor): boolean {
   });
 
   return insideHeading;
+}
+
+function truncateNoteTitle(title: string): string {
+  return Array.from(title).slice(0, 50).join("");
+}
+
+function deriveNoteTitleFromEditor(editor: TiptapEditor): string {
+  const { doc } = editor.state;
+
+  for (let index = 0; index < doc.childCount; index += 1) {
+    const node = doc.child(index);
+    if (node.type.name === "frontmatter") {
+      continue;
+    }
+
+    const text = node.textContent.trim();
+    if (!text) {
+      continue;
+    }
+
+    if (node.type.name === "heading" && node.attrs.level === 1) {
+      return truncateNoteTitle(text);
+    }
+
+    return truncateNoteTitle(text);
+  }
+
+  return "Untitled";
 }
 
 // Standard number-field shortcuts for KaTeX (shared between inline and block math)
@@ -681,6 +710,9 @@ function EditorImpl({
   const [, setSelectionKey] = useState(0);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [documentTitle, setDocumentTitle] = useState(
+    currentNote?.title ?? "Untitled",
+  );
   // Delay transition classes until after initial mount to avoid format bar height animation on note load
   const [hasTransitioned, setHasTransitioned] = useState(false);
   useEffect(() => {
@@ -741,6 +773,7 @@ function EditorImpl({
     consumePendingNewNote,
     currentNote,
     currentNoteIdRef,
+    onDocumentTitleChange: setDocumentTitle,
     editorReady,
     editorRef,
     focusAndSelectTitle,
@@ -874,6 +907,9 @@ function EditorImpl({
     isLoadingRef,
     katexMacros,
     onCreate: () => setEditorReady(true),
+    onDocumentChange: (editorInstance) => {
+      setDocumentTitle(deriveNoteTitleFromEditor(editorInstance));
+    },
     provisionalFilenameNoteIdRef,
     scheduleSave,
     selectionIsInsideH1,
@@ -886,6 +922,10 @@ function EditorImpl({
   useEffect(() => {
     onEditorReady?.(editor);
   }, [editor, onEditorReady]);
+
+  useEffect(() => {
+    setDocumentTitle(currentNote?.title ?? "Untitled");
+  }, [currentNote?.id, currentNote?.title]);
 
   useEffect(() => {
     onRegisterScrollContainer?.(scrollContainerRef.current);
@@ -1132,6 +1172,24 @@ function EditorImpl({
       toast.error("Failed to save markdown");
     }
   }, [editor, currentNote, getMarkdown]);
+
+  const handleRenameFromEditor = useCallback(
+    async (nextName: string) => {
+      if (!currentNote || !renameNote) {
+        return;
+      }
+
+      try {
+        await flushPendingSave();
+        await renameNote(currentNote.id, nextName);
+      } catch (error) {
+        console.error("Failed to rename note file:", error);
+        toast.error("Failed to rename file");
+        throw error;
+      }
+    },
+    [currentNote, flushPendingSave, renameNote],
+  );
 
   // Listen for toggle-source-mode custom event (from App.tsx shortcut / command palette)
   useEffect(() => {
@@ -1429,7 +1487,7 @@ function EditorImpl({
             /* Markdown source editor */
             <div className="h-full">
               <div
-                className="min-h-full px-6 pt-8 pb-24"
+                className="min-h-full px-6 pt-6 pb-24"
                 style={{
                   maxWidth: "var(--editor-max-width, 48rem)",
                   minHeight: "100%",
@@ -1437,6 +1495,13 @@ function EditorImpl({
                   marginRight: "auto",
                 }}
               >
+                {currentNote && renameNote && !printMode && !focusMode ? (
+                  <EditorFilenameField
+                    noteId={currentNote.id}
+                    documentTitle={documentTitle}
+                    onRename={handleRenameFromEditor}
+                  />
+                ) : null}
                 <MarkdownSourceEditor
                   ref={sourceEditorRef}
                   value={sourceContent}
@@ -1471,7 +1536,24 @@ function EditorImpl({
                 className="h-full"
                 onContextMenu={handleContextMenu}
               >
-                <EditorContent editor={editor} className="h-full text-text" />
+                <div
+                  className="min-h-full px-6 pt-6 pb-24"
+                  style={{
+                    maxWidth: "var(--editor-max-width, 48rem)",
+                    minHeight: "100%",
+                    marginLeft: "auto",
+                    marginRight: "auto",
+                  }}
+                >
+                  {currentNote && renameNote && !printMode && !focusMode ? (
+                    <EditorFilenameField
+                      noteId={currentNote.id}
+                      documentTitle={documentTitle}
+                      onRename={handleRenameFromEditor}
+                    />
+                  ) : null}
+                  <EditorContent editor={editor} className="h-full text-text" />
+                </div>
               </div>
             </>
           )}
