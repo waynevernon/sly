@@ -57,7 +57,7 @@ export function TasksSettingsSection() {
           <div className="flex flex-col gap-0.75">
             <h2 className="text-xl font-medium">Tasks</h2>
             <p className="text-sm text-text-muted max-w-lg">
-              Enable a lightweight task list. Tasks are stored in{" "}
+              Enable the task workspace. Tasks are stored in{" "}
               <code className="font-mono text-xs">.sly/tasks.db</code> inside this vault.
             </p>
           </div>

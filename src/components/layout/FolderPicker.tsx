@@ -45,8 +45,8 @@ export function FolderPicker() {
             className="text-text-muted mb-6 animate-fade-in-up"
             style={{ animationDelay: "100ms" }}
           >
-            Choose a folder to keep your notes in plain markdown files on your
-            computer.
+            Choose a folder to get started. Your notes live here as plain
+            markdown files, and your tasks are stored in the same vault.
           </p>
           <div
             className="animate-fade-in-up"
