@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Sly is a cross-platform markdown note-taking app for macOS, Windows, and Linux. It is built with Tauri v2 (Rust backend) and React/TypeScript/Tailwind on the frontend, with TipTap for editing and Tantivy for search.
+Sly is a notes and tasks workspace for macOS. It is built with Tauri v2 (Rust backend) and React/TypeScript/Tailwind on the frontend, with TipTap for editing and Tantivy for search.
 
 ## Tech Stack
 
@@ -391,6 +391,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Keep interaction keyboard-friendly
 - Favor calm hierarchy over decorative chrome
 - Keep async work non-blocking and surface errors clearly
+- Write copy that's calm, warm, and direct — concrete about what Sly does, honest about tradeoffs, with personality but without cuteness. Canonical product description and tone guidance lives in `docs/ui-design-language.md`.
 
 ## UI Design Reference
 

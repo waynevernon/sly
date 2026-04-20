@@ -855,7 +855,7 @@ function AppContent() {
 
   const openTaskCapture = useCallback(() => {
     if (!tasksEnabled) {
-      toast("Enable tasks in Settings to capture tasks.");
+      toast("Tasks aren't enabled yet. Turn them on in Settings → Tasks.");
       return;
     }
 
@@ -1410,7 +1410,7 @@ function AppContent() {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "2") {
         e.preventDefault();
         if (!tasksEnabled) {
-          toast("Enable tasks in Settings to switch to task mode.");
+          toast("Tasks aren't enabled yet. Turn them on in Settings → Tasks.");
           return;
         }
         showTasksMode();

@@ -225,7 +225,8 @@ When semantic tokens exist, use them. Avoid raw palette classes such as `text-or
 
 ## Copy and Launch Surfaces
 
-- Product-facing copy should be calm, concrete, and specific about what Sly does: local markdown notes, editor-first workflow, keyboard-friendly interaction, optional AI, optional Git.
+- The canonical product description: "A local-first workspace for notes and tasks — plain markdown files, keyboard-first, with optional AI and Git." Use this as the anchor for About screens, onboarding, release notes, and any marketing surface.
+- Tone is calm, warm, and direct — concrete about what Sly does, honest about constraints, friendly without being cutesy. Write like you're describing a tool you actually use and trust.
 - About screens, readmes, release copy, and menu labels should reuse the same core phrasing instead of drifting into separate tones.
 - Credit upstream work plainly and professionally. Attribution should be visible, but it should not overpower Sly's own product identity.
 - Empty-state illustrations can add warmth, but the message and action must still work without mascot-specific jokes or lore.

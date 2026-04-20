@@ -3,9 +3,9 @@
 </p>
 
 # Sly
-Sly is an editor-first markdown notes app for macOS. It keeps your notes on disk as plain markdown files, stays fast on real folders, and adds optional AI and Git workflows without turning your notes into a cloud product.
+Sly is a notes and tasks workspace for macOS. Your markdown files stay on disk, plain and portable. Sly adds an editor-first writing surface, structured task management, keyboard-first navigation, and optional AI and Git — without turning your work into a cloud product.
 
-Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project created by Eric Li.
+Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project by Eric Li.
 
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
 
@@ -15,16 +15,14 @@ Sly is developed by [Wayne Vernon](https://github.com/waynevernon) as an indepen
 
 ## Features
 
-- Plain markdown notes you own. Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
-- A serious writing and editing surface. Sly combines a polished rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
-- Fast navigation through large note collections. Full-text search, command palette workflows, recent notes, find-in-note, better keyboard folder navigation, and keyboard-first shortcuts keep you moving without digging through menus.
-- A lightweight task mode when notes turn into action. Enable the beta tasks view to capture work in an inbox, sort it into Today, Upcoming, Someday, Waiting, and Logbook, and keep task notes in plain markdown inside your vault.
-- Flexible organization that still feels lightweight. Use pinned and recent notes, a dedicated pinned notes view, recursive folder views, per-folder note sorting, folder sorting, note counts, drag-and-drop, multi-note move/delete, rename and duplicate commands, and customizable folder icons with color or emoji.
-- Editor-first layouts that adapt to how you work. Switch between 1, 2, and 3 pane views, detach notes into their own windows, tune editor width, and keep folders, note lists, outline, assistant, and the current note visible in the balance you want.
-- Optional AI help without AI lock-in. Use the built-in side assistant or run note editing flows through Claude Code, OpenAI Codex, OpenCode, or Ollama when you want assistance, while keeping plain files and local workflows at the center.
-- Built-in Git workflows for notes on disk. Initialize a repo, inspect status, commit changes, configure remotes, and push without leaving the app.
-- Deep workspace customization. Choose from a growing set of theme presets, bundled fonts, separate UI/note/code font controls, typography tuning, text direction, and interface zoom.
-- Useful desktop extras. Open markdown files in standalone preview mode before choosing a notes folder, use the dedicated print preview window for PDF export, install the `sly` CLI on supported platforms to launch notes and manage tasks, and get in-app update checks through the Tauri updater.
+- **Your files, your format.** Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
+- **A focused writing surface.** Rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
+- **Tasks in the same workspace.** Capture work into an inbox, schedule it across Today, Upcoming, Someday, and Waiting, and keep task notes in plain markdown inside your vault.
+- **Fast through large note collections.** Full-text search, command palette, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
+- **Flexible organization, without the complexity.** Pinned and recent notes, recursive folder views, drag-and-drop, per-folder note sorting, folder sorting, note counts, and customizable folder icons.
+- **Layouts that adapt.** Switch between 1, 2, and 3-pane views, detach notes into their own windows, and tune the editor width.
+- **Optional AI and Git, no lock-in.** Side assistant or note editing flows through Claude, Codex, Ollama; initialize, commit, and push Git repos without leaving the app.
+- **Deep workspace customization.** Theme presets, bundled fonts, separate font controls, typography tuning, text direction, and zoom.
 
 ## Installation
 

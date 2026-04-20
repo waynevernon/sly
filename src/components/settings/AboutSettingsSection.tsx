@@ -78,10 +78,10 @@ export function AboutSettingsSection() {
         <div>
           <h2 className="text-xl font-medium mb-1">About Sly</h2>
           <p className="text-sm text-text-muted mb-4">
-            Sly is an editor-first markdown notes app for local files, fast
-            capture, and focused writing. It keeps your notes on your own disk
-            as plain markdown, stays keyboard-friendly, and adds optional AI
-            and Git workflows without locking your notes into a cloud service.
+            Sly is a local-first workspace for notes and tasks. It keeps your
+            notes as plain markdown files on your own disk, brings structured
+            task management into the same workspace, and adds optional AI and
+            Git — without locking anything into a cloud service.
             Learn more in{" "}
             <button
               onClick={() => handleOpenUrl(REPOSITORY_URL)}
