@@ -258,7 +258,7 @@ export function TaskDetailPanel() {
               placeholder="Task name"
               onChange={handleTitleChange}
               onBlur={flushSave}
-              className="min-w-0 flex-1 bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
+              className="min-w-0 flex-1 truncate bg-transparent text-2xl font-medium leading-tight text-text outline-none placeholder:text-text-muted/50"
             />
             <IconButton
               type="button"

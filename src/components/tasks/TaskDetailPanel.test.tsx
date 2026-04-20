@@ -226,6 +226,16 @@ describe("TaskDetailPanel", () => {
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   });
 
+  it("truncates long task titles in the detail pane", () => {
+    render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByPlaceholderText("Task name")).toHaveClass("truncate");
+  });
+
   it("shows the completed timestamp when the task is done", async () => {
     const tasksContext = await import("../../context/TasksContext");
 
