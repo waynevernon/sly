@@ -682,6 +682,36 @@ describe("TaskListPane", () => {
     expect(screen.getByPlaceholderText("Search tasks…")).toBeInTheDocument();
   });
 
+  it("starts inline task creation when the global inline-create event is dispatched", () => {
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    expect(screen.queryByPlaceholderText("Task name")).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("start-inline-task-create"));
+    });
+
+    expect(screen.getByPlaceholderText("Task name")).toBeInTheDocument();
+  });
+
+  it("ignores the global inline-create event in non-inline task views", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "upcoming",
+      }),
+    );
+
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("start-inline-task-create"));
+    });
+
+    expect(screen.queryByPlaceholderText("Task name")).not.toBeInTheDocument();
+  });
+
   it("shows matching task rows when a query is typed", async () => {
     const user = userEvent.setup();
     const tasksContext = await import("../../context/TasksContext");

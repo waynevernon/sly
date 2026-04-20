@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import type { TaskView } from "./types/tasks";
 
 const { tauriEventListeners, listenMock } = vi.hoisted(() => {
   const listeners = new Map<string, Set<(event: { payload: unknown }) => void>>();
@@ -84,6 +85,7 @@ const themeState = {
 const tasksState = {
   deleteTask: vi.fn().mockResolvedValue(undefined),
   selectAllVisibleTasks: vi.fn(),
+  selectedView: "inbox" as TaskView,
   selectedTaskId: "task-1",
   selectedTaskIds: ["task-1", "task-2"],
 };
@@ -284,6 +286,7 @@ describe("App", () => {
     themeState.rightPanelVisible = true;
     themeState.rightPanelTab = "outline";
     notesDataState.settings.tasksEnabled = false;
+    tasksState.selectedView = "inbox";
     tasksState.selectedTaskId = "task-1";
     tasksState.selectedTaskIds = ["task-1", "task-2"];
     tauriEventListeners.clear();
@@ -350,12 +353,12 @@ describe("App", () => {
     expect(screen.queryByText("folder-picker")).not.toBeInTheDocument();
   });
 
-  it("opens the global task capture dialog with Cmd/Ctrl+Shift+N when tasks are enabled", async () => {
+  it("opens the global task capture dialog with Cmd/Ctrl+Shift+T when tasks are enabled", async () => {
     notesDataState.settings.tasksEnabled = true;
 
     render(<App />);
 
-    fireEvent.keyDown(window, { key: "N", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
 
     expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
   });
@@ -370,8 +373,28 @@ describe("App", () => {
     expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
   });
 
-  it("switches back to notes mode before creating a note with Cmd/Ctrl+N", async () => {
+  it("creates a note from anywhere with Cmd/Ctrl+Shift+N", async () => {
     notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "N", metaKey: true, shiftKey: true });
+
+    await waitFor(() => {
+      expect(notesActionsState.createNote).toHaveBeenCalled();
+      expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+    });
+    expect(screen.getByText("editor")).toBeInTheDocument();
+  });
+
+  it("starts inline task creation with Cmd/Ctrl+N in inline-capable task views", async () => {
+    notesDataState.settings.tasksEnabled = true;
+    tasksState.selectedView = "inbox";
+    const handleStartInlineTaskCreate = vi.fn();
+    window.addEventListener("start-inline-task-create", handleStartInlineTaskCreate);
 
     render(<App />);
 
@@ -381,10 +404,44 @@ describe("App", () => {
     fireEvent.keyDown(window, { key: "n", metaKey: true });
 
     await waitFor(() => {
+      expect(handleStartInlineTaskCreate).toHaveBeenCalledTimes(1);
+    });
+    expect(notesActionsState.createNote).not.toHaveBeenCalled();
+    expect(screen.queryByText("global-task-capture-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    window.removeEventListener("start-inline-task-create", handleStartInlineTaskCreate);
+  });
+
+  it("opens task capture with Cmd/Ctrl+N in derived task views", async () => {
+    notesDataState.settings.tasksEnabled = true;
+    tasksState.selectedView = "upcoming";
+    const handleStartInlineTaskCreate = vi.fn();
+    window.addEventListener("start-inline-task-create", handleStartInlineTaskCreate);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
+
+    expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
+    expect(handleStartInlineTaskCreate).not.toHaveBeenCalled();
+    expect(notesActionsState.createNote).not.toHaveBeenCalled();
+
+    window.removeEventListener("start-inline-task-create", handleStartInlineTaskCreate);
+  });
+
+  it("creates a note with Cmd/Ctrl+N while in notes mode", async () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
+
+    await waitFor(() => {
       expect(notesActionsState.createNote).toHaveBeenCalled();
       expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
     });
-    expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
   it("switches to task mode with Cmd/Ctrl+2 when tasks are enabled", async () => {

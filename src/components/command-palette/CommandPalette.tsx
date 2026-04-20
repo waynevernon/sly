@@ -125,7 +125,7 @@ export function CommandPalette({
       {
         id: "new-note",
         label: "New Note",
-        shortcut: `${mod} N`,
+        shortcut: `${mod} ${shift} N`,
         icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           createNote();

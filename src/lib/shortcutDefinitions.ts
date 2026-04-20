@@ -45,12 +45,17 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   },
   {
     keys: [mod, "N"],
-    description: "Create new note",
-    category: "Notes",
+    description: "Create new note or task in current workspace",
+    category: "Navigation",
   },
   {
     keys: [mod, shift, "N"],
-    description: "Open quick task capture",
+    description: "Create new note from anywhere",
+    category: "Notes",
+  },
+  {
+    keys: [mod, shift, "T"],
+    description: "Create new task from anywhere",
     category: "Tasks",
   },
   {

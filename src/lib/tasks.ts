@@ -65,6 +65,10 @@ export const TASK_DRAG_TARGET_VIEWS: TaskView[] = [
   "completed",
 ];
 
+export function canInlineCreateTaskInView(view: TaskView): boolean {
+  return view !== "completed" && view !== "waiting" && view !== "starred" && view !== "upcoming";
+}
+
 export interface DetectedTaskDate {
   actionAt: string;
   cleanedTitle: string;

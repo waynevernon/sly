@@ -93,7 +93,7 @@ export function acceleratorToLabel(accelerator: string): string {
 }
 
 export function getDefaultAccelerator(): string {
-  return isMac ? "Control+Space" : "CommandOrControl+Shift+N";
+  return isMac ? "Control+Space" : "CommandOrControl+Shift+T";
 }
 
 export function getTaskQuickAddShortcutLabel(
@@ -103,13 +103,13 @@ export function getTaskQuickAddShortcutLabel(
   return acceleratorToLabel(value);
 }
 
-export const IN_APP_TASK_QUICK_ADD_SHORTCUT_LABEL = isMac ? "⌘⇧N" : "Ctrl+Shift+N";
+export const IN_APP_TASK_QUICK_ADD_SHORTCUT_LABEL = isMac ? "⌘⇧T" : "Ctrl+Shift+T";
 
 export function matchesInAppTaskQuickAddShortcut(event: KeyboardEvent): boolean {
   return (
     (isMac ? event.metaKey : event.ctrlKey) &&
     !event.altKey &&
     event.shiftKey &&
-    event.key.toLowerCase() === "n"
+    event.key.toLowerCase() === "t"
   );
 }

@@ -36,6 +36,7 @@ import {
   localDateToNormalizedActionAt,
   taskScheduleSelectionFromView,
   TASK_VIEW_LABELS,
+  canInlineCreateTaskInView,
 } from "../../lib/tasks";
 import {
   Button,
@@ -281,7 +282,7 @@ export function TaskListPane() {
   const HeaderIcon = HEADER_ICONS[selectedView];
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
-  const canInlineCreate = selectedView !== "completed" && selectedView !== "waiting" && selectedView !== "starred" && selectedView !== "upcoming";
+  const canInlineCreate = canInlineCreateTaskInView(selectedView);
   const inlineTitleHighlights = useMemo(() => {
     const ranges: Array<{ start: number; end: number }> = [];
     const lower = newTitle.toLowerCase();
@@ -545,6 +546,18 @@ export function TaskListPane() {
   }, []);
 
   useEffect(() => {
+    const handleStartInlineCreate = () => {
+      if (!canInlineCreate) {
+        return;
+      }
+      handleStartCreate();
+    };
+
+    window.addEventListener("start-inline-task-create", handleStartInlineCreate);
+    return () => window.removeEventListener("start-inline-task-create", handleStartInlineCreate);
+  }, [canInlineCreate, handleStartCreate]);
+
+  useEffect(() => {
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
@@ -723,7 +736,7 @@ export function TaskListPane() {
             {canInlineCreate && !isSearching && (
               <IconButton
                 type="button"
-                title={`New task (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}N)`}
+                title={`New task (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}T)`}
                 aria-label="New task"
                 variant="ghost"
                 onClick={handleStartCreate}
@@ -886,7 +899,7 @@ export function TaskListPane() {
                     {mod}
                     {isMac ? "" : "+"}
                     {shift}
-                    {isMac ? "" : "+"}N
+                    {isMac ? "" : "+"}T
                   </span>
                 </Button>
               ) : undefined}

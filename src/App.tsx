@@ -53,6 +53,7 @@ import type {
 } from "./types/assistant";
 import { isMac, mod, shift, shortcut } from "./lib/platform";
 import { matchesInAppTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
+import { canInlineCreateTaskInView } from "./lib/tasks";
 import { UpdateToast } from "./components/updater/UpdateToast";
 import {
   applyLineReplacement,
@@ -432,6 +433,7 @@ function AppContent() {
   const {
     deleteTask,
     selectAllVisibleTasks,
+    selectedView,
     selectedTaskId,
     selectedTaskIds,
   } = useTasks();
@@ -507,6 +509,8 @@ function AppContent() {
   const isTasksModeActive = workspaceMode === "tasks";
   const isTasksModeActiveRef = useRef(isTasksModeActive);
   isTasksModeActiveRef.current = isTasksModeActive;
+  const selectedTaskViewRef = useRef(selectedView);
+  selectedTaskViewRef.current = selectedView;
   const tasksEnabled = settings?.tasksEnabled ?? false;
   const showRightPanel =
     rightPanelVisible &&
@@ -1394,6 +1398,29 @@ function AppContent() {
         return;
       }
 
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "n"
+      ) {
+        e.preventDefault();
+        showNotesMode();
+        createNote();
+        return;
+      }
+
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "t"
+      ) {
+        e.preventDefault();
+        openTaskCapture();
+        return;
+      }
+
       // Block all other shortcuts when in settings view
       if (viewRef.current === "settings") {
         return;
@@ -1509,9 +1536,22 @@ function AppContent() {
         return;
       }
 
-      // Cmd+N - New note
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+      // Cmd/Ctrl+N - New note or task in the current workspace
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "n"
+      ) {
         e.preventDefault();
+        if (isTasksModeActiveRef.current) {
+          if (canInlineCreateTaskInView(selectedTaskViewRef.current)) {
+            window.dispatchEvent(new CustomEvent("start-inline-task-create"));
+          } else {
+            openTaskCapture();
+          }
+          return;
+        }
         showNotesMode();
         createNote();
         return;
