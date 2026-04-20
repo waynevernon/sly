@@ -26,14 +26,12 @@ import {
   Checkbox,
   ListItem,
   PanelEmptyState,
-  PopoverTextEditor,
   destructiveMenuItemClassName,
   menuItemClassName,
   menuSeparatorClassName,
   menuSurfaceClassName,
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
-import { sanitizeNoteFilename } from "../../lib/noteIdentity";
 import * as notesService from "../../services/notes";
 import {
   AddNoteIcon,
@@ -114,10 +112,6 @@ function formatDate(timestamp: number): string {
 function getNoteFilename(id: string): string {
   const baseName = id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
   return `${baseName}.md`;
-}
-
-function getNoteLeaf(id: string): string {
-  return id.includes("/") ? id.substring(id.lastIndexOf("/") + 1) : id;
 }
 
 function getNoteOptionId(id: string): string {
@@ -231,12 +225,7 @@ interface NoteItemWithMenuProps extends Omit<NoteItemProps, "optionId"> {
   onPin: (id: string) => Promise<void>;
   onUnpin: (id: string) => Promise<void>;
   onDuplicate: (id: string) => void;
-  isRenameOpen: boolean;
-  renameSuggestion: string | null;
   onOpenRenameFile: (id: string) => void;
-  onRenameFileOpenChange: (id: string, open: boolean) => void;
-  onRenameFileSubmit: (id: string, newName: string) => Promise<void | boolean>;
-  isRenamingFile: boolean;
   onOpenInNewWindow: (id: string) => void;
   onDelete: (ids: string[]) => void;
   onClearSelection: () => void;
@@ -257,12 +246,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   onPin,
   onUnpin,
   onDuplicate,
-  isRenameOpen,
-  renameSuggestion,
   onOpenRenameFile,
-  onRenameFileOpenChange,
-  onRenameFileSubmit,
-  isRenamingFile,
   onOpenInNewWindow,
   onDelete,
   onClearSelection,
@@ -305,133 +289,109 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   });
 
   return (
-    <PopoverTextEditor
-      open={isRenameOpen}
-      onOpenChange={(open) => onRenameFileOpenChange(id, open)}
-      value={getNoteLeaf(id)}
-      onSubmit={(value) => onRenameFileSubmit(id, value)}
-      title="Rename file"
-      placeholder="Untitled"
-      icon={<PencilIcon className="w-4 h-4 stroke-[1.6]" />}
-      isSubmitting={isRenamingFile}
-      className="w-full"
-      renderAuxiliaryContent={({ draft, setDraft }) =>
-        renameSuggestion && renameSuggestion !== draft ? (
-          <button
-            type="button"
-            onClick={() => setDraft(renameSuggestion)}
-            className="max-w-full truncate text-left text-xs text-text-muted underline decoration-text-muted/50 underline-offset-2 transition-colors hover:text-text hover:decoration-text"
-          >
-            Use note name: <span className="font-medium">{renameSuggestion}</span>
-          </button>
-        ) : null
-      }
-      renderTrigger={() => (
-        <ContextMenu.Root>
-          <ContextMenu.Trigger asChild>
-            <div
-              ref={setNodeRef}
-              {...attributes}
-              {...listeners}
-              className={isDragging ? "opacity-40" : ""}
-              onContextMenu={() => {
-                onFocusList();
-                if (!isPartOfBatchSelection) {
-                  onSelect(id, {
-                    shiftKey: false,
-                    metaKey: false,
-                    ctrlKey: false,
-                  });
-                }
-              }}
-            >
-              <NoteItem
-                optionId={getNoteOptionId(id)}
-                id={id}
-                title={title}
-                preview={preview}
-                modified={modified}
-                created={created}
-                selectionState={selectionState}
-                isPinned={isPinned}
-                onSelect={onSelect}
-                noteListDateMode={noteListDateMode}
-                noteListPreviewLines={noteListPreviewLines}
-                showNoteListFilename={showNoteListFilename}
-                showNoteListFolderPath={showNoteListFolderPath}
-              />
-            </div>
-          </ContextMenu.Trigger>
-          <ContextMenu.Portal>
-            <ContextMenu.Content
-              className={`${menuSurfaceClassName} min-w-44 z-50`}
-            >
-              {isPartOfBatchSelection ? (
-                <>
-                  <ContextMenu.Item
-                    className={destructiveMenuItemClassName}
-                    onSelect={() => onDelete(selectedNoteIds)}
-                  >
-                    <TrashIcon className="w-4 h-4 stroke-[1.6]" />
-                    Delete Selected Notes
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    className={menuItemClassName}
-                    onSelect={onClearSelection}
-                  >
-                    <XIcon className="w-4 h-4 stroke-[1.6]" />
-                    Clear Selection
-                  </ContextMenu.Item>
-                </>
-              ) : (
-                <>
-                  <ContextMenu.Item
-                    className={menuItemClassName}
-                    onSelect={() => onOpenInNewWindow(id)}
-                  >
-                    <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
-                    Open in New Window
-                  </ContextMenu.Item>
-                  <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
-                    <PinIcon className="w-4 h-4 stroke-[1.6]" />
-                    {isPinned ? "Unpin" : "Pin"}
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    className={menuItemClassName}
-                    onSelect={() => onDuplicate(id)}
-                  >
-                    <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                    Duplicate
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    className={menuItemClassName}
-                    onSelect={() => onOpenRenameFile(id)}
-                  >
-                    <PencilIcon className="w-4 h-4 stroke-[1.6]" />
-                    Rename File…
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    className={menuItemClassName}
-                    onSelect={handleCopyFilepath}
-                  >
-                    <CopyIcon className="w-4 h-4 stroke-[1.6]" />
-                    Copy Filepath
-                  </ContextMenu.Item>
-                  <ContextMenu.Separator className={menuSeparatorClassName} />
-                  <ContextMenu.Item
-                    className={destructiveMenuItemClassName}
-                    onSelect={() => onDelete([id])}
-                  >
-                    <TrashIcon className="w-4 h-4 stroke-[1.6]" />
-                    Delete
-                  </ContextMenu.Item>
-                </>
-              )}
-            </ContextMenu.Content>
-          </ContextMenu.Portal>
-        </ContextMenu.Root>
-      )}
-    />
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className={isDragging ? "opacity-40" : ""}
+          onContextMenu={() => {
+            onFocusList();
+            if (!isPartOfBatchSelection) {
+              onSelect(id, {
+                shiftKey: false,
+                metaKey: false,
+                ctrlKey: false,
+              });
+            }
+          }}
+        >
+          <NoteItem
+            optionId={getNoteOptionId(id)}
+            id={id}
+            title={title}
+            preview={preview}
+            modified={modified}
+            created={created}
+            selectionState={selectionState}
+            isPinned={isPinned}
+            onSelect={onSelect}
+            noteListDateMode={noteListDateMode}
+            noteListPreviewLines={noteListPreviewLines}
+            showNoteListFilename={showNoteListFilename}
+            showNoteListFolderPath={showNoteListFolderPath}
+          />
+        </div>
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content
+          className={`${menuSurfaceClassName} min-w-44 z-50`}
+        >
+          {isPartOfBatchSelection ? (
+            <>
+              <ContextMenu.Item
+                className={destructiveMenuItemClassName}
+                onSelect={() => onDelete(selectedNoteIds)}
+              >
+                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                Delete Selected Notes
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={onClearSelection}
+              >
+                <XIcon className="w-4 h-4 stroke-[1.6]" />
+                Clear Selection
+              </ContextMenu.Item>
+            </>
+          ) : (
+            <>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onOpenInNewWindow(id)}
+              >
+                <SquareArrowOutUpRight className="w-4 h-4 stroke-[1.6]" />
+                Open in New Window
+              </ContextMenu.Item>
+              <ContextMenu.Item className={menuItemClassName} onSelect={handlePin}>
+                <PinIcon className="w-4 h-4 stroke-[1.6]" />
+                {isPinned ? "Unpin" : "Pin"}
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onDuplicate(id)}
+              >
+                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                Duplicate
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={() => onOpenRenameFile(id)}
+              >
+                <PencilIcon className="w-4 h-4 stroke-[1.6]" />
+                Rename File…
+              </ContextMenu.Item>
+              <ContextMenu.Item
+                className={menuItemClassName}
+                onSelect={handleCopyFilepath}
+              >
+                <CopyIcon className="w-4 h-4 stroke-[1.6]" />
+                Copy Filepath
+              </ContextMenu.Item>
+              <ContextMenu.Separator className={menuSeparatorClassName} />
+              <ContextMenu.Item
+                className={destructiveMenuItemClassName}
+                onSelect={() => onDelete([id])}
+              >
+                <TrashIcon className="w-4 h-4 stroke-[1.6]" />
+                Delete
+              </ContextMenu.Item>
+            </>
+          )}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 });
 
@@ -466,7 +426,6 @@ export function NoteList({
     deleteNote,
     deleteSelectedNotes,
     duplicateNote,
-    renameNote,
     pinNote,
     unpinNote,
     isLoading,
@@ -481,8 +440,6 @@ export function NoteList({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteIdsToDelete, setNoteIdsToDelete] = useState<string[]>([]);
   const [dontAskAgain, setDontAskAgain] = useState(false);
-  const [noteIdToRename, setNoteIdToRename] = useState<string | null>(null);
-  const [isRenaming, setIsRenaming] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -577,55 +534,16 @@ export function NoteList({
 
   const openRenameEditor = useCallback(
     (noteId: string) => {
-      focusList();
-      setNoteIdToRename(noteId);
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent("request-note-filename-edit", {
+            detail: noteId,
+          }),
+        );
+      }, 0);
     },
-    [focusList],
+    [],
   );
-
-  const closeRenameEditor = useCallback(() => {
-    if (isRenaming) return;
-    setNoteIdToRename(null);
-    focusList();
-  }, [focusList, isRenaming]);
-
-  const handleRenameOpenChange = useCallback((noteId: string, open: boolean) => {
-    if (open) {
-      openRenameEditor(noteId);
-      return;
-    }
-
-    if (noteIdToRename === noteId) {
-      closeRenameEditor();
-    }
-  }, [closeRenameEditor, noteIdToRename, openRenameEditor]);
-
-  const handleRenameSubmit = useCallback(async (noteId: string, nextValue: string) => {
-    const trimmed = nextValue.trim();
-    if (!trimmed) {
-      return true;
-    }
-
-    const currentLeaf = getNoteLeaf(noteId);
-    if (trimmed === currentLeaf || trimmed === `${currentLeaf}.md`) {
-      return true;
-    }
-
-    try {
-      setIsRenaming(true);
-      await renameNote(noteId, trimmed);
-      setNoteIdToRename(null);
-      focusList();
-      toast.success("Filename updated");
-      return true;
-    } catch (error) {
-      console.error("Failed to rename note file:", error);
-      toast.error("Failed to rename file");
-      return false;
-    } finally {
-      setIsRenaming(false);
-    }
-  }, [focusList, renameNote]);
 
   useEffect(() => {
     const handleFocusNoteList = () => {
@@ -719,16 +637,7 @@ export function NoteList({
               onPin={pinNote}
               onUnpin={unpinNote}
               onDuplicate={duplicateNote}
-              isRenameOpen={noteIdToRename === item.id}
-              renameSuggestion={(() => {
-                const baseName = getNoteLeaf(item.id);
-                const suggested = sanitizeNoteFilename(item.title);
-                return suggested && suggested !== baseName ? suggested : null;
-              })()}
               onOpenRenameFile={openRenameEditor}
-              onRenameFileOpenChange={handleRenameOpenChange}
-              onRenameFileSubmit={handleRenameSubmit}
-              isRenamingFile={isRenaming && noteIdToRename === item.id}
               onOpenInNewWindow={(noteId) => {
                 void notesService
                   .openNoteWindow(noteId)

@@ -713,6 +713,8 @@ function EditorImpl({
   const [documentTitle, setDocumentTitle] = useState(
     currentNote?.title ?? "Untitled",
   );
+  const [filenameFocusRequestToken, setFilenameFocusRequestToken] = useState(0);
+  const [pendingFilenameEditNoteId, setPendingFilenameEditNoteId] = useState<string | null>(null);
   // Delay transition classes until after initial mount to avoid format bar height animation on note load
   const [hasTransitioned, setHasTransitioned] = useState(false);
   useEffect(() => {
@@ -926,6 +928,37 @@ function EditorImpl({
   useEffect(() => {
     setDocumentTitle(currentNote?.title ?? "Untitled");
   }, [currentNote?.id, currentNote?.title]);
+
+  useEffect(() => {
+    const handleRequestFilenameEdit = (event: Event) => {
+      const customEvent = event as CustomEvent<string | null>;
+      if (!customEvent.detail) {
+        return;
+      }
+      setPendingFilenameEditNoteId(customEvent.detail);
+    };
+
+    window.addEventListener("request-note-filename-edit", handleRequestFilenameEdit);
+    return () =>
+      window.removeEventListener("request-note-filename-edit", handleRequestFilenameEdit);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !pendingFilenameEditNoteId ||
+      !currentNote ||
+      currentNote.id !== pendingFilenameEditNoteId
+    ) {
+      return;
+    }
+
+    setPendingFilenameEditNoteId(null);
+    if (printMode || focusMode) {
+      return;
+    }
+
+    setFilenameFocusRequestToken((token) => token + 1);
+  }, [currentNote, focusMode, pendingFilenameEditNoteId, printMode]);
 
   useEffect(() => {
     onRegisterScrollContainer?.(scrollContainerRef.current);
@@ -1500,6 +1533,7 @@ function EditorImpl({
                     noteId={currentNote.id}
                     documentTitle={documentTitle}
                     onRename={handleRenameFromEditor}
+                    focusRequestToken={filenameFocusRequestToken}
                   />
                 ) : null}
                 <MarkdownSourceEditor
@@ -1550,6 +1584,7 @@ function EditorImpl({
                       noteId={currentNote.id}
                       documentTitle={documentTitle}
                       onRename={handleRenameFromEditor}
+                      focusRequestToken={filenameFocusRequestToken}
                     />
                   ) : null}
                   <EditorContent editor={editor} className="h-full text-text" />

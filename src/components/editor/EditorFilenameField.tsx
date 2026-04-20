@@ -15,6 +15,7 @@ interface EditorFilenameFieldProps {
   noteId: string;
   documentTitle: string;
   onRename: (nextName: string) => Promise<void>;
+  focusRequestToken?: number;
 }
 
 const filenameFieldShellClassName =
@@ -24,6 +25,7 @@ export function EditorFilenameField({
   noteId,
   documentTitle,
   onRename,
+  focusRequestToken = 0,
 }: EditorFilenameFieldProps) {
   const filename = getNoteLeaf(noteId);
   const filenameWithExtension = `${filename}.md`;
@@ -61,6 +63,14 @@ export function EditorFilenameField({
 
     return () => cancelAnimationFrame(frame);
   }, [isEditing]);
+
+  useEffect(() => {
+    if (focusRequestToken === 0) {
+      return;
+    }
+
+    setIsEditing(true);
+  }, [focusRequestToken]);
 
   const handleRename = useCallback(
     async (nextName: string) => {
