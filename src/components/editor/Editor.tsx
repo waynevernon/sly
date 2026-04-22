@@ -25,6 +25,7 @@ import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
 import { useEditorSearch } from "./useEditorSearch";
 import { isAllowedUrlScheme, normalizeUrl } from "./linkUtils";
 import { shouldParseMarkdownPaste } from "./markdownPaste";
+import { isAddLinkShortcut } from "./shortcutUtils";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
 import { computeFormatBarLayout } from "./formatBarLayout";
@@ -1081,7 +1082,7 @@ function EditorImpl({
   // Keyboard shortcut for Cmd+K to add link (only when editor is focused)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if (isAddLinkShortcut(e)) {
         // Only handle if we're in the editor
         const target = e.target as HTMLElement;
         const isInEditor = target.closest(".ProseMirror");
