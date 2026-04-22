@@ -595,6 +595,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   notesFolderRef.current = notesFolder;
   const settingsRef = useRef<Settings>(settings);
   settingsRef.current = settings;
+  const recentScopeNoteIdsRef = useRef<string[] | undefined>(recentScopeNoteIds);
+  recentScopeNoteIdsRef.current = recentScopeNoteIds;
   const settingsWriteQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const settingsMutationVersionRef = useRef(0);
   const settingsRefreshRequestIdRef = useRef(0);
@@ -1305,6 +1307,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const applyUpdatedNoteState = useCallback(
     async (previousId: string, updated: Note) => {
+      const remappedRecentScopeNoteIds =
+        updated.id !== previousId &&
+        selectedScopeRef.current.type === "recent" &&
+        recentScopeNoteIdsRef.current?.includes(previousId)
+          ? replaceNoteIds(
+              recentScopeNoteIdsRef.current,
+              new Map([[previousId, updated.id]]),
+            )
+          : null;
+
       if (updated.id !== previousId) {
         noteIdRedirectsRef.current.set(previousId, updated.id);
         const pinnedIds = settingsRef.current.pinnedNoteIds || [];
@@ -1341,8 +1353,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       if (selectionRangeEndIdRef.current === previousId) {
         selectionRangeEndIdRef.current = updated.id;
       }
+
+      if (remappedRecentScopeNoteIds) {
+        refreshRecentScopeNoteIds(remappedRecentScopeNoteIds);
+      }
     },
-    [persistSettings],
+    [persistSettings, refreshRecentScopeNoteIds],
   );
 
   const saveNote = useCallback(
