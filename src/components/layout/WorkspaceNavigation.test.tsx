@@ -1,10 +1,11 @@
 import { act, render } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt } from "../../lib/tasks";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 
 let latestDndProps: Record<string, unknown> | null = null;
+let foldersPaneMountCount = 0;
 
 vi.mock("@dnd-kit/core", () => ({
   DndContext: ({
@@ -35,7 +36,13 @@ vi.mock("../../context/ThemeContext", () => ({
 }));
 
 vi.mock("./FoldersPane", () => ({
-  FoldersPane: () => <div data-testid="folders-pane" />,
+  FoldersPane: () => {
+    useEffect(() => {
+      foldersPaneMountCount += 1;
+    }, []);
+
+    return <div data-testid="folders-pane" />;
+  },
 }));
 
 vi.mock("./NotesPane", () => ({
@@ -114,6 +121,7 @@ function makeTasksHookValue(
 describe("WorkspaceNavigation", () => {
   beforeEach(async () => {
     latestDndProps = null;
+    foldersPaneMountCount = 0;
 
     const notesContext = await import("../../context/NotesContext");
     vi.mocked(notesContext.useNotes).mockReturnValue(makeNotesHookValue());
@@ -240,14 +248,33 @@ describe("WorkspaceNavigation", () => {
   });
 
   it("renders the task list pane instead of the notes pane in task mode", async () => {
-    const { queryByTestId, getByTestId } = render(
+    const { getByTestId, queryByTestId } = render(
       <WorkspaceNavigation paneMode={3} workspaceMode="tasks" />,
     );
 
     expect(getByTestId("task-list-pane")).toBeInTheDocument();
     expect(getByTestId("task-navigation-pane")).toBeInTheDocument();
-    expect(queryByTestId("folders-pane")).not.toBeInTheDocument();
+    expect(getByTestId("folders-pane")).not.toBeVisible();
     expect(queryByTestId("notes-pane")).not.toBeInTheDocument();
+  });
+
+  it("keeps the folders pane mounted across notes and task mode switches", async () => {
+    const { rerender, getByTestId } = render(
+      <WorkspaceNavigation paneMode={3} workspaceMode="notes" />,
+    );
+
+    expect(getByTestId("folders-pane")).toBeVisible();
+    expect(foldersPaneMountCount).toBe(1);
+
+    rerender(<WorkspaceNavigation paneMode={3} workspaceMode="tasks" />);
+
+    expect(getByTestId("folders-pane")).not.toBeVisible();
+    expect(foldersPaneMountCount).toBe(1);
+
+    rerender(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
+
+    expect(getByTestId("folders-pane")).toBeVisible();
+    expect(foldersPaneMountCount).toBe(1);
   });
 
   it("moves a multi-selected task drag to Anytime", async () => {

@@ -419,27 +419,28 @@ export function WorkspaceNavigation({
         >
           <div
             className={cn(
-              "h-full overflow-visible",
+              "relative h-full overflow-visible",
               !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
               foldersVisible
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-3",
             )}
           >
-            {isTasksModeActive ? (
-              <TaskNavigationPane
-                onOpenSettings={onOpenSettings}
-                onShowNotes={onShowNotes}
-                onShowTasks={onShowTasks}
-              />
-            ) : (
+            <div className="h-full" hidden={isTasksModeActive}>
               <FoldersPane
                 onOpenSettings={onOpenSettings}
                 pendingFolderPath={pendingFolderPath}
                 onShowNotes={onShowNotes}
                 onShowTasks={onShowTasks}
               />
-            )}
+            </div>
+            <div className="h-full" hidden={!isTasksModeActive}>
+              <TaskNavigationPane
+                onOpenSettings={onOpenSettings}
+                onShowNotes={onShowNotes}
+                onShowTasks={onShowTasks}
+              />
+            </div>
           </div>
           {foldersVisible && notesVisible && (
             <PaneResizeHandle
