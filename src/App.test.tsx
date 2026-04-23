@@ -336,6 +336,27 @@ describe("App", () => {
     });
   });
 
+  it("allows the native context menu inside CodeMirror source mode", () => {
+    render(<App />);
+
+    const codeMirror = document.createElement("div");
+    codeMirror.className = "cm-editor";
+    const line = document.createElement("div");
+    codeMirror.appendChild(line);
+    document.body.appendChild(codeMirror);
+
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    line.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+
+    document.body.removeChild(codeMirror);
+  });
+
   it("renders preview mode without folder mode shell", async () => {
     window.history.replaceState(
       {},

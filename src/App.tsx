@@ -1711,12 +1711,14 @@ function AppContent() {
       }
     };
 
-    // Disable right-click context menu except in editor
+    // Disable right-click context menu except in editor surfaces and text inputs.
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // Allow context menu in editor (prose class), inputs, and note list sidebar
+      // Allow context menu in TipTap, CodeMirror, inputs, and note list sidebar.
       const isInEditor =
-        target.closest(".prose") || target.closest(".ProseMirror");
+        target.closest(".prose") ||
+        target.closest(".ProseMirror") ||
+        target.closest(".cm-editor");
       const isInput =
         target.tagName === "INPUT" || target.tagName === "TEXTAREA";
       const isInNoteList = target.closest("[data-note-list]");
