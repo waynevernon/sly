@@ -301,7 +301,7 @@ export function TaskListPane() {
   }, [detectedDate, detectedUrl, newTitle]);
 
   const focusCreateInput = useCallback(() => {
-    setTimeout(() => inputRef.current?.focus(), 0);
+    requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
   const handleStartCreate = useCallback(() => {
@@ -314,6 +314,11 @@ export function TaskListPane() {
     setIgnoredUrlSignature(null);
     focusCreateInput();
   }, [focusCreateInput]);
+
+  useEffect(() => {
+    if (!isCreating) return;
+    focusCreateInput();
+  }, [focusCreateInput, isCreating]);
 
   useEffect(() => {
     if (!isCreating) {

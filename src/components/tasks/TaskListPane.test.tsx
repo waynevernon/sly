@@ -682,7 +682,7 @@ describe("TaskListPane", () => {
     expect(screen.getByPlaceholderText("Search tasks…")).toBeInTheDocument();
   });
 
-  it("starts inline task creation when the global inline-create event is dispatched", () => {
+  it("starts and focuses inline task creation when the global inline-create event is dispatched", async () => {
     render(<TooltipProvider><TaskListPane /></TooltipProvider>);
 
     expect(screen.queryByPlaceholderText("Task name")).not.toBeInTheDocument();
@@ -691,7 +691,11 @@ describe("TaskListPane", () => {
       window.dispatchEvent(new CustomEvent("start-inline-task-create"));
     });
 
-    expect(screen.getByPlaceholderText("Task name")).toBeInTheDocument();
+    const input = screen.getByPlaceholderText("Task name");
+    expect(input).toBeInTheDocument();
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+    });
   });
 
   it("ignores the global inline-create event in non-inline task views", async () => {
