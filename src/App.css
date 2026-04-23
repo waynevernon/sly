@@ -640,6 +640,7 @@ body {
 table.not-prose,
 .tableWrapper {
   --ui-scrollbar-size: 8px;
+  --ui-scrollbar-inset: 2px;
   --ui-scrollbar-radius: 999px;
   --ui-scrollbar-thumb-color: transparent;
   --ui-scrollbar-thumb-hover: color-mix(
@@ -686,7 +687,7 @@ table.not-prose::-webkit-scrollbar-thumb,
 .tableWrapper::-webkit-scrollbar-thumb {
   background-color: var(--ui-scrollbar-thumb-color);
   border-radius: var(--ui-scrollbar-radius);
-  border: 1px solid transparent;
+  border: var(--ui-scrollbar-inset) solid transparent;
   background-clip: content-box;
   transition:
     background-color var(--ui-motion-duration-fade) var(--ui-motion-ease-standard),
