@@ -15,6 +15,12 @@ vi.mock("../../context/TasksContext", () => ({
   useTasks: vi.fn(),
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+  },
+}));
+
 vi.mock("./TaskRow", () => ({
   TaskRow: () => <div data-testid="task-row" />,
 }));
@@ -76,6 +82,8 @@ describe("TaskListPane", () => {
   beforeEach(async () => {
     const tasksContext = await import("../../context/TasksContext");
     vi.mocked(tasksContext.useTasks).mockReturnValue(makeTasksHookValue());
+    const sonner = await import("sonner");
+    vi.mocked(sonner.toast.success).mockReset();
   });
 
   afterEach(() => {
@@ -364,6 +372,120 @@ describe("TaskListPane", () => {
         scheduleBucket: null,
       });
     });
+  });
+
+  it("shows a toast when a newly created task moves out of the current view", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const sonner = await import("sonner");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Pay rent",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Pay rent",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: localDateToNormalizedActionAt("2026-04-10"),
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    });
+    const selectTask = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "today",
+        createTask,
+        updateTask,
+        selectTask,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow{enter}");
+
+    await waitFor(() => {
+      expect(sonner.toast.success).toHaveBeenCalledWith("Task added to Upcoming");
+    });
+    expect(selectTask).not.toHaveBeenCalled();
+  });
+
+  it("does not show a creation toast when the task remains in the current view", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const sonner = await import("sonner");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Today task",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Today task",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T10:00:00Z",
+      actionAt: localDateToNormalizedActionAt("2026-04-09"),
+      scheduleBucket: null,
+      completedAt: null,
+      starred: false,
+      dueAt: null,
+      recurrence: null,
+    });
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "today",
+        createTask,
+        updateTask,
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
+    await user.type(screen.getByPlaceholderText("Task name"), "Today task{enter}");
+
+    await waitFor(() => {
+      expect(updateTask).toHaveBeenCalled();
+    });
+    expect(sonner.toast.success).not.toHaveBeenCalled();
   });
 
   it("lets the user dismiss a detected date before submit", async () => {

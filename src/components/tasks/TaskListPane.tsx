@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode, useRef, useState, useCallback, useEffect, useMemo } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import {
   Archive,
   ArrowDownAZ,
@@ -32,6 +33,7 @@ import {
   actionAtToLocalDate,
   detectTaskDateFromTitle,
   detectTaskUrlFromTitle,
+  deriveView,
   localDateString,
   localDateToNormalizedActionAt,
   taskScheduleSelectionFromView,
@@ -174,6 +176,22 @@ const MANUAL_SORT_ITEM: SortMenuItem<TaskSortMode> = {
 };
 
 const CREATE_DATE_DEBOUNCE_MS = 350;
+
+function taskBelongsToView(
+  task: TaskMetadata,
+  view: TaskView,
+  today: string,
+): boolean {
+  if (view === "waiting") {
+    return !task.completedAt && task.waitingFor.trim().length > 0;
+  }
+
+  if (view === "starred") {
+    return task.starred && !task.completedAt;
+  }
+
+  return deriveView(task, today) === view;
+}
 
 function renderInlineTitleHighlights(
   text: string,
@@ -408,6 +426,7 @@ export function TaskListPane() {
     }
 
     const task = await createTask(title);
+    let effectiveTask = task;
     setNewTitle("");
     setNewStarred(false);
     setDetectedDate(null);
@@ -416,26 +435,32 @@ export function TaskListPane() {
     setIgnoredUrlSignature(null);
 
     if (task && (activeUrlDetection || newStarred)) {
-      await updateTask(task.id, {
+      effectiveTask = await updateTask(task.id, {
         ...(activeUrlDetection ? { link: activeUrlDetection.url } : {}),
         ...(newStarred ? { starred: true } : {}),
-      });
+      }) ?? effectiveTask;
     }
 
     if (task && activeDetection && !task.actionAt) {
-      await updateTask(task.id, {
+      effectiveTask = await updateTask(task.id, {
         actionAt: activeDetection.actionAt,
         scheduleBucket: null,
-      });
+      }) ?? effectiveTask;
     } else if (task && !task.actionAt && !task.scheduleBucket) {
       const defaultSchedule = taskScheduleSelectionFromView(selectedView, today);
       if (defaultSchedule) {
-        await updateTask(task.id, defaultSchedule);
+        effectiveTask = await updateTask(task.id, defaultSchedule) ?? effectiveTask;
       }
     }
 
-    if (task) {
-      setPendingSelectionTaskId(task.id);
+    if (effectiveTask) {
+      const remainsInCurrentView = taskBelongsToView(effectiveTask, selectedView, today);
+      if (remainsInCurrentView) {
+        setPendingSelectionTaskId(effectiveTask.id);
+      } else {
+        setPendingSelectionTaskId(null);
+        toast.success(`Task added to ${TASK_VIEW_LABELS[deriveView(effectiveTask, today)]}`);
+      }
     }
 
     if (continueCapturing) {
