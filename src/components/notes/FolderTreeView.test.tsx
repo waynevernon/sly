@@ -537,6 +537,46 @@ describe("FolderTreeView", () => {
     resolveRename?.();
   });
 
+  it("renders moved folders optimistically while move data is settling", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["source", "source/moved"],
+        selectedScope: { type: "folder", path: "source/moved" },
+        selectedFolderPath: "source/moved",
+        folderAppearances: {
+          "source/moved": { colorId: "blue" },
+        },
+      }),
+    );
+
+    render(
+      <FolderTreeView
+        pendingFolderPathChange={{
+          oldPath: "source/moved",
+          newPath: "target/moved",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-folder-path="target"]')).not.toBeNull();
+    });
+
+    expect(document.querySelector('[data-folder-path="source/moved"]')).toBeNull();
+    expect(screen.getByText("target")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Expand folder/i }));
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-folder-path="target/moved"]')).not.toBeNull();
+    });
+
+    expect(screen.getByText("moved")).toHaveStyle({ color: "#2f6fde" });
+  });
+
   it("shows only direct folder note counts and hides zero-count folder badges", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();

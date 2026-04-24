@@ -21,7 +21,9 @@ import { useTheme } from "../../context/ThemeContext";
 import {
   buildFolderTree,
   countNotesInFolder,
+  rewriteFolderScopedId,
   rewriteFolderPathList,
+  type FolderPathChange,
 } from "../../lib/folderTree";
 import type {
   FolderAppearance,
@@ -87,8 +89,6 @@ type FolderIconPickerTarget =
 
 const TREE_INDENT_WIDTH = 12;
 
-type OptimisticFolderRename = { oldPath: string; newPath: string };
-
 function sanitizeFolderName(name: string): string {
   return name.replace(/[\/\\:*?"<>|]/g, "-").trim();
 }
@@ -122,17 +122,6 @@ function getRenamedFolderPath(path: string, newName: string): string {
   return lastSlash >= 0
     ? `${path.substring(0, lastSlash)}/${sanitizedName}`
     : sanitizedName;
-}
-
-function rewriteFolderScopedId(id: string, rename: OptimisticFolderRename): string {
-  const oldPrefix = `${rename.oldPath}/`;
-  const newPrefix = `${rename.newPath}/`;
-
-  if (id.startsWith(oldPrefix)) {
-    return `${newPrefix}${id.slice(oldPrefix.length)}`;
-  }
-
-  return id;
 }
 
 function getFolderTextStyle(
@@ -666,8 +655,10 @@ const FolderItem = memo(function FolderItem({
 
 export function FolderTreeView({
   pendingFolderPath = null,
+  pendingFolderPathChange = null,
 }: {
   pendingFolderPath?: string | null;
+  pendingFolderPathChange?: FolderPathChange | null;
 } = {}) {
   const {
     notes,
@@ -706,8 +697,8 @@ export function FolderTreeView({
     useState(false);
   const [inlineEditState, setInlineEditState] =
     useState<InlineFolderEditState | null>(null);
-  const [optimisticFolderRename, setOptimisticFolderRename] =
-    useState<OptimisticFolderRename | null>(null);
+  const [optimisticFolderPathChange, setOptimisticFolderPathChange] =
+    useState<FolderPathChange | null>(null);
   const [iconPickerTarget, setIconPickerTarget] =
     useState<FolderIconPickerTarget | null>(null);
   const { confirmDeletions, resolvedTheme, setConfirmDeletions } = useTheme();
@@ -759,45 +750,47 @@ export function FolderTreeView({
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
+  const activeFolderPathChange =
+    optimisticFolderPathChange ?? pendingFolderPathChange;
   const renderedKnownFolders = useMemo(
     () =>
-      optimisticFolderRename
+      activeFolderPathChange
         ? rewriteFolderPathList(
             knownFolders,
-            optimisticFolderRename.oldPath,
-            optimisticFolderRename.newPath,
+            activeFolderPathChange.oldPath,
+            activeFolderPathChange.newPath,
           )
         : knownFolders,
-    [knownFolders, optimisticFolderRename],
+    [activeFolderPathChange, knownFolders],
   );
   const renderedNotes = useMemo(
     () =>
-      optimisticFolderRename
+      activeFolderPathChange
         ? notes.map((note) => ({
             ...note,
-            id: rewriteFolderScopedId(note.id, optimisticFolderRename),
+            id: rewriteFolderScopedId(note.id, activeFolderPathChange),
           }))
         : notes,
-    [notes, optimisticFolderRename],
+    [activeFolderPathChange, notes],
   );
   const renderedSelectedFolderPath = useMemo(() => {
-    if (!selectedFolderPath || !optimisticFolderRename) return selectedFolderPath;
+    if (!selectedFolderPath || !activeFolderPathChange) return selectedFolderPath;
     return rewriteFolderPathList(
       [selectedFolderPath],
-      optimisticFolderRename.oldPath,
-      optimisticFolderRename.newPath,
+      activeFolderPathChange.oldPath,
+      activeFolderPathChange.newPath,
     )[0] ?? selectedFolderPath;
-  }, [optimisticFolderRename, selectedFolderPath]);
+  }, [activeFolderPathChange, selectedFolderPath]);
   const renderedFolderAppearances = useMemo(
     () =>
-      optimisticFolderRename
+      activeFolderPathChange
         ? rewriteFolderAppearancePaths(
             folderAppearances,
-            optimisticFolderRename.oldPath,
-            optimisticFolderRename.newPath,
+            activeFolderPathChange.oldPath,
+            activeFolderPathChange.newPath,
           )
         : folderAppearances,
-    [folderAppearances, optimisticFolderRename],
+    [activeFolderPathChange, folderAppearances],
   );
   const tree = useMemo(
     () =>
@@ -878,28 +871,28 @@ export function FolderTreeView({
   ]);
 
   useEffect(() => {
-    if (!optimisticFolderRename) return;
+    if (!optimisticFolderPathChange) return;
 
-    const oldPrefix = `${optimisticFolderRename.oldPath}/`;
+    const oldPrefix = `${optimisticFolderPathChange.oldPath}/`;
     const oldPathStillPresent =
       knownFolders.some(
         (path) =>
-          path === optimisticFolderRename.oldPath || path.startsWith(oldPrefix),
+          path === optimisticFolderPathChange.oldPath || path.startsWith(oldPrefix),
       ) || notes.some((note) => note.id.startsWith(oldPrefix));
 
     if (oldPathStillPresent) return;
 
     const timeoutId = window.setTimeout(() => {
-      setOptimisticFolderRename((current) =>
-        current?.oldPath === optimisticFolderRename.oldPath &&
-        current.newPath === optimisticFolderRename.newPath
+      setOptimisticFolderPathChange((current) =>
+        current?.oldPath === optimisticFolderPathChange.oldPath &&
+        current.newPath === optimisticFolderPathChange.newPath
           ? null
           : current,
       );
     }, 750);
 
     return () => window.clearTimeout(timeoutId);
-  }, [knownFolders, notes, optimisticFolderRename]);
+  }, [knownFolders, notes, optimisticFolderPathChange]);
 
   useEffect(() => {
     if (!pendingFolderSelectionPath) {
@@ -1345,7 +1338,7 @@ export function FolderTreeView({
         collapsedFoldersRef.current.has(oldPath) ||
         settings.collapsedFolders?.includes(oldPath) === true;
       const collapsedFoldersAfterRename = new Set(collapsedFoldersRef.current);
-      setOptimisticFolderRename({ oldPath, newPath });
+      setOptimisticFolderPathChange({ oldPath, newPath });
       if (wasCollapsed) {
         collapsedFoldersBeforeRename = new Set(collapsedFoldersRef.current);
         setForcedCollapsedFolderPath(newPath);
@@ -1373,7 +1366,7 @@ export function FolderTreeView({
       setIconPickerTarget(null);
       focusTree();
     } catch (error) {
-      setOptimisticFolderRename((current) =>
+      setOptimisticFolderPathChange((current) =>
         current?.oldPath === oldPath && current.newPath === newPath
           ? null
           : current,

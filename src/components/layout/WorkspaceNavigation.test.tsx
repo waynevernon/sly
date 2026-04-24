@@ -1,10 +1,11 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { type ReactNode, useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt } from "../../lib/tasks";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 
 let latestDndProps: Record<string, unknown> | null = null;
+let latestFoldersPaneProps: Record<string, unknown> | null = null;
 let foldersPaneMountCount = 0;
 
 vi.mock("@dnd-kit/core", () => ({
@@ -36,7 +37,8 @@ vi.mock("../../context/ThemeContext", () => ({
 }));
 
 vi.mock("./FoldersPane", () => ({
-  FoldersPane: () => {
+  FoldersPane: (props: Record<string, unknown>) => {
+    latestFoldersPaneProps = props;
     useEffect(() => {
       foldersPaneMountCount += 1;
     }, []);
@@ -121,6 +123,7 @@ function makeTasksHookValue(
 describe("WorkspaceNavigation", () => {
   beforeEach(async () => {
     latestDndProps = null;
+    latestFoldersPaneProps = null;
     foldersPaneMountCount = 0;
 
     const notesContext = await import("../../context/NotesContext");
@@ -173,6 +176,59 @@ describe("WorkspaceNavigation", () => {
 
     expect(moveFolder).toHaveBeenCalledWith("source/moved", "target");
     expect(revealFolder).toHaveBeenCalledWith("target");
+  });
+
+  it("passes an optimistic folder path change while a folder move is pending", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    let resolveMove: (() => void) | null = null;
+    const moveFolder = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMove = resolve;
+        }),
+    );
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({ moveFolder }),
+    );
+
+    render(<WorkspaceNavigation paneMode={3} workspaceMode="notes" />);
+
+    let movePromise: Promise<void> | undefined;
+    act(() => {
+      movePromise = (latestDndProps?.onDragEnd as ((event: unknown) => Promise<void>))?.({
+        active: {
+          data: {
+            current: {
+              type: "folder",
+              path: "source/moved",
+            },
+          },
+        },
+        over: {
+          data: {
+            current: {
+              type: "folder-drop-target",
+              path: "target",
+            },
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(latestFoldersPaneProps?.pendingFolderPathChange).toEqual({
+        oldPath: "source/moved",
+        newPath: "target/moved",
+      });
+    });
+
+    resolveMove?.();
+    await act(async () => {
+      await movePromise;
+    });
+
+    expect(latestFoldersPaneProps?.pendingFolderPathChange).toBeNull();
   });
 
   it("moves folders to root when dropped on Notes", async () => {

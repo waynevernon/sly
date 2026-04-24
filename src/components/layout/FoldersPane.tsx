@@ -3,6 +3,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ArrowDownAZ, ArrowUpAZ, Check, CheckSquare, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
+import type { FolderPathChange } from "../../lib/folderTree";
 import { FolderPlusIcon } from "../icons";
 import {
   IconButton,
@@ -34,6 +35,7 @@ const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
 interface FoldersPaneProps {
   onOpenSettings?: () => void;
   pendingFolderPath?: string | null;
+  pendingFolderPathChange?: FolderPathChange | null;
   onShowNotes?: () => void;
   onShowTasks?: () => void;
 }
@@ -41,6 +43,7 @@ interface FoldersPaneProps {
 export function FoldersPane({
   onOpenSettings,
   pendingFolderPath = null,
+  pendingFolderPathChange = null,
   onShowNotes,
   onShowTasks,
 }: FoldersPaneProps) {
@@ -164,7 +167,10 @@ export function FoldersPane({
         ref={scrollContainerRef}
         className="ui-scrollbar-overlay flex-1 overflow-y-auto py-2.5"
       >
-        <FolderTreeView pendingFolderPath={pendingFolderPath} />
+        <FolderTreeView
+          pendingFolderPath={pendingFolderPath}
+          pendingFolderPathChange={pendingFolderPathChange}
+        />
       </div>
 
       <Footer onOpenSettings={onOpenSettings} />

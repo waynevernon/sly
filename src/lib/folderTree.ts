@@ -10,6 +10,25 @@ export interface FolderTreeData {
   folders: FolderNode[];
 }
 
+export interface FolderPathChange {
+  oldPath: string;
+  newPath: string;
+}
+
+export function rewriteFolderScopedId(
+  id: string,
+  change: FolderPathChange,
+): string {
+  const oldPrefix = `${change.oldPath}/`;
+  const newPrefix = `${change.newPath}/`;
+
+  if (id.startsWith(oldPrefix)) {
+    return `${newPrefix}${id.slice(oldPrefix.length)}`;
+  }
+
+  return id;
+}
+
 export function rewriteFolderPathList(
   paths: string[],
   oldPath: string,

@@ -15,6 +15,7 @@ import { useNotes } from "../../context/NotesContext";
 import { useTasks } from "../../context/TasksContext";
 import { useTheme } from "../../context/ThemeContext";
 import { workspaceCollisionDetection } from "../../lib/dragCollision";
+import type { FolderPathChange } from "../../lib/folderTree";
 import { cn } from "../../lib/utils";
 import { TASK_DRAG_TARGET_VIEWS, localDateToNormalizedActionAt } from "../../lib/tasks";
 import type { TaskView } from "../../types/tasks";
@@ -83,6 +84,14 @@ function getOverlayHotspot(overlaySize: number, inset: number): number {
   }
 
   return Math.min(inset, overlaySize / 2);
+}
+
+function getMovedFolderPath(path: string, targetParent: string): string {
+  const folderName = path.includes("/")
+    ? path.substring(path.lastIndexOf("/") + 1)
+    : path;
+
+  return targetParent ? `${targetParent}/${folderName}` : folderName;
 }
 
 export function WorkspaceNavigation({
@@ -167,6 +176,8 @@ export function WorkspaceNavigation({
   const [dragType, setDragType] = useState<"folder" | "note" | "task" | null>(null);
   const [dragFolderPath, setDragFolderPath] = useState<string | null>(null);
   const [pendingFolderPath, setPendingFolderPath] = useState<string | null>(null);
+  const [pendingFolderPathChange, setPendingFolderPathChange] =
+    useState<FolderPathChange | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -311,6 +322,10 @@ export function WorkspaceNavigation({
         }
 
         setPendingFolderPath(folderPath);
+        setPendingFolderPathChange({
+          oldPath: folderPath,
+          newPath: getMovedFolderPath(folderPath, targetFolder),
+        });
         try {
           await moveFolder(folderPath, targetFolder);
           if (targetFolder) {
@@ -319,6 +334,9 @@ export function WorkspaceNavigation({
         } finally {
           setPendingFolderPath((currentPath) =>
             currentPath === folderPath ? null : currentPath,
+          );
+          setPendingFolderPathChange((currentChange) =>
+            currentChange?.oldPath === folderPath ? null : currentChange,
           );
         }
         return;
@@ -430,6 +448,7 @@ export function WorkspaceNavigation({
               <FoldersPane
                 onOpenSettings={onOpenSettings}
                 pendingFolderPath={pendingFolderPath}
+                pendingFolderPathChange={pendingFolderPathChange}
                 onShowNotes={onShowNotes}
                 onShowTasks={onShowTasks}
               />
