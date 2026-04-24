@@ -10,6 +10,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { FolderAppearance, FolderColorId } from "../../types/note";
 import {
+  type EmojiItem,
   getEmojiCatalogItems,
   getEmojiItem,
   searchEmojiShortcodes,
@@ -19,11 +20,13 @@ import {
   FOLDER_COLOR_PALETTE,
   sanitizeFolderAppearance,
 } from "../../lib/folderIcons";
+import { cn } from "../../lib/utils";
 import {
   LUCIDE_ICON_CATALOG,
   type LucideIconCatalogEntry,
   searchLucideIcons,
 } from "../../lib/lucideIcons";
+import { FolderGlyph } from "./FolderGlyph";
 import { Button, Input, IconButton } from "../ui";
 import {
   dialogOverlayClassName,
@@ -36,8 +39,22 @@ const EMOJI_CATALOG = getEmojiCatalogItems();
 const TILE_GAP = 10;
 const TILE_MIN_WIDTH = 78;
 const ROW_HEIGHT = 88;
+const INITIAL_RENDERED_ROWS = 8;
 
 type FolderStyleSource = "icons" | "emoji";
+type FolderPickerResult =
+  | {
+      id: string;
+      kind: "icon";
+      label: string;
+      icon: LucideIconCatalogEntry;
+    }
+  | {
+      id: string;
+      kind: "emoji";
+      label: string;
+      emoji: EmojiItem;
+    };
 
 interface FolderIconPickerModalProps {
   open: boolean;
@@ -80,6 +97,23 @@ export function FolderIconPickerModal({
   }, [deferredQuery]);
 
   const resultCount = source === "icons" ? filteredIcons.length : emojiResults.length;
+  const visibleResults = useMemo<FolderPickerResult[]>(() => {
+    if (source === "icons") {
+      return filteredIcons.map((icon) => ({
+        id: icon.name,
+        kind: "icon",
+        label: icon.name,
+        icon,
+      }));
+    }
+
+    return emojiResults.map((emoji) => ({
+      id: emoji.id,
+      kind: "emoji",
+      label: `:${emoji.shortcode}:`,
+      emoji,
+    }));
+  }, [emojiResults, filteredIcons, source]);
   const lanes = Math.max(
     1,
     Math.floor((gridWidth + TILE_GAP) / (TILE_MIN_WIDTH + TILE_GAP)),
@@ -92,6 +126,26 @@ export function FolderIconPickerModal({
     estimateSize: () => ROW_HEIGHT,
     overscan: 6,
   });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const renderedRows =
+    virtualRows.length > 0
+      ? virtualRows.map((row) => ({
+          key: row.key,
+          index: row.index,
+          start: row.start,
+        }))
+      : Array.from(
+          { length: Math.min(rowCount, INITIAL_RENDERED_ROWS) },
+          (_, index) => ({
+            key: `initial-${index}`,
+            index,
+            start: index * ROW_HEIGHT,
+          }),
+        );
+  const gridHeight = Math.max(
+    rowVirtualizer.getTotalSize(),
+    rowCount * ROW_HEIGHT,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -117,7 +171,7 @@ export function FolderIconPickerModal({
 
     let observer: ResizeObserver | null = null;
     const frameId = requestAnimationFrame(() => {
-      const element = gridMeasureRef.current;
+      const element = gridMeasureRef.current ?? scrollRef.current;
       if (!element) return;
 
       const updateWidth = () => {
@@ -133,7 +187,17 @@ export function FolderIconPickerModal({
       cancelAnimationFrame(frameId);
       observer?.disconnect();
     };
-  }, [open]);
+  }, [open, resultCount, source]);
+
+  useEffect(() => {
+    if (!open || resultCount === 0) return;
+
+    const frameId = requestAnimationFrame(() => {
+      rowVirtualizer.measure();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [lanes, open, resultCount, rowVirtualizer, source]);
 
   useEffect(() => {
     if (resultCount === 0) {
@@ -161,6 +225,10 @@ export function FolderIconPickerModal({
   const selectedEmojiId = selectedEmojiShortcode
     ? getEmojiItem(selectedEmojiShortcode)?.id ?? null
     : null;
+  const selectedSwatchColor = selectedColorId
+    ? FOLDER_COLOR_PALETTE[selectedColorId].swatch
+    : null;
+  const previewAppearance = sanitizeFolderAppearance(draftAppearance);
 
   const handleSelectColor = (colorId: FolderColorId | null) => {
     setDraftAppearance((current) => {
@@ -192,6 +260,15 @@ export function FolderIconPickerModal({
 
   const handleReset = () => {
     setDraftAppearance(null);
+  };
+
+  const handleSelectResult = (result: FolderPickerResult) => {
+    if (result.kind === "icon") {
+      handleSelectLucide(result.icon.name);
+      return;
+    }
+
+    handleSelectEmoji(result.emoji.shortcode);
   };
 
   const handleApply = async () => {
@@ -231,15 +308,13 @@ export function FolderIconPickerModal({
         event.preventDefault();
         setActiveIndex((current) => Math.max(current - lanes, 0));
         break;
-      case "Enter":
+      case "Enter": {
         if (resultCount === 0) return;
         event.preventDefault();
-        if (source === "icons") {
-          handleSelectLucide(filteredIcons[activeIndex]?.name ?? "");
-        } else {
-          handleSelectEmoji(emojiResults[activeIndex]?.shortcode ?? "");
-        }
+        const activeResult = visibleResults[activeIndex];
+        if (activeResult) handleSelectResult(activeResult);
         break;
+      }
       default:
         break;
     }
@@ -257,12 +332,33 @@ export function FolderIconPickerModal({
           className={`fixed left-[50%] top-[50%] z-50 flex h-[min(90vh,44rem)] w-[min(calc(100vw-1.5rem),46rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden duration-200 data-[state=open]:animate-slide-down focus:outline-none ${dialogPanelClassName}`}
         >
           <div className="border-b border-border/80 px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <Dialog.Title className="text-sm font-medium text-text">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted"
+                  style={
+                    selectedSwatchColor
+                      ? { color: selectedSwatchColor }
+                      : undefined
+                  }
+                >
+                  <FolderGlyph
+                    icon={previewAppearance?.icon ?? null}
+                    className="h-4.5 w-4.5 text-current"
+                    strokeWidth={1.8}
+                  />
+                </div>
+                <Dialog.Title
+                  className="truncate text-sm font-medium text-text"
+                  style={
+                    selectedSwatchColor
+                      ? { color: selectedSwatchColor }
+                      : undefined
+                  }
+                >
                   {title}
                 </Dialog.Title>
-                <Dialog.Description className="text-xs text-text-muted">
+                <Dialog.Description className="sr-only">
                   {description}
                 </Dialog.Description>
               </div>
@@ -275,7 +371,7 @@ export function FolderIconPickerModal({
               </IconButton>
             </div>
 
-            <div className="mt-3 flex flex-col gap-3">
+            <div className="mt-3">
               <div className="flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
                   <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 stroke-[1.6] text-text-muted/70" />
@@ -306,7 +402,17 @@ export function FolderIconPickerModal({
                   )}
                 </div>
 
-                <div className="flex items-center rounded-[var(--ui-radius-md)] border border-border bg-bg-secondary/80 p-1">
+                <div className="relative flex w-40 items-center rounded-[var(--ui-radius-md)] border border-border bg-bg-secondary/80 p-0.5">
+                  <div
+                    className="pointer-events-none absolute bottom-0.5 top-0.5 rounded-[calc(var(--ui-radius-md)-2px)] bg-bg shadow-sm transition-transform duration-[var(--ui-motion-duration-fade)] ease-[var(--ui-motion-ease-standard)]"
+                    style={{
+                      left: 2,
+                      width: "calc((100% - 4px) / 2)",
+                      transform: `translateX(calc(${
+                        source === "icons" ? 0 : 1
+                      } * 100%))`,
+                    }}
+                  />
                   {(["icons", "emoji"] as const).map((nextSource) => (
                     <button
                       key={nextSource}
@@ -315,203 +421,63 @@ export function FolderIconPickerModal({
                         setSource(nextSource);
                         setActiveIndex(0);
                       }}
-                      className={`ui-focus-ring min-w-[4.75rem] rounded-[calc(var(--ui-radius-md)-2px)] px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={cn(
+                        "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--ui-motion-duration-fade)]",
                         source === nextSource
-                          ? "bg-bg text-text shadow-sm"
-                          : "text-text-muted hover:text-text"
-                      }`}
+                          ? "text-text"
+                          : "text-text-muted hover:text-text",
+                      )}
                       aria-pressed={source === nextSource}
                     >
                       {nextSource === "icons" ? "Icons" : "Emoji"}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
-                  Color
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleSelectColor(null)}
-                  className={`ui-focus-ring inline-flex h-7 items-center justify-center rounded-full border px-2.5 text-[11px] font-medium transition-colors ${
-                    selectedColorId === null
-                      ? "border-accent bg-accent/7 text-text"
-                      : "border-border bg-bg text-text-muted hover:text-text"
-                  }`}
-                  aria-pressed={selectedColorId === null}
-                >
-                  Default
-                </button>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {FOLDER_COLOR_IDS.map((colorId) => {
-                    const swatchColor = FOLDER_COLOR_PALETTE[colorId].swatch;
-                    const isSelected = selectedColorId === colorId;
-
-                    return (
-                      <button
-                        key={colorId}
-                        type="button"
-                        onClick={() => handleSelectColor(colorId)}
-                        className={`ui-focus-ring relative flex h-7 w-7 items-center justify-center rounded-full border transition-[transform,border-color,box-shadow] duration-150 ${
-                          isSelected
-                            ? "border-text shadow-[0_0_0_1px_var(--color-bg),0_0_0_3px_color-mix(in_srgb,var(--color-accent)_26%,transparent)]"
-                            : "border-border/80 hover:scale-[1.04]"
-                        }`}
-                        aria-label={`Use ${colorId} folder color`}
-                        aria-pressed={isSelected}
-                      >
-                        <span
-                          className="h-4.5 w-4.5 rounded-full"
-                          style={{ backgroundColor: swatchColor }}
-                        />
-                        {isSelected && (
-                          <span className="absolute inset-0 flex items-center justify-center text-white">
-                            <CheckIcon className="h-3.25 w-3.25 stroke-[2.4]" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="w-20 shrink-0 text-right text-[11px] text-text-muted">
+                  {source === "icons" ? (
+                    <span>
+                      {filteredIcons.length.toLocaleString()} icon
+                      {filteredIcons.length === 1 ? "" : "s"}
+                    </span>
+                  ) : (
+                    <span>
+                      {emojiResults.length.toLocaleString()} emoji
+                    </span>
+                  )}
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleReset}
-                  className="ml-auto h-7 rounded-full px-3 text-xs"
-                >
-                  Reset
-                </Button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-4 pb-2.5 pt-2 text-[11px] text-text-muted">
-            {source === "icons" ? (
-              <>
-                <span>
-                  {filteredIcons.length.toLocaleString()} icon
-                  {filteredIcons.length === 1 ? "" : "s"}
-                </span>
-                <span>Enter to choose, Apply to save</span>
-              </>
-            ) : (
-              <>
-                <span>
-                  {emojiResults.length.toLocaleString()} emoji
-                </span>
-                <span>Enter to choose, Apply to save</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             <div
               ref={scrollRef}
               className="ui-scrollbar-overlay min-h-0 flex-1 overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
             >
-              {source === "icons" ? (
+              {visibleResults.length === 0 ? (
                 <div ref={gridMeasureRef} className="w-full">
-                  {filteredIcons.length === 0 ? (
-                    <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--ui-radius-lg)] border border-border bg-bg/60 text-center">
-                      <div className="text-sm font-medium text-text">
-                        No icons found
-                      </div>
-                      <div className="max-w-xs text-sm text-text-muted">
-                        Try a shorter search or another keyword.
-                      </div>
+                  <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--ui-radius-lg)] border border-border bg-bg/60 text-center">
+                    <div className="text-sm font-medium text-text">
+                      {source === "icons"
+                        ? "No icons found"
+                        : "No matching emoji"}
                     </div>
-                  ) : (
-                    <div
-                      className="relative"
-                      style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-                    >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const startIndex = virtualRow.index * lanes;
-                        const rowItems = filteredIcons.slice(
-                          startIndex,
-                          startIndex + lanes,
-                        );
-
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            className="absolute left-0 top-0 w-full"
-                            style={{
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <div
-                              className="grid gap-2.5"
-                              style={{
-                                gridTemplateColumns: `repeat(${lanes}, minmax(0, 1fr))`,
-                              }}
-                            >
-                              {rowItems.map((icon, columnIndex) => {
-                                const index = startIndex + columnIndex;
-                                const isSelected = icon.name === selectedLucideName;
-                                const isActive = index === activeIndex;
-
-                                return (
-                                  <button
-                                    key={icon.name}
-                                    type="button"
-                                    title={icon.name}
-                                    aria-label={icon.name}
-                                    aria-selected={isSelected}
-                                    onMouseEnter={() => setActiveIndex(index)}
-                                    onFocus={() => setActiveIndex(index)}
-                                    onClick={() => handleSelectLucide(icon.name)}
-                                    className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
-                                      isSelected
-                                        ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
-                                        : isActive
-                                          ? "border-text-muted/45 bg-bg shadow-sm"
-                                          : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
-                                    }`}
-                                  >
-                                    {isSelected && (
-                                      <span className="absolute right-1.5 top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-accent text-text-inverse">
-                                        <CheckIcon className="h-2.75 w-2.75 stroke-[2.4]" />
-                                      </span>
-                                    )}
-                                    <icon.Component
-                                      className="h-5 w-5 shrink-0 text-text"
-                                      strokeWidth={1.85}
-                                    />
-                                    <span className="max-w-full truncate text-[11px] font-medium leading-4 text-text-muted group-hover:text-text">
-                                      {icon.name}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="max-w-xs text-sm text-text-muted">
+                      {source === "icons"
+                        ? "Try a shorter search or another keyword."
+                        : "Try another alias or a shorter search."}
                     </div>
-                  )}
-                </div>
-              ) : emojiResults.length === 0 ? (
-                <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--ui-radius-lg)] border border-border bg-bg/60 text-center">
-                  <div className="text-sm font-medium text-text">
-                    No matching emoji
-                  </div>
-                  <div className="max-w-xs text-sm text-text-muted">
-                    Try another alias or a shorter search.
                   </div>
                 </div>
               ) : (
                 <div ref={gridMeasureRef} className="w-full">
                   <div
                     className="relative"
-                    style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+                    style={{ height: `${gridHeight}px` }}
                   >
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    {renderedRows.map((virtualRow) => {
                       const startIndex = virtualRow.index * lanes;
-                      const rowItems = emojiResults.slice(
+                      const rowItems = visibleResults.slice(
                         startIndex,
                         startIndex + lanes,
                       );
@@ -530,39 +496,49 @@ export function FolderIconPickerModal({
                               gridTemplateColumns: `repeat(${lanes}, minmax(0, 1fr))`,
                             }}
                           >
-                              {rowItems.map((item, columnIndex) => {
-                                const index = startIndex + columnIndex;
-                                const isSelected = item.id === selectedEmojiId;
-                                const isActive = index === activeIndex;
+                            {rowItems.map((item, columnIndex) => {
+                              const index = startIndex + columnIndex;
+                              const isSelected =
+                                item.kind === "icon"
+                                  ? item.icon.name === selectedLucideName
+                                  : item.id === selectedEmojiId;
+                              const isActive = index === activeIndex;
 
-                                return (
-                                  <button
-                                    key={item.id}
-                                    type="button"
-                                    title={`:${item.shortcode}:`}
-                                    aria-label={`:${item.shortcode}:`}
-                                    aria-selected={isSelected}
-                                    onMouseEnter={() => setActiveIndex(index)}
-                                    onFocus={() => setActiveIndex(index)}
-                                    onClick={() => handleSelectEmoji(item.shortcode)}
-                                    className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-150 ${
-                                      isSelected
-                                        ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
-                                        : isActive
-                                          ? "border-text-muted/45 bg-bg shadow-sm"
-                                          : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
-                                    }`}
-                                  >
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  title={item.label}
+                                  aria-label={item.label}
+                                  aria-selected={isSelected}
+                                  onMouseEnter={() => setActiveIndex(index)}
+                                  onFocus={() => setActiveIndex(index)}
+                                  onClick={() => handleSelectResult(item)}
+                                  className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-[var(--ui-motion-duration-fade)] ${
+                                    isSelected
+                                      ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
+                                      : isActive
+                                        ? "border-text-muted/45 bg-bg shadow-sm"
+                                        : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
+                                  }`}
+                                >
                                   {isSelected && (
                                     <span className="absolute right-1.5 top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-accent text-text-inverse">
                                       <CheckIcon className="h-2.75 w-2.75 stroke-[2.4]" />
                                     </span>
                                   )}
-                                  <span className="flex h-5 w-5 items-center justify-center text-[1.25rem] leading-none">
-                                    {item.emoji}
-                                  </span>
+                                  {item.kind === "icon" ? (
+                                    <item.icon.Component
+                                      className="h-5 w-5 shrink-0 text-text"
+                                      strokeWidth={1.85}
+                                    />
+                                  ) : (
+                                    <span className="flex h-5 w-5 items-center justify-center text-[1.25rem] leading-none">
+                                      {item.emoji.emoji}
+                                    </span>
+                                  )}
                                   <span className="max-w-full truncate text-[11px] font-medium leading-4 text-text-muted group-hover:text-text">
-                                    :{item.shortcode}:
+                                    {item.label}
                                   </span>
                                 </button>
                               );
@@ -577,23 +553,79 @@ export function FolderIconPickerModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-border/80 px-4 py-3">
-            <Button
-              variant="ghost"
-              size="md"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => void handleApply()}
-              disabled={isSubmitting}
-            >
-              Apply
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 px-4 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectColor(null)}
+                className={`ui-focus-ring inline-flex h-7 items-center justify-center rounded-full border px-2.5 text-[11px] font-medium transition-colors ${
+                  selectedColorId === null
+                    ? "border-accent bg-accent/7 text-text"
+                    : "border-border bg-bg text-text-muted hover:text-text"
+                }`}
+                aria-pressed={selectedColorId === null}
+              >
+                Default
+              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {FOLDER_COLOR_IDS.map((colorId) => {
+                  const swatchColor = FOLDER_COLOR_PALETTE[colorId].swatch;
+                  const isSelected = selectedColorId === colorId;
+
+                  return (
+                    <button
+                      key={colorId}
+                      type="button"
+                      onClick={() => handleSelectColor(colorId)}
+                      className={`ui-focus-ring relative flex h-7 w-7 items-center justify-center rounded-full border transition-[transform,border-color,box-shadow] duration-[var(--ui-motion-duration-fade)] ${
+                        isSelected
+                          ? "border-text shadow-[0_0_0_1px_var(--color-bg),0_0_0_3px_color-mix(in_srgb,var(--color-accent)_26%,transparent)]"
+                          : "border-border/80 hover:scale-[1.04]"
+                      }`}
+                      aria-label={`Use ${colorId} folder color`}
+                      aria-pressed={isSelected}
+                    >
+                      <span
+                        className="h-4.5 w-4.5 rounded-full"
+                        style={{ backgroundColor: swatchColor }}
+                      />
+                      {isSelected && (
+                        <span className="absolute inset-0 flex items-center justify-center text-white">
+                          <CheckIcon className="h-3.25 w-3.25 stroke-[2.4]" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={handleReset}
+                disabled={isSubmitting}
+              >
+                Reset
+              </Button>
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => void handleApply()}
+                disabled={isSubmitting}
+              >
+                Apply
+              </Button>
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
