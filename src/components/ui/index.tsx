@@ -215,7 +215,7 @@ export function ListItem({
         {isPinned && (
           <PinIcon className="w-4.25 h-4.25 stroke-[1.6] fill-current text-text-muted shrink-0" />
         )}
-        <span className={cn("text-sm font-medium truncate text-text")}>
+        <span className={cn("min-w-0 text-sm font-medium truncate text-text")}>
           {title}
         </span>
       </div>
@@ -258,7 +258,7 @@ export function ListItem({
             {hasMeta && (
               <div
                 className={cn(
-                  "text-xs whitespace-nowrap shrink-0 truncate",
+                  "min-w-0 text-xs whitespace-nowrap shrink truncate",
                   isSelected ? "text-text" : "text-text-muted"
                 )}
               >

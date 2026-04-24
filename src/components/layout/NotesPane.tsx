@@ -345,10 +345,10 @@ export function NotesPane() {
   }, []);
 
   return (
-    <div className="h-full bg-bg flex flex-col select-none">
+    <div className="ui-pane-shell h-full bg-bg flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <div className="min-w-0 flex items-center gap-1.5">
+        <div className="min-w-0 flex flex-1 items-center gap-1.5">
           {!searchQuery.trim() && !hasBatchSelection && (
             selectedScope.type === "pinned" ? (
               <PinIcon className="w-4.5 h-4.5 text-text-muted/80 shrink-0 stroke-[1.7]" />
@@ -364,7 +364,7 @@ export function NotesPane() {
             )
           )}
           <div
-            className="font-medium text-base text-text truncate"
+            className="min-w-0 font-medium text-base text-text truncate"
             style={
               !hasBatchSelection &&
               !searchQuery.trim() &&
@@ -593,7 +593,7 @@ export function NotesPane() {
                   >
                     <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                       <DropdownMenu.ItemIndicator>
-                        <span className="text-xs leading-none">✓</span>
+                        <Check className="h-3 w-3 stroke-[2.2]" />
                       </DropdownMenu.ItemIndicator>
                     </span>
                     <span>Folder Path</span>
@@ -609,7 +609,7 @@ export function NotesPane() {
                   >
                     <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                       <DropdownMenu.ItemIndicator>
-                        <span className="text-xs leading-none">✓</span>
+                        <Check className="h-3 w-3 stroke-[2.2]" />
                       </DropdownMenu.ItemIndicator>
                     </span>
                     <span>Filename</span>
@@ -663,7 +663,7 @@ export function NotesPane() {
               )}
             </div>
             {(selectedScope.type === "folder" || selectedScope.type === "all") && (
-              <div className="relative mt-1.5 flex items-center rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
+              <div className="relative mt-1.5 grid grid-cols-3 rounded-[var(--ui-radius-md)] border border-border/80 bg-bg-secondary/70 p-0.5">
                 <div
                   className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-[calc(var(--ui-radius-md)-2px)] bg-bg shadow-sm transition-transform duration-[var(--ui-motion-duration-fade)] ease-[var(--ui-motion-ease-standard)]"
                   style={{
@@ -678,7 +678,7 @@ export function NotesPane() {
                     type="button"
                     onClick={() => setSearchScope(scope)}
                     className={cn(
-                      "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] py-1 text-[11px] font-medium transition-colors duration-[var(--ui-motion-duration-fade)]",
+                      "ui-focus-ring relative min-w-0 rounded-[calc(var(--ui-radius-md)-2px)] px-1 py-1 text-[11px] font-medium transition-colors duration-[var(--ui-motion-duration-fade)]",
                       searchScope === scope
                         ? "text-text"
                         : "text-text-muted hover:text-text",

@@ -244,7 +244,7 @@ describe("TaskListPane", () => {
     await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
 
     await waitFor(() => {
-      expect(screen.getByText("Date: Tomorrow")).toBeInTheDocument();
+      expect(screen.getByText("Action: Tomorrow")).toBeInTheDocument();
     });
   });
 
@@ -395,11 +395,11 @@ describe("TaskListPane", () => {
     await user.click(screen.getAllByRole("button", { name: "New task" })[0]);
     await user.type(screen.getByPlaceholderText("Task name"), "Pay rent tomorrow");
     await waitFor(() => {
-      expect(screen.getByText("Date: Tomorrow")).toBeInTheDocument();
+      expect(screen.getByText("Action: Tomorrow")).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: "Dismiss detected date" }));
-    expect(screen.queryByText("Date: Tomorrow")).not.toBeInTheDocument();
+    expect(screen.queryByText("Action: Tomorrow")).not.toBeInTheDocument();
 
     await user.keyboard("{Enter}");
 

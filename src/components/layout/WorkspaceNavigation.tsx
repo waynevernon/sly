@@ -412,7 +412,7 @@ export function WorkspaceNavigation({
         <div
           className={cn(
             "relative h-full shrink-0",
-            !isResizing && "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            !isResizing && "transition-[width] duration-[var(--ui-motion-duration-layout)] ease-[var(--ui-motion-ease-standard)]",
             !foldersVisible && "w-0 pointer-events-none",
           )}
           style={foldersVisible ? { width: liveWidths.folders } : undefined}
@@ -420,7 +420,7 @@ export function WorkspaceNavigation({
           <div
             className={cn(
               "relative h-full overflow-visible",
-              !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              !isResizing && "transition-[opacity,transform] duration-[var(--ui-motion-duration-layout)] ease-[var(--ui-motion-ease-standard)]",
               foldersVisible
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-3",
@@ -454,7 +454,7 @@ export function WorkspaceNavigation({
         <div
           className={cn(
             "relative h-full shrink-0",
-            !isResizing && "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            !isResizing && "transition-[width] duration-[var(--ui-motion-duration-layout)] ease-[var(--ui-motion-ease-standard)]",
             !notesVisible && "w-0 pointer-events-none",
           )}
           style={notesVisible ? { width: liveWidths.notes } : undefined}
@@ -462,7 +462,7 @@ export function WorkspaceNavigation({
           <div
             className={cn(
               "h-full overflow-visible",
-              !isResizing && "transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              !isResizing && "transition-[opacity,transform] duration-[var(--ui-motion-duration-layout)] ease-[var(--ui-motion-ease-standard)]",
               notesVisible
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-3",

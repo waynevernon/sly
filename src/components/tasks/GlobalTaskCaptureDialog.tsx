@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, Clock3, X } from "lucide-react";
+import { CalendarDays, Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
@@ -404,8 +404,8 @@ export function GlobalTaskCaptureDialog({
             )}
             {showDetectedDateChip ? (
               <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-2.5 text-xs font-medium text-text-muted">
-                <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>Date: {detectedDate?.label}</span>
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>Action: {detectedDate?.label}</span>
                 <button
                   type="button"
                   aria-label="Dismiss detected date"

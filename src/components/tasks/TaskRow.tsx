@@ -202,7 +202,7 @@ export function TaskRow({
                 }}
                 className="ui-focus-ring min-w-0 flex-1 text-left outline-none"
               >
-                <span className="flex items-center gap-2">
+                <span className="flex min-w-0 items-center gap-2">
                   <span
                     className={cn(
                       "block min-w-0 flex-1 truncate text-sm font-medium",
@@ -213,7 +213,7 @@ export function TaskRow({
                   </span>
 
                   {(hasLink || hasDescription || hasWaitingFor || hasRecurrence) && (
-                    <span className="flex shrink-0 items-center gap-1 text-text-muted/40">
+                    <span className="flex max-w-[4.5rem] shrink-0 items-center justify-end gap-1 overflow-hidden text-text-muted/40">
                       {hasRecurrence ? (
                         <Repeat2
                           className="h-3.5 w-3.5 stroke-[1.8]"
@@ -247,7 +247,7 @@ export function TaskRow({
                 {(secondaryLabel || dueDateLabel) && (
                   <span
                     className={cn(
-                      "mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-xs leading-none tabular-nums",
+                      "mt-0.5 flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden text-xs leading-none tabular-nums",
                       overdue && secondaryLabel ? "text-[var(--color-danger)]" : "text-text-muted/60",
                     )}
                   >
@@ -255,12 +255,12 @@ export function TaskRow({
                       isCompletedViewItem ? (
                         <span className="inline-flex min-w-0 items-center gap-1">
                           <CheckCheck className="h-3.25 w-3.25 shrink-0 stroke-[1.9]" />
-                          <span>{secondaryLabel}</span>
+                          <span className="min-w-0 truncate">{secondaryLabel}</span>
                         </span>
                       ) : (
                         <span className="inline-flex min-w-0 items-center gap-1">
                           <CalendarDays className="h-3.25 w-3.25 shrink-0 stroke-[1.9]" />
-                          <span>{secondaryLabel}</span>
+                          <span className="min-w-0 truncate">{secondaryLabel}</span>
                         </span>
                       )
                     )}
@@ -270,12 +270,12 @@ export function TaskRow({
                     {dueDateLabel && (
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1",
+                          "inline-flex min-w-0 items-center gap-1",
                           dueOverdue ? "text-[var(--color-danger)]" : "text-text-muted/60",
                         )}
                       >
                         <Flag className="h-3 w-3 shrink-0 stroke-[1.9]" />
-                        <span>{dueDateLabel}</span>
+                        <span className="min-w-0 truncate">{dueDateLabel}</span>
                       </span>
                     )}
                   </span>

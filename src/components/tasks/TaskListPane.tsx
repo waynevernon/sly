@@ -661,10 +661,10 @@ export function TaskListPane() {
   );
 
   return (
-    <div className="flex h-full flex-col select-none bg-bg">
+    <div className="ui-pane-shell flex h-full flex-col select-none bg-bg">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {!isSearching && <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />}
           <div className="min-w-0 truncate font-medium text-base text-text">
             {hasBatchSelection
@@ -917,9 +917,9 @@ export function TaskListPane() {
             {groupedSections.map((section) => {
               const sectionItems = section.tasks.map((t) => `task:${t.id}`);
               const sectionContent = (
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 {section.label ? (
-                  <div className="flex items-center justify-between gap-2 px-2.5 pt-1 pb-0.5">
+                  <div className="flex min-w-0 items-center justify-between gap-2 px-2.5 pt-1 pb-0.5">
                     <div className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
                       {section.label}
                     </div>
@@ -1044,7 +1044,7 @@ export function TaskListPane() {
 
             {isCreating && (
               <div className="rounded-[var(--ui-radius-md)] bg-bg-muted/50">
-                <div className="flex items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 py-[var(--ui-list-item-py)]">
+                <div className="flex min-w-0 items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 py-[var(--ui-list-item-py)]">
                   <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-border bg-bg" />
                   <div className="relative flex min-w-0 flex-1">
                     {inlineTitleHighlights.length > 0 && (
@@ -1103,11 +1103,11 @@ export function TaskListPane() {
                 </div>
 
                 {(detectedDate || detectedUrl) ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-6.5">
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 pb-2 pl-6.5 pr-2.5">
                     {detectedDate ? (
-                      <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                      <div className="inline-flex h-[var(--ui-control-height-compact)] min-w-0 max-w-full items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
                         <CalendarClock className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                        <span>Date: {detectedDate.label}</span>
+                        <span className="min-w-0 truncate">Action: {detectedDate.label}</span>
                         <button
                           type="button"
                           aria-label="Dismiss detected date"
@@ -1124,9 +1124,9 @@ export function TaskListPane() {
                       </div>
                     ) : null}
                     {detectedUrl ? (
-                      <div className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                      <div className="inline-flex h-[var(--ui-control-height-compact)] min-w-0 max-w-full items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
                         <Link2 className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                        <span className="max-w-[200px] truncate">Link: {detectedUrl.url}</span>
+                        <span className="min-w-0 max-w-[200px] truncate">Link: {detectedUrl.url}</span>
                         <button
                           type="button"
                           aria-label="Dismiss detected link"
@@ -1421,10 +1421,10 @@ function BulkReschedulePicker({
             }
             setIsOpen((current) => !current);
           }}
-          className="ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 text-xs font-medium text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+          className="ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] min-w-0 max-w-full items-center gap-1.5 rounded-[var(--ui-radius-md)] px-2 text-xs font-medium text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
         >
-          <CalendarDays className="h-3.5 w-3.5 stroke-[1.8]" />
-          <span>{isSaving ? "Rescheduling…" : triggerLabel}</span>
+          <CalendarDays className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+          <span className="min-w-0 truncate">{isSaving ? "Rescheduling…" : triggerLabel}</span>
         </button>
       ) : null}
 

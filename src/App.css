@@ -455,6 +455,10 @@ body {
 }
 
 @layer components {
+  .ui-pane-shell {
+    container-type: inline-size;
+  }
+
   .ui-pane-header {
     display: flex;
     align-items: center;
@@ -472,6 +476,31 @@ body {
     align-items: center;
     gap: var(--ui-action-gap);
     flex-shrink: 0;
+  }
+
+  @container (max-width: 190px) {
+    .ui-pane-header {
+      gap: 0.375rem;
+      padding-left: 0.625rem;
+      padding-right: 0.5rem;
+    }
+
+    .ui-pane-header-actions {
+      gap: 0;
+    }
+
+    .ui-pane-mode-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .ui-pane-mode-active {
+      gap: 0;
+    }
   }
 }
 

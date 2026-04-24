@@ -137,7 +137,7 @@ describe("GlobalTaskCaptureDialog", () => {
       screen.getByPlaceholderText("What needs doing?"),
       "Pay rent tomorrow",
     );
-    await screen.findByText("Date: Tomorrow");
+    await screen.findByText("Action: Tomorrow");
     await user.click(screen.getByRole("button", { name: "Waiting" }));
     await user.type(screen.getByPlaceholderText("Waiting…"), "Jordan");
     await user.type(screen.getByPlaceholderText("Add link…"), "example.com");
@@ -194,10 +194,10 @@ describe("GlobalTaskCaptureDialog", () => {
       screen.getByPlaceholderText("What needs doing?"),
       "Plan tomorrow",
     );
-    await screen.findByText("Date: Tomorrow");
+    await screen.findByText("Action: Tomorrow");
     await user.click(screen.getByRole("button", { name: "Dismiss detected date" }));
     await waitFor(() => {
-      expect(screen.queryByText("Date: Tomorrow")).not.toBeInTheDocument();
+      expect(screen.queryByText("Action: Tomorrow")).not.toBeInTheDocument();
     });
     await user.click(screen.getByRole("button", { name: "Create Task" }));
 
