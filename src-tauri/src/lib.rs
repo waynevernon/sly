@@ -1085,6 +1085,53 @@ async fn move_note_file_without_clobber(source: &Path, dest: &Path) -> std::io::
     Ok(())
 }
 
+async fn rename_directory_allowing_case_change(source: &Path, dest: &Path) -> std::io::Result<()> {
+    if dest.exists() {
+        let source_canonical = std::fs::canonicalize(source)?;
+        let dest_canonical = std::fs::canonicalize(dest)?;
+
+        if source_canonical != dest_canonical {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "destination directory already exists",
+            ));
+        }
+
+        let parent = source.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "source directory has no parent",
+            )
+        })?;
+        let source_name = source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("folder");
+        let mut counter = 0;
+        let temp_dest = loop {
+            let suffix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0);
+            let candidate = parent.join(format!(".sly-renaming-{source_name}-{suffix}-{counter}"));
+            if !candidate.exists() {
+                break candidate;
+            }
+            counter += 1;
+        };
+
+        fs::rename(source, &temp_dest).await?;
+        if let Err(error) = fs::rename(&temp_dest, dest).await {
+            let _ = fs::rename(&temp_dest, source).await;
+            return Err(error);
+        }
+
+        return Ok(());
+    }
+
+    fs::rename(source, dest).await
+}
+
 /// Expands template tags in a note name template using local timezone
 fn expand_note_name_template(template: &str) -> String {
     use chrono::Local;
@@ -2858,10 +2905,6 @@ async fn rename_folder(
         .ok_or("Cannot determine parent directory")?
         .join(&sanitized_name);
 
-    if new_target.exists() {
-        return Err("A folder with that name already exists".to_string());
-    }
-
     // Compute old and new path prefixes for updating IDs
     let old_prefix = format!("{}/", old_path);
     let new_path = if let Some(pos) = old_path.rfind('/') {
@@ -2872,9 +2915,15 @@ async fn rename_folder(
     let new_prefix = format!("{}/", new_path);
 
     // Rename on disk
-    tokio::fs::rename(&old_target, &new_target)
+    rename_directory_allowing_case_change(&old_target, &new_target)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                "A folder with that name already exists".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
 
     // Update pinned note IDs in settings
     {
@@ -6913,6 +6962,46 @@ mod tests {
             std::fs::read_to_string(&destination).unwrap(),
             "# Destination\n"
         );
+
+        let _ = std::fs::remove_dir_all(notes_root);
+    }
+
+    #[test]
+    fn rename_directory_allowing_case_change_keeps_existing_destination() {
+        let notes_root = temp_dir_path("rename-directory-existing-destination");
+        std::fs::create_dir_all(notes_root.join("Source")).unwrap();
+        std::fs::create_dir_all(notes_root.join("Destination")).unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let error = runtime
+            .block_on(rename_directory_allowing_case_change(
+                &notes_root.join("Source"),
+                &notes_root.join("Destination"),
+            ))
+            .unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+        assert!(notes_root.join("Source").is_dir());
+        assert!(notes_root.join("Destination").is_dir());
+
+        let _ = std::fs::remove_dir_all(notes_root);
+    }
+
+    #[test]
+    fn rename_directory_allowing_case_change_renames_folder() {
+        let notes_root = temp_dir_path("rename-directory-case-change");
+        std::fs::create_dir_all(notes_root.join("Projects")).unwrap();
+        std::fs::write(notes_root.join("Projects/Alpha.md"), "# Alpha\n").unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime
+            .block_on(rename_directory_allowing_case_change(
+                &notes_root.join("Projects"),
+                &notes_root.join("projects"),
+            ))
+            .unwrap();
+
+        assert!(notes_root.join("projects/Alpha.md").is_file());
 
         let _ = std::fs::remove_dir_all(notes_root);
     }
