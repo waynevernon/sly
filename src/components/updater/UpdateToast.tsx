@@ -25,7 +25,13 @@ export function UpdateToast({
     try {
       await update.downloadAndInstall();
       toast.dismiss(toastId);
-      toast.success("Update installed! Restart Sly to apply.", {
+      toast.success("Update installed. Restart Sly to apply it.", {
+        action: {
+          label: "Restart",
+          onClick: () => {
+            void invoke("restart_app");
+          },
+        },
         duration: Infinity,
         closeButton: true,
       });

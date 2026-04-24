@@ -38,11 +38,9 @@ It does not produce release bundles.
 
 ### Release (`release.yml`)
 
-Runs on `v*` tag push or manual `workflow_dispatch`. Builds in parallel for:
+Runs on `v*` tag push or manual `workflow_dispatch`. Builds for:
 
 - **macOS**: Universal binary (`arm64` + `x86_64`), code-signed and notarized
-- **Windows**: NSIS installer (`x64`)
-- **Linux**: AppImage and `.deb`
 
 Release behavior:
 
@@ -54,7 +52,7 @@ Release behavior:
 - The workflow sets the updater channel at build time:
   - **stable builds** point to `https://github.com/waynevernon/sly/releases/latest/download/latest.json`
   - **beta builds** point to `https://raw.githubusercontent.com/waynevernon/sly/updater-beta/latest.json`
-- The workflow creates a **draft** GitHub release with platform artifacts and `latest.json` for the auto-updater.
+- The workflow creates a **draft** GitHub release with macOS artifacts and `latest.json` for the auto-updater.
 - The **beta update track** should always point to whichever published release is newer between the latest stable release and the latest published beta release.
 
 Publishing behavior after the draft release exists:
@@ -64,8 +62,8 @@ Publishing behavior after the draft release exists:
 
 Current release posture before 1.0:
 
-- **macOS** is the primary validated platform
-- **Windows** and **Linux** artifacts are built in CI, but they are still considered manually untested until explicitly checked before release
+- **macOS** is the only release platform currently built and validated
+- **Windows** and **Linux** release artifacts are not currently built
 
 ### Releasing a New Version
 
@@ -79,7 +77,7 @@ Current release posture before 1.0:
    - stable example: `.github/updater-notes/v1.3.0.md`
    - beta example: `.github/updater-notes/v1.4.0-beta.1.md`
    - start from `.github/updater-notes/TEMPLATE.md`
-   - write 2–3 sentences of continuous prose with no line breaks — the same text appears verbatim in the in-app updater prompt, so it should read naturally as a short paragraph, not a bulleted list
+   - write 1–2 short sentences of continuous prose with no line breaks — the same text appears verbatim in the in-app updater prompt, so keep it brief enough to scan in a toast
    - keep it user-facing and conversational; avoid changelog-style fragments
 3. Run the expected local confidence checks before tagging:
    ```bash

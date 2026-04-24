@@ -13,4 +13,5 @@ release text, expect the draft body to start with this short updater copy.
 Codex should replace or expand the GitHub release notes from commits before the
 release is published.
 
-Keep updater notes short and user-facing. Two to four lines works well.
+Keep updater notes short and user-facing. One brief paragraph of one or two
+sentences works best because the text appears in the in-app updater prompt.

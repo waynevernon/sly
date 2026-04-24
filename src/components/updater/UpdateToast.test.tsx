@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { waitFor } from "@testing-library/react";
 import { UpdateToast } from "./UpdateToast";
 
 const invokeMock = vi.fn();
@@ -19,6 +20,13 @@ vi.mock("sonner", () => ({
     error: (...args: unknown[]) => toastErrorMock(...args),
   },
 }));
+
+beforeEach(() => {
+  invokeMock.mockReset();
+  toastDismissMock.mockReset();
+  toastSuccessMock.mockReset();
+  toastErrorMock.mockReset();
+});
 
 function makeUpdate(overrides: Partial<import("@tauri-apps/plugin-updater").Update> = {}) {
   return {
@@ -94,5 +102,31 @@ describe("UpdateToast", () => {
     expect(
       screen.queryByRole("button", { name: "Release Notes" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("offers a restart action after installing the update", async () => {
+    const user = userEvent.setup();
+    const update = makeUpdate();
+
+    render(<UpdateToast update={update} toastId="update-toast" />);
+
+    await user.click(screen.getByRole("button", { name: "Update Now" }));
+
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith(
+        "Update installed. Restart Sly to apply it.",
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Restart" }),
+        }),
+      );
+    });
+
+    const [, toastOptions] = toastSuccessMock.mock.calls[0] as [
+      string,
+      { action: { onClick: () => void } },
+    ];
+    toastOptions.action.onClick();
+
+    expect(invokeMock).toHaveBeenCalledWith("restart_app");
   });
 });

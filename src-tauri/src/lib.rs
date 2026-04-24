@@ -4014,6 +4014,11 @@ fn copy_to_clipboard(app: AppHandle, text: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.request_restart();
+}
+
+#[tauri::command]
 async fn save_clipboard_image(
     base64_data: String,
     state: State<'_, AppState>,
@@ -6197,6 +6202,7 @@ pub fn run() {
             start_file_watcher,
             rebuild_search_index,
             copy_to_clipboard,
+            restart_app,
             copy_image_to_assets,
             save_clipboard_image,
             open_folder_dialog,
