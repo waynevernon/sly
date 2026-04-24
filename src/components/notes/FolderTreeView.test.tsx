@@ -487,6 +487,56 @@ describe("FolderTreeView", () => {
     expect(screen.getByText("archive")).toBeInTheDocument();
   });
 
+  it("renders the new folder name optimistically while rename data is settling", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const user = userEvent.setup();
+    let resolveRename: (() => void) | null = null;
+    const renameFolder = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRename = resolve;
+        }),
+    );
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs"],
+        selectedScope: { type: "folder", path: "docs" },
+        selectedFolderPath: "docs",
+        folderAppearances: {
+          docs: { colorId: "blue" },
+        },
+        renameFolder,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("docs")).toBeInTheDocument();
+    });
+
+    const docsRow = screen.getByText("docs").closest('[data-folder-path="docs"]');
+    expect(docsRow).not.toBeNull();
+
+    fireEvent.contextMenu(docsRow!);
+    await user.click(screen.getByRole("menuitem", { name: /Rename/i }));
+
+    const input = screen.getByDisplayValue("docs");
+    await user.clear(input);
+    await user.type(input, "archive{enter}");
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-folder-path="archive"]')).not.toBeNull();
+    });
+
+    expect(document.querySelector('[data-folder-path="docs"]')).toBeNull();
+    expect(screen.queryByText("docs")).not.toBeInTheDocument();
+    expect(screen.getByText("archive")).toHaveStyle({ color: "#2f6fde" });
+
+    resolveRename?.();
+  });
+
   it("shows only direct folder note counts and hides zero-count folder badges", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();

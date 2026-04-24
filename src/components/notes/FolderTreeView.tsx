@@ -18,7 +18,11 @@ import { FilePlusCorner, History } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
-import { buildFolderTree, countNotesInFolder } from "../../lib/folderTree";
+import {
+  buildFolderTree,
+  countNotesInFolder,
+  rewriteFolderPathList,
+} from "../../lib/folderTree";
 import type {
   FolderAppearance,
   FolderNode,
@@ -28,6 +32,7 @@ import {
   getFolderAppearance,
   resolveFolderAppearanceIconColor,
   resolveFolderAppearanceTextColor,
+  rewriteFolderAppearancePaths,
   type FolderAppearanceMap,
 } from "../../lib/folderIcons";
 import {
@@ -82,6 +87,8 @@ type FolderIconPickerTarget =
 
 const TREE_INDENT_WIDTH = 12;
 
+type OptimisticFolderRename = { oldPath: string; newPath: string };
+
 function sanitizeFolderName(name: string): string {
   return name.replace(/[\/\\:*?"<>|]/g, "-").trim();
 }
@@ -115,6 +122,17 @@ function getRenamedFolderPath(path: string, newName: string): string {
   return lastSlash >= 0
     ? `${path.substring(0, lastSlash)}/${sanitizedName}`
     : sanitizedName;
+}
+
+function rewriteFolderScopedId(id: string, rename: OptimisticFolderRename): string {
+  const oldPrefix = `${rename.oldPath}/`;
+  const newPrefix = `${rename.newPath}/`;
+
+  if (id.startsWith(oldPrefix)) {
+    return `${newPrefix}${id.slice(oldPrefix.length)}`;
+  }
+
+  return id;
 }
 
 function getFolderTextStyle(
@@ -153,6 +171,91 @@ function FolderRowTrailing({
         />
       </div>
     </div>
+  );
+}
+
+interface InlineFolderRenameEditorProps {
+  initialValue: string;
+  placeholder: string;
+  style?: CSSProperties;
+  onSubmit: (name: string) => Promise<void> | void;
+  onCancel: () => void;
+}
+
+function InlineFolderRenameEditor({
+  initialValue,
+  placeholder,
+  style,
+  onSubmit,
+  onCancel,
+}: InlineFolderRenameEditorProps) {
+  const [value, setValue] = useState(initialValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (isSubmitting) return;
+
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === initialValue.trim()) {
+      onCancel();
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(trimmed);
+    } catch {
+      setIsSubmitting(false);
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
+    }
+  }, [initialValue, isSubmitting, onCancel, onSubmit, value]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      disabled={isSubmitting}
+      placeholder={placeholder}
+      onChange={(event) => setValue(event.target.value)}
+      onClick={(event) => event.stopPropagation()}
+      onBlur={() => {
+        void commitRename();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          void commitRename();
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
+      className="block h-5 min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-sm font-medium leading-5 text-text outline-none shadow-none placeholder:text-text-muted disabled:opacity-50"
+      style={style}
+    />
   );
 }
 
@@ -389,29 +492,7 @@ const FolderItem = memo(function FolderItem({
     </div>
   );
 
-  const content = isRenaming ? (
-    <>
-      <InlineFolderRow
-        depth={depth}
-        initialValue={inlineEditState?.mode === "rename" ? inlineEditState.initialValue : ""}
-        appearance={inlineEditState?.mode === "rename" ? inlineEditState.appearance : null}
-        placeholder="Folder name"
-        noteCount={noteCount}
-        showNoteCounts={showNoteCounts}
-        isSelected={selectedFolderPath === folder.path}
-        collapseState={
-          hasNestedFolders ? (isCollapsed ? "collapsed" : "expanded") : undefined
-        }
-        resolvedTheme={resolvedTheme}
-        onSubmit={onRenameFolder}
-        onCancel={onCancelInlineEdit}
-        onOpenIconPicker={() =>
-          onOpenIconPicker({ kind: "inline-rename", path: folder.path })
-        }
-      />
-      {children}
-    </>
-  ) : (
+  const content = (
     <>
       <div className={`relative ${isDragging || isPendingMove ? "opacity-40" : ""}`}>
         <div
@@ -421,7 +502,11 @@ const FolderItem = memo(function FolderItem({
           aria-selected={selectedFolderPath === folder.path}
           className={`${rowClassName} cursor-default`}
           data-folder-row-select={folder.path}
-          onClick={() => onSelectFolder(folder.path)}
+          onClick={() => {
+            if (!isRenaming) {
+              onSelectFolder(folder.path);
+            }
+          }}
           onContextMenu={() => onContextSelectFolder(folder.path)}
         >
           <div
@@ -467,12 +552,22 @@ const FolderItem = memo(function FolderItem({
               />
             </button>
             <div className="min-w-0 flex flex-1 items-center gap-1.5 text-left">
-              <span
-                className="min-w-0 flex-1 text-sm text-text truncate block"
-                style={folderTextStyle}
-              >
-                {folder.name}
-              </span>
+              {isRenaming ? (
+                <InlineFolderRenameEditor
+                  initialValue={inlineEditState?.mode === "rename" ? inlineEditState.initialValue : ""}
+                  placeholder="Folder name"
+                  onSubmit={onRenameFolder}
+                  onCancel={onCancelInlineEdit}
+                  style={folderTextStyle}
+                />
+              ) : (
+                <span
+                  className="min-w-0 flex-1 text-sm text-text truncate block"
+                  style={folderTextStyle}
+                >
+                  {folder.name}
+                </span>
+              )}
               {showNoteCounts && noteCount > 0 && (
                 <FolderRowTrailing
                   count={noteCount}
@@ -611,6 +706,8 @@ export function FolderTreeView({
     useState(false);
   const [inlineEditState, setInlineEditState] =
     useState<InlineFolderEditState | null>(null);
+  const [optimisticFolderRename, setOptimisticFolderRename] =
+    useState<OptimisticFolderRename | null>(null);
   const [iconPickerTarget, setIconPickerTarget] =
     useState<FolderIconPickerTarget | null>(null);
   const { confirmDeletions, resolvedTheme, setConfirmDeletions } = useTheme();
@@ -662,18 +759,58 @@ export function FolderTreeView({
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
+  const renderedKnownFolders = useMemo(
+    () =>
+      optimisticFolderRename
+        ? rewriteFolderPathList(
+            knownFolders,
+            optimisticFolderRename.oldPath,
+            optimisticFolderRename.newPath,
+          )
+        : knownFolders,
+    [knownFolders, optimisticFolderRename],
+  );
+  const renderedNotes = useMemo(
+    () =>
+      optimisticFolderRename
+        ? notes.map((note) => ({
+            ...note,
+            id: rewriteFolderScopedId(note.id, optimisticFolderRename),
+          }))
+        : notes,
+    [notes, optimisticFolderRename],
+  );
+  const renderedSelectedFolderPath = useMemo(() => {
+    if (!selectedFolderPath || !optimisticFolderRename) return selectedFolderPath;
+    return rewriteFolderPathList(
+      [selectedFolderPath],
+      optimisticFolderRename.oldPath,
+      optimisticFolderRename.newPath,
+    )[0] ?? selectedFolderPath;
+  }, [optimisticFolderRename, selectedFolderPath]);
+  const renderedFolderAppearances = useMemo(
+    () =>
+      optimisticFolderRename
+        ? rewriteFolderAppearancePaths(
+            folderAppearances,
+            optimisticFolderRename.oldPath,
+            optimisticFolderRename.newPath,
+          )
+        : folderAppearances,
+    [folderAppearances, optimisticFolderRename],
+  );
   const tree = useMemo(
     () =>
       buildFolderTree(
-        notes,
+        renderedNotes,
         new Set<string>(),
-        knownFolders,
+        renderedKnownFolders,
         folderSortMode,
       ),
-    [folderSortMode, knownFolders, notes],
+    [folderSortMode, renderedKnownFolders, renderedNotes],
   );
   const allFolderPaths = useMemo(() => {
-    const paths = new Set(knownFolders);
+    const paths = new Set(renderedKnownFolders);
 
     const visit = (folder: FolderNode) => {
       paths.add(folder.path);
@@ -682,7 +819,7 @@ export function FolderTreeView({
 
     tree.folders.forEach(visit);
     return [...paths];
-  }, [knownFolders, tree]);
+  }, [renderedKnownFolders, tree]);
   const noteCountForFolder = useCallback(
     (folder: FolderNode) =>
       showNotesFromSubfolders ? countNotesInFolder(folder) : folder.notes.length,
@@ -729,16 +866,40 @@ export function FolderTreeView({
     if (selectedScope.type === "all") {
       return getVirtualFolderOptionId("all");
     }
-    if (selectedFolderPath) {
-      return getFolderOptionId(selectedFolderPath);
+    if (renderedSelectedFolderPath) {
+      return getFolderOptionId(renderedSelectedFolderPath);
     }
     return undefined;
   }, [
-    selectedFolderPath,
+    renderedSelectedFolderPath,
     selectedScope.type,
     showPinnedNotes,
     showRecentNotes,
   ]);
+
+  useEffect(() => {
+    if (!optimisticFolderRename) return;
+
+    const oldPrefix = `${optimisticFolderRename.oldPath}/`;
+    const oldPathStillPresent =
+      knownFolders.some(
+        (path) =>
+          path === optimisticFolderRename.oldPath || path.startsWith(oldPrefix),
+      ) || notes.some((note) => note.id.startsWith(oldPrefix));
+
+    if (oldPathStillPresent) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setOptimisticFolderRename((current) =>
+        current?.oldPath === optimisticFolderRename.oldPath &&
+        current.newPath === optimisticFolderRename.newPath
+          ? null
+          : current,
+      );
+    }, 750);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [knownFolders, notes, optimisticFolderRename]);
 
   useEffect(() => {
     if (!pendingFolderSelectionPath) {
@@ -990,13 +1151,13 @@ export function FolderTreeView({
   const getCurrentNavigationIndex = useCallback(() => {
     const selectedIndex = visibleNavigationItems.findIndex((item) => {
       if (item.kind === "folder") {
-        return selectedScope.type === "folder" && item.path === selectedFolderPath;
+        return selectedScope.type === "folder" && item.path === renderedSelectedFolderPath;
       }
       return selectedScope.type === item.kind;
     });
 
     return selectedIndex >= 0 ? selectedIndex : 0;
-  }, [selectedFolderPath, selectedScope.type, visibleNavigationItems]);
+  }, [renderedSelectedFolderPath, selectedScope.type, visibleNavigationItems]);
 
   const handleTreeKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -1033,10 +1194,10 @@ export function FolderTreeView({
       if (
         event.key === "ArrowLeft" &&
         selectedScope.type === "folder" &&
-        selectedFolderPath
+        renderedSelectedFolderPath
       ) {
         const current = visibleNavigationItems.find(
-          (item) => item.kind === "folder" && item.path === selectedFolderPath,
+          (item) => item.kind === "folder" && item.path === renderedSelectedFolderPath,
         );
         if (current?.kind !== "folder") return;
 
@@ -1059,10 +1220,10 @@ export function FolderTreeView({
       if (
         event.key === "ArrowRight" &&
         selectedScope.type === "folder" &&
-        selectedFolderPath
+        renderedSelectedFolderPath
       ) {
         const current = visibleNavigationItems.find(
-          (item) => item.kind === "folder" && item.path === selectedFolderPath,
+          (item) => item.kind === "folder" && item.path === renderedSelectedFolderPath,
         );
         if (
           current?.kind === "folder" &&
@@ -1082,7 +1243,7 @@ export function FolderTreeView({
       inlineEditState,
       selectFolder,
       selectNavigationItem,
-      selectedFolderPath,
+      renderedSelectedFolderPath,
       selectedScope.type,
       visibleNavigationItems,
     ],
@@ -1184,6 +1345,7 @@ export function FolderTreeView({
         collapsedFoldersRef.current.has(oldPath) ||
         settings.collapsedFolders?.includes(oldPath) === true;
       const collapsedFoldersAfterRename = new Set(collapsedFoldersRef.current);
+      setOptimisticFolderRename({ oldPath, newPath });
       if (wasCollapsed) {
         collapsedFoldersBeforeRename = new Set(collapsedFoldersRef.current);
         setForcedCollapsedFolderPath(newPath);
@@ -1211,6 +1373,11 @@ export function FolderTreeView({
       setIconPickerTarget(null);
       focusTree();
     } catch (error) {
+      setOptimisticFolderRename((current) =>
+        current?.oldPath === oldPath && current.newPath === newPath
+          ? null
+          : current,
+      );
       setPendingFolderSelectionPath(null);
       if (collapsedFoldersBeforeRename) {
         setCollapsedFoldersState(collapsedFoldersBeforeRename);
@@ -1513,11 +1680,11 @@ export function FolderTreeView({
               folder={folder}
               depth={0}
               pendingFolderPath={pendingFolderPath}
-              folderAppearances={folderAppearances}
+              folderAppearances={renderedFolderAppearances}
               showNoteCounts={showNoteCounts}
               noteCount={noteCountForFolder(folder)}
               getNoteCount={noteCountForFolder}
-              selectedFolderPath={selectedFolderPath}
+              selectedFolderPath={renderedSelectedFolderPath}
               collapsedFolders={renderedCollapsedFolders}
               inlineEditState={inlineEditState}
               resolvedTheme={resolvedTheme}
