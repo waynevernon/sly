@@ -1043,10 +1043,10 @@ export function TaskListPane() {
             })}
 
             {isCreating && (
-              <div className="rounded-[var(--ui-radius-md)] bg-bg-muted/50 pl-2.5 pr-2.5 py-1.75">
-                <div className="flex items-center gap-2.5">
-                  <div className="mt-0.5 h-4 w-4 shrink-0 rounded-[var(--ui-radius-sm)] border border-border bg-bg" />
-                  <div className="relative min-w-0 flex-1">
+              <div className="rounded-[var(--ui-radius-md)] bg-bg-muted/50">
+                <div className="flex items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 py-[var(--ui-list-item-py)]">
+                  <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-border bg-bg" />
+                  <div className="relative flex min-w-0 flex-1">
                     {inlineTitleHighlights.length > 0 && (
                       <div
                         aria-hidden="true"
@@ -1078,9 +1078,7 @@ export function TaskListPane() {
                       onScroll={syncInlineOverlayScroll}
                       onBlur={() => void handleCommitCreate()}
                       onKeyDown={handleCreateKeyDown}
-                      className={cn(
-                        "relative min-w-0 w-full bg-transparent text-sm font-medium text-text outline-none placeholder:text-text-muted/50",
-                      )}
+                      className="relative min-w-0 flex-1 bg-transparent text-sm font-medium text-text outline-none placeholder:text-text-muted/50"
                     />
                   </div>
                   <button
