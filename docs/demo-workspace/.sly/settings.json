@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "gitEnabled": false,
+  "tasksEnabled": true,
   "pinnedNoteIds": [
     "Field Notes/Sly profile",
     "Product/Launch/1.0 screenshot checklist"

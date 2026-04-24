@@ -11,7 +11,8 @@ Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fo
 
 [Releases](https://github.com/waynevernon/sly/releases) · [Report an Issue](https://github.com/waynevernon/sly/issues)
 
-![Sly screenshot](./docs/assets/screenshot.png)
+![Sly notes screenshot](./docs/assets/screenshot1.png)
+![Sly tasks screenshot](./docs/assets/screenshot2.png)
 
 ## Features
 
