@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt, taskScheduleSelectionFromView } from "../../lib/tasks";
+import { mod, shortcut } from "../../lib/platform";
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
 
@@ -714,6 +715,16 @@ describe("TaskListPane", () => {
     });
 
     expect(screen.queryByPlaceholderText("Task name")).not.toBeInTheDocument();
+  });
+
+  it("shows Cmd/Ctrl+N on the empty-state new task button", () => {
+    render(<TooltipProvider><TaskListPane /></TooltipProvider>);
+
+    expect(
+      screen.getByRole("button", {
+        name: `New Task ${shortcut(mod, "N")}`,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("shows matching task rows when a query is typed", async () => {

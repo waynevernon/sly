@@ -52,7 +52,7 @@ import {
 import { SortMenuButton, type SortMenuItem } from "../layout/SortMenuButton";
 import { TaskDatePickerPanel } from "./TaskDatePicker";
 import { TaskRow } from "./TaskRow";
-import { isMac, mod, shift } from "../../lib/platform";
+import { isMac, mod, shift, shortcut } from "../../lib/platform";
 import { cn } from "../../lib/utils";
 import { compareTasks, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
@@ -901,10 +901,7 @@ export function TaskListPane() {
                 >
                   New Task{" "}
                   <span className="ml-1 text-text-muted">
-                    {mod}
-                    {isMac ? "" : "+"}
-                    {shift}
-                    {isMac ? "" : "+"}T
+                    {shortcut(mod, "N")}
                   </span>
                 </Button>
               ) : undefined}
