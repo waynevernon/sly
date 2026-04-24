@@ -1513,7 +1513,9 @@ function EditorImpl({
             "ui-scrollbar-overlay",
             printMode
               ? "print-note-scroll overflow-visible"
-              : "absolute inset-0 overflow-y-auto overflow-x-hidden",
+              : effectiveSourceMode && !sourceModeWordWrap
+                ? "absolute inset-0 overflow-auto"
+                : "absolute inset-0 overflow-y-auto overflow-x-hidden",
           )}
           dir={textDirection}
         >
@@ -1521,9 +1523,14 @@ function EditorImpl({
             /* Markdown source editor */
             <div className="h-full">
               <div
-                className="min-h-full px-6 pt-6 pb-24"
+                className={cn(
+                  "min-h-full px-6 pt-6 pb-24",
+                  !sourceModeWordWrap && "w-max min-w-full",
+                )}
                 style={{
-                  maxWidth: "var(--editor-max-width, 48rem)",
+                  maxWidth: sourceModeWordWrap
+                    ? "var(--editor-max-width, 48rem)"
+                    : "none",
                   minHeight: "100%",
                   marginLeft: "auto",
                   marginRight: "auto",

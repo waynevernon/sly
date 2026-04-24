@@ -100,6 +100,10 @@ const sourceEditorTheme = EditorView.theme({
   "&.cm-focused": {
     outline: "none",
   },
+  "&.cm-source-nowrap": {
+    minWidth: "100%",
+    width: "max-content",
+  },
   ".cm-scroller": {
     overflow: "visible",
     fontFamily: "var(--font-mono)",
@@ -112,6 +116,10 @@ const sourceEditorTheme = EditorView.theme({
     caretColor: "var(--color-text)",
     padding: "0",
   },
+  "&.cm-source-nowrap .cm-content": {
+    minWidth: "100%",
+    width: "max-content",
+  },
   ".cm-line": {
     padding: "0",
   },
@@ -122,8 +130,17 @@ const sourceEditorTheme = EditorView.theme({
     marginRight: "1rem",
     paddingRight: "0.25rem",
   },
+  "&.cm-source-nowrap .cm-gutters": {
+    backgroundColor: "var(--color-bg)",
+    position: "sticky",
+    left: "0",
+    zIndex: "2",
+  },
   ".cm-gutter": {
     backgroundColor: "transparent",
+  },
+  "&.cm-source-nowrap .cm-gutter": {
+    backgroundColor: "var(--color-bg)",
   },
   ".cm-gutterElement": {
     padding: "0",
@@ -142,6 +159,15 @@ const sourceEditorTheme = EditorView.theme({
 
 function clampPosition(pos: number, length: number) {
   return Math.max(0, Math.min(pos, length));
+}
+
+function sourceWrapExtensions(wordWrap: boolean) {
+  return [
+    wordWrap ? EditorView.lineWrapping : [],
+    EditorView.editorAttributes.of({
+      class: wordWrap ? "cm-source-wrap" : "cm-source-nowrap",
+    }),
+  ];
 }
 
 export const MarkdownSourceEditor = forwardRef<
@@ -210,9 +236,7 @@ export const MarkdownSourceEditor = forwardRef<
           EditorState.tabSize.of(2),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           markdown(),
-          wrapCompartment.of(
-            initialWordWrapRef.current ? EditorView.lineWrapping : [],
-          ),
+          wrapCompartment.of(sourceWrapExtensions(initialWordWrapRef.current)),
           syntaxCompartment.of(
             initialSyntaxHighlightingRef.current
               ? syntaxHighlighting(sourceHighlightStyle)
@@ -265,9 +289,7 @@ export const MarkdownSourceEditor = forwardRef<
     if (!view) return;
 
     view.dispatch({
-      effects: wrapCompartment.reconfigure(
-        wordWrap ? EditorView.lineWrapping : [],
-      ),
+      effects: wrapCompartment.reconfigure(sourceWrapExtensions(wordWrap)),
     });
   }, [wordWrap, wrapCompartment]);
 
