@@ -1254,6 +1254,14 @@ html.dark {
   margin-bottom: 1.75em;
 }
 
+.prose
+  :where(hr.ProseMirror-selectednode):not(
+    :where([class~="not-prose"], [class~="not-prose"] *)
+  ) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-bg-emphasis);
+}
+
 /* Prose spacing - fixed paragraph spacing */
 .prose p {
   margin-top: 0;
