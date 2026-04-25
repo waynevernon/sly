@@ -180,11 +180,11 @@ describe("WorkspaceNavigation", () => {
 
   it("passes an optimistic folder path change while a folder move is pending", async () => {
     const notesContext = await import("../../context/NotesContext");
-    let resolveMove: (() => void) | null = null;
+    const moveResolver: { current?: () => void } = {};
     const moveFolder = vi.fn(
       () =>
         new Promise<void>((resolve) => {
-          resolveMove = resolve;
+          moveResolver.current = resolve;
         }),
     );
 
@@ -223,7 +223,7 @@ describe("WorkspaceNavigation", () => {
       });
     });
 
-    resolveMove?.();
+    moveResolver.current?.();
     await act(async () => {
       await movePromise;
     });

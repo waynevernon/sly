@@ -475,7 +475,8 @@ describe("FolderTreeView", () => {
 
     const input = screen.getByDisplayValue("docs");
     await user.clear(input);
-    await user.type(input, "archive{enter}");
+    fireEvent.change(input, { target: { value: "archive" } });
+    fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
       expect(screen.getByText("archive")).toBeInTheDocument();
@@ -490,11 +491,11 @@ describe("FolderTreeView", () => {
   it("renders the new folder name optimistically while rename data is settling", async () => {
     const notesContext = await import("../../context/NotesContext");
     const user = userEvent.setup();
-    let resolveRename: (() => void) | null = null;
+    const renameResolver: { current?: () => void } = {};
     const renameFolder = vi.fn(
       () =>
         new Promise<void>((resolve) => {
-          resolveRename = resolve;
+          renameResolver.current = resolve;
         }),
     );
 
@@ -524,7 +525,8 @@ describe("FolderTreeView", () => {
 
     const input = screen.getByDisplayValue("docs");
     await user.clear(input);
-    await user.type(input, "archive{enter}");
+    fireEvent.change(input, { target: { value: "archive" } });
+    fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
       expect(document.querySelector('[data-folder-path="archive"]')).not.toBeNull();
@@ -534,7 +536,7 @@ describe("FolderTreeView", () => {
     expect(screen.queryByText("docs")).not.toBeInTheDocument();
     expect(screen.getByText("archive")).toHaveStyle({ color: "#2f6fde" });
 
-    resolveRename?.();
+    renameResolver.current?.();
   });
 
   it("renders moved folders optimistically while move data is settling", async () => {
