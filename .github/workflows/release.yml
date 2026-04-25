@@ -18,6 +18,12 @@ jobs:
           - platform: macos-latest
             args: "--target universal-apple-darwin"
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+            rust_targets: ""
+          - platform: windows-latest
+            args: ""
+            rust_targets: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -74,10 +80,23 @@ jobs:
           node-version: lts/*
           cache: npm
 
-      - name: Install Rust stable
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y \
+            --no-install-recommends libwebkit2gtk-4.1-dev \
+            libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install Rust stable with targets
+        if: matrix.rust_targets != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_targets }}
+
+      - name: Install Rust stable
+        if: matrix.rust_targets == ''
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
