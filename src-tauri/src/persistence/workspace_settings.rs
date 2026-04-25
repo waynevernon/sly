@@ -194,6 +194,11 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
         }
     }
 
+    if settings.tasks_enabled.is_none() {
+        settings.tasks_enabled = Some(true);
+        changed = true;
+    }
+
     if let Some(task_quick_add_shortcut) = settings.task_quick_add_shortcut.take() {
         match normalize_task_quick_add_shortcut_value(&task_quick_add_shortcut) {
             Some(normalized) => {

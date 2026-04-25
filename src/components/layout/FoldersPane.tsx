@@ -58,7 +58,7 @@ export function FoldersPane({
     setShowPinnedNotes,
     setShowRecentNotes,
   } = useNotes();
-  const tasksEnabled = settings?.tasksEnabled ?? false;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (

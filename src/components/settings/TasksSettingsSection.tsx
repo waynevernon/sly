@@ -10,6 +10,7 @@ import { Button } from "../ui";
 
 export function TasksSettingsSection() {
   const { settings, setTasksEnabled, setTaskQuickAddShortcut } = useNotes();
+  const tasksEnabled = settings?.tasksEnabled ?? true;
   const configuredShortcut = settings?.taskQuickAddShortcut ?? null;
   const [isRecording, setIsRecording] = useState(false);
 
@@ -64,14 +65,14 @@ export function TasksSettingsSection() {
           <div className="ui-settings-toggle-group">
             <Button
               onClick={() => void setTasksEnabled(false)}
-              variant={!settings?.tasksEnabled ? "primary" : "ghost"}
+              variant={!tasksEnabled ? "primary" : "ghost"}
               size="xs"
             >
               Off
             </Button>
             <Button
               onClick={() => void setTasksEnabled(true)}
-              variant={settings?.tasksEnabled ? "primary" : "ghost"}
+              variant={tasksEnabled ? "primary" : "ghost"}
               size="xs"
             >
               On

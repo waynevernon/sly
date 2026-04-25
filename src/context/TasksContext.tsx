@@ -53,7 +53,7 @@ const TasksContext = createContext<TasksContextValue | null>(null);
 
 export function TasksProvider({ children }: { children: ReactNode }) {
   const { notesFolder, settings } = useNotesData();
-  const tasksEnabled = settings?.tasksEnabled ?? false;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
 
   const [tasks, setTasks] = useState<TaskMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);

@@ -511,7 +511,7 @@ function AppContent() {
   isTasksModeActiveRef.current = isTasksModeActive;
   const selectedTaskViewRef = useRef(selectedView);
   selectedTaskViewRef.current = selectedView;
-  const tasksEnabled = settings?.tasksEnabled ?? false;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
   const showRightPanel =
     rightPanelVisible &&
     !focusMode &&

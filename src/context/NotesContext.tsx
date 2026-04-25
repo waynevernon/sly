@@ -161,6 +161,7 @@ const DEFAULT_SETTINGS: Settings = {
   noteListPreviewLines: 2,
   noteSortMode: DEFAULT_NOTE_SORT_MODE,
   folderSortMode: DEFAULT_FOLDER_SORT_MODE,
+  tasksEnabled: true,
 };
 
 function normalizeNoteIds(

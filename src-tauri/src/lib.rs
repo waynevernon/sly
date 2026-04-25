@@ -166,6 +166,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_tasks_enabled() -> Option<bool> {
+    Some(true)
+}
+
 pub(crate) fn normalize_task_quick_add_shortcut_value(value: &str) -> Option<String> {
     let trimmed = value.trim();
 
@@ -576,7 +580,7 @@ pub struct Settings {
     #[serde(
         rename = "tasksEnabled",
         skip_serializing_if = "Option::is_none",
-        default
+        default = "default_tasks_enabled"
     )]
     pub tasks_enabled: Option<bool>,
     #[serde(
@@ -610,7 +614,7 @@ impl Default for Settings {
             note_sort_mode: NoteSortMode::default(),
             folder_note_sort_modes: None,
             folder_sort_mode: FolderSortMode::default(),
-            tasks_enabled: None,
+            tasks_enabled: default_tasks_enabled(),
             task_quick_add_shortcut: None,
         }
     }
@@ -5818,7 +5822,7 @@ fn default_task_quick_add_shortcut() -> &'static str {
 }
 
 fn resolve_task_quick_add_shortcut_accelerator(settings: &Settings) -> Option<String> {
-    if settings.tasks_enabled != Some(true) {
+    if settings.tasks_enabled == Some(false) {
         return None;
     }
 
@@ -6702,6 +6706,7 @@ mod tests {
         );
         assert_eq!(rewritten["noteListPreviewLines"], serde_json::json!(3));
         assert_eq!(rewritten["folderSortMode"], serde_json::json!("nameAsc"));
+        assert_eq!(rewritten["tasksEnabled"], serde_json::json!(true));
         assert!(rewritten.get("taskQuickAddShortcut").is_none());
 
         let _ = std::fs::remove_file(path);
@@ -6730,7 +6735,8 @@ mod tests {
   "noteListPreviewLines": 2,
   "noteSortMode": "modifiedDesc",
   "folderNoteSortModes": null,
-  "folderSortMode": "nameAsc"
+  "folderSortMode": "nameAsc",
+  "tasksEnabled": true
 }"#;
         std::fs::write(&path, content).unwrap();
 
@@ -7063,7 +7069,7 @@ mod tests {
                 NoteSortMode::CreatedAsc,
             )])),
             folder_sort_mode: FolderSortMode::NameDesc,
-            tasks_enabled: None,
+            tasks_enabled: Some(false),
             task_quick_add_shortcut: None,
         };
 
@@ -7108,6 +7114,7 @@ mod tests {
         assert!(!settings.show_note_list_preview);
         assert_eq!(settings.note_list_preview_lines, 3);
         assert_eq!(settings.note_sort_mode, NoteSortMode::TitleAsc);
+        assert_eq!(settings.tasks_enabled, Some(false));
         assert_eq!(
             settings.folder_note_sort_modes,
             Some(HashMap::from([(
@@ -7243,6 +7250,7 @@ mod tests {
         assert_eq!(settings.note_sort_mode, NoteSortMode::ModifiedDesc);
         assert_eq!(settings.folder_note_sort_modes, None);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
+        assert_eq!(settings.tasks_enabled, Some(true));
         assert_eq!(settings.task_quick_add_shortcut, None);
     }
 
