@@ -74,6 +74,7 @@ export function TaskDetailPanel() {
   const taskIdRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<TaskPatch>({});
+  const selectedTaskTagsKey = (selectedTask?.tags ?? []).join("\u0000");
 
   const scheduleSave = useCallback(
     (patch: TaskPatch) => {
@@ -127,6 +128,11 @@ export function TaskDetailPanel() {
     setDescription(selectedTask.description);
     pendingPatchRef.current = {};
   }, [flushSave, selectedTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    setTags(selectedTask.tags ?? []);
+  }, [selectedTask, selectedTaskTagsKey]);
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(event.target.value);
