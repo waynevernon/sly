@@ -309,8 +309,7 @@ body {
 }
 
 .ui-dialog-overlay {
-  background: rgb(0 0 0 / 0.45);
-  backdrop-filter: blur(12px);
+  background: rgb(0 0 0 / 0.28);
 }
 
 .ui-menu-label {
