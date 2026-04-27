@@ -15,11 +15,13 @@ import type { CSSProperties } from "react";
 import type { FolderAppearance } from "../../types/note";
 import {
   CountBadge,
+  Tooltip,
   menuItemClassName,
   menuSurfaceClassName,
 } from "../ui";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { PencilIcon, SwatchIcon } from "../icons";
+import { mod, shortcut } from "../../lib/platform";
 
 const FolderIconPickerModal = lazy(() =>
   import("../folders/FolderIconPickerModal").then((module) => ({
@@ -124,24 +126,27 @@ export function TaskNavigationPane({
       <div className="ui-pane-header border-border/80">
         {onShowNotes && onShowTasks ? (
           <div className="flex min-w-0 items-center gap-1 -ml-2">
-            <button
-              type="button"
-              aria-pressed={false}
-              onClick={onShowNotes}
-              title="Notes"
-              className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
-            >
-              <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
-            </button>
-            <button
-              type="button"
-              aria-pressed={true}
-              onClick={onShowTasks}
-              className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
-            >
-              <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
-              <span className="ui-pane-mode-label">Tasks</span>
-            </button>
+            <Tooltip content={`Notes (${shortcut(mod, "1")})`}>
+              <button
+                type="button"
+                aria-pressed={false}
+                onClick={onShowNotes}
+                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+              >
+                <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+              </button>
+            </Tooltip>
+            <Tooltip content={`Tasks (${shortcut(mod, "2")})`}>
+              <button
+                type="button"
+                aria-pressed={true}
+                onClick={onShowTasks}
+                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
+              >
+                <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span className="ui-pane-mode-label">Tasks</span>
+              </button>
+            </Tooltip>
           </div>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-1.5">

@@ -7,6 +7,7 @@ import type { FolderPathChange } from "../../lib/folderTree";
 import { FolderPlusIcon } from "../icons";
 import {
   IconButton,
+  Tooltip,
   menuItemClassName,
   menuLabelClassName,
   menuSeparatorClassName,
@@ -14,6 +15,7 @@ import {
 import { FolderTreeView } from "../notes/FolderTreeView";
 import { Footer } from "./Footer";
 import { SortMenuButton, type SortMenuItem } from "./SortMenuButton";
+import { mod, shortcut } from "../../lib/platform";
 
 const folderSortItems: SortMenuItem<FolderSortMode>[] = [{
   key: "name",
@@ -67,24 +69,27 @@ export function FoldersPane({
       <div className="ui-pane-header border-border/80">
         {tasksEnabled && onShowNotes && onShowTasks ? (
           <div className="flex min-w-0 items-center gap-1 -ml-2">
-            <button
-              type="button"
-              aria-pressed={true}
-              onClick={onShowNotes}
-              className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
-            >
-              <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
-              <span className="ui-pane-mode-label">Notes</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={false}
-              onClick={onShowTasks}
-              title="Tasks"
-              className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
-            >
-              <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
-            </button>
+            <Tooltip content={`Notes (${shortcut(mod, "1")})`}>
+              <button
+                type="button"
+                aria-pressed={true}
+                onClick={onShowNotes}
+                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
+              >
+                <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
+                <span className="ui-pane-mode-label">Notes</span>
+              </button>
+            </Tooltip>
+            <Tooltip content={`Tasks (${shortcut(mod, "2")})`}>
+              <button
+                type="button"
+                aria-pressed={false}
+                onClick={onShowTasks}
+                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+              >
+                <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
+              </button>
+            </Tooltip>
           </div>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
