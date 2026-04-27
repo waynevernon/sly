@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localDateToNormalizedActionAt, taskScheduleSelectionFromView } from "../../lib/tasks";
 import { mod, shortcut } from "../../lib/platform";
+import type { TaskMetadata } from "../../types/tasks";
 import { TooltipProvider } from "../ui";
 import { TaskListPane } from "./TaskListPane";
 
@@ -888,7 +889,7 @@ describe("TaskListPane", () => {
 
   it("groups tagged project tasks by active horizons and completed recency", async () => {
     const tasksContext = await import("../../context/TasksContext");
-    const taggedTasks = [
+    const taggedTasks: TaskMetadata[] = [
       {
         id: "task-overdue",
         title: "Missed review",

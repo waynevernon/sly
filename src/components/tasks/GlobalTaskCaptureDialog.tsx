@@ -1,13 +1,21 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, Hash, X } from "lucide-react";
+import { CalendarDays, Clock3, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
+import { useTheme } from "../../context/ThemeContext";
+import { FolderGlyph } from "../folders/FolderGlyph";
+import {
+  getFolderAppearance,
+  resolveFolderAppearanceIconColor,
+  resolveFolderAppearanceTextColor,
+} from "../../lib/folderIcons";
 import {
   detectTaskDateFromTitle,
   detectTaskTagsFromTitle,
   detectTaskUrlFromTitle,
   deriveView,
   localDateToNormalizedActionAt,
+  normalizeTaskTag,
   TASK_VIEW_LABELS,
 } from "../../lib/tasks";
 import { cn } from "../../lib/utils";
@@ -30,6 +38,14 @@ interface GlobalTaskCaptureDialogProps {
 }
 
 const CAPTURE_DATE_DEBOUNCE_MS = 350;
+
+function useResolvedThemeFallback(): "light" | "dark" {
+  try {
+    return useTheme().resolvedTheme;
+  } catch {
+    return "light";
+  }
+}
 
 function renderTitleHighlights(
   text: string,
@@ -58,15 +74,21 @@ export function GlobalTaskCaptureDialog({
   const {
     createTask,
     tasks,
+    taskTagAppearances,
     updateTask,
     selectTask,
     selectView,
     today,
   } = useTasks();
+  const resolvedTheme = useResolvedThemeFallback();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const [tagSuggestionIndex, setTagSuggestionIndex] = useState(0);
+  const [isTagInputFocused, setIsTagInputFocused] = useState(false);
   const [waitingFor, setWaitingFor] = useState("");
   const [waitingEditorOpen, setWaitingEditorOpen] = useState(false);
   const [recurrence, setRecurrence] = useState<string | null>(null);
@@ -104,6 +126,10 @@ export function GlobalTaskCaptureDialog({
     setTitle("");
     setDescription("");
     setLink("");
+    setTags([]);
+    setTagDraft("");
+    setTagSuggestionIndex(0);
+    setIsTagInputFocused(false);
     setWaitingFor("");
     setWaitingEditorOpen(false);
     setRecurrence(null);
@@ -206,6 +232,74 @@ export function GlobalTaskCaptureDialog({
     setDetectedTags(nextDetection);
   }, [ignoredTagSignature, open, title]);
 
+  const activeDetectedTags = useMemo(() => {
+    if (!detectedTags) return [];
+    return detectedTags.tags.filter((tag) => !tags.includes(tag));
+  }, [detectedTags, tags]);
+  const visibleTags = useMemo(() => [...tags, ...activeDetectedTags], [activeDetectedTags, tags]);
+
+  const knownTagSuggestions = useMemo(() => {
+    const counts = new Map<string, number>();
+    const selectedTagSet = new Set(visibleTags);
+    const query = normalizeTaskTag(tagDraft) ?? "";
+
+    for (const task of tasks) {
+      for (const tag of task.tags ?? []) {
+        const normalizedTag = normalizeTaskTag(tag);
+        if (!normalizedTag || selectedTagSet.has(normalizedTag)) continue;
+        if (query && !normalizedTag.includes(query)) continue;
+        counts.set(normalizedTag, (counts.get(normalizedTag) ?? 0) + 1);
+      }
+    }
+
+    return [...counts.entries()]
+      .sort(([leftTag, leftCount], [rightTag, rightCount]) => {
+        if (leftCount !== rightCount) return rightCount - leftCount;
+        return leftTag.localeCompare(rightTag);
+      })
+      .slice(0, 6)
+      .map(([tag]) => tag);
+  }, [tagDraft, tasks, visibleTags]);
+
+  useEffect(() => {
+    setTagSuggestionIndex(0);
+  }, [knownTagSuggestions]);
+
+  const saveTags = useCallback((nextTags: string[]) => {
+    const normalizedTags = nextTags
+      .map((tag) => normalizeTaskTag(tag))
+      .filter((tag): tag is string => Boolean(tag));
+    setTags([...new Set(normalizedTags)]);
+  }, []);
+
+  const commitTagDraft = useCallback(() => {
+    const normalizedTag = normalizeTaskTag(tagDraft);
+    if (!normalizedTag) {
+      setTagDraft("");
+      return;
+    }
+    saveTags([...tags, normalizedTag]);
+    setTagDraft("");
+  }, [saveTags, tagDraft, tags]);
+
+  const applyTagSuggestion = useCallback((tag: string) => {
+    saveTags([...tags, tag]);
+    setTagDraft("");
+    setTagSuggestionIndex(0);
+  }, [saveTags, tags]);
+
+  const removeTag = useCallback((tag: string) => {
+    if (tags.includes(tag)) {
+      setTags(tags.filter((existingTag) => existingTag !== tag));
+      return;
+    }
+
+    if (detectedTags?.tags.includes(tag)) {
+      setIgnoredTagSignature(detectedTags.tags.join(","));
+      setDetectedTags(null);
+    }
+  }, [detectedTags, tags]);
+
   const handleClose = useCallback(() => {
     if (isSaving) return;
     onClose();
@@ -221,9 +315,10 @@ export function GlobalTaskCaptureDialog({
         : null;
     const titleAfterUrl = activeUrlDetection ? activeUrlDetection.cleanedTitle : title;
     const nextTagDetection = detectTaskTagsFromTitle(titleAfterUrl);
+    const detectedTagSignature = nextTagDetection.tags.join(",");
     const activeTagDetection =
       nextTagDetection.tags.length > 0 &&
-      nextTagDetection.tags.join(",") !== ignoredTagSignature
+      detectedTagSignature !== ignoredTagSignature
         ? nextTagDetection
         : null;
     const titleAfterTags = activeTagDetection ? activeTagDetection.cleanedTitle : titleAfterUrl;
@@ -241,6 +336,12 @@ export function GlobalTaskCaptureDialog({
 
     const effectiveActionDate =
       manualScheduleBucket ? "" : manualActionDate || activeDetection?.localDate || "";
+    const effectiveTags = [
+      ...new Set([
+        ...tags,
+        ...(activeTagDetection?.tags ?? []),
+      ]),
+    ];
 
     setIsSaving(true);
     try {
@@ -256,7 +357,7 @@ export function GlobalTaskCaptureDialog({
         actionAt: localDateToNormalizedActionAt(effectiveActionDate),
         scheduleBucket: manualScheduleBucket,
         recurrence,
-        ...(activeTagDetection?.tags.length ? { tags: activeTagDetection.tags } : {}),
+        ...(effectiveTags.length ? { tags: effectiveTags } : {}),
         ...(manualDueDate
           ? { dueAt: localDateToNormalizedActionAt(manualDueDate) }
           : {}),
@@ -269,7 +370,7 @@ export function GlobalTaskCaptureDialog({
         Boolean(effectiveActionDate) ||
         Boolean(manualScheduleBucket) ||
         Boolean(recurrence) ||
-        Boolean(activeTagDetection?.tags.length) ||
+        effectiveTags.length > 0 ||
         Boolean(manualDueDate);
 
       const finalTask = hasPatch
@@ -304,6 +405,7 @@ export function GlobalTaskCaptureDialog({
     recurrence,
     selectTask,
     selectView,
+    tags,
     title,
     today,
     updateTask,
@@ -469,25 +571,6 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
-            {detectedTags?.tags.map((tag) => (
-              <div key={tag} className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-2.5 text-xs font-medium text-text-muted">
-                <Hash className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>Tag: {tag}</span>
-                <button
-                  type="button"
-                  aria-label={`Dismiss detected tag ${tag}`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    setIgnoredTagSignature(detectedTags.tags.join(","));
-                    setDetectedTags(null);
-                    titleInputRef.current?.focus();
-                  }}
-                  className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
-                >
-                  <X className="h-3 w-3 stroke-[2]" />
-                </button>
-              </div>
-            ))}
             <DueDatePicker
               dueDate={manualDueDate}
               today={today}
@@ -534,6 +617,141 @@ export function GlobalTaskCaptureDialog({
                 )
               }
             />
+          </div>
+
+          <div className={cn("w-full", TASK_DETAIL_SECTION_CLASS)}>
+            <div className={TASK_DETAIL_LABEL_CLASS}>Tags</div>
+            <div className="relative">
+              <div
+                className="flex min-h-[calc(var(--ui-control-height-compact)+0.5rem)] flex-wrap items-center gap-1.5 bg-transparent py-1"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    event.preventDefault();
+                    event.currentTarget.querySelector("input")?.focus();
+                  }
+                }}
+              >
+                {visibleTags.map((tag) => {
+                  const appearance = getFolderAppearance(taskTagAppearances, tag);
+                  const textColor = resolveFolderAppearanceTextColor(appearance, resolvedTheme);
+                  const iconColor = resolveFolderAppearanceIconColor(appearance, resolvedTheme);
+                  const isDetected = activeDetectedTags.includes(tag);
+                  return (
+                    <span
+                      key={tag}
+                      className={cn(
+                        "inline-flex h-[var(--ui-control-height-compact)] max-w-full items-center gap-1.5 rounded-[var(--ui-radius-sm)] px-2 text-xs font-medium",
+                        isDetected ? "bg-accent/10 text-text" : "bg-bg-muted text-text",
+                      )}
+                      style={textColor ? { color: textColor } : undefined}
+                    >
+                      <FolderGlyph
+                        icon={appearance?.icon ?? { kind: "lucide", name: "hash" }}
+                        className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-text-muted"
+                        style={iconColor ? { color: iconColor } : undefined}
+                      />
+                      <span className="min-w-0 truncate">{tag}</span>
+                      <button
+                        type="button"
+                        aria-label={isDetected ? `Dismiss detected tag ${tag}` : `Remove tag ${tag}`}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          removeTag(tag);
+                          titleInputRef.current?.focus();
+                        }}
+                        className="ui-focus-ring -mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                      >
+                        <X className="h-3 w-3 stroke-[2]" />
+                      </button>
+                    </span>
+                  );
+                })}
+                <input
+                  type="text"
+                  value={tagDraft}
+                  placeholder={visibleTags.length > 0 ? "Add tag…" : "Add tags…"}
+                  onFocus={() => setIsTagInputFocused(true)}
+                  onChange={(event) => setTagDraft(event.target.value)}
+                  onBlur={() => {
+                    setIsTagInputFocused(false);
+                    commitTagDraft();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      if (knownTagSuggestions.length === 0) return;
+                      event.preventDefault();
+                      setTagSuggestionIndex((current) =>
+                        (current + 1) % knownTagSuggestions.length,
+                      );
+                      return;
+                    }
+
+                    if (event.key === "ArrowUp") {
+                      if (knownTagSuggestions.length === 0) return;
+                      event.preventDefault();
+                      setTagSuggestionIndex((current) =>
+                        current <= 0 ? knownTagSuggestions.length - 1 : current - 1,
+                      );
+                      return;
+                    }
+
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      const suggestion = knownTagSuggestions[tagSuggestionIndex];
+                      if (suggestion) {
+                        applyTagSuggestion(suggestion);
+                      } else {
+                        commitTagDraft();
+                      }
+                      return;
+                    }
+
+                    if (event.key === "," || event.key === " ") {
+                      event.preventDefault();
+                      commitTagDraft();
+                      return;
+                    }
+
+                    if (event.key === "Backspace" && !tagDraft && tags.length > 0) {
+                      removeTag(tags[tags.length - 1]);
+                    }
+                  }}
+                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50"
+                />
+              </div>
+              {isTagInputFocused && knownTagSuggestions.length > 0 ? (
+                <div className="absolute left-0 top-full z-40 mt-1.5 min-w-48 max-w-full rounded-[var(--ui-radius-md)] border border-border bg-bg-secondary p-1 shadow-[var(--ui-shadow-menu)]">
+                  {knownTagSuggestions.map((tag, index) => {
+                    const appearance = getFolderAppearance(taskTagAppearances, tag);
+                    const textColor = resolveFolderAppearanceTextColor(appearance, resolvedTheme);
+                    const iconColor = resolveFolderAppearanceIconColor(appearance, resolvedTheme);
+                    const isActive = index === tagSuggestionIndex;
+
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onMouseEnter={() => setTagSuggestionIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => applyTagSuggestion(tag)}
+                        className={cn(
+                          "ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-1.5 text-left text-sm text-text transition-colors",
+                          isActive ? "bg-bg-muted" : "hover:bg-bg-muted",
+                        )}
+                        style={textColor ? { color: textColor } : undefined}
+                      >
+                        <FolderGlyph
+                          icon={appearance?.icon ?? { kind: "lucide", name: "hash" }}
+                          className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted"
+                          style={iconColor ? { color: iconColor } : undefined}
+                        />
+                        <span className="min-w-0 truncate">{tag}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className={cn("w-full", TASK_DETAIL_SECTION_CLASS)}>

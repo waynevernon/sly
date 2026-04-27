@@ -28,6 +28,9 @@ function makeTasksHookValue(
       completed: [],
       starred: [],
     },
+    tagBuckets: {},
+    tagNames: [],
+    taskTagAppearances: {},
     today: "2026-04-10",
     isLoading: false,
     lastError: null,
@@ -203,6 +206,121 @@ describe("GlobalTaskCaptureDialog", () => {
 
     await waitFor(() => {
       expect(createTask).toHaveBeenCalledWith("Plan tomorrow");
+    });
+    expect(updateTask).not.toHaveBeenCalled();
+  });
+
+  it("shows detected title tags in the tags section and removes them from the created title", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Prepare launch plan",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-10T12:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+      dueAt: null,
+      recurrence: null,
+      tags: [],
+    });
+    const updateTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Prepare launch plan",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-10T12:00:00Z",
+      actionAt: "2026-04-11T17:00:00.000Z",
+      scheduleBucket: null,
+      completedAt: null,
+      dueAt: null,
+      recurrence: null,
+      tags: ["launch"],
+    });
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ createTask, updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <GlobalTaskCaptureDialog
+          open
+          workspaceMode="notes"
+          onClose={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("What needs doing?"),
+      "Prepare #Launch plan tomorrow",
+    );
+    await screen.findByText("launch");
+    await screen.findByText("Action: Tomorrow");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledWith("Prepare plan");
+      expect(updateTask).toHaveBeenCalledWith("task-1", {
+        description: "",
+        link: "",
+        waitingFor: "",
+        actionAt: localDateToNormalizedActionAt("2026-04-11"),
+        scheduleBucket: null,
+        recurrence: null,
+        tags: ["launch"],
+      });
+    });
+  });
+
+  it("keeps a dismissed detected tag in the title", async () => {
+    const user = userEvent.setup();
+    const tasksContext = await import("../../context/TasksContext");
+    const createTask = vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Prepare #Launch plan",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-10T12:00:00Z",
+      actionAt: null,
+      scheduleBucket: null,
+      completedAt: null,
+    });
+    const updateTask = vi.fn();
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({ createTask, updateTask }),
+    );
+
+    render(
+      <TooltipProvider>
+        <GlobalTaskCaptureDialog
+          open
+          workspaceMode="notes"
+          onClose={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("What needs doing?"),
+      "Prepare #Launch plan",
+    );
+    await screen.findByText("launch");
+    await user.click(screen.getByRole("button", { name: "Dismiss detected tag launch" }));
+    await waitFor(() => {
+      expect(screen.queryByText("launch")).not.toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledWith("Prepare #Launch plan");
     });
     expect(updateTask).not.toHaveBeenCalled();
   });
