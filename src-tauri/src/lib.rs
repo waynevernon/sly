@@ -6732,6 +6732,7 @@ mod tests {
   "defaultNoteName": null,
   "ollamaModel": null,
   "folderIcons": null,
+  "taskTagIcons": null,
   "collapsedFolders": null,
   "noteListDateMode": "modified",
   "showNoteListFilename": false,

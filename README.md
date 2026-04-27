@@ -18,7 +18,7 @@ Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fo
 
 - **Your files, your format.** Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
 - **A focused writing surface.** Rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
-- **Tasks in the same workspace.** Capture work into an inbox, schedule it across Today, Upcoming, Someday, and Waiting, and keep task notes in plain markdown inside your vault.
+- **Tasks in the same workspace.** Capture work into an inbox, tag related tasks, schedule them across Today, Upcoming, Someday, and Waiting, and keep task notes in plain markdown inside your vault.
 - **Fast through large note collections.** Full-text search, command palette, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
 - **Flexible organization, without the complexity.** Pinned and recent notes, recursive folder views, drag-and-drop, per-folder note sorting, folder sorting, note counts, and customizable folder icons.
 - **Layouts that adapt.** Switch between 1, 2, and 3-pane views, detach notes into their own windows, and tune the editor width.
