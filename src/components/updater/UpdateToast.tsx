@@ -25,13 +25,8 @@ export function UpdateToast({
     try {
       await update.downloadAndInstall();
       toast.dismiss(toastId);
-      toast.success("Update installed. Restart Sly to apply it.", {
-        action: {
-          label: "Restart",
-          onClick: () => {
-            void invoke("restart_app");
-          },
-        },
+      toast(<InstalledUpdateToast />, {
+        id: "update-installed-toast",
         duration: Infinity,
         closeButton: true,
       });
@@ -79,6 +74,26 @@ export function UpdateToast({
             Release Notes
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function InstalledUpdateToast() {
+  const handleRestart = () => {
+    void invoke("restart_app");
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="font-medium text-sm">Update Installed</div>
+      <div className="text-xs text-text-muted">
+        Restart Sly to apply it.
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <Button onClick={handleRestart} size="sm" variant="primary">
+          Restart
+        </Button>
       </div>
     </div>
   );
