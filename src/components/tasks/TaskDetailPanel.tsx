@@ -419,7 +419,7 @@ export function TaskDetailPanel() {
             <div className={TASK_DETAIL_LABEL_CLASS}>Tags</div>
             <div className="relative">
               <div
-                className="flex min-h-[var(--ui-control-height-standard)] flex-wrap items-center gap-1.5 bg-transparent py-1"
+                className="flex min-h-[calc(var(--ui-control-height-compact)+0.5rem)] flex-wrap items-center gap-1.5 bg-transparent py-1"
                 onMouseDown={(event) => {
                   if (event.target === event.currentTarget) {
                     event.preventDefault();
@@ -505,7 +505,7 @@ export function TaskDetailPanel() {
                       removeTag(tags[tags.length - 1]);
                     }
                   }}
-                  className="min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50"
+                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50"
                 />
               </div>
               {isTagInputFocused && knownTagSuggestions.length > 0 ? (
@@ -544,9 +544,6 @@ export function TaskDetailPanel() {
           </div>
 
           <div />
-          <div className={TASK_DETAIL_DIVIDER_CLASS} />
-
-          <div />
           <div className={TASK_DETAIL_SECTION_CLASS}>
             <div className={TASK_DETAIL_LABEL_CLASS}>
               Link
@@ -575,6 +572,9 @@ export function TaskDetailPanel() {
               ) : null}
             </div>
           </div>
+
+          <div />
+          <div className={TASK_DETAIL_DIVIDER_CLASS} />
 
           <div />
           <div className={TASK_DETAIL_SECTION_CLASS}>

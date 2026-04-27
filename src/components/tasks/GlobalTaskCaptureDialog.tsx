@@ -536,8 +536,6 @@ export function GlobalTaskCaptureDialog({
             />
           </div>
 
-          <div className={cn("w-full", TASK_DETAIL_DIVIDER_CLASS)} />
-
           <div className={cn("w-full", TASK_DETAIL_SECTION_CLASS)}>
             <div className={TASK_DETAIL_LABEL_CLASS}>
               Link

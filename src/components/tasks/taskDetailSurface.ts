@@ -1,6 +1,6 @@
 // Keep quick task capture and the full task detail panel visually aligned.
 // When one surface changes, update the shared tokens here so the other follows.
-export const TASK_DETAIL_LABEL_CLASS = "text-[11px] font-medium text-text-muted";
+export const TASK_DETAIL_LABEL_CLASS = "text-sm font-medium text-text-muted";
 
 export const TASK_DETAIL_SECTION_CLASS = "space-y-1.5";
 
