@@ -12,10 +12,14 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            "group toast ui-surface-toast w-full max-w-80 px-3 py-2 text-text",
+            "group toast ui-surface-toast w-full max-w-80 px-3 py-2 !bg-bg !text-text !border-border",
           description: "text-text-muted",
-          actionButton: "bg-accent text-text-inverse",
-          cancelButton: "bg-bg-muted text-text",
+          actionButton:
+            "h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] bg-accent px-2.5 text-xs font-medium text-text-inverse transition-colors hover:bg-accent/90",
+          cancelButton:
+            "h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] border border-border bg-transparent px-2.5 text-xs font-medium text-text transition-colors hover:bg-bg-muted",
+          closeButton:
+            "!border-border !bg-bg !text-text-muted transition-colors hover:!bg-bg-muted hover:!text-text",
           error: "!bg-bg !text-text !border-border",
           success: "!bg-bg !text-text !border-border",
           warning: "!bg-bg !text-text !border-border",

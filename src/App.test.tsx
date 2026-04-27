@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { TaskView } from "./types/tasks";
 
-const { tauriEventListeners, listenMock } = vi.hoisted(() => {
+const { tauriEventListeners, listenMock, toastInfoMock } = vi.hoisted(() => {
   const listeners = new Map<string, Set<(event: { payload: unknown }) => void>>();
   return {
     tauriEventListeners: listeners,
+    toastInfoMock: vi.fn(),
     listenMock: vi.fn(
       (event: string, callback: (event: { payload: unknown }) => void) => {
         const callbacks = listeners.get(event) ?? new Set();
@@ -22,6 +23,20 @@ const { tauriEventListeners, listenMock } = vi.hoisted(() => {
         });
       },
     ),
+  };
+});
+
+vi.mock("sonner", () => {
+  const toast = Object.assign(vi.fn(), {
+    dismiss: vi.fn(),
+    error: vi.fn(),
+    info: toastInfoMock,
+    success: vi.fn(),
+  });
+
+  return {
+    Toaster: () => null,
+    toast,
   };
 });
 
@@ -384,6 +399,20 @@ describe("App", () => {
     expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
   });
 
+  it("shows the disabled tasks toast with Cmd/Ctrl+Shift+T when tasks are disabled", () => {
+    notesDataState.settings.tasksEnabled = false;
+
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Tasks aren't enabled yet. Turn them on in Settings → Tasks.",
+      { id: "tasks-disabled" },
+    );
+    expect(screen.queryByText("global-task-capture-dialog")).not.toBeInTheDocument();
+  });
+
   it("opens the global task capture dialog from the desktop shortcut event", async () => {
     notesDataState.settings.tasksEnabled = true;
 
@@ -392,6 +421,20 @@ describe("App", () => {
     emitTauriEvent("open-global-task-capture");
 
     expect(await screen.findByText("global-task-capture-dialog")).toBeInTheDocument();
+  });
+
+  it("shows the disabled tasks toast from the desktop shortcut event when tasks are disabled", () => {
+    notesDataState.settings.tasksEnabled = false;
+
+    render(<App />);
+
+    emitTauriEvent("open-global-task-capture");
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Tasks aren't enabled yet. Turn them on in Settings → Tasks.",
+      { id: "tasks-disabled" },
+    );
+    expect(screen.queryByText("global-task-capture-dialog")).not.toBeInTheDocument();
   });
 
   it("creates a note from anywhere with Cmd/Ctrl+Shift+N", async () => {
@@ -475,6 +518,34 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
     });
+  });
+
+  it("shows the disabled tasks toast with Cmd/Ctrl+2 when tasks are disabled", () => {
+    notesDataState.settings.tasksEnabled = false;
+
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "2", metaKey: true });
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Tasks aren't enabled yet. Turn them on in Settings → Tasks.",
+      { id: "tasks-disabled" },
+    );
+    expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+  });
+
+  it("shows the disabled tasks toast from the native View Tasks menu event", () => {
+    notesDataState.settings.tasksEnabled = false;
+
+    render(<App />);
+
+    emitTauriEvent("show-tasks-mode");
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Tasks aren't enabled yet. Turn them on in Settings → Tasks.",
+      { id: "tasks-disabled" },
+    );
+    expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
   });
 
   it("switches back to notes mode with Cmd/Ctrl+1", async () => {

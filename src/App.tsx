@@ -84,6 +84,14 @@ const WorkspaceNoteApp = lazy(() =>
   })),
 );
 
+const TASKS_DISABLED_TOAST_ID = "tasks-disabled";
+
+function showTasksDisabledToast() {
+  toast.info("Tasks aren't enabled yet. Turn them on in Settings → Tasks.", {
+    id: TASKS_DISABLED_TOAST_ID,
+  });
+}
+
 type DetachedSource = "workspace-note" | "external-file";
 type DetachedPresentation = "interactive" | "print";
 
@@ -848,6 +856,11 @@ function AppContent() {
   }, []);
 
   const showTasksMode = useCallback(() => {
+    if (!tasksEnabled) {
+      showTasksDisabledToast();
+      return;
+    }
+
     clearNoteSelection();
     setFocusMode(false);
     setEditorSourceMode(false);
@@ -855,11 +868,11 @@ function AppContent() {
       setPaneMode(2);
     }
     setWorkspaceMode("tasks");
-  }, [clearNoteSelection, setPaneMode]);
+  }, [clearNoteSelection, setPaneMode, tasksEnabled]);
 
   const openTaskCapture = useCallback(() => {
     if (!tasksEnabled) {
-      toast("Tasks aren't enabled yet. Turn them on in Settings → Tasks.");
+      showTasksDisabledToast();
       return;
     }
 
@@ -1436,10 +1449,6 @@ function AppContent() {
       // Cmd/Ctrl+2 - Switch to tasks mode
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "2") {
         e.preventDefault();
-        if (!tasksEnabled) {
-          toast("Tasks aren't enabled yet. Turn them on in Settings → Tasks.");
-          return;
-        }
         showTasksMode();
         return;
       }

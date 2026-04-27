@@ -5818,7 +5818,7 @@ fn default_task_quick_add_shortcut() -> &'static str {
 
 #[cfg(not(target_os = "macos"))]
 fn default_task_quick_add_shortcut() -> &'static str {
-    "CommandOrControl+Shift+N"
+    "CommandOrControl+Shift+T"
 }
 
 fn resolve_task_quick_add_shortcut_accelerator(settings: &Settings) -> Option<String> {
