@@ -22,6 +22,7 @@ export interface TaskMetadata {
   starred: boolean;
   dueAt: string | null;
   recurrence: string | null;
+  tags?: string[];
 }
 
 export interface Task extends TaskMetadata {
@@ -37,4 +38,5 @@ export interface TaskPatch {
   starred?: boolean;
   dueAt?: string | null;
   recurrence?: string | null;
+  tags?: string[];
 }

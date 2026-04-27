@@ -90,6 +90,9 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(folder_icons) = patch.folder_icons {
         settings.folder_icons = folder_icons;
     }
+    if let Some(task_tag_icons) = patch.task_tag_icons {
+        settings.task_tag_icons = task_tag_icons;
+    }
     if let Some(collapsed_folders) = patch.collapsed_folders {
         settings.collapsed_folders = collapsed_folders;
     }
@@ -148,6 +151,14 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
                 changed = true;
             }
             settings.folder_icons = Some(normalized_folder_icons);
+        }
+    }
+    if let Some(task_tag_icons) = settings.task_tag_icons.take() {
+        let normalized_task_tag_icons = sanitize_folder_icons_map(task_tag_icons);
+        if normalized_task_tag_icons.is_empty() {
+            settings.task_tag_icons = None;
+        } else {
+            settings.task_tag_icons = Some(normalized_task_tag_icons);
         }
     }
 
@@ -272,6 +283,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_optional_string_field(object, "defaultNoteName");
     normalize_optional_string_field(object, "ollamaModel");
     normalize_folder_icons_field(object, "folderIcons");
+    normalize_folder_icons_field(object, "taskTagIcons");
     normalize_optional_string_array_field(object, "collapsedFolders");
     normalize_string_enum_field(object, "noteListDateMode", &["modified", "created", "off"]);
     normalize_bool_field(object, "showNoteListFilename");

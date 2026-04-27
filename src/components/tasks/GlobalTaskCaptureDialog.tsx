@@ -1,9 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, X } from "lucide-react";
+import { CalendarDays, Clock3, Hash, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "../../context/TasksContext";
 import {
   detectTaskDateFromTitle,
+  detectTaskTagsFromTitle,
   detectTaskUrlFromTitle,
   deriveView,
   localDateToNormalizedActionAt,
@@ -76,6 +77,8 @@ export function GlobalTaskCaptureDialog({
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
   const [detectedUrl, setDetectedUrl] = useState<ReturnType<typeof detectTaskUrlFromTitle>>(null);
   const [ignoredUrlSignature, setIgnoredUrlSignature] = useState<string | null>(null);
+  const [detectedTags, setDetectedTags] = useState<ReturnType<typeof detectTaskTagsFromTitle> | null>(null);
+  const [ignoredTagSignature, setIgnoredTagSignature] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleOverlayRef = useRef<HTMLSpanElement>(null);
@@ -111,6 +114,8 @@ export function GlobalTaskCaptureDialog({
     setIgnoredDetectionSignature(null);
     setDetectedUrl(null);
     setIgnoredUrlSignature(null);
+    setDetectedTags(null);
+    setIgnoredTagSignature(null);
     autoPopulatedLinkRef.current = null;
     setIsSaving(false);
     titleInputRef.current?.focus();
@@ -126,7 +131,17 @@ export function GlobalTaskCaptureDialog({
     }
 
     const timer = window.setTimeout(() => {
-      const nextDetection = detectTaskDateFromTitle(title, today);
+      const urlDetection = detectTaskUrlFromTitle(title);
+      const titleAfterUrl =
+        urlDetection && urlDetection.signature !== ignoredUrlSignature
+          ? urlDetection.cleanedTitle
+          : title;
+      const tagDetection = detectTaskTagsFromTitle(titleAfterUrl);
+      const titleForDate =
+        tagDetection.tags.length > 0 && tagDetection.tags.join(",") !== ignoredTagSignature
+          ? tagDetection.cleanedTitle
+          : titleAfterUrl;
+      const nextDetection = detectTaskDateFromTitle(titleForDate, today);
       if (!nextDetection || nextDetection.signature === ignoredDetectionSignature) {
         setDetectedDate(null);
         return;
@@ -136,7 +151,7 @@ export function GlobalTaskCaptureDialog({
     }, CAPTURE_DATE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [ignoredDetectionSignature, open, title, today]);
+  }, [ignoredDetectionSignature, ignoredTagSignature, ignoredUrlSignature, open, title, today]);
 
   useEffect(() => {
     if (!open || !title.trim()) {
@@ -175,6 +190,22 @@ export function GlobalTaskCaptureDialog({
     return () => window.clearTimeout(timer);
   }, [ignoredUrlSignature, open, title]);
 
+  useEffect(() => {
+    if (!open || !title.trim()) {
+      setDetectedTags(null);
+      return;
+    }
+
+    const nextDetection = detectTaskTagsFromTitle(title);
+    const signature = nextDetection.tags.join(",");
+    if (nextDetection.tags.length === 0 || signature === ignoredTagSignature) {
+      setDetectedTags(null);
+      return;
+    }
+
+    setDetectedTags(nextDetection);
+  }, [ignoredTagSignature, open, title]);
+
   const handleClose = useCallback(() => {
     if (isSaving) return;
     onClose();
@@ -189,14 +220,21 @@ export function GlobalTaskCaptureDialog({
         ? nextUrlDetection
         : null;
     const titleAfterUrl = activeUrlDetection ? activeUrlDetection.cleanedTitle : title;
+    const nextTagDetection = detectTaskTagsFromTitle(titleAfterUrl);
+    const activeTagDetection =
+      nextTagDetection.tags.length > 0 &&
+      nextTagDetection.tags.join(",") !== ignoredTagSignature
+        ? nextTagDetection
+        : null;
+    const titleAfterTags = activeTagDetection ? activeTagDetection.cleanedTitle : titleAfterUrl;
     // link is already correct — auto-populated by the detection effect or typed manually.
 
-    const nextDetection = detectTaskDateFromTitle(titleAfterUrl, today);
+    const nextDetection = detectTaskDateFromTitle(titleAfterTags, today);
     const activeDetection =
       nextDetection && nextDetection.signature !== ignoredDetectionSignature
         ? nextDetection
         : null;
-    const trimmedTitle = (activeDetection?.cleanedTitle ?? titleAfterUrl).trim();
+    const trimmedTitle = (activeDetection?.cleanedTitle ?? titleAfterTags).trim();
     if (!trimmedTitle || isSaving) {
       return;
     }
@@ -218,6 +256,7 @@ export function GlobalTaskCaptureDialog({
         actionAt: localDateToNormalizedActionAt(effectiveActionDate),
         scheduleBucket: manualScheduleBucket,
         recurrence,
+        ...(activeTagDetection?.tags.length ? { tags: activeTagDetection.tags } : {}),
         ...(manualDueDate
           ? { dueAt: localDateToNormalizedActionAt(manualDueDate) }
           : {}),
@@ -230,6 +269,7 @@ export function GlobalTaskCaptureDialog({
         Boolean(effectiveActionDate) ||
         Boolean(manualScheduleBucket) ||
         Boolean(recurrence) ||
+        Boolean(activeTagDetection?.tags.length) ||
         Boolean(manualDueDate);
 
       const finalTask = hasPatch
@@ -253,6 +293,7 @@ export function GlobalTaskCaptureDialog({
     createTask,
     description,
     ignoredDetectionSignature,
+    ignoredTagSignature,
     ignoredUrlSignature,
     isSaving,
     link,
@@ -310,8 +351,14 @@ export function GlobalTaskCaptureDialog({
       }
     }
 
+    if (detectedTags) {
+      for (const match of detectedTags.matches) {
+        ranges.push({ start: match.start, end: match.end });
+      }
+    }
+
     return ranges.sort((a, b) => a.start - b.start);
-  }, [showDetectedDateChip, detectedDate, detectedUrl, title]);
+  }, [showDetectedDateChip, detectedDate, detectedTags, detectedUrl, title]);
   const waitingForSuggestions = useMemo(() => {
     const counts = new Map<string, { value: string; count: number }>();
 
@@ -422,6 +469,25 @@ export function GlobalTaskCaptureDialog({
                 </button>
               </div>
             ) : null}
+            {detectedTags?.tags.map((tag) => (
+              <div key={tag} className="inline-flex h-[var(--ui-control-height-compact)] items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-2.5 text-xs font-medium text-text-muted">
+                <Hash className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>Tag: {tag}</span>
+                <button
+                  type="button"
+                  aria-label={`Dismiss detected tag ${tag}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setIgnoredTagSignature(detectedTags.tags.join(","));
+                    setDetectedTags(null);
+                    titleInputRef.current?.focus();
+                  }}
+                  className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg hover:text-text"
+                >
+                  <X className="h-3 w-3 stroke-[2]" />
+                </button>
+              </div>
+            ))}
             <DueDatePicker
               dueDate={manualDueDate}
               today={today}

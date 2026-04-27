@@ -85,6 +85,12 @@ export interface DetectedTaskUrl {
   url: string;
 }
 
+export interface DetectedTaskTags {
+  cleanedTitle: string;
+  matches: Array<{ start: number; end: number; matchedText: string; tag: string }>;
+  tags: string[];
+}
+
 /**
  * Derive which primary horizon view a task belongs to.
  * Priority (first match wins):
@@ -160,7 +166,7 @@ export function groupByView(
 export function taskMatchesQuery(task: TaskMetadata, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return [task.title, task.description, task.link, task.waitingFor].some(
+  return [task.title, task.description, task.link, task.waitingFor, ...(task.tags ?? [])].some(
     (field) => field.toLowerCase().includes(needle),
   );
 }
@@ -377,6 +383,40 @@ export function detectTaskUrlFromTitle(title: string): DetectedTaskUrl | null {
     signature: `url:${matchedText.toLowerCase()}:${cleanedTitle.toLowerCase()}`,
     url: matchedText,
   };
+}
+
+export function detectTaskTagsFromTitle(title: string): DetectedTaskTags {
+  const tags: string[] = [];
+  const matches: DetectedTaskTags["matches"] = [];
+  const cleanedTitle = title
+    .replace(/(^|\s)#([\p{L}\p{N}_/-]+)/gu, (match, prefix: string, rawTag: string, offset: number) => {
+      const tag = normalizeTaskTag(rawTag);
+      if (tag && !tags.includes(tag)) tags.push(tag);
+      if (tag) {
+        const start = offset + prefix.length;
+        matches.push({
+          start,
+          end: start + match.length - prefix.length,
+          matchedText: match.slice(prefix.length),
+          tag,
+        });
+      }
+      return prefix;
+    })
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return { cleanedTitle, matches, tags };
+}
+
+export function normalizeTaskTag(value: string): string | null {
+  const normalized = value
+    .trim()
+    .replace(/^#+/, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}_/-]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || null;
 }
 
 export function activeCountForView(

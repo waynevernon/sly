@@ -35,6 +35,7 @@ import {
 } from "../lib/folderIcons";
 import { rewriteFolderPathList } from "../lib/folderTree";
 import { markNoteOpenTiming, startNoteOpenTiming } from "../lib/noteOpenTiming";
+import { normalizeTaskTag } from "../lib/tasks";
 
 interface FolderRevealRequest {
   path: string;
@@ -61,6 +62,7 @@ interface NotesDataContextValue {
   showNoteListPreview: boolean;
   settings: Settings;
   folderAppearances: FolderAppearanceMap;
+  taskTagAppearances: FolderAppearanceMap;
   noteSortMode: NoteSortMode;
   folderSortMode: FolderSortMode;
   selectedScope: NoteScope;
@@ -114,6 +116,10 @@ interface NotesActionsContextValue {
   moveFolder: (path: string, targetParent: string) => Promise<void>;
   setFolderAppearance: (
     path: string,
+    appearance: FolderAppearance | null,
+  ) => Promise<void>;
+  setTaskTagAppearance: (
+    tag: string,
     appearance: FolderAppearance | null,
   ) => Promise<void>;
   setCollapsedFolders: (paths: string[]) => Promise<void>;
@@ -547,6 +553,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   >(undefined);
   const [folderAppearances, setFolderAppearances] =
     useState<FolderAppearanceMap>({});
+  const [taskTagAppearances, setTaskTagAppearances] =
+    useState<FolderAppearanceMap>({});
   const [selectedScope, setSelectedScope] = useState<NoteScope>({ type: "all" });
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
@@ -690,6 +698,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       nextSettings.folderIcons ?? undefined,
     );
     setFolderAppearances(nextFolderAppearances);
+    setTaskTagAppearances(
+      sanitizeFolderAppearances(nextSettings.taskTagIcons ?? undefined),
+    );
     return nextSettings;
   }, []);
 
@@ -2135,6 +2146,42 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [persistSettings]);
 
+  const setTaskTagAppearance = useCallback(async (
+    tag: string,
+    appearance: FolderAppearance | null,
+  ) => {
+    const normalizedTag = normalizeTaskTag(tag);
+    if (!normalizedTag) return;
+
+    try {
+      await persistSettings((currentSettings) => {
+        const nextTaskTagIcons = sanitizeFolderAppearances(
+          currentSettings.taskTagIcons,
+        );
+        const normalizedAppearance = sanitizeFolderAppearances({
+          [normalizedTag]: appearance,
+        })[normalizedTag];
+
+        if (normalizedAppearance) {
+          nextTaskTagIcons[normalizedTag] = normalizedAppearance;
+        } else {
+          delete nextTaskTagIcons[normalizedTag];
+        }
+
+        return {
+          ...currentSettings,
+          taskTagIcons:
+            Object.keys(nextTaskTagIcons).length > 0
+              ? nextTaskTagIcons
+              : undefined,
+        };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update tag style");
+      throw err;
+    }
+  }, [persistSettings]);
+
   const setNotesFolder = useCallback(async (path: string) => {
     try {
       await notesService.setNotesFolder(path);
@@ -2448,6 +2495,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListPreview,
       settings,
       folderAppearances,
+      taskTagAppearances,
       noteSortMode: effectiveNoteSortMode,
       folderSortMode: settings.folderSortMode || DEFAULT_FOLDER_SORT_MODE,
       selectedScope,
@@ -2483,6 +2531,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       showNoteListPreview,
       settings,
       folderAppearances,
+      taskTagAppearances,
       effectiveNoteSortMode,
       selectedScope,
       selectedNoteId,
@@ -2536,6 +2585,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveSelectedNotes,
       moveFolder: moveFolderAction,
       setFolderAppearance,
+      setTaskTagAppearance,
       setCollapsedFolders,
       setNoteSortMode,
       setNoteListViewOptions,
@@ -2578,6 +2628,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       moveSelectedNotes,
       moveFolderAction,
       setFolderAppearance,
+      setTaskTagAppearance,
       setCollapsedFolders,
       setNoteSortMode,
       setNoteListViewOptions,

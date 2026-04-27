@@ -556,6 +556,8 @@ pub struct Settings {
     pub ollama_model: Option<String>,
     #[serde(rename = "folderIcons", default)]
     pub folder_icons: Option<HashMap<String, FolderAppearance>>,
+    #[serde(rename = "taskTagIcons", default)]
+    pub task_tag_icons: Option<HashMap<String, FolderAppearance>>,
     #[serde(rename = "collapsedFolders")]
     pub collapsed_folders: Option<Vec<String>>,
     #[serde(rename = "noteListDateMode", default)]
@@ -605,6 +607,7 @@ impl Default for Settings {
             default_note_name: None,
             ollama_model: None,
             folder_icons: None,
+            task_tag_icons: None,
             collapsed_folders: None,
             note_list_date_mode: NoteListDateMode::default(),
             show_note_list_filename: true,
@@ -643,6 +646,8 @@ pub struct SettingsPatch {
     pub ollama_model: Option<Option<String>>,
     #[serde(default)]
     pub folder_icons: Option<Option<HashMap<String, FolderAppearance>>>,
+    #[serde(default)]
+    pub task_tag_icons: Option<Option<HashMap<String, FolderAppearance>>>,
     #[serde(default)]
     pub collapsed_folders: Option<Option<Vec<String>>>,
     #[serde(default)]
@@ -7057,6 +7062,7 @@ mod tests {
             default_note_name: Some("Untitled".to_string()),
             ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
+            task_tag_icons: None,
             collapsed_folders: None,
             note_list_date_mode: NoteListDateMode::Modified,
             show_note_list_filename: true,

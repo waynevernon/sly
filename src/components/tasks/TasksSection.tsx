@@ -18,10 +18,11 @@ const VIEW_ICONS: Record<TaskView, React.FC<{ className?: string }>> = {
 };
 
 export function TasksSection() {
-  const { selectedView, selectView, buckets } = useTasks();
+  const { selectedView, selectedTag, selectView, buckets } = useTasks();
   return (
     <TasksSectionInner
       selectedView={selectedView}
+      selectedTag={selectedTag}
       selectView={selectView}
       buckets={buckets}
       showLabel
@@ -31,6 +32,7 @@ export function TasksSection() {
 
 interface TasksSectionInnerProps {
   selectedView: ReturnType<typeof useTasks>["selectedView"];
+  selectedTag: ReturnType<typeof useTasks>["selectedTag"];
   selectView: ReturnType<typeof useTasks>["selectView"];
   buckets: ReturnType<typeof useTasks>["buckets"];
   showLabel: boolean;
@@ -38,6 +40,7 @@ interface TasksSectionInnerProps {
 
 function TasksSectionInner({
   selectedView,
+  selectedTag,
   selectView,
   buckets,
   showLabel,
@@ -54,7 +57,7 @@ function TasksSectionInner({
       <nav className="space-y-1" aria-label="Task horizons">
         {TASK_VIEW_ORDER.map((view) => {
           const Icon = VIEW_ICONS[view];
-          const isSelected = selectedView === view;
+          const isSelected = !selectedTag && selectedView === view;
           const count = buckets[view].length;
           const isDragTarget = TASK_DRAG_TARGET_VIEWS.includes(view);
 
@@ -151,10 +154,11 @@ function TaskViewButton({
 }
 
 export function TaskModeNavigationSection() {
-  const { selectedView, selectView, buckets } = useTasks();
+  const { selectedView, selectedTag, selectView, buckets } = useTasks();
   return (
     <TasksSectionInner
       selectedView={selectedView}
+      selectedTag={selectedTag}
       selectView={selectView}
       buckets={buckets}
       showLabel={false}

@@ -16,6 +16,7 @@ import {
   ClockArrowDown,
   ClockArrowUp,
   GripVertical,
+  Hash,
   Inbox,
   Layers,
   Plus,
@@ -29,9 +30,17 @@ import { SearchIcon, SearchOffIcon } from "../icons";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDndMonitor } from "@dnd-kit/core";
 import { useTasks } from "../../context/TasksContext";
+import { useTheme } from "../../context/ThemeContext";
+import { FolderGlyph } from "../folders/FolderGlyph";
+import {
+  getFolderAppearance,
+  resolveFolderAppearanceIconColor,
+  resolveFolderAppearanceTextColor,
+} from "../../lib/folderIcons";
 import {
   actionAtToLocalDate,
   detectTaskDateFromTitle,
+  detectTaskTagsFromTitle,
   detectTaskUrlFromTitle,
   deriveView,
   localDateString,
@@ -177,6 +186,14 @@ const MANUAL_SORT_ITEM: SortMenuItem<TaskSortMode> = {
 
 const CREATE_DATE_DEBOUNCE_MS = 350;
 
+function useResolvedThemeFallback(): "light" | "dark" {
+  try {
+    return useTheme().resolvedTheme;
+  } catch {
+    return "light";
+  }
+}
+
 function taskBelongsToView(
   task: TaskMetadata,
   view: TaskView,
@@ -216,7 +233,9 @@ export function TaskListPane() {
   const {
     tasks: allTasks,
     buckets,
+    taskTagAppearances,
     selectedView,
+    selectedTag,
     selectedTaskId,
     selectedTaskIds,
     today,
@@ -234,6 +253,7 @@ export function TaskListPane() {
     updateTask,
     deleteTask,
   } = useTasks();
+  const resolvedTheme = useResolvedThemeFallback();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -242,6 +262,8 @@ export function TaskListPane() {
   const [ignoredDetectionSignature, setIgnoredDetectionSignature] = useState<string | null>(null);
   const [detectedUrl, setDetectedUrl] = useState<ReturnType<typeof detectTaskUrlFromTitle>>(null);
   const [ignoredUrlSignature, setIgnoredUrlSignature] = useState<string | null>(null);
+  const [detectedTags, setDetectedTags] = useState<ReturnType<typeof detectTaskTagsFromTitle> | null>(null);
+  const [ignoredTagSignature, setIgnoredTagSignature] = useState<string | null>(null);
   const [pendingSelectionTaskId, setPendingSelectionTaskId] = useState<string | null>(null);
   const [rescheduleTaskIds, setRescheduleTaskIds] = useState<string[] | null>(null);
   const [rescheduleAnchor, setRescheduleAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -274,8 +296,12 @@ export function TaskListPane() {
   const isSearching = searchQuery.trim().length > 0;
 
   const viewOrder = taskViewOrders[selectedView];
-  const tasks = [...(buckets[selectedView] ?? [])].sort((a, b) =>
-    compareTasks(a, b, selectedView, taskSortMode, viewOrder),
+  const visibleSource = selectedTag
+    ? allTasks.filter((task) => (task.tags ?? []).includes(selectedTag))
+    : buckets[selectedView] ?? [];
+  const effectiveSortMode = selectedTag && taskSortMode === "manual" ? "createdAsc" : taskSortMode;
+  const tasks = [...visibleSource].sort((a, b) =>
+    compareTasks(a, b, selectedView, effectiveSortMode, selectedTag ? undefined : viewOrder),
   );
   const taskMap = useMemo(
     () => new Map(tasks.map((task) => [task.id, task] as const)),
@@ -292,15 +318,34 @@ export function TaskListPane() {
         .filter((task): task is TaskMetadata => Boolean(task)),
     [selectedTaskIds, taskMap],
   );
-  const empty = EMPTY_MESSAGES[selectedView] ?? {
+  const empty = selectedTag
+    ? {
+        title: "No tagged tasks",
+        message: `Tasks tagged ${selectedTag} will show up here.`,
+      }
+    : EMPTY_MESSAGES[selectedView] ?? {
     title: "Nothing here",
     message: "",
   };
-  const EmptyStateIcon = EMPTY_STATE_ICONS[selectedView];
-  const HeaderIcon = HEADER_ICONS[selectedView];
+  const EmptyStateIcon = selectedTag ? Hash : EMPTY_STATE_ICONS[selectedView];
+  const HeaderIcon = selectedTag ? Hash : HEADER_ICONS[selectedView];
+  const headerLabel = selectedTag ?? TASK_VIEW_LABELS[selectedView];
+  const selectedTagAppearance = selectedTag
+    ? getFolderAppearance(taskTagAppearances ?? {}, selectedTag)
+    : null;
+  const selectedTagIconStyle = selectedTag
+    ? {
+        color: resolveFolderAppearanceIconColor(selectedTagAppearance, resolvedTheme) ?? undefined,
+      }
+    : undefined;
+  const selectedTagTextStyle = selectedTag
+    ? {
+        color: resolveFolderAppearanceTextColor(selectedTagAppearance, resolvedTheme) ?? undefined,
+      }
+    : undefined;
   const selectionCount = selectedTaskIds.length;
   const hasBatchSelection = selectionCount > 1;
-  const canInlineCreate = canInlineCreateTaskInView(selectedView);
+  const canInlineCreate = Boolean(selectedTag) || canInlineCreateTaskInView(selectedView);
   const inlineTitleHighlights = useMemo(() => {
     const ranges: Array<{ start: number; end: number }> = [];
     const lower = newTitle.toLowerCase();
@@ -315,8 +360,14 @@ export function TaskListPane() {
       if (start !== -1) ranges.push({ start, end: start + detectedUrl.matchedText.length });
     }
 
+    if (detectedTags) {
+      for (const match of detectedTags.matches) {
+        ranges.push({ start: match.start, end: match.end });
+      }
+    }
+
     return ranges.sort((a, b) => a.start - b.start);
-  }, [detectedDate, detectedUrl, newTitle]);
+  }, [detectedDate, detectedTags, detectedUrl, newTitle]);
 
   const focusCreateInput = useCallback(() => {
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -330,6 +381,8 @@ export function TaskListPane() {
     setIgnoredDetectionSignature(null);
     setDetectedUrl(null);
     setIgnoredUrlSignature(null);
+    setDetectedTags(null);
+    setIgnoredTagSignature(null);
     focusCreateInput();
   }, [focusCreateInput]);
 
@@ -350,7 +403,17 @@ export function TaskListPane() {
     }
 
     const timer = setTimeout(() => {
-      const nextDetection = detectTaskDateFromTitle(newTitle, today);
+      const urlDetection = detectTaskUrlFromTitle(newTitle);
+      const titleAfterUrl =
+        urlDetection && urlDetection.signature !== ignoredUrlSignature
+          ? urlDetection.cleanedTitle
+          : newTitle;
+      const tagDetection = detectTaskTagsFromTitle(titleAfterUrl);
+      const titleForDate =
+        tagDetection.tags.length > 0 && tagDetection.tags.join(",") !== ignoredTagSignature
+          ? tagDetection.cleanedTitle
+          : titleAfterUrl;
+      const nextDetection = detectTaskDateFromTitle(titleForDate, today);
       if (!nextDetection || nextDetection.signature === ignoredDetectionSignature) {
         setDetectedDate(null);
         return;
@@ -359,7 +422,7 @@ export function TaskListPane() {
     }, CREATE_DATE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [ignoredDetectionSignature, isCreating, newTitle, today]);
+  }, [ignoredDetectionSignature, ignoredTagSignature, ignoredUrlSignature, isCreating, newTitle, today]);
 
   useEffect(() => {
     if (!isCreating) {
@@ -383,6 +446,26 @@ export function TaskListPane() {
 
     return () => clearTimeout(timer);
   }, [ignoredUrlSignature, isCreating, newTitle]);
+
+  useEffect(() => {
+    if (!isCreating) {
+      setDetectedTags(null);
+      return;
+    }
+
+    if (!newTitle.trim()) {
+      setDetectedTags(null);
+      return;
+    }
+
+    const nextDetection = detectTaskTagsFromTitle(newTitle);
+    const signature = nextDetection.tags.join(",");
+    if (nextDetection.tags.length === 0 || signature === ignoredTagSignature) {
+      setDetectedTags(null);
+      return;
+    }
+    setDetectedTags(nextDetection);
+  }, [ignoredTagSignature, isCreating, newTitle]);
 
   useEffect(() => {
     if (!pendingSelectionTaskId) {
@@ -410,12 +493,20 @@ export function TaskListPane() {
         : null;
     const titleAfterUrl = activeUrlDetection ? activeUrlDetection.cleanedTitle : newTitle;
 
-    const nextDetection = detectTaskDateFromTitle(titleAfterUrl, today);
+    const nextTagDetection = detectTaskTagsFromTitle(titleAfterUrl);
+    const activeTagDetection =
+      nextTagDetection.tags.length > 0 &&
+      nextTagDetection.tags.join(",") !== ignoredTagSignature
+        ? nextTagDetection
+        : null;
+    const titleAfterTags = activeTagDetection ? activeTagDetection.cleanedTitle : titleAfterUrl;
+
+    const nextDetection = detectTaskDateFromTitle(titleAfterTags, today);
     const activeDetection =
       nextDetection && nextDetection.signature !== ignoredDetectionSignature
         ? nextDetection
         : null;
-    const title = (activeDetection?.cleanedTitle ?? titleAfterUrl).trim();
+    const title = (activeDetection?.cleanedTitle ?? titleAfterTags).trim();
     if (!title) {
       if (continueCapturing) {
         focusCreateInput();
@@ -433,11 +524,19 @@ export function TaskListPane() {
     setIgnoredDetectionSignature(null);
     setDetectedUrl(null);
     setIgnoredUrlSignature(null);
+    setDetectedTags(null);
+    setIgnoredTagSignature(null);
 
-    if (task && (activeUrlDetection || newStarred)) {
+    const nextTags = [...new Set([
+      ...(selectedTag ? [selectedTag] : []),
+      ...(activeTagDetection?.tags ?? []),
+    ])];
+
+    if (task && (activeUrlDetection || newStarred || nextTags.length > 0)) {
       effectiveTask = await updateTask(task.id, {
         ...(activeUrlDetection ? { link: activeUrlDetection.url } : {}),
         ...(newStarred ? { starred: true } : {}),
+        ...(nextTags.length > 0 ? { tags: nextTags } : {}),
       }) ?? effectiveTask;
     }
 
@@ -446,7 +545,7 @@ export function TaskListPane() {
         actionAt: activeDetection.actionAt,
         scheduleBucket: null,
       }) ?? effectiveTask;
-    } else if (task && !task.actionAt && !task.scheduleBucket) {
+    } else if (task && !selectedTag && !task.actionAt && !task.scheduleBucket) {
       const defaultSchedule = taskScheduleSelectionFromView(selectedView, today);
       if (defaultSchedule) {
         effectiveTask = await updateTask(task.id, defaultSchedule) ?? effectiveTask;
@@ -454,7 +553,9 @@ export function TaskListPane() {
     }
 
     if (effectiveTask) {
-      const remainsInCurrentView = taskBelongsToView(effectiveTask, selectedView, today);
+      const remainsInCurrentView = selectedTag
+        ? (effectiveTask.tags ?? []).includes(selectedTag)
+        : taskBelongsToView(effectiveTask, selectedView, today);
       if (remainsInCurrentView) {
         setPendingSelectionTaskId(effectiveTask.id);
       } else {
@@ -474,10 +575,12 @@ export function TaskListPane() {
     createTask,
     focusCreateInput,
     ignoredDetectionSignature,
+    ignoredTagSignature,
     ignoredUrlSignature,
     newStarred,
     newTitle,
     selectedView,
+    selectedTag,
     today,
     updateTask,
   ]);
@@ -495,13 +598,17 @@ export function TaskListPane() {
         setIgnoredDetectionSignature(null);
         setDetectedUrl(null);
         setIgnoredUrlSignature(null);
+        setDetectedTags(null);
+        setIgnoredTagSignature(null);
       }
     },
     [handleCommitCreate],
   );
 
-  const isManualSort = taskSortMode === "manual" && MANUAL_SORT_VIEWS.includes(selectedView);
-  const groupedSections = getTaskSections(tasks, selectedView, today);
+  const isManualSort = !selectedTag && taskSortMode === "manual" && MANUAL_SORT_VIEWS.includes(selectedView);
+  const groupedSections = selectedTag
+    ? [{ id: `tag-${selectedTag}`, label: null, tasks }]
+    : getTaskSections(tasks, selectedView, today);
 
   // Search results: filter all tasks across every view, sort starred first then newest first
   const searchResults = useMemo(() => {
@@ -690,13 +797,24 @@ export function TaskListPane() {
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {!isSearching && <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />}
-          <div className="min-w-0 truncate font-medium text-base text-text">
+          {!isSearching && selectedTag ? (
+            <FolderGlyph
+              icon={selectedTagAppearance?.icon ?? { kind: "lucide", name: "hash" }}
+              className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]"
+              style={selectedTagIconStyle}
+            />
+          ) : !isSearching ? (
+            <HeaderIcon className="h-4.5 w-4.5 shrink-0 text-text-muted/80 stroke-[1.7]" />
+          ) : null}
+          <div
+            className="min-w-0 truncate font-medium text-base text-text"
+            style={!hasBatchSelection && !isSearching ? selectedTagTextStyle : undefined}
+          >
             {hasBatchSelection
               ? `${selectionCount} selected`
               : isSearching
                 ? "Search Results"
-                : TASK_VIEW_LABELS[selectedView]}
+                : headerLabel}
           </div>
         </div>
         {hasBatchSelection ? (
@@ -738,13 +856,15 @@ export function TaskListPane() {
             {!isSearching && (
               <SortMenuButton
                 title="Sort tasks"
-                menuTitle={`Sort ${TASK_VIEW_LABELS[selectedView]}`}
-                value={taskSortMode}
+                menuTitle={`Sort ${headerLabel}`}
+                value={effectiveSortMode}
                 items={(() => {
-                  const base = selectedView === "completed"
+                  const base = selectedTag
+                    ? BASE_TASK_SORT_ITEMS.filter((item) => item.key !== "completed")
+                    : selectedView === "completed"
                     ? BASE_TASK_SORT_ITEMS
                     : BASE_TASK_SORT_ITEMS.filter((item) => item.key !== "completed");
-                  return MANUAL_SORT_VIEWS.includes(selectedView)
+                  return !selectedTag && MANUAL_SORT_VIEWS.includes(selectedView)
                     ? [...base, MANUAL_SORT_ITEM]
                     : base;
                 })()}
@@ -935,7 +1055,7 @@ export function TaskListPane() {
         ) : (
           <div
             role="listbox"
-            aria-label={TASK_VIEW_LABELS[selectedView]}
+            aria-label={headerLabel}
             aria-multiselectable={true}
             className="flex flex-col gap-1 px-1.5 pt-2.5 pb-1.5 outline-none"
           >
@@ -1127,7 +1247,7 @@ export function TaskListPane() {
                   </button>
                 </div>
 
-                {(detectedDate || detectedUrl) ? (
+                {(detectedDate || detectedUrl || detectedTags) ? (
                   <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 pb-2 pl-6.5 pr-2.5">
                     {detectedDate ? (
                       <div className="inline-flex h-[var(--ui-control-height-compact)] min-w-0 max-w-full items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
@@ -1167,6 +1287,25 @@ export function TaskListPane() {
                         </button>
                       </div>
                     ) : null}
+                    {detectedTags?.tags.map((tag) => (
+                      <div key={tag} className="inline-flex h-[var(--ui-control-height-compact)] min-w-0 max-w-full items-center gap-1.5 rounded-[var(--ui-radius-md)] bg-bg px-2.5 text-xs font-medium text-text-muted">
+                        <Hash className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                        <span className="min-w-0 truncate">Tag: {tag}</span>
+                        <button
+                          type="button"
+                          aria-label={`Dismiss detected tag ${tag}`}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setIgnoredTagSignature(detectedTags.tags.join(","));
+                            setDetectedTags(null);
+                            inputRef.current?.focus();
+                          }}
+                          className="ui-focus-ring inline-flex h-4 w-4 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                        >
+                          <X className="h-3 w-3 stroke-[2]" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </div>

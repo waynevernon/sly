@@ -203,6 +203,7 @@ export interface Settings {
   defaultNoteName?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
+  taskTagIcons?: Record<string, FolderAppearance> | null;
   collapsedFolders?: string[] | null;
   noteListDateMode: NoteListDateMode;
   showNoteListFilename: boolean;
@@ -227,6 +228,7 @@ export interface SettingsPatch {
   defaultNoteName?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
+  taskTagIcons?: Record<string, FolderAppearance> | null;
   collapsedFolders?: string[] | null;
   noteListDateMode?: NoteListDateMode;
   showNoteListFilename?: boolean | null;

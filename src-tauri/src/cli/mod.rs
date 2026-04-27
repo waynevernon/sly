@@ -794,6 +794,7 @@ fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, Str
         starred: None,
         due_at: None,
         recurrence: None,
+        tags: None,
     })
 }
 
@@ -804,6 +805,7 @@ fn task_patch_has_changes(patch: &TaskPatch) -> bool {
         || patch.waiting_for.is_some()
         || patch.action_at.is_some()
         || patch.schedule_bucket.is_some()
+        || patch.tags.is_some()
 }
 
 trait TaskPatchExt {

@@ -11,19 +11,24 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import type { Task, TaskMetadata, TaskPatch, TaskSortMode, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
-import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString, MANUAL_SORT_VIEWS } from "../lib/tasks";
+import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString, MANUAL_SORT_VIEWS, normalizeTaskTag } from "../lib/tasks";
 import { useNotesData } from "./NotesContext";
+import { sanitizeFolderAppearances, type FolderAppearanceMap } from "../lib/folderIcons";
 
 interface TasksContextValue {
   // Data
   tasks: TaskMetadata[];
   buckets: Record<TaskView, TaskMetadata[]>;
+  tagBuckets: Record<string, TaskMetadata[]>;
+  tagNames: string[];
+  taskTagAppearances: FolderAppearanceMap;
   today: string;
   isLoading: boolean;
   lastError: string | null;
 
   // Navigation
   selectedView: TaskView;
+  selectedTag: string | null;
   selectedTaskId: string | null;
   selectedTaskIds: string[];
   selectedTask: Task | null;
@@ -37,6 +42,7 @@ interface TasksContextValue {
 
   // Actions
   selectView: (view: TaskView) => void;
+  selectTag: (tag: string) => void;
   selectTask: (id: string | null) => void;
   toggleTaskSelection: (id: string) => void;
   selectTaskRange: (id: string) => void;
@@ -46,6 +52,7 @@ interface TasksContextValue {
   updateTask: (id: string, patch: TaskPatch) => Promise<Task | null>;
   setCompleted: (id: string, completed: boolean) => Promise<Task | null>;
   deleteTask: (id: string) => Promise<void>;
+  renameTag: (oldTag: string, newTag: string) => Promise<void>;
   refreshTasks: () => Promise<void>;
 }
 
@@ -59,6 +66,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [selectedView, setSelectedView] = useState<TaskView>("inbox");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [taskSortModes, setTaskSortModes] = useState<Partial<Record<TaskView, TaskSortMode>>>({});
   const [taskViewOrders, setTaskViewOrdersState] = useState<Partial<Record<TaskView, string[]>>>({});
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -78,13 +86,27 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const today = localDateString();
   const buckets = useMemo(() => groupByView(tasks, today), [tasks, today]);
+  const tagBuckets = useMemo(() => {
+    const next: Record<string, TaskMetadata[]> = {};
+    for (const task of tasks) {
+      for (const tag of task.tags ?? []) {
+        (next[tag] ??= []).push(task);
+      }
+    }
+    return next;
+  }, [tasks]);
+  const tagNames = useMemo(() => Object.keys(tagBuckets).sort((a, b) => a.localeCompare(b)), [tagBuckets]);
+  const taskTagAppearances = useMemo(
+    () => sanitizeFolderAppearances(settings?.taskTagIcons ?? undefined),
+    [settings?.taskTagIcons],
+  );
   const taskSortMode = taskSortModes[selectedView] ?? getDefaultTaskSortMode(selectedView);
   const visibleTaskIds = useMemo(
     () =>
-      [...(buckets[selectedView] ?? [])]
+      [...(selectedTag ? tagBuckets[selectedTag] ?? [] : buckets[selectedView] ?? [])]
         .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode, taskViewOrders[selectedView]))
         .map((task) => task.id),
-    [buckets, selectedView, taskSortMode, taskViewOrders],
+    [buckets, selectedTag, selectedView, tagBuckets, taskSortMode, taskViewOrders],
   );
 
   const setTaskViewOrder = useCallback((view: TaskView, ids: string[]) => {
@@ -232,6 +254,17 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const selectView = useCallback((view: TaskView) => {
     setSelectedView(view);
+    setSelectedTag(null);
+    setSelectedTaskId(null);
+    setSelectedTaskIds([]);
+    setSelectedTask(null);
+    selectionAnchorIdRef.current = null;
+  }, []);
+
+  const selectTag = useCallback((tag: string) => {
+    const normalizedTag = normalizeTaskTag(tag);
+    if (!normalizedTag) return;
+    setSelectedTag(normalizedTag);
     setSelectedTaskId(null);
     setSelectedTaskIds([]);
     setSelectedTask(null);
@@ -393,6 +426,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           starred: task.starred,
           dueAt: task.dueAt,
           recurrence: task.recurrence,
+          tags: task.tags,
         },
       ]);
       return task;
@@ -419,6 +453,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
                 starred: task.starred,
                 dueAt: task.dueAt,
                 recurrence: task.recurrence,
+                tags: task.tags,
               }
             : t
         )
@@ -465,14 +500,33 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedTaskId]);
 
+  const renameTag = useCallback(async (oldTag: string, newTag: string): Promise<void> => {
+    const normalizedOldTag = normalizeTaskTag(oldTag);
+    const normalizedNewTag = normalizeTaskTag(newTag);
+    if (!normalizedOldTag) return;
+    if (!normalizedNewTag || normalizedOldTag === normalizedNewTag) return;
+    const affectedTasks = tasks.filter((task) => (task.tags ?? []).includes(normalizedOldTag));
+    await Promise.all(
+      affectedTasks.map((task) => {
+        const tags = [...new Set((task.tags ?? []).map((tag) => tag === normalizedOldTag ? normalizedNewTag : tag))];
+        return updateTask(task.id, { tags });
+      }),
+    );
+    setSelectedTag((current) => current === normalizedOldTag ? normalizedNewTag : current);
+  }, [tasks, updateTask]);
+
   const value = useMemo<TasksContextValue>(
     () => ({
       tasks,
       buckets,
+      tagBuckets,
+      tagNames,
+      taskTagAppearances,
       today,
       isLoading,
       lastError,
       selectedView,
+      selectedTag,
       selectedTaskId,
       selectedTaskIds,
       selectedTask,
@@ -482,6 +536,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       taskViewOrders,
       setTaskViewOrder,
       selectView,
+      selectTag,
       selectTask,
       toggleTaskSelection,
       selectTaskRange,
@@ -491,15 +546,20 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       updateTask,
       setCompleted,
       deleteTask,
+      renameTag,
       refreshTasks,
     }),
     [
       tasks,
       buckets,
+      tagBuckets,
+      tagNames,
+      taskTagAppearances,
       today,
       isLoading,
       lastError,
       selectedView,
+      selectedTag,
       selectedTaskId,
       selectedTaskIds,
       selectedTask,
@@ -509,6 +569,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       taskViewOrders,
       setTaskViewOrder,
       selectView,
+      selectTag,
       selectTask,
       toggleTaskSelection,
       selectTaskRange,
@@ -518,6 +579,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       updateTask,
       setCompleted,
       deleteTask,
+      renameTag,
       refreshTasks,
     ]
   );
@@ -528,10 +590,14 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 const TASKS_NOOP: TasksContextValue = {
   tasks: [],
   buckets: { inbox: [], today: [], upcoming: [], waiting: [], anytime: [], someday: [], completed: [], starred: [] },
+  tagBuckets: {},
+  tagNames: [],
+  taskTagAppearances: {},
   today: "",
   isLoading: false,
   lastError: null,
   selectedView: "inbox",
+  selectedTag: null,
   selectedTaskId: null,
   selectedTaskIds: [],
   selectedTask: null,
@@ -541,6 +607,7 @@ const TASKS_NOOP: TasksContextValue = {
   taskViewOrders: {},
   setTaskViewOrder: () => {},
   selectView: () => {},
+  selectTag: () => {},
   selectTask: () => {},
   toggleTaskSelection: () => {},
   selectTaskRange: () => {},
@@ -550,6 +617,7 @@ const TASKS_NOOP: TasksContextValue = {
   updateTask: async () => null,
   setCompleted: async () => null,
   deleteTask: async () => {},
+  renameTag: async () => {},
   refreshTasks: async () => {},
 };
 

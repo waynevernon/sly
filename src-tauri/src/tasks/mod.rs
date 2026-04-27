@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const TASKS_DB_SCHEMA_VERSION: i32 = 8;
+const TASKS_DB_SCHEMA_VERSION: i32 = 9;
 
 // Public types
 
@@ -24,6 +24,7 @@ pub struct TaskMetadata {
     pub starred: bool,
     pub due_at: Option<String>,
     pub recurrence: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +42,7 @@ pub struct Task {
     pub starred: bool,
     pub due_at: Option<String>,
     pub recurrence: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -59,6 +61,7 @@ pub struct TaskPatch {
     pub due_at: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub recurrence: Option<Option<String>>,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,6 +135,7 @@ struct TaskRow {
     starred: bool,
     due_at: Option<String>,
     recurrence: Option<String>,
+    tags: Vec<String>,
 }
 
 impl From<TaskRow> for Task {
@@ -149,6 +153,7 @@ impl From<TaskRow> for Task {
             starred: row.starred,
             due_at: row.due_at,
             recurrence: row.recurrence,
+            tags: row.tags,
         }
     }
 }
@@ -168,6 +173,7 @@ impl From<TaskRow> for TaskMetadata {
             starred: row.starred,
             due_at: row.due_at,
             recurrence: row.recurrence,
+            tags: row.tags,
         }
     }
 }
@@ -245,6 +251,13 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 
     if !table_column_exists(conn, "tasks", "recurrence")? {
         conn.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NULL", [])?;
+    }
+
+    if !table_column_exists(conn, "tasks", "tags")? {
+        conn.execute(
+            "ALTER TABLE tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+            [],
+        )?;
     }
 
     conn.execute_batch(
@@ -340,6 +353,55 @@ fn normalize_schedule_bucket(value: Option<String>) -> Result<Option<String>> {
         "anytime" | "someday" => Ok(Some(trimmed.to_string())),
         _ => Err(anyhow!("Invalid scheduleBucket value: {trimmed}")),
     }
+}
+
+fn normalize_tag(value: &str) -> Option<String> {
+    let trimmed = value.trim().trim_start_matches('#');
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let normalized = trimmed
+        .chars()
+        .map(|ch| {
+            if ch.is_alphanumeric() || matches!(ch, '-' | '_' | '/') {
+                ch.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for tag in tags {
+        let Some(tag) = normalize_tag(&tag) else {
+            continue;
+        };
+        if !normalized.contains(&tag) {
+            normalized.push(tag);
+        }
+    }
+    normalized
+}
+
+fn serialize_tags(tags: &[String]) -> Result<String> {
+    serde_json::to_string(tags).map_err(|error| anyhow!("Invalid task tags: {error}"))
+}
+
+fn deserialize_tags(value: String) -> Vec<String> {
+    serde_json::from_str::<Vec<String>>(&value)
+        .map(normalize_tags)
+        .unwrap_or_default()
 }
 
 fn table_column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
@@ -511,13 +573,14 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
             .unwrap_or(false),
         due_at: row.get("due_at")?,
         recurrence: row.get("recurrence")?,
+        tags: deserialize_tags(row.get("tags")?),
     })
 }
 
 fn read_task_row(conn: &Connection, id: &str) -> Result<TaskRow> {
     conn.query_row(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence, tags
         FROM tasks
         WHERE id = ?1
         ",
@@ -534,7 +597,7 @@ pub(crate) fn list_tasks(notes_root: &Path) -> Result<Vec<TaskMetadata>> {
     let conn = open_tasks_db(notes_root)?;
     let mut statement = conn.prepare(
         "
-        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence
+        SELECT id, title, description, link, waiting_for, created_at, action_at, schedule_bucket, completed_at, starred, due_at, recurrence, tags
         FROM tasks
         ORDER BY created_at DESC
         ",
@@ -579,12 +642,14 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
         starred: false,
         due_at: None,
         recurrence: None,
+        tags: Vec::new(),
     };
+    let tags_json = serialize_tags(&task.tags)?;
 
     conn.execute(
         "
-        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence, tags)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
         ",
         params![
             &task.id,
@@ -599,6 +664,7 @@ pub(crate) fn create_task(notes_root: &Path, title: &str) -> Result<Task> {
             task.starred as i64,
             &task.due_at,
             &task.recurrence,
+            tags_json,
         ],
     )?;
 
@@ -649,6 +715,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         Some(next) => normalize_recurrence(next)?,
         None => existing.recurrence,
     };
+    let tags = patch.tags.map(normalize_tags).unwrap_or(existing.tags);
+    let tags_json = serialize_tags(&tags)?;
 
     conn.execute(
         "
@@ -661,7 +729,8 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             schedule_bucket = ?7,
             starred = ?8,
             due_at = ?9,
-            recurrence = ?10
+            recurrence = ?10,
+            tags = ?11
         WHERE id = ?1
         ",
         params![
@@ -675,6 +744,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
             starred as i64,
             due_at,
             recurrence,
+            tags_json,
         ],
     )?;
 
@@ -691,6 +761,7 @@ pub(crate) fn update_task(notes_root: &Path, id: &str, patch: TaskPatch) -> Resu
         starred,
         due_at,
         recurrence,
+        tags,
     })
 }
 
@@ -722,8 +793,8 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
             let next_created_at = now_rfc3339();
             tx.execute(
                 "
-                INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                INSERT INTO tasks (id, title, description, link, waiting_for, action_at, schedule_bucket, created_at, completed_at, starred, due_at, recurrence, tags)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
                 ",
                 params![
                     next_id,
@@ -738,6 +809,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
                     0i64,
                     Option::<String>::None,
                     &existing.recurrence,
+                    serialize_tags(&existing.tags)?,
                 ],
             )?;
         }
@@ -758,6 +830,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
         starred: existing.starred,
         due_at: existing.due_at,
         recurrence: existing.recurrence,
+        tags: existing.tags,
     })
 }
 
@@ -1081,6 +1154,7 @@ mod tests {
                 starred: None,
                 due_at: None,
                 recurrence: None,
+                tags: None,
             },
         )
         .unwrap();
