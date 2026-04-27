@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskMetadata } from "../types/tasks";
-import { compareTasks, deriveView, detectTaskDateFromTitle, groupByView, isOverdue, localDateString, taskMatchesQuery } from "./tasks";
+import { compareTasks, deriveView, detectTaskDateFromTitle, getDefaultTaskSortMode, groupByView, isOverdue, localDateString, taskMatchesQuery } from "./tasks";
 
 const TODAY = "2026-04-09";
 
@@ -120,6 +120,10 @@ describe("compareTasks", () => {
     const dated = meta({ id: "dated", waitingFor: "Jordan", actionAt: "2026-04-10T18:00:00Z" });
     const unscheduled = meta({ id: "unscheduled", waitingFor: "Jordan" });
     expect(compareTasks(dated, unscheduled, "waiting")).toBeLessThan(0);
+  });
+
+  it("defaults starred to action-date sorting", () => {
+    expect(getDefaultTaskSortMode("starred")).toBe("actionAsc");
   });
 });
 

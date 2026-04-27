@@ -176,6 +176,7 @@ export function getDefaultTaskSortMode(view: TaskView): TaskSortMode {
     case "today":
     case "upcoming":
     case "waiting":
+    case "starred":
       return "actionAsc";
     case "completed":
       return "completedDesc";

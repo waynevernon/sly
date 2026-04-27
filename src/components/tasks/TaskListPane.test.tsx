@@ -783,6 +783,177 @@ describe("TaskListPane", () => {
     expect(screen.queryByRole("button", { name: "New task" })).not.toBeInTheDocument();
   });
 
+  it("groups starred tasks by their underlying date horizon", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "starred",
+        buckets: {
+          inbox: [],
+          today: [],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [],
+          starred: [
+            {
+              id: "task-overdue",
+              title: "Missed review",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-08"),
+              scheduleBucket: null,
+              completedAt: null,
+              starred: true,
+              dueAt: null,
+              recurrence: null,
+            },
+            {
+              id: "task-today",
+              title: "Send update",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-09"),
+              scheduleBucket: null,
+              completedAt: null,
+              starred: true,
+              dueAt: null,
+              recurrence: null,
+            },
+            {
+              id: "task-upcoming",
+              title: "Prep roadmap",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-10T12:00:00Z",
+              actionAt: localDateToNormalizedActionAt("2026-04-10"),
+              scheduleBucket: null,
+              completedAt: null,
+              starred: true,
+              dueAt: null,
+              recurrence: null,
+            },
+            {
+              id: "task-anytime",
+              title: "Clean backlog",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-11T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: "anytime",
+              completedAt: null,
+              starred: true,
+              dueAt: null,
+              recurrence: null,
+            },
+            {
+              id: "task-unscheduled",
+              title: "Read proposal",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-12T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: null,
+              starred: true,
+              dueAt: null,
+              recurrence: null,
+            },
+          ],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText("Upcoming")).toBeInTheDocument();
+    expect(screen.getByText("Anytime")).toBeInTheDocument();
+    expect(screen.getByText("Unscheduled")).toBeInTheDocument();
+  });
+
+  it("groups tagged project tasks by active horizons and completed recency", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    const taggedTasks = [
+      {
+        id: "task-overdue",
+        title: "Missed review",
+        description: "",
+        link: "",
+        waitingFor: "",
+        createdAt: "2026-04-08T12:00:00Z",
+        actionAt: localDateToNormalizedActionAt("2026-04-08"),
+        scheduleBucket: null,
+        completedAt: null,
+        starred: false,
+        dueAt: null,
+        recurrence: null,
+        tags: ["Launch"],
+      },
+      {
+        id: "task-anytime",
+        title: "Clean backlog",
+        description: "",
+        link: "",
+        waitingFor: "",
+        createdAt: "2026-04-09T12:00:00Z",
+        actionAt: null,
+        scheduleBucket: "anytime",
+        completedAt: null,
+        starred: false,
+        dueAt: null,
+        recurrence: null,
+        tags: ["Launch"],
+      },
+      {
+        id: "task-completed",
+        title: "Close beta checklist",
+        description: "",
+        link: "",
+        waitingFor: "",
+        createdAt: "2026-04-09T12:00:00Z",
+        actionAt: null,
+        scheduleBucket: null,
+        completedAt: "2026-04-09T13:00:00Z",
+        starred: false,
+        dueAt: null,
+        recurrence: null,
+        tags: ["Launch"],
+      },
+    ];
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        tasks: taggedTasks,
+        selectedTag: "Launch",
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getByText("Anytime")).toBeInTheDocument();
+    expect(screen.getByText("Completed Today")).toBeInTheDocument();
+  });
+
   it("opens the search input when the search button is clicked", async () => {
     const user = userEvent.setup();
     render(<TooltipProvider><TaskListPane /></TooltipProvider>);

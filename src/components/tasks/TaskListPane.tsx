@@ -607,7 +607,7 @@ export function TaskListPane() {
 
   const isManualSort = !selectedTag && taskSortMode === "manual" && MANUAL_SORT_VIEWS.includes(selectedView);
   const groupedSections = selectedTag
-    ? [{ id: `tag-${selectedTag}`, label: null, tasks }]
+    ? getTaggedTaskSections(tasks, today)
     : getTaskSections(tasks, selectedView, today);
 
   // Search results: filter all tasks across every view, sort starred first then newest first
@@ -1411,47 +1411,102 @@ function getTaskSections(
     ].filter((section) => section.tasks.length > 0);
   }
 
-  if (view === "waiting") {
-    const overdue: typeof tasks = [];
-    const todayItems: typeof tasks = [];
-    const upcomingItems: typeof tasks = [];
-    const anytimeItems: typeof tasks = [];
-    const somedayItems: typeof tasks = [];
-    const unscheduledItems: typeof tasks = [];
-
-    for (const task of tasks) {
-      const actionDate = actionAtToLocalDate(task.actionAt);
-      if (actionDate) {
-        if (actionDate < today) {
-          overdue.push(task);
-        } else if (actionDate === today) {
-          todayItems.push(task);
-        } else {
-          upcomingItems.push(task);
-        }
-        continue;
-      }
-
-      if (task.scheduleBucket === "anytime") {
-        anytimeItems.push(task);
-      } else if (task.scheduleBucket === "someday") {
-        somedayItems.push(task);
-      } else {
-        unscheduledItems.push(task);
-      }
-    }
-
-    return [
-      { id: "waiting-overdue", label: "Overdue", tasks: overdue },
-      { id: "waiting-today", label: "Today", tasks: todayItems },
-      { id: "waiting-upcoming", label: "Upcoming", tasks: upcomingItems },
-      { id: "waiting-anytime", label: "Anytime", tasks: anytimeItems },
-      { id: "waiting-someday", label: "Someday", tasks: somedayItems },
-      { id: "waiting-unscheduled", label: "Unscheduled", tasks: unscheduledItems },
-    ].filter((section) => section.tasks.length > 0);
+  if (view === "waiting" || view === "starred") {
+    return getHorizonTaskSections(tasks, today, view);
   }
 
   return [{ id: "all", label: null, tasks }];
+}
+
+function getTaggedTaskSections(
+  tasks: ReturnType<typeof useTasks>["tasks"],
+  today: string,
+): Array<{ id: string; label: string | null; tasks: ReturnType<typeof useTasks>["tasks"] }> {
+  const activeTasks = tasks.filter((task) => !task.completedAt);
+  const completedTasks = tasks.filter((task) => task.completedAt);
+  return [
+    ...getHorizonTaskSections(activeTasks, today, "tag"),
+    ...getCompletedTaskSections(completedTasks, today, "tag"),
+  ];
+}
+
+function getHorizonTaskSections(
+  tasks: ReturnType<typeof useTasks>["tasks"],
+  today: string,
+  idPrefix: string,
+): Array<{ id: string; label: string; tasks: ReturnType<typeof useTasks>["tasks"] }> {
+  const overdue: typeof tasks = [];
+  const todayItems: typeof tasks = [];
+  const upcomingItems: typeof tasks = [];
+  const anytimeItems: typeof tasks = [];
+  const somedayItems: typeof tasks = [];
+  const unscheduledItems: typeof tasks = [];
+
+  for (const task of tasks) {
+    const actionDate = actionAtToLocalDate(task.actionAt);
+    if (actionDate) {
+      if (actionDate < today) {
+        overdue.push(task);
+      } else if (actionDate === today) {
+        todayItems.push(task);
+      } else {
+        upcomingItems.push(task);
+      }
+      continue;
+    }
+
+    if (task.scheduleBucket === "anytime") {
+      anytimeItems.push(task);
+    } else if (task.scheduleBucket === "someday") {
+      somedayItems.push(task);
+    } else {
+      unscheduledItems.push(task);
+    }
+  }
+
+  return [
+    { id: `${idPrefix}-overdue`, label: "Overdue", tasks: overdue },
+    { id: `${idPrefix}-today`, label: "Today", tasks: todayItems },
+    { id: `${idPrefix}-upcoming`, label: "Upcoming", tasks: upcomingItems },
+    { id: `${idPrefix}-anytime`, label: "Anytime", tasks: anytimeItems },
+    { id: `${idPrefix}-someday`, label: "Someday", tasks: somedayItems },
+    { id: `${idPrefix}-unscheduled`, label: "Unscheduled", tasks: unscheduledItems },
+  ].filter((section) => section.tasks.length > 0);
+}
+
+function getCompletedTaskSections(
+  tasks: ReturnType<typeof useTasks>["tasks"],
+  today: string,
+  idPrefix: string,
+): Array<{ id: string; label: string; tasks: ReturnType<typeof useTasks>["tasks"] }> {
+  const yesterday = offsetLocalDate(today, -1);
+  const weekStart = startOfWeek(today);
+  const todayItems: typeof tasks = [];
+  const yesterdayItems: typeof tasks = [];
+  const thisWeekItems: typeof tasks = [];
+  const earlierItems: typeof tasks = [];
+
+  for (const task of tasks) {
+    const completedDate = actionAtToLocalDate(task.completedAt);
+    if (!completedDate) {
+      earlierItems.push(task);
+    } else if (completedDate === today) {
+      todayItems.push(task);
+    } else if (completedDate === yesterday) {
+      yesterdayItems.push(task);
+    } else if (completedDate >= weekStart) {
+      thisWeekItems.push(task);
+    } else {
+      earlierItems.push(task);
+    }
+  }
+
+  return [
+    { id: `${idPrefix}-completed-today`, label: "Completed Today", tasks: todayItems },
+    { id: `${idPrefix}-completed-yesterday`, label: "Completed Yesterday", tasks: yesterdayItems },
+    { id: `${idPrefix}-completed-this-week`, label: "Completed This Week", tasks: thisWeekItems },
+    { id: `${idPrefix}-completed-earlier`, label: "Completed Earlier", tasks: earlierItems },
+  ].filter((section) => section.tasks.length > 0);
 }
 
 function BulkReschedulePicker({
