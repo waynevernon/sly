@@ -7,7 +7,7 @@ import {
   KeyboardIcon,
   InfoIcon,
 } from "../icons";
-import { Button, IconButton } from "../ui";
+import { IconButton } from "../ui";
 import { GeneralSettingsSection } from "./GeneralSettingsSection";
 import { TasksSettingsSection } from "./TasksSettingsSection";
 import { AppearanceSettingsSection } from "./EditorSettingsSection";
@@ -142,24 +142,30 @@ export function SettingsPage({
         </div>
 
         {/* Navigation tabs */}
-        <nav className="flex-1 p-2.5 flex flex-col gap-1">
+        <nav className="flex-1 px-1.5 py-2.5 flex flex-col gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <Button
+              <button
+                type="button"
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                variant={isActive ? "secondary" : "ghost"}
-                size="sm"
-                className="justify-between gap-2.5 h-10 pr-3.5"
+                aria-pressed={isActive}
+                className={`ui-focus-ring flex w-full items-center justify-between gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+                  isActive ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted/80"
+                }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <Icon className="w-4.5 h-4.5 stroke-[1.5]" />
-                  {tab.label}
-                </div>
-                <div className="text-xs text-text-muted">{tab.shortcutLabel}</div>
-              </Button>
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <Icon className="h-4.25 w-4.25 shrink-0 text-text-muted/80 stroke-[1.7]" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {tab.label}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-text-muted">
+                  {tab.shortcutLabel}
+                </span>
+              </button>
             );
           })}
         </nav>
