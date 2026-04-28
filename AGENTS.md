@@ -351,6 +351,9 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Avoid commented-out code and TODO-driven dead branches in production code
 - Prefer idiomatic, clean solutions over workarounds; if a workaround is the only viable path, flag it explicitly before proceeding
 - Prefer small, testable helper functions over large monolithic branches when logic is easy to isolate
+- Any UI that derives buckets or labels from the current local date must refresh at local midnight while the app stays open. Do not rely on incidental re-renders for Today, Upcoming, overdue, or due-date state.
+- Command palettes, suggestion lists, tree views, and selectable collections must use either native controls or a documented composite pattern such as `listbox`, `tree`, `aria-activedescendant`, or roving tabindex. Do not add new `role="button"` plus `tabIndex={-1}` rows without documenting the container-level keyboard model.
+- Any command that imports files or base64 data into the workspace must validate size, type/signature, extension, and destination. SVG requires explicit sanitization or a documented reason to allow it.
 
 ### Testing
 

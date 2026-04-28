@@ -214,7 +214,11 @@ Use the same state grammar across editor save state, Git state, AI state, settin
 
 All warning, error, and success messaging should use shared status-panel primitives. Do not hand-build tinted message boxes with raw palette utilities.
 
-When semantic tokens exist, use them. Avoid raw palette classes such as `text-orange-700`, `text-white`, or one-off surface colors in product UI.
+When semantic tokens exist, use them. Avoid raw palette classes such as `text-orange-700`, `text-white`, `text-amber-400`, or one-off surface colors in product UI.
+
+Product UI should not use hardcoded Tailwind motion durations such as `duration-100` or `duration-200`; use `--ui-motion-*` tokens.
+
+Named semantic state tokens should cover starred, warning, danger, success, and selected states. Components should consume those tokens so custom themes and accessibility modes remain coherent.
 
 ## Empty, Loading, Error, and Success States
 
