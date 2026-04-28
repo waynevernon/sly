@@ -400,10 +400,16 @@ fn serialize_tags(tags: &[String]) -> Result<String> {
     serde_json::to_string(tags).map_err(|error| anyhow!("Invalid task tags: {error}"))
 }
 
-fn deserialize_tags(value: String) -> Vec<String> {
+fn deserialize_tags(value: String) -> rusqlite::Result<Vec<String>> {
     serde_json::from_str::<Vec<String>>(&value)
         .map(normalize_tags)
-        .unwrap_or_default()
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })
 }
 
 fn table_column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
@@ -587,7 +593,7 @@ fn task_row_from_query(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRow> {
             .unwrap_or(false),
         due_at: row.get("due_at")?,
         recurrence: row.get("recurrence")?,
-        tags: deserialize_tags(row.get("tags")?),
+        tags: deserialize_tags(row.get("tags")?)?,
     })
 }
 
@@ -1428,6 +1434,21 @@ mod tests {
             get_task_view_order(root.path(), "inbox").unwrap(),
             vec![first.id, second.id],
         );
+    }
+
+    #[test]
+    fn list_tasks_reports_corrupt_tag_json() {
+        let root = make_root();
+        let task = create_task(root.path(), "Broken tags").unwrap();
+        let conn = open_tasks_db(root.path()).unwrap();
+        conn.execute(
+            "UPDATE tasks SET tags = ?2 WHERE id = ?1",
+            params![task.id, "not-json"],
+        )
+        .unwrap();
+
+        let error = list_tasks(root.path()).unwrap_err().to_string();
+        assert!(error.contains("expected ident") || error.contains("expected value"));
     }
 
     #[test]
