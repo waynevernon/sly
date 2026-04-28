@@ -5290,6 +5290,18 @@ fn focus_window_after_build(window: &tauri::WebviewWindow) {
     });
 }
 
+#[cfg(target_os = "macos")]
+fn activate_app() {
+    if let Some(mtm) = objc2_foundation::MainThreadMarker::new() {
+        let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::activateIgnoringOtherApps(&app, true);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn activate_app() {}
+
 fn register_note_window(state: &AppState, note_id: &str, label: &str) {
     let mut note_windows = state.note_windows.lock().expect("note windows mutex");
     note_windows.retain(|_, existing_label| existing_label != label);
@@ -5812,6 +5824,7 @@ fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(main_window) = app.get_webview_window("main") {
         let _ = main_window.show();
         let _ = main_window.unminimize();
+        activate_app();
         let _ = main_window.set_focus();
     }
 }
@@ -6137,6 +6150,9 @@ pub fn run() {
                     // - No notes folder is configured yet (new user needs FolderPicker
                     //   for onboarding, even if a preview is also showing).
                     let _ = main_window.show();
+                    let _ = main_window.unminimize();
+                    activate_app();
+                    let _ = main_window.set_focus();
                 }
             }
 

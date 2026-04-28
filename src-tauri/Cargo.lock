@@ -4368,6 +4368,8 @@ dependencies = [
  "clap",
  "dirs",
  "notify",
+ "objc2-app-kit",
+ "objc2-foundation",
  "open",
  "regex",
  "rusqlite",
