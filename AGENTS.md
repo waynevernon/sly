@@ -78,7 +78,9 @@ Current release posture before 1.0:
    - beta example: `.github/updater-notes/v1.4.0-beta.1.md`
    - start from `.github/updater-notes/TEMPLATE.md`
    - write 1–2 short sentences of continuous prose with no line breaks — the same text appears verbatim in the in-app updater prompt, so keep it brief enough to scan in a toast
-   - keep it user-facing and conversational; avoid changelog-style fragments
+   - keep it user-facing and conversational; describe what changed for the person using Sly, not the internal implementation
+   - avoid changelog fragments, framework names, low-level bug language, PR titles, and engineering shorthand unless the user-facing feature truly depends on the term
+   - run a humanizer-style pass before committing: remove AI-ish filler, inflated claims, rule-of-three phrasing, em dash overuse, vague "polish" language, and anything that reads like generated marketing copy
 3. Run the expected local confidence checks before tagging:
    ```bash
    npm run verify
@@ -109,6 +111,9 @@ Current release posture before 1.0:
    - stable releases: write notes from the previous stable tag to `HEAD`
    - beta prereleases: write notes from the last stable tag to `HEAD`, not from the previous beta tag
    - treat beta notes as a running draft of the next stable release, so each new beta rewrites the full accumulated beta notes instead of only appending the latest beta delta
+   - write for users first: group changes by the workflows they affect, lead with visible improvements, and translate technical commits into plain product outcomes
+   - keep internal details out unless they help users understand a meaningful behavior change; "fixed sync race in TasksContext" should become "task changes stay in sync more reliably when the CLI and app are both open"
+   - run the same humanizer-style pass before publishing: remove boilerplate, excessive hype, vague claims, title/PR residue, and AI-sounding rhythm so the notes read like Sly wrote them
 10. Publish the release from the CLI:
    - stable:
      ```bash

@@ -3,7 +3,11 @@
 </p>
 
 # Sly
-Sly is a notes and tasks workspace for macOS. Your markdown files stay on disk, plain and portable. Sly adds an editor-first writing surface, structured task management, keyboard-first navigation, and optional AI and Git — without turning your work into a cloud product.
+Markdown notes and task planning, local by default.
+
+Sly is a macOS workspace for people who want a real app without giving up their files. Open a folder of markdown notes and get a calm editor, fast navigation, built-in task planning, local AI hooks, Git, and a scriptable CLI.
+
+Your notes stay on disk as plain `.md` files. Your tasks live with the same workspace. Nothing gets trapped in someone else's cloud.
 
 Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project by Eric Li.
 
@@ -14,16 +18,25 @@ Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fo
 ![Sly notes screenshot](./docs/assets/screenshot1.png)
 ![Sly tasks screenshot](./docs/assets/screenshot2.png)
 
-## Features
+## What Sly is
 
-- **Your files, your format.** Open a folder, work directly with `.md` files on disk, and keep your notes usable outside the app.
-- **A focused writing surface.** Rich editor with markdown source mode, Focus Mode, wikilinks, slash commands, Mermaid diagrams, KaTeX math, tables, inline link editing, image support, and syntax-highlighted code blocks.
-- **Tasks in the same workspace.** Capture work into an inbox, tag related tasks, schedule them across Today, Upcoming, Someday, and Waiting, and keep task notes in plain markdown inside your vault.
-- **Fast through large note collections.** Full-text search, command palette, recent notes, find-in-note, and keyboard-first shortcuts keep you moving without digging through menus.
-- **Flexible organization, without the complexity.** Pinned and recent notes, recursive folder views, drag-and-drop, per-folder note sorting, folder sorting, note counts, and customizable folder icons.
-- **Layouts that adapt.** Switch between 1, 2, and 3-pane views, detach notes into their own windows, and tune the editor width.
-- **Optional AI and Git, no lock-in.** Side assistant or note editing flows through Claude, Codex, Ollama; initialize, commit, and push Git repos without leaving the app.
-- **Deep workspace customization.** Theme presets, bundled fonts, separate font controls, typography tuning, text direction, and zoom.
+Sly is for local notes, serious task capture, and keyboard-driven work. It gives you the shape of a modern productivity app while keeping the files simple enough to open anywhere.
+
+- Work directly in a folder of markdown files.
+- Write in a polished rich text editor, or switch to markdown source when you want the raw file.
+- Capture tasks into Inbox, Today, Upcoming, Anytime, Someday, Waiting, Completed, and Starred.
+- Add dates, due dates, tags, links, waiting-for notes, stars, and recurrence.
+- Search notes and tasks quickly, open commands from the keyboard, and keep recent work close.
+- Use 1, 2, or 3 panes, detach notes into their own windows, and tune the editor width.
+- Bring your own AI through Claude Code, OpenAI Codex, OpenCode, or Ollama.
+- Initialize, commit, and push Git repos from the app.
+- Use the `sly` CLI for capture, search, scripting, and opening notes from the terminal.
+
+## Why it exists
+
+Most notes apps eventually ask you to choose between comfort and ownership. Sly tries to avoid that bargain. It feels like an app, but it behaves like a folder.
+
+That means your daily workspace can have nice things: focus mode, wikilinks, Mermaid diagrams, KaTeX math, tables, image support, syntax-highlighted code, task planning, themes, fonts, zoom, and Git. But the center stays boring in the best way: markdown on disk.
 
 ## Installation
 
@@ -47,7 +60,7 @@ The beta channel follows whichever published release is newer between the latest
 
 If you prefer a direct install, download the latest DMG from the [Releases](https://github.com/waynevernon/sly/releases) page, open it, and drag Sly to Applications.
 
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 Sly is designed to stay usable from the keyboard. A few of the core shortcuts:
 
@@ -64,17 +77,17 @@ Sly is designed to stay usable from the keyboard. A few of the core shortcuts:
 | `Cmd/Ctrl+\\` | Cycle workspace layout |
 | `Cmd/Ctrl+=`, `-`, `0` | Zoom in, out, reset |
 
-Open Settings → Shortcuts inside the app for the full reference.
+Open Settings > Shortcuts inside the app for the full reference.
 
 ## CLI
 
-On macOS, install the CLI from Settings → Assistant & CLI. The `sly` command keeps the existing launch behavior for the app:
+On macOS, install the CLI from Settings > Assistant & CLI. The `sly` command keeps the app launch behavior you would expect:
 
 - `sly` launches Sly
 - `sly .` opens a notes folder
 - `sly file.md` opens a markdown file
 
-Notes and task commands:
+It also gives you terminal access to notes and tasks:
 
 ```bash
 sly doctor [--format table|json]
@@ -95,18 +108,18 @@ sly [--notes-folder PATH] task reschedule SELECTOR (--date YYYY-MM-DD | --bucket
 sly [--notes-folder PATH] task delete SELECTOR
 ```
 
-Selector resolution order for single-task commands:
+Single-task commands resolve selectors in this order:
 
 1. Exact UUID
 2. Exact title
 3. Unique UUID prefix
 4. Unique case-insensitive title fragment
 
-Global option available before any subcommand:
+Global option:
 
 - `--notes-folder PATH`: use a specific notes folder instead of the folder saved in Sly app config
 
-`doctor` options:
+`doctor`:
 
 - `--format table|json`: show discovery details as a terminal report or machine-readable JSON
 
@@ -117,7 +130,7 @@ Global option available before any subcommand:
 - `-n`/`--limit N`: cap the number of returned notes
 - `--format table|json|csv`: choose human-readable table output or machine-readable JSON/CSV
 
-`note show`, `note create`, `note append`, and `note open` options:
+`note show`, `note create`, `note append`, and `note open`:
 
 - `SELECTOR`: exact note ID, exact title, unique ID prefix, or unique case-insensitive title fragment
 - `note show --format text|json`: print raw markdown content or the full note object
@@ -135,12 +148,12 @@ Global option available before any subcommand:
 - `-n`/`--limit N`: cap the number of returned tasks
 - `--format table|json|csv`: choose human-readable table output or machine-readable JSON/CSV
 
-`task show` options:
+`task show`:
 
 - `SELECTOR`: exact UUID, exact title, unique UUID prefix, or unique case-insensitive title fragment
 - `--format text|json`: show a terminal-friendly view or the full task object
 
-`task create` options:
+`task create`:
 
 - `TITLE`: task title
 - `--description TEXT`: set description
@@ -154,7 +167,7 @@ Global option available before any subcommand:
 - `--tag TAG`: add a tag; repeat for multiple tags
 - `--format text|json`: print terminal text or the full task object
 
-`task update` options:
+`task update`:
 
 - `SELECTOR`: same selector rules as `task show`
 - `--title TEXT`: replace the title
@@ -169,7 +182,7 @@ Global option available before any subcommand:
 - `--tag TAG` or `--clear-tags`: replace tags with the provided repeated tag list, or clear all tags
 - `--format text|json`: print terminal text or the full task object
 
-`task complete`, `task reopen`, and `task reschedule` options:
+`task complete`, `task reopen`, and `task reschedule`:
 
 - `SELECTOR`: same selector rules as `task show`
 - `task complete` / `task reopen`: toggle completion state
@@ -200,7 +213,7 @@ sly task reschedule "Plan launch notes" --date 2026-04-12
 sly task complete 0195d9f1
 ```
 
-## Build From Source
+## Build from source
 
 ### Requirements
 
