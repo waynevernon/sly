@@ -73,6 +73,7 @@ pub(crate) enum TaskView {
     Anytime,
     Someday,
     Completed,
+    Starred,
 }
 
 impl TaskView {
@@ -85,6 +86,7 @@ impl TaskView {
             Self::Anytime => "anytime",
             Self::Someday => "someday",
             Self::Completed => "completed",
+            Self::Starred => "starred",
         }
     }
 }
@@ -470,6 +472,10 @@ pub(crate) fn task_matches_view(task: &TaskMetadata, view: Option<TaskView>, tod
         return task.completed_at.is_none() && !task.waiting_for.trim().is_empty();
     }
 
+    if view == TaskView::Starred {
+        return task.completed_at.is_none() && task.starred;
+    }
+
     derive_task_view(task, today) == view
 }
 
@@ -487,6 +493,10 @@ pub(crate) fn task_matches_query(task: &TaskMetadata, query: &str) -> bool {
     ]
     .iter()
     .any(|field| field.to_lowercase().contains(&needle))
+        || task
+            .tags
+            .iter()
+            .any(|tag| tag.to_lowercase().contains(&needle))
 }
 
 pub(crate) fn sort_tasks_for_view(tasks: &mut [TaskMetadata], view: Option<TaskView>, today: &str) {
@@ -500,7 +510,10 @@ fn compare_tasks(
     today: &str,
 ) -> std::cmp::Ordering {
     match view {
-        Some(TaskView::Today) | Some(TaskView::Upcoming) | Some(TaskView::Waiting) => {
+        Some(TaskView::Today)
+        | Some(TaskView::Upcoming)
+        | Some(TaskView::Waiting)
+        | Some(TaskView::Starred) => {
             let left_date = action_at_to_local_date(left.action_at.as_deref());
             let right_date = action_at_to_local_date(right.action_at.as_deref());
             match (left_date, right_date) {
@@ -553,6 +566,7 @@ fn task_view_sort_order(view: TaskView) -> i32 {
         TaskView::Inbox => 4,
         TaskView::Completed => 5,
         TaskView::Waiting => 6,
+        TaskView::Starred => 7,
     }
 }
 

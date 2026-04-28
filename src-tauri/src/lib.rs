@@ -4738,7 +4738,7 @@ fn install_cli() -> Result<String, String> {
         // stdout, stderr, and exit codes are preserved. GUI launch/open-folder
         // flows stay backgrounded to preserve the current terminal UX.
         let script = format!(
-            "#!/bin/sh\n{}\nforeground=0\nskip_next=0\nfor arg in \"$@\"; do\n  if [ \"$skip_next\" -eq 1 ]; then\n    skip_next=0\n    continue\n  fi\n  case \"$arg\" in\n    --notes-folder)\n      skip_next=1\n      ;;\n    --notes-folder=*)\n      ;;\n    task|doctor|-h|--help|-V|--version)\n      foreground=1\n      break\n      ;;\n  esac\ndone\nif [ \"$foreground\" -eq 1 ]; then\n  exec {} \"$@\"\nfi\nnohup {} \"$@\" >/dev/null 2>&1 &\n",
+            "#!/bin/sh\n{}\nforeground=0\nskip_next=0\nfor arg in \"$@\"; do\n  if [ \"$skip_next\" -eq 1 ]; then\n    skip_next=0\n    continue\n  fi\n  case \"$arg\" in\n    --notes-folder)\n      skip_next=1\n      ;;\n    --notes-folder=*)\n      ;;\n    note|task|doctor|-h|--help|-V|--version)\n      foreground=1\n      break\n      ;;\n  esac\ndone\nif [ \"$foreground\" -eq 1 ]; then\n  exec {} \"$@\"\nfi\nnohup {} \"$@\" >/dev/null 2>&1 &\n",
             SLY_CLI_MARKER, escaped_exe, escaped_exe
         );
         std::fs::write(&target, script.as_bytes())

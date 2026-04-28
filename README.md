@@ -74,15 +74,21 @@ On macOS, install the CLI from Settings → Assistant & CLI. The `sly` command k
 - `sly .` opens a notes folder
 - `sly file.md` opens a markdown file
 
-Task management commands:
+Notes and task commands:
 
 ```bash
 sly doctor [--format table|json]
-sly [--notes-folder PATH] task list [--view all|inbox|today|upcoming|waiting|anytime|someday|completed] [-q QUERY] [-n N] [--format table|json|csv]
-sly [--notes-folder PATH] task search QUERY [--view all|inbox|today|upcoming|waiting|anytime|someday|completed] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] note list [--folder PATH] [-q QUERY] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] note search QUERY [--folder PATH] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] note show SELECTOR [--format text|json]
+sly [--notes-folder PATH] note create TITLE [--folder PATH] [--content TEXT | --content-file PATH] [--format text|json]
+sly [--notes-folder PATH] note append SELECTOR TEXT [--no-newline] [--format text|json]
+sly [--notes-folder PATH] note open SELECTOR
+sly [--notes-folder PATH] task list [--view all|inbox|today|upcoming|waiting|anytime|someday|completed|starred] [-q QUERY] [-n N] [--format table|json|csv]
+sly [--notes-folder PATH] task search QUERY [--view all|inbox|today|upcoming|waiting|anytime|someday|completed|starred] [-n N] [--format table|json|csv]
 sly [--notes-folder PATH] task show SELECTOR [--format text|json]
-sly [--notes-folder PATH] task create TITLE [--description TEXT] [--link URL] [--waiting-for TEXT] [--date YYYY-MM-DD | --bucket anytime|someday] [--format text|json]
-sly [--notes-folder PATH] task update SELECTOR [--title TEXT] [--description TEXT | --clear-description] [--link URL | --clear-link] [--waiting-for TEXT | --clear-waiting-for] [--date YYYY-MM-DD | --clear-date] [--bucket anytime|someday | --clear-bucket] [--format text|json]
+sly [--notes-folder PATH] task create TITLE [--description TEXT] [--link URL] [--waiting-for TEXT] [--date YYYY-MM-DD | --bucket anytime|someday] [--due-date YYYY-MM-DD] [--starred] [--recurrence RULE] [--tag TAG ...] [--format text|json]
+sly [--notes-folder PATH] task update SELECTOR [--title TEXT] [--description TEXT | --clear-description] [--link URL | --clear-link] [--waiting-for TEXT | --clear-waiting-for] [--date YYYY-MM-DD | --clear-date] [--bucket anytime|someday | --clear-bucket] [--due-date YYYY-MM-DD | --clear-due-date] [--starred | --unstarred] [--recurrence RULE | --clear-recurrence] [--tag TAG ... | --clear-tags] [--format text|json]
 sly [--notes-folder PATH] task complete SELECTOR [--format text|json]
 sly [--notes-folder PATH] task reopen SELECTOR [--format text|json]
 sly [--notes-folder PATH] task reschedule SELECTOR (--date YYYY-MM-DD | --bucket anytime|someday | --clear) [--format text|json]
@@ -104,9 +110,27 @@ Global option available before any subcommand:
 
 - `--format table|json`: show discovery details as a terminal report or machine-readable JSON
 
+`note list` options (`note search` is an alias that takes the query as a positional argument):
+
+- `-q`/`--query TEXT`: filter notes by text across title, preview, and note ID
+- `--folder PATH`: limit results to a folder and its subfolders
+- `-n`/`--limit N`: cap the number of returned notes
+- `--format table|json|csv`: choose human-readable table output or machine-readable JSON/CSV
+
+`note show`, `note create`, `note append`, and `note open` options:
+
+- `SELECTOR`: exact note ID, exact title, unique ID prefix, or unique case-insensitive title fragment
+- `note show --format text|json`: print raw markdown content or the full note object
+- `note create TITLE`: create a markdown note with `# TITLE`
+- `note create --folder PATH`: place the note in a folder
+- `note create --content TEXT` or `--content-file PATH`: add initial body content below the heading
+- `note append SELECTOR TEXT`: append text to an existing note
+- `note append --no-newline`: append without adding a trailing newline
+- `note open SELECTOR`: open the note in Sly
+
 `task list` options (`task search` is an alias that takes the query as a positional argument):
 
-- `-q`/`--query TEXT`: filter tasks by text across title, description, link, and waiting-for
+- `-q`/`--query TEXT`: filter tasks by text across title, description, link, waiting-for, and tags
 - `--view ...`: filter to one task horizon or bucket
 - `-n`/`--limit N`: cap the number of returned tasks
 - `--format table|json|csv`: choose human-readable table output or machine-readable JSON/CSV
@@ -123,7 +147,11 @@ Global option available before any subcommand:
 - `--link URL`: set link
 - `--waiting-for TEXT`: mark the task as waiting on someone or something
 - `--date YYYY-MM-DD`: schedule the task for a specific day
+- `--due-date YYYY-MM-DD`: set a deadline separate from the action date
 - `--bucket anytime|someday`: assign an unscheduled horizon bucket
+- `--starred`: star the task
+- `--recurrence RULE`: set recurrence, such as `daily:schedule`, `weekly:completion`, or `monthly:schedule:15`
+- `--tag TAG`: add a tag; repeat for multiple tags
 - `--format text|json`: print terminal text or the full task object
 
 `task update` options:
@@ -135,6 +163,10 @@ Global option available before any subcommand:
 - `--waiting-for TEXT` or `--clear-waiting-for`: replace or clear the waiting-for field
 - `--date YYYY-MM-DD` or `--clear-date`: replace or clear the scheduled day
 - `--bucket anytime|someday` or `--clear-bucket`: replace or clear the schedule bucket
+- `--due-date YYYY-MM-DD` or `--clear-due-date`: replace or clear the deadline
+- `--starred` or `--unstarred`: update star state
+- `--recurrence RULE` or `--clear-recurrence`: replace or clear recurrence
+- `--tag TAG` or `--clear-tags`: replace tags with the provided repeated tag list, or clear all tags
 - `--format text|json`: print terminal text or the full task object
 
 `task complete`, `task reopen`, and `task reschedule` options:

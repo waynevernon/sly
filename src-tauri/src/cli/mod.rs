@@ -11,8 +11,10 @@ use crate::cli::discovery::{
     build_doctor_context, persist_tasks_enabled, resolve_notes_folder, tasks_db_info, CliRuntime,
 };
 use crate::cli::formatters::{
-    render_delete_message, render_doctor_json, render_doctor_table, render_task_json,
-    render_task_list_csv, render_task_list_json, render_task_list_table, render_task_text,
+    render_delete_message, render_doctor_json, render_doctor_table, render_note_json,
+    render_note_list_csv, render_note_list_json, render_note_list_table, render_note_text,
+    render_task_json, render_task_list_csv, render_task_list_json, render_task_list_table,
+    render_task_text,
 };
 use crate::persistence::workspace_settings::load_settings;
 use crate::tasks::{
@@ -20,6 +22,7 @@ use crate::tasks::{
     sort_tasks_for_view, task_matches_query, task_matches_view, Task, TaskMetadata, TaskPatch,
     TaskView,
 };
+use crate::{Note, NoteMetadata};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,9 +36,25 @@ pub(crate) struct CliTaskSummary {
     pub(crate) action_at: Option<String>,
     pub(crate) schedule_bucket: Option<String>,
     pub(crate) completed_at: Option<String>,
+    pub(crate) starred: bool,
+    pub(crate) due_at: Option<String>,
+    pub(crate) recurrence: Option<String>,
+    pub(crate) tags: Vec<String>,
     pub(crate) view: String,
     pub(crate) overdue: bool,
     pub(crate) completed: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CliNoteSummary {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) preview: String,
+    pub(crate) folder: String,
+    pub(crate) path: String,
+    pub(crate) modified: i64,
+    pub(crate) created: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +73,13 @@ pub(crate) struct CliDoctorReport {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ListFormat {
+    Table,
+    Json,
+    Csv,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum NoteListFormat {
     Table,
     Json,
     Csv,
@@ -82,6 +108,7 @@ enum TaskViewArg {
     Anytime,
     Someday,
     Completed,
+    Starred,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -111,6 +138,7 @@ impl TaskViewArg {
             Self::Anytime => Some(TaskView::Anytime),
             Self::Someday => Some(TaskView::Someday),
             Self::Completed => Some(TaskView::Completed),
+            Self::Starred => Some(TaskView::Starred),
         }
     }
 }
@@ -135,14 +163,90 @@ struct Cli {
 enum Command {
     #[command(about = "Diagnose notes-folder and task database discovery.")]
     Doctor(DoctorCommand),
+    #[command(subcommand, about = "Work with notes stored in the current Sly vault.")]
+    Note(Box<NoteCommand>),
     #[command(subcommand, about = "Manage tasks stored in the current Sly vault.")]
-    Task(TaskCommand),
+    Task(Box<TaskCommand>),
 }
 
 #[derive(Debug, Args)]
 struct DoctorCommand {
     #[arg(long, value_enum, default_value_t = DoctorFormat::Table)]
     format: DoctorFormat,
+}
+
+#[derive(Debug, Subcommand)]
+enum NoteCommand {
+    #[command(about = "List notes in the current vault.")]
+    List(NoteListCommand),
+    #[command(about = "Search notes by text (alias for `note list --query`).")]
+    Search(NoteSearchCommand),
+    #[command(about = "Show a single note.")]
+    Show(NoteShowCommand),
+    #[command(about = "Create a note.")]
+    Create(NoteCreateCommand),
+    #[command(about = "Append text to a note.")]
+    Append(NoteAppendCommand),
+    #[command(about = "Open a note in Sly.")]
+    Open(NoteOpenCommand),
+}
+
+#[derive(Debug, Args)]
+struct NoteListCommand {
+    #[arg(long, short = 'q')]
+    query: Option<String>,
+    #[arg(long)]
+    folder: Option<String>,
+    #[arg(long, short = 'n')]
+    limit: Option<usize>,
+    #[arg(long, value_enum, default_value_t = NoteListFormat::Table)]
+    format: NoteListFormat,
+}
+
+#[derive(Debug, Args)]
+struct NoteSearchCommand {
+    query: String,
+    #[arg(long)]
+    folder: Option<String>,
+    #[arg(long, short = 'n')]
+    limit: Option<usize>,
+    #[arg(long, value_enum, default_value_t = NoteListFormat::Table)]
+    format: NoteListFormat,
+}
+
+#[derive(Debug, Args)]
+struct NoteShowCommand {
+    selector: String,
+    #[arg(long, value_enum, default_value_t = TextOrJsonFormat::Text)]
+    format: TextOrJsonFormat,
+}
+
+#[derive(Debug, Args)]
+struct NoteCreateCommand {
+    title: String,
+    #[arg(long)]
+    folder: Option<String>,
+    #[arg(long)]
+    content: Option<String>,
+    #[arg(long = "content-file")]
+    content_file: Option<PathBuf>,
+    #[arg(long, value_enum, default_value_t = TextOrJsonFormat::Text)]
+    format: TextOrJsonFormat,
+}
+
+#[derive(Debug, Args)]
+struct NoteAppendCommand {
+    selector: String,
+    text: String,
+    #[arg(long, action = ArgAction::SetTrue)]
+    no_newline: bool,
+    #[arg(long, value_enum, default_value_t = TextOrJsonFormat::Text)]
+    format: TextOrJsonFormat,
+}
+
+#[derive(Debug, Args)]
+struct NoteOpenCommand {
+    selector: String,
 }
 
 #[derive(Debug, Subcommand)]
@@ -208,8 +312,16 @@ struct TaskCreateCommand {
     waiting_for: Option<String>,
     #[arg(long, conflicts_with = "bucket")]
     date: Option<String>,
+    #[arg(long = "due-date")]
+    due_date: Option<String>,
     #[arg(long, value_enum, conflicts_with = "date")]
     bucket: Option<ScheduleBucketArg>,
+    #[arg(long, action = ArgAction::SetTrue)]
+    starred: bool,
+    #[arg(long)]
+    recurrence: Option<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
     #[arg(long, value_enum, default_value_t = TextOrJsonFormat::Text)]
     format: TextOrJsonFormat,
 }
@@ -233,12 +345,28 @@ struct TaskUpdateCommand {
     clear_waiting_for: bool,
     #[arg(long, conflicts_with_all = ["bucket", "clear_date", "clear_bucket"])]
     date: Option<String>,
+    #[arg(long = "due-date", conflicts_with = "clear_due_date")]
+    due_date: Option<String>,
+    #[arg(long = "clear-due-date", action = ArgAction::SetTrue)]
+    clear_due_date: bool,
     #[arg(long = "clear-date", action = ArgAction::SetTrue, conflicts_with_all = ["date", "bucket"])]
     clear_date: bool,
     #[arg(long, value_enum, conflicts_with_all = ["date", "clear_date", "clear_bucket"])]
     bucket: Option<ScheduleBucketArg>,
     #[arg(long = "clear-bucket", action = ArgAction::SetTrue, conflicts_with_all = ["bucket", "date"])]
     clear_bucket: bool,
+    #[arg(long, conflicts_with = "unstarred", action = ArgAction::SetTrue)]
+    starred: bool,
+    #[arg(long = "unstarred", action = ArgAction::SetTrue)]
+    unstarred: bool,
+    #[arg(long, conflicts_with = "clear_recurrence")]
+    recurrence: Option<String>,
+    #[arg(long = "clear-recurrence", action = ArgAction::SetTrue)]
+    clear_recurrence: bool,
+    #[arg(long = "tag", conflicts_with = "clear_tags")]
+    tags: Vec<String>,
+    #[arg(long = "clear-tags", action = ArgAction::SetTrue)]
+    clear_tags: bool,
     #[arg(long, value_enum, default_value_t = TextOrJsonFormat::Text)]
     format: TextOrJsonFormat,
 }
@@ -284,7 +412,7 @@ pub(crate) fn should_handle_cli(argv: &[String]) -> bool {
             "--notes-folder" => {
                 skip_next = true;
             }
-            "-h" | "--help" | "-V" | "--version" | "task" | "doctor" => {
+            "-h" | "--help" | "-V" | "--version" | "note" | "task" | "doctor" => {
                 return true;
             }
             _ if arg.starts_with("--notes-folder=") => {}
@@ -341,8 +469,11 @@ fn dispatch(cli: Cli, stdout: &mut dyn Write, runtime: &CliRuntime) -> Result<()
         Some(Command::Doctor(args)) => {
             handle_doctor(args, cli.notes_folder.as_deref(), stdout, runtime)
         }
+        Some(Command::Note(command)) => {
+            handle_note(*command, cli.notes_folder.as_deref(), stdout, runtime)
+        }
         Some(Command::Task(command)) => {
-            handle_task(command, cli.notes_folder.as_deref(), stdout, runtime)
+            handle_task(*command, cli.notes_folder.as_deref(), stdout, runtime)
         }
         None => {
             let mut command = Cli::command();
@@ -423,6 +554,122 @@ fn handle_doctor(
         DoctorFormat::Table => render_doctor_table(&report),
     };
     writeln!(stdout, "{output}").map_err(|error| error.to_string())
+}
+
+fn handle_note(
+    command: NoteCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    match command {
+        NoteCommand::List(args) => handle_note_list(args, cli_notes_folder, stdout, runtime),
+        NoteCommand::Search(args) => handle_note_search(args, cli_notes_folder, stdout, runtime),
+        NoteCommand::Show(args) => handle_note_show(args, cli_notes_folder, stdout, runtime),
+        NoteCommand::Create(args) => handle_note_create(args, cli_notes_folder, stdout, runtime),
+        NoteCommand::Append(args) => handle_note_append(args, cli_notes_folder, stdout, runtime),
+        NoteCommand::Open(args) => handle_note_open(args, cli_notes_folder, stdout, runtime),
+    }
+}
+
+fn handle_note_list(
+    args: NoteListCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    let vault = resolve_notes_folder(cli_notes_folder, runtime, false, false)?;
+    let notes = build_note_summaries(
+        list_cli_notes(&vault.notes_folder)?,
+        &vault.notes_folder,
+        args.query.as_deref(),
+        args.folder.as_deref(),
+        args.limit,
+    )?;
+    write_note_list_output(&notes, args.format, stdout)
+}
+
+fn handle_note_search(
+    args: NoteSearchCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    handle_note_list(
+        NoteListCommand {
+            query: Some(args.query),
+            folder: args.folder,
+            limit: args.limit,
+            format: args.format,
+        },
+        cli_notes_folder,
+        stdout,
+        runtime,
+    )
+}
+
+fn handle_note_show(
+    args: NoteShowCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    let vault = resolve_notes_folder(cli_notes_folder, runtime, false, false)?;
+    let note = resolve_full_note(&vault.notes_folder, &args.selector)?;
+    write_note_output(&note, args.format, stdout)
+}
+
+fn handle_note_create(
+    args: NoteCreateCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    let vault = resolve_notes_folder(cli_notes_folder, runtime, true, true)?;
+    let body = read_note_create_body(args.content, args.content_file.as_deref())?;
+    let note = create_cli_note(
+        &vault.notes_folder,
+        &args.title,
+        args.folder.as_deref(),
+        &body,
+    )?;
+    write_note_output(&note, args.format, stdout)
+}
+
+fn handle_note_append(
+    args: NoteAppendCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    let vault = resolve_notes_folder(cli_notes_folder, runtime, false, true)?;
+    let mut note = resolve_full_note(&vault.notes_folder, &args.selector)?;
+    if note.content.is_empty() || note.content.ends_with('\n') || args.no_newline {
+        note.content.push_str(&args.text);
+    } else {
+        note.content.push('\n');
+        note.content.push_str(&args.text);
+    }
+    if !args.no_newline && !note.content.ends_with('\n') {
+        note.content.push('\n');
+    }
+    note = write_cli_note(&vault.notes_folder, &note.id, &note.content)?;
+    write_note_output(&note, args.format, stdout)
+}
+
+fn handle_note_open(
+    args: NoteOpenCommand,
+    cli_notes_folder: Option<&Path>,
+    stdout: &mut dyn Write,
+    runtime: &CliRuntime,
+) -> Result<(), String> {
+    let vault = resolve_notes_folder(cli_notes_folder, runtime, false, false)?;
+    let note = resolve_full_note(&vault.notes_folder, &args.selector)?;
+    std::process::Command::new(std::env::current_exe().map_err(|error| error.to_string())?)
+        .arg(&note.path)
+        .spawn()
+        .map_err(|error| format!("Failed to open note in Sly: {error}"))?;
+    writeln!(stdout, "Opened note {} ({})", note.id, note.title).map_err(|error| error.to_string())
 }
 
 fn handle_task(
@@ -520,6 +767,17 @@ fn handle_task_create(
         clear_date: false,
         bucket: args.bucket,
         clear_bucket: false,
+        due_date: args.due_date,
+        clear_due_date: false,
+        starred: args.starred.then_some(true),
+        recurrence: args.recurrence,
+        clear_recurrence: false,
+        tags: if args.tags.is_empty() {
+            None
+        } else {
+            Some(args.tags)
+        },
+        clear_tags: false,
     })?;
 
     if task_patch_has_changes(&patch) {
@@ -551,6 +809,23 @@ fn handle_task_update(
         clear_date: args.clear_date,
         bucket: args.bucket,
         clear_bucket: args.clear_bucket,
+        due_date: args.due_date,
+        clear_due_date: args.clear_due_date,
+        starred: if args.starred {
+            Some(true)
+        } else if args.unstarred {
+            Some(false)
+        } else {
+            None
+        },
+        recurrence: args.recurrence,
+        clear_recurrence: args.clear_recurrence,
+        tags: if args.tags.is_empty() {
+            None
+        } else {
+            Some(args.tags)
+        },
+        clear_tags: args.clear_tags,
     })?
     .with_title(args.title);
 
@@ -679,6 +954,10 @@ fn build_task_summaries(
                 action_at: task.action_at,
                 schedule_bucket: task.schedule_bucket,
                 completed_at: task.completed_at.clone(),
+                starred: task.starred,
+                due_at: task.due_at,
+                recurrence: task.recurrence,
+                tags: task.tags,
                 view: derived_view,
                 overdue,
                 completed: task.completed_at.is_some(),
@@ -712,9 +991,473 @@ fn write_task_output(
     writeln!(stdout, "{output}").map_err(|error| error.to_string())
 }
 
+fn write_note_list_output(
+    notes: &[CliNoteSummary],
+    format: NoteListFormat,
+    stdout: &mut dyn Write,
+) -> Result<(), String> {
+    let output = match format {
+        NoteListFormat::Table => render_note_list_table(notes),
+        NoteListFormat::Json => render_note_list_json(notes),
+        NoteListFormat::Csv => render_note_list_csv(notes),
+    };
+    writeln!(stdout, "{output}").map_err(|error| error.to_string())
+}
+
+fn write_note_output(
+    note: &Note,
+    format: TextOrJsonFormat,
+    stdout: &mut dyn Write,
+) -> Result<(), String> {
+    let output = match format {
+        TextOrJsonFormat::Text => render_note_text(note),
+        TextOrJsonFormat::Json => render_note_json(note),
+    };
+    writeln!(stdout, "{output}").map_err(|error| error.to_string())
+}
+
 fn resolve_full_task(notes_folder: &Path, selector: &str) -> Result<Task, String> {
     let resolved = resolve_task_selector(notes_folder, selector).map_err(selector_error_message)?;
     tasks::read_task(notes_folder, &resolved.id).map_err(|error| error.to_string())
+}
+
+fn resolve_full_note(notes_folder: &Path, selector: &str) -> Result<Note, String> {
+    let notes = list_cli_notes(notes_folder)?;
+    let id = resolve_note_selector(&notes, selector)?;
+    read_cli_note(notes_folder, &id)
+}
+
+fn build_note_summaries(
+    notes: Vec<NoteMetadata>,
+    notes_folder: &Path,
+    query: Option<&str>,
+    folder: Option<&str>,
+    limit: Option<usize>,
+) -> Result<Vec<CliNoteSummary>, String> {
+    let folder = folder.map(normalize_cli_folder).transpose()?;
+    let mut filtered: Vec<NoteMetadata> = notes
+        .into_iter()
+        .filter(|note| query.is_none_or(|value| note_matches_query(note, value)))
+        .filter(|note| {
+            folder.as_deref().is_none_or(|folder| {
+                note_folder(&note.id)
+                    .map(|note_folder| {
+                        note_folder == folder || note_folder.starts_with(&format!("{folder}/"))
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .collect();
+
+    filtered.sort_by(|left, right| {
+        right
+            .modified
+            .cmp(&left.modified)
+            .then_with(|| left.title.to_lowercase().cmp(&right.title.to_lowercase()))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    if let Some(limit) = limit {
+        filtered.truncate(limit);
+    }
+
+    filtered
+        .into_iter()
+        .map(|note| {
+            let path = cli_abs_path_from_id(notes_folder, &note.id)?;
+            Ok(CliNoteSummary {
+                folder: note_folder(&note.id).unwrap_or_default(),
+                path: path.to_string_lossy().into_owned(),
+                id: note.id,
+                title: note.title,
+                preview: note.preview,
+                modified: note.modified,
+                created: note.created,
+            })
+        })
+        .collect()
+}
+
+fn note_matches_query(note: &NoteMetadata, query: &str) -> bool {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return true;
+    }
+    [note.id.as_str(), note.title.as_str(), note.preview.as_str()]
+        .iter()
+        .any(|field| field.to_lowercase().contains(&needle))
+}
+
+fn resolve_note_selector(notes: &[NoteMetadata], selector: &str) -> Result<String, String> {
+    if notes.iter().any(|note| note.id == selector) {
+        return Ok(selector.to_string());
+    }
+
+    let exact_titles: Vec<&NoteMetadata> =
+        notes.iter().filter(|note| note.title == selector).collect();
+    if exact_titles.len() == 1 {
+        return Ok(exact_titles[0].id.clone());
+    }
+    if exact_titles.len() > 1 {
+        return Err(ambiguous_note_message(selector, exact_titles));
+    }
+
+    let id_prefixes: Vec<&NoteMetadata> = notes
+        .iter()
+        .filter(|note| note.id.starts_with(selector))
+        .collect();
+    if id_prefixes.len() == 1 {
+        return Ok(id_prefixes[0].id.clone());
+    }
+    if id_prefixes.len() > 1 {
+        return Err(ambiguous_note_message(selector, id_prefixes));
+    }
+
+    let needle = selector.to_lowercase();
+    let title_matches: Vec<&NoteMetadata> = notes
+        .iter()
+        .filter(|note| note.title.to_lowercase().contains(&needle))
+        .collect();
+    if title_matches.len() == 1 {
+        return Ok(title_matches[0].id.clone());
+    }
+    if title_matches.len() > 1 {
+        return Err(ambiguous_note_message(selector, title_matches));
+    }
+
+    Err(format!("Note not found for selector `{selector}`."))
+}
+
+fn ambiguous_note_message(selector: &str, notes: Vec<&NoteMetadata>) -> String {
+    let formatted = notes
+        .into_iter()
+        .map(|note| format!("{} ({})", note.title, note.id))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("Selector `{selector}` matched multiple notes: {formatted}")
+}
+
+fn list_cli_notes(notes_folder: &Path) -> Result<Vec<NoteMetadata>, String> {
+    let mut notes = Vec::new();
+    for entry in walkdir::WalkDir::new(notes_folder)
+        .max_depth(10)
+        .into_iter()
+        .filter_entry(is_cli_visible_notes_entry)
+    {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let file_path = entry.path();
+        if !file_path.is_file() {
+            continue;
+        }
+        let Some(id) = cli_id_from_abs_path(notes_folder, file_path) else {
+            continue;
+        };
+        let content = std::fs::read_to_string(file_path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::InvalidData {
+                format!(
+                    "File is not valid UTF-8. Sly only supports UTF-8 encoded notes: {}",
+                    file_path.display()
+                )
+            } else {
+                error.to_string()
+            }
+        })?;
+        let metadata = entry.metadata().map_err(|error| error.to_string())?;
+        let modified = cli_metadata_time_secs(metadata.modified()).unwrap_or(0);
+        let created = cli_metadata_time_secs(metadata.created()).unwrap_or(modified);
+        notes.push(NoteMetadata {
+            id,
+            title: cli_extract_title(&content),
+            preview: cli_generate_preview(&content),
+            modified,
+            created,
+        });
+    }
+    Ok(notes)
+}
+
+fn read_cli_note(notes_folder: &Path, id: &str) -> Result<Note, String> {
+    let path = cli_abs_path_from_id(notes_folder, id)?;
+    if !path.exists() {
+        return Err("Note not found".to_string());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::InvalidData {
+            "File is not valid UTF-8. Sly only supports UTF-8 encoded notes.".to_string()
+        } else {
+            error.to_string()
+        }
+    })?;
+    let metadata = std::fs::metadata(&path).map_err(|error| error.to_string())?;
+    Ok(Note {
+        id: id.to_string(),
+        title: cli_extract_title(&content),
+        content,
+        path: path.to_string_lossy().into_owned(),
+        modified: cli_metadata_time_secs(metadata.modified()).unwrap_or(0),
+    })
+}
+
+fn write_cli_note(notes_folder: &Path, id: &str, content: &str) -> Result<Note, String> {
+    let path = cli_abs_path_from_id(notes_folder, id)?;
+    std::fs::write(&path, content).map_err(|error| error.to_string())?;
+    read_cli_note(notes_folder, id)
+}
+
+fn create_cli_note(
+    notes_folder: &Path,
+    title: &str,
+    folder: Option<&str>,
+    body: &str,
+) -> Result<Note, String> {
+    let normalized_folder = folder.map(normalize_cli_folder).transpose()?;
+    let base_leaf = normalize_cli_note_leaf(title);
+    let base_id = normalized_folder
+        .filter(|folder| !folder.is_empty())
+        .map(|folder| format!("{folder}/{base_leaf}"))
+        .unwrap_or(base_leaf);
+    let content = build_cli_note_content(title, body);
+
+    let mut candidate_id = base_id.clone();
+    let mut counter = 1;
+    loop {
+        let path = cli_abs_path_from_id(notes_folder, &candidate_id)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(mut file) => {
+                use std::io::Write as _;
+                file.write_all(content.as_bytes())
+                    .map_err(|error| error.to_string())?;
+                return read_cli_note(notes_folder, &candidate_id);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                candidate_id = format!("{base_id}-{counter}");
+                counter += 1;
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+}
+
+fn read_note_create_body(
+    content: Option<String>,
+    content_file: Option<&Path>,
+) -> Result<String, String> {
+    match (content, content_file) {
+        (Some(_), Some(_)) => {
+            Err("Pass either `--content` or `--content-file`, not both.".to_string())
+        }
+        (Some(content), None) => Ok(content),
+        (None, Some(path)) => std::fs::read_to_string(path).map_err(|error| error.to_string()),
+        (None, None) => Ok(String::new()),
+    }
+}
+
+fn build_cli_note_content(title: &str, body: &str) -> String {
+    let trimmed_body = body.trim_matches('\n');
+    if trimmed_body.is_empty() {
+        format!("# {}\n", title.trim())
+    } else {
+        format!("# {}\n\n{}\n", title.trim(), trimmed_body)
+    }
+}
+
+fn normalize_cli_note_leaf(title: &str) -> String {
+    let trimmed = title.trim();
+    let without_extension = trimmed
+        .strip_suffix(".md")
+        .or_else(|| trimmed.strip_suffix(".MD"))
+        .unwrap_or(trimmed);
+    sanitize_cli_filename(without_extension)
+}
+
+fn sanitize_cli_filename(title: &str) -> String {
+    let sanitized: String = title
+        .chars()
+        .filter(|char| *char != '\u{00A0}' && *char != '\u{FEFF}')
+        .map(|char| match char {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+            _ => char,
+        })
+        .collect();
+    let trimmed = sanitized.trim();
+    if trimmed.is_empty() || trimmed.chars().all(|char| char.is_whitespace()) {
+        "Untitled".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_cli_folder(folder: &str) -> Result<String, String> {
+    let normalized = folder.trim().trim_matches('/').to_string();
+    validate_cli_folder_path(&normalized)?;
+    Ok(normalized)
+}
+
+fn validate_cli_folder_path(path: &str) -> Result<(), String> {
+    if path.contains('\\') {
+        return Err("Invalid path: backslashes not allowed".to_string());
+    }
+    if path.is_empty() {
+        return Err("Path cannot be empty".to_string());
+    }
+    for component in Path::new(path).components() {
+        match component {
+            std::path::Component::ParentDir => return Err("Path traversal not allowed".to_string()),
+            std::path::Component::CurDir => {
+                return Err("Invalid path: current directory references not allowed".to_string());
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err("Invalid path: absolute paths not allowed".to_string());
+            }
+            std::path::Component::Normal(name) => {
+                let name = name.to_string_lossy();
+                if CLI_RESERVED_FOLDER_NAMES.contains(&name.as_ref()) {
+                    return Err(format!("'{}' is a reserved folder name", name));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+const CLI_RESERVED_FOLDER_NAMES: &[&str] = &[".git", ".sly", ".obsidian", ".trash", "assets"];
+
+fn is_cli_visible_notes_entry(entry: &walkdir::DirEntry) -> bool {
+    if entry.file_type().is_dir() {
+        let name = entry.file_name().to_str().unwrap_or("");
+        return !CLI_RESERVED_FOLDER_NAMES.contains(&name);
+    }
+    true
+}
+
+fn cli_id_from_abs_path(notes_folder: &Path, file_path: &Path) -> Option<String> {
+    let rel = file_path.strip_prefix(notes_folder).ok()?;
+    for component in rel.parent().unwrap_or(Path::new("")).components() {
+        if let std::path::Component::Normal(name) = component {
+            if CLI_RESERVED_FOLDER_NAMES.contains(&name.to_str()?) {
+                return None;
+            }
+        }
+    }
+    if file_path.extension()?.to_str()? != "md" {
+        return None;
+    }
+    rel.to_str()?
+        .strip_suffix(".md")
+        .map(|id| id.replace(std::path::MAIN_SEPARATOR, "/"))
+        .filter(|id| !id.is_empty())
+}
+
+fn cli_abs_path_from_id(notes_folder: &Path, id: &str) -> Result<PathBuf, String> {
+    if id.contains('\\') {
+        return Err("Invalid note ID: backslashes not allowed".to_string());
+    }
+    for component in Path::new(id).components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Err("Invalid note ID: parent directory references not allowed".to_string());
+            }
+            std::path::Component::CurDir => {
+                return Err("Invalid note ID: current directory references not allowed".to_string());
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err("Invalid note ID: absolute paths not allowed".to_string());
+            }
+            std::path::Component::Normal(name) => {
+                let name = name.to_string_lossy();
+                if CLI_RESERVED_FOLDER_NAMES.contains(&name.as_ref()) {
+                    return Err(format!("'{}' is a reserved folder name", name));
+                }
+            }
+        }
+    }
+    let joined = notes_folder.join(Path::new(id));
+    let mut file_path_os = joined.into_os_string();
+    file_path_os.push(".md");
+    let file_path = PathBuf::from(file_path_os);
+    if !file_path.starts_with(notes_folder) {
+        return Err("Invalid note ID: path escapes notes folder".to_string());
+    }
+    Ok(file_path)
+}
+
+fn note_folder(id: &str) -> Option<String> {
+    id.rfind('/').map(|index| id[..index].to_string())
+}
+
+fn cli_metadata_time_secs(result: std::io::Result<std::time::SystemTime>) -> Option<i64> {
+    result
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs() as i64)
+}
+
+fn cli_strip_frontmatter(content: &str) -> &str {
+    let trimmed = content.trim_start();
+    if let Some(rest) = trimmed.strip_prefix("---") {
+        if let Some(end) = rest.find("\n---") {
+            let after_close = &rest[end + 4..];
+            return after_close
+                .strip_prefix("\r\n")
+                .or_else(|| after_close.strip_prefix('\n'))
+                .unwrap_or(after_close);
+        }
+    }
+    content
+}
+
+fn cli_extract_title(content: &str) -> String {
+    let body = cli_strip_frontmatter(content);
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if let Some(title) = trimmed.strip_prefix("# ") {
+            let title = title.trim();
+            if !title.is_empty() {
+                return title.to_string();
+            }
+        }
+        if !trimmed.is_empty() {
+            return trimmed.chars().take(50).collect();
+        }
+    }
+    "Untitled".to_string()
+}
+
+fn cli_generate_preview(content: &str) -> String {
+    let body = cli_strip_frontmatter(content);
+    let mut preview = String::new();
+    for line in body.lines().skip(1) {
+        let stripped = cli_strip_markdown(line.trim());
+        let normalized = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
+        if normalized.is_empty() {
+            continue;
+        }
+        if !preview.is_empty() {
+            preview.push(' ');
+        }
+        preview.push_str(&normalized);
+        if preview.chars().count() > 180 {
+            return preview.chars().take(179).collect::<String>() + "…";
+        }
+    }
+    preview
+}
+
+fn cli_strip_markdown(text: &str) -> String {
+    text.trim_start_matches('#')
+        .trim()
+        .trim_start_matches("- ")
+        .trim_start_matches("* ")
+        .replace("**", "")
+        .replace("__", "")
+        .replace('`', "")
 }
 
 fn selector_error_message(error: tasks::ResolveTaskSelectorError) -> String {
@@ -751,6 +1494,13 @@ struct TaskPatchFieldArgs {
     clear_date: bool,
     bucket: Option<ScheduleBucketArg>,
     clear_bucket: bool,
+    due_date: Option<String>,
+    clear_due_date: bool,
+    starred: Option<bool>,
+    recurrence: Option<String>,
+    clear_recurrence: bool,
+    tags: Option<Vec<String>>,
+    clear_tags: bool,
 }
 
 fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, String> {
@@ -767,6 +1517,16 @@ fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, Str
     let schedule_bucket = if let Some(bucket) = args.bucket {
         Some(Some(bucket.as_str().to_string()))
     } else if args.clear_bucket {
+        Some(None)
+    } else {
+        None
+    };
+
+    let due_at = if let Some(date) = args.due_date {
+        Some(Some(
+            local_date_to_action_at(&date).map_err(|error| error.to_string())?,
+        ))
+    } else if args.clear_due_date {
         Some(None)
     } else {
         None
@@ -791,10 +1551,18 @@ fn patch_from_optional_fields(args: TaskPatchFieldArgs) -> Result<TaskPatch, Str
         },
         action_at,
         schedule_bucket,
-        starred: None,
-        due_at: None,
-        recurrence: None,
-        tags: None,
+        starred: args.starred,
+        due_at,
+        recurrence: if args.clear_recurrence {
+            Some(None)
+        } else {
+            args.recurrence.map(Some)
+        },
+        tags: if args.clear_tags {
+            Some(Vec::new())
+        } else {
+            args.tags
+        },
     })
 }
 
@@ -805,6 +1573,9 @@ fn task_patch_has_changes(patch: &TaskPatch) -> bool {
         || patch.waiting_for.is_some()
         || patch.action_at.is_some()
         || patch.schedule_bucket.is_some()
+        || patch.starred.is_some()
+        || patch.due_at.is_some()
+        || patch.recurrence.is_some()
         || patch.tags.is_some()
 }
 
@@ -877,6 +1648,12 @@ mod tests {
         )
     }
 
+    fn seed_note(notes_folder: &Path, id: &str, content: &str) {
+        let path = cli_abs_path_from_id(notes_folder, id).expect("note path");
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("parent dir");
+        std::fs::write(path, content).expect("write note");
+    }
+
     fn run_cli(runtime: &CliRuntime, args: &[&str]) -> (i32, String, String) {
         let argv = args
             .iter()
@@ -916,7 +1693,109 @@ mod tests {
         assert_eq!(code, 0);
         assert!(stderr.is_empty());
         assert!(stdout.contains("doctor"));
+        assert!(stdout.contains("note"));
         assert!(stdout.contains("task"));
+    }
+
+    #[test]
+    fn note_help_lists_create_command() {
+        let root = TempDir::new().expect("tempdir");
+        let runtime = make_runtime(&root);
+        let (code, stdout, stderr) = run_cli(&runtime, &["sly", "note", "--help"]);
+
+        assert_eq!(code, 0);
+        assert!(stderr.is_empty());
+        assert!(stdout.contains("create"));
+        assert!(stdout.contains("append"));
+    }
+
+    #[test]
+    fn note_list_search_and_show_work() {
+        let root = TempDir::new().expect("tempdir");
+        let runtime = make_runtime(&root);
+        let notes_folder = root.path().join("vault");
+        std::fs::create_dir_all(&notes_folder).expect("notes folder");
+        write_app_config(&runtime, &notes_folder);
+        seed_note(
+            &notes_folder,
+            "Projects/Launch Plan",
+            "# Launch Plan\n\nCoordinate beta notes.\n",
+        );
+        seed_note(
+            &notes_folder,
+            "Journal/Today",
+            "# Today\n\nQuiet work block.\n",
+        );
+
+        let (list_code, list_stdout, list_stderr) = run_cli(
+            &runtime,
+            &[
+                "sly", "note", "list", "--folder", "Projects", "--format", "json",
+            ],
+        );
+        assert_eq!(list_code, 0);
+        assert!(list_stderr.is_empty());
+        assert!(list_stdout.contains("\"id\": \"Projects/Launch Plan\""));
+        assert!(!list_stdout.contains("\"id\": \"Journal/Today\""));
+
+        let (search_code, search_stdout, search_stderr) = run_cli(
+            &runtime,
+            &["sly", "note", "search", "beta", "--format", "json"],
+        );
+        assert_eq!(search_code, 0);
+        assert!(search_stderr.is_empty());
+        assert!(search_stdout.contains("\"title\": \"Launch Plan\""));
+
+        let (show_code, show_stdout, show_stderr) =
+            run_cli(&runtime, &["sly", "note", "show", "Launch"]);
+        assert_eq!(show_code, 0);
+        assert!(show_stderr.is_empty());
+        assert!(show_stdout.contains("# Launch Plan"));
+    }
+
+    #[test]
+    fn note_create_and_append_round_trip() {
+        let root = TempDir::new().expect("tempdir");
+        let runtime = make_runtime(&root);
+        let notes_folder = root.path().join("vault");
+        std::fs::create_dir_all(&notes_folder).expect("notes folder");
+        write_app_config(&runtime, &notes_folder);
+
+        let (create_code, create_stdout, create_stderr) = run_cli(
+            &runtime,
+            &[
+                "sly",
+                "note",
+                "create",
+                "Meeting Notes",
+                "--folder",
+                "Work",
+                "--content",
+                "Initial agenda",
+                "--format",
+                "json",
+            ],
+        );
+        assert_eq!(create_code, 0);
+        assert!(create_stderr.is_empty());
+        assert!(create_stdout.contains("\"id\": \"Work/Meeting Notes\""));
+        assert!(create_stdout.contains("Initial agenda"));
+
+        let (append_code, append_stdout, append_stderr) = run_cli(
+            &runtime,
+            &[
+                "sly",
+                "note",
+                "append",
+                "Meeting",
+                "Follow up",
+                "--format",
+                "json",
+            ],
+        );
+        assert_eq!(append_code, 0);
+        assert!(append_stderr.is_empty());
+        assert!(append_stdout.contains("Initial agenda\\nFollow up\\n"));
     }
 
     #[test]
@@ -966,7 +1845,7 @@ mod tests {
         assert!(stderr.is_empty());
         assert_eq!(
             stdout.lines().next().expect("header"),
-            "id,title,view,completed,overdue,actionAt,scheduleBucket,waitingFor,link,createdAt,completedAt,description"
+            "id,title,view,completed,overdue,starred,actionAt,dueAt,scheduleBucket,waitingFor,link,createdAt,completedAt,recurrence,tags,description"
         );
     }
 
@@ -1024,6 +1903,15 @@ mod tests {
                 "Jordan",
                 "--bucket",
                 "anytime",
+                "--due-date",
+                "2026-04-14",
+                "--starred",
+                "--recurrence",
+                "weekly:completion",
+                "--tag",
+                "release",
+                "--tag",
+                "writing",
                 "--format",
                 "json",
             ],
@@ -1033,6 +1921,10 @@ mod tests {
         assert!(stderr.is_empty());
         assert!(stdout.contains("\"title\": \"Review release notes\""));
         assert!(stdout.contains("\"scheduleBucket\": \"anytime\""));
+        assert!(stdout.contains("\"starred\": true"));
+        assert!(stdout.contains("\"dueAt\": \"2026-04-14"));
+        assert!(stdout.contains("\"recurrence\": \"weekly:completion\""));
+        assert!(stdout.contains("\"tags\": [\n    \"release\",\n    \"writing\"\n  ]"));
 
         let settings = load_settings(notes_folder.to_string_lossy().as_ref());
         assert_eq!(settings.tasks_enabled, Some(true));
@@ -1060,6 +1952,13 @@ mod tests {
                 "https://example.com",
                 "--date",
                 "2026-04-12",
+                "--due-date",
+                "2026-04-13",
+                "--starred",
+                "--recurrence",
+                "daily:schedule",
+                "--tag",
+                "editing",
                 "--format",
                 "json",
             ],
@@ -1068,6 +1967,10 @@ mod tests {
         assert!(stderr1.is_empty());
         assert!(stdout1.contains("\"description\": \"Needs edits\""));
         assert!(stdout1.contains("\"link\": \"https://example.com\""));
+        assert!(stdout1.contains("\"starred\": true"));
+        assert!(stdout1.contains("\"dueAt\": \"2026-04-13"));
+        assert!(stdout1.contains("\"recurrence\": \"daily:schedule\""));
+        assert!(stdout1.contains("\"editing\""));
 
         let (code2, stdout2, stderr2) = run_cli(
             &runtime,
@@ -1079,6 +1982,10 @@ mod tests {
                 "--clear-description",
                 "--clear-link",
                 "--clear-date",
+                "--clear-due-date",
+                "--unstarred",
+                "--clear-recurrence",
+                "--clear-tags",
                 "--format",
                 "json",
             ],
@@ -1088,6 +1995,51 @@ mod tests {
         assert!(stdout2.contains("\"description\": \"\""));
         assert!(stdout2.contains("\"link\": \"\""));
         assert!(stdout2.contains("\"actionAt\": null"));
+        assert!(stdout2.contains("\"starred\": false"));
+        assert!(stdout2.contains("\"dueAt\": null"));
+        assert!(stdout2.contains("\"recurrence\": null"));
+        assert!(stdout2.contains("\"tags\": []"));
+    }
+
+    #[test]
+    fn list_supports_starred_view_and_tag_search() {
+        let root = TempDir::new().expect("tempdir");
+        let runtime = make_runtime(&root);
+        let notes_folder = root.path().join("vault");
+        std::fs::create_dir_all(&notes_folder).expect("notes folder");
+        write_app_config(&runtime, &notes_folder);
+        let starred = tasks::create_task(&notes_folder, "Important followup").expect("starred");
+        let normal = tasks::create_task(&notes_folder, "Normal followup").expect("normal");
+        tasks::update_task(
+            &notes_folder,
+            &starred.id,
+            TaskPatch {
+                starred: Some(true),
+                tags: Some(vec!["launch".to_string()]),
+                ..Default::default()
+            },
+        )
+        .expect("starred patch");
+
+        let (star_code, star_stdout, star_stderr) = run_cli(
+            &runtime,
+            &[
+                "sly", "task", "list", "--view", "starred", "--format", "json",
+            ],
+        );
+        assert_eq!(star_code, 0);
+        assert!(star_stderr.is_empty());
+        assert!(star_stdout.contains(&starred.id));
+        assert!(!star_stdout.contains(&normal.id));
+
+        let (search_code, search_stdout, search_stderr) = run_cli(
+            &runtime,
+            &["sly", "task", "search", "launch", "--format", "json"],
+        );
+        assert_eq!(search_code, 0);
+        assert!(search_stderr.is_empty());
+        assert!(search_stdout.contains(&starred.id));
+        assert!(!search_stdout.contains(&normal.id));
     }
 
     #[test]

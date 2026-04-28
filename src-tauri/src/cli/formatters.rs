@@ -1,5 +1,6 @@
-use crate::cli::{CliDoctorReport, CliTaskSummary};
+use crate::cli::{CliDoctorReport, CliNoteSummary, CliTaskSummary};
 use crate::tasks::Task;
+use crate::Note;
 use serde::Serialize;
 
 fn json_dumps<T: Serialize + ?Sized>(value: &T) -> String {
@@ -87,6 +88,9 @@ pub(crate) fn render_task_list_table(tasks: &[CliTaskSummary]) -> String {
         } else if task.overdue {
             title.push_str(" [overdue]");
         }
+        if task.starred {
+            title.push_str(" [starred]");
+        }
         if !task.waiting_for.trim().is_empty() {
             title.push_str(" [waiting]");
         }
@@ -102,24 +106,89 @@ pub(crate) fn render_task_list_table(tasks: &[CliTaskSummary]) -> String {
     lines.join("\n")
 }
 
+pub(crate) fn render_note_list_table(notes: &[CliNoteSummary]) -> String {
+    let mut lines = Vec::with_capacity(notes.len() + 2);
+    lines.push(format!(
+        "{}  {}  {}",
+        pad("ID", 32),
+        pad("MODIFIED", 10),
+        "TITLE"
+    ));
+    lines.push(format!(
+        "{}  {}  {}",
+        "-".repeat(32),
+        "-".repeat(10),
+        "-".repeat(40)
+    ));
+
+    for note in notes {
+        lines.push(format!(
+            "{}  {}  {}",
+            pad(&truncate_with_ellipsis(&note.id, 32), 32),
+            pad(&note.modified.to_string(), 10),
+            note.title
+        ));
+    }
+
+    lines.join("\n")
+}
+
+pub(crate) fn render_note_list_csv(notes: &[CliNoteSummary]) -> String {
+    let mut lines = vec![String::from(
+        "id,title,folder,modified,created,preview,path",
+    )];
+
+    for note in notes {
+        let row = [
+            csv_escape(&note.id),
+            csv_escape(&note.title),
+            csv_escape(&note.folder),
+            note.modified.to_string(),
+            note.created.to_string(),
+            csv_escape(&note.preview),
+            csv_escape(&note.path),
+        ];
+        lines.push(row.join(","));
+    }
+
+    lines.join("\n")
+}
+
+pub(crate) fn render_note_list_json(notes: &[CliNoteSummary]) -> String {
+    json_dumps(notes)
+}
+
+pub(crate) fn render_note_text(note: &Note) -> String {
+    note.content.clone()
+}
+
+pub(crate) fn render_note_json(note: &Note) -> String {
+    json_dumps(note)
+}
+
 pub(crate) fn render_task_list_csv(tasks: &[CliTaskSummary]) -> String {
     let mut lines = vec![String::from(
-        "id,title,view,completed,overdue,actionAt,scheduleBucket,waitingFor,link,createdAt,completedAt,description",
+        "id,title,view,completed,overdue,starred,actionAt,dueAt,scheduleBucket,waitingFor,link,createdAt,completedAt,recurrence,tags,description",
     )];
 
     for task in tasks {
+        let tags = task.tags.join(";");
         let row = [
             csv_escape(&task.id),
             csv_escape(&task.title),
             csv_escape(&task.view),
             task.completed.to_string(),
             task.overdue.to_string(),
+            task.starred.to_string(),
             csv_escape(task.action_at.as_deref().unwrap_or("")),
+            csv_escape(task.due_at.as_deref().unwrap_or("")),
             csv_escape(task.schedule_bucket.as_deref().unwrap_or("")),
             csv_escape(&task.waiting_for),
             csv_escape(&task.link),
             csv_escape(&task.created_at),
             csv_escape(task.completed_at.as_deref().unwrap_or("")),
+            csv_escape(task.recurrence.as_deref().unwrap_or("")),
+            csv_escape(&tags),
             csv_escape(&task.description),
         ];
         lines.push(row.join(","));
@@ -146,6 +215,18 @@ pub(crate) fn render_task_text(task: &Task) -> String {
     }
     if let Some(schedule_bucket) = &task.schedule_bucket {
         lines.push(format!("Schedule Bucket: {schedule_bucket}"));
+    }
+    if task.starred {
+        lines.push("Starred: true".to_string());
+    }
+    if let Some(due_at) = &task.due_at {
+        lines.push(format!("Due At: {due_at}"));
+    }
+    if let Some(recurrence) = &task.recurrence {
+        lines.push(format!("Recurrence: {recurrence}"));
+    }
+    if !task.tags.is_empty() {
+        lines.push(format!("Tags: {}", task.tags.join(", ")));
     }
     if let Some(completed_at) = &task.completed_at {
         lines.push(format!("Completed At: {completed_at}"));
