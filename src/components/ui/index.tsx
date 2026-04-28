@@ -306,12 +306,11 @@ export function CommandItem({
   onClick,
 }: CommandItemProps) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      role="button"
-      tabIndex={-1}
       className={cn(
-        "w-full text-left px-3 py-2 rounded-[var(--ui-radius-md)] flex items-center justify-between transition-colors cursor-pointer",
+        "ui-focus-ring w-full text-left px-3 py-2 rounded-[var(--ui-radius-md)] flex items-center justify-between transition-colors cursor-pointer",
         isSelected ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted"
       )}
     >
@@ -350,6 +349,6 @@ export function CommandItem({
           {shortcut}
         </kbd>
       )}
-    </div>
+    </button>
   );
 }

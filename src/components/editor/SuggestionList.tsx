@@ -35,6 +35,9 @@ function SuggestionListInner<T>(
 ) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const activeOptionId = items[selectedIndex]
+    ? `suggestion-option-${selectedIndex}`
+    : undefined;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -78,16 +81,20 @@ function SuggestionListInner<T>(
   return (
     <PopoverSurface
       ref={listRef}
+      role="listbox"
+      aria-activedescendant={activeOptionId}
       className={cn(
-        "ui-scrollbar-overlay max-h-80 overflow-y-auto flex flex-col gap-1",
+        "ui-scrollbar-overlay max-h-80 overflow-y-auto flex flex-col gap-1 outline-none",
         width,
       )}
     >
       {items.map((item, index) => (
         <div
           key={itemKey(item)}
+          id={`suggestion-option-${index}`}
           data-index={index}
-          role="button"
+          role="option"
+          aria-selected={selectedIndex === index}
           tabIndex={-1}
           onClick={() => command(item)}
           className={cn(
