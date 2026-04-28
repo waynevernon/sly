@@ -4,9 +4,11 @@
   "tasksEnabled": true,
   "pinnedNoteIds": [
     "Field Notes/Sly profile",
-    "Product/Launch/1.0 screenshot checklist"
+    "Product/Launch/1.0 screenshot checklist",
+    "Product/Launch/Task tag setup"
   ],
   "recentNoteIds": [
+    "Product/Launch/Task tag setup",
     "Field Notes/Sly profile",
     "Product/Launch/1.0 screenshot checklist",
     "Product/Design/Icon direction",
@@ -74,6 +76,92 @@
         "name": "archive"
       },
       "colorId": "red"
+    }
+  },
+  "taskTagIcons": {
+    "demo": {
+      "icon": {
+        "kind": "lucide",
+        "name": "monitor"
+      },
+      "colorId": "blue"
+    },
+    "design": {
+      "icon": {
+        "kind": "lucide",
+        "name": "palette"
+      },
+      "colorId": "plum"
+    },
+    "field-notes": {
+      "icon": {
+        "kind": "lucide",
+        "name": "paw-print"
+      },
+      "colorId": "green"
+    },
+    "keyboard": {
+      "icon": {
+        "kind": "lucide",
+        "name": "keyboard"
+      },
+      "colorId": "slate"
+    },
+    "polish": {
+      "icon": {
+        "kind": "lucide",
+        "name": "sparkles"
+      },
+      "colorId": "amber"
+    },
+    "readme": {
+      "icon": {
+        "kind": "lucide",
+        "name": "book-open"
+      },
+      "colorId": "teal"
+    },
+    "recurring": {
+      "icon": {
+        "kind": "lucide",
+        "name": "repeat-2"
+      },
+      "colorId": "olive"
+    },
+    "release": {
+      "icon": {
+        "kind": "lucide",
+        "name": "rocket"
+      },
+      "colorId": "orange"
+    },
+    "screenshots": {
+      "icon": {
+        "kind": "lucide",
+        "name": "image"
+      },
+      "colorId": "red"
+    },
+    "waiting": {
+      "icon": {
+        "kind": "lucide",
+        "name": "clock-3"
+      },
+      "colorId": "amber"
+    },
+    "workflow": {
+      "icon": {
+        "kind": "lucide",
+        "name": "list-checks"
+      },
+      "colorId": "blue"
+    },
+    "writing": {
+      "icon": {
+        "kind": "lucide",
+        "name": "pencil-line"
+      },
+      "colorId": "teal"
     }
   },
   "collapsedFolders": [],
