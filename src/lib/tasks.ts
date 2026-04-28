@@ -185,6 +185,18 @@ export function getDefaultTaskSortMode(view: TaskView): TaskSortMode {
   }
 }
 
+export function createTaskOrderRank(viewOrder?: string[]): Map<string, number> | undefined {
+  if (!viewOrder) return undefined;
+
+  const rank = new Map<string, number>();
+  viewOrder.forEach((id, index) => {
+    if (!rank.has(id)) {
+      rank.set(id, index);
+    }
+  });
+  return rank;
+}
+
 /**
  * Compare two tasks for display ordering within a view.
  * Starred tasks float first in all modes except "manual".
@@ -197,15 +209,14 @@ export function compareTasks(
   view: TaskView,
   sortMode?: TaskSortMode,
   viewOrder?: string[],
+  viewOrderRank = createTaskOrderRank(viewOrder),
 ): number {
   const mode = sortMode ?? getDefaultTaskSortMode(view);
 
   if (mode === "manual") {
-    if (viewOrder) {
-      const aIdx = viewOrder.indexOf(a.id);
-      const bIdx = viewOrder.indexOf(b.id);
-      const aPos = aIdx === -1 ? Infinity : aIdx;
-      const bPos = bIdx === -1 ? Infinity : bIdx;
+    if (viewOrderRank) {
+      const aPos = viewOrderRank.get(a.id) ?? Infinity;
+      const bPos = viewOrderRank.get(b.id) ?? Infinity;
       if (aPos !== bPos) return aPos < bPos ? -1 : 1;
     }
     return a.createdAt.localeCompare(b.createdAt);

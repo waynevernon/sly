@@ -11,7 +11,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import type { Task, TaskMetadata, TaskPatch, TaskSortMode, TaskView } from "../types/tasks";
 import * as tasksService from "../services/tasksService";
-import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString, MANUAL_SORT_VIEWS, normalizeTaskTag } from "../lib/tasks";
+import { compareTasks, createTaskOrderRank, getDefaultTaskSortMode, groupByView, localDateString, MANUAL_SORT_VIEWS, normalizeTaskTag } from "../lib/tasks";
 import { useNotesData } from "./NotesContext";
 import { sanitizeFolderAppearances, type FolderAppearanceMap } from "../lib/folderIcons";
 
@@ -113,10 +113,13 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   );
   const taskSortMode = taskSortModes[selectedView] ?? getDefaultTaskSortMode(selectedView);
   const visibleTaskIds = useMemo(
-    () =>
-      [...(selectedTag ? tagBuckets[selectedTag] ?? [] : buckets[selectedView] ?? [])]
-        .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode, taskViewOrders[selectedView]))
-        .map((task) => task.id),
+    () => {
+      const viewOrder = taskViewOrders[selectedView];
+      const viewOrderRank = createTaskOrderRank(viewOrder);
+      return [...(selectedTag ? tagBuckets[selectedTag] ?? [] : buckets[selectedView] ?? [])]
+        .sort((a, b) => compareTasks(a, b, selectedView, taskSortMode, viewOrder, viewOrderRank))
+        .map((task) => task.id);
+    },
     [buckets, selectedTag, selectedView, tagBuckets, taskSortMode, taskViewOrders],
   );
 

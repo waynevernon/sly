@@ -65,7 +65,7 @@ import { TaskDatePickerPanel } from "./TaskDatePicker";
 import { TaskRow } from "./TaskRow";
 import { isMac, mod, shift, shortcut } from "../../lib/platform";
 import { cn } from "../../lib/utils";
-import { compareTasks, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
+import { compareTasks, createTaskOrderRank, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
@@ -300,8 +300,9 @@ export function TaskListPane() {
     ? allTasks.filter((task) => (task.tags ?? []).includes(selectedTag))
     : buckets[selectedView] ?? [];
   const effectiveSortMode = selectedTag && taskSortMode === "manual" ? "createdAsc" : taskSortMode;
+  const viewOrderRank = createTaskOrderRank(selectedTag ? undefined : viewOrder);
   const tasks = [...visibleSource].sort((a, b) =>
-    compareTasks(a, b, selectedView, effectiveSortMode, selectedTag ? undefined : viewOrder),
+    compareTasks(a, b, selectedView, effectiveSortMode, selectedTag ? undefined : viewOrder, viewOrderRank),
   );
   const taskMap = useMemo(
     () => new Map(tasks.map((task) => [task.id, task] as const)),
