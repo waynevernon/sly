@@ -347,7 +347,9 @@ export function TaskDetailPanel() {
               onClick={() => void updateTask(selectedTask.id, { starred: !selectedTask.starred })}
               className={cn(
                 "mt-0.5 shrink-0",
-                selectedTask.starred ? "text-amber-400 hover:text-amber-400/80" : undefined,
+                selectedTask.starred
+                  ? "text-[var(--color-starred)] hover:opacity-80"
+                  : undefined,
               )}
             >
               <Star

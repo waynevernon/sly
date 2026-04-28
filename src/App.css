@@ -76,6 +76,7 @@
   --color-danger-muted: rgba(225, 29, 72, 0.12);
   --color-warning: rgb(194, 65, 12);
   --color-warning-muted: rgba(194, 65, 12, 0.12);
+  --color-starred: rgb(217, 119, 6);
 
   /* Shared UI tokens */
   --ui-radius-sm: 6px;
@@ -172,6 +173,7 @@
   --color-danger-muted: rgba(251, 113, 133, 0.14);
   --color-warning: rgb(251, 146, 60);
   --color-warning-muted: rgba(251, 146, 60, 0.15);
+  --color-starred: rgb(251, 191, 36);
   --ui-shadow-menu:
     0 18px 42px rgba(0, 0, 0, 0.34),
     0 6px 18px rgba(0, 0, 0, 0.2);

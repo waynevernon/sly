@@ -143,7 +143,7 @@ export function TaskRow({
               });
             }}
             className={cn(
-              "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-100",
+              "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-[var(--ui-motion-duration-fade)]",
               secondaryLabel || dueDateLabel ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
               isActive
                 ? "bg-bg-emphasis"
@@ -294,7 +294,7 @@ export function TaskRow({
                 "mt-0.5 shrink-0 rounded transition-colors outline-none",
                 "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
                 task.starred
-                  ? "text-amber-400"
+                  ? "text-[var(--color-starred)]"
                   : "text-transparent group-hover:text-text-muted/30 hover:!text-text-muted",
               )}
             >

@@ -1235,7 +1235,7 @@ export function TaskListPane() {
                       "mt-0.5 shrink-0 rounded transition-colors outline-none",
                       "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1",
                       newStarred
-                        ? "text-amber-400"
+                        ? "text-[var(--color-starred)]"
                         : "text-text-muted/30 hover:text-text-muted",
                     )}
                   >
