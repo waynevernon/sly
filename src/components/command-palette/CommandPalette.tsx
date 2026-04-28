@@ -6,18 +6,47 @@ import {
   useRef,
   useMemo,
   type KeyboardEvent,
-  type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FilePlusCorner, PanelRight, SquareArrowOutUpRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Archive,
+  CalendarClock,
+  CheckSquare,
+  CheckCheck,
+  Clock3,
+  FilePlusCorner,
+  FileText,
+  Inbox,
+  Layers,
+  PanelLeft,
+  PanelRight,
+  Plus,
+  SquareArrowOutUpRight,
+  Star,
+  Sun,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useGit } from "../../context/GitContext";
+import { useTasks } from "../../context/TasksContext";
 import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
 import type { Settings } from "../../types/note";
+import type { ThemePresetId } from "../../types/note";
+import type { TaskView } from "../../types/tasks";
 import type { Editor } from "@tiptap/react";
+import {
+  DARK_THEME_PRESETS,
+  LIGHT_THEME_PRESETS,
+  resolveThemeTokens,
+  themeColorsToCSSVariables,
+} from "../../lib/appearance";
+import {
+  commandMatchesQuery,
+  type AppCommand,
+} from "../../lib/commandRegistry";
 import {
   CommandItem,
   AlertDialog,
@@ -39,6 +68,12 @@ import {
 import { plainTextFromMarkdown } from "../../lib/plainText";
 import { duplicateNote } from "../../services/notes";
 import {
+  deriveView,
+  taskMatchesQuery,
+  TASK_VIEW_LABELS,
+  TASK_VIEW_ORDER,
+} from "../../lib/tasks";
+import {
   CopyIcon,
   DownloadIcon,
   SettingsIcon,
@@ -51,26 +86,39 @@ import {
   MarkdownIcon,
   FolderIcon,
   FolderPlusIcon,
+  InfoIcon,
+  KeyboardIcon,
+  SearchIcon,
 } from "../icons";
-import { mod, shift, shortcut } from "../../lib/platform";
-import { TOGGLE_RIGHT_PANE_KEYS } from "../../lib/shortcutDefinitions";
+import { mod, shift } from "../../lib/platform";
 
-interface Command {
-  id: string;
-  label: string;
-  shortcut?: string;
-  icon?: ReactNode;
-  action: () => void;
-}
+const RECENT_COMMANDS_STORAGE_KEY = "sly.recentCommandIds";
+const MAX_RECENT_COMMANDS = 5;
+
+const TASK_VIEW_ICONS: Record<TaskView, React.ComponentType<{ className?: string }>> = {
+  inbox: Inbox,
+  today: Sun,
+  upcoming: CalendarClock,
+  waiting: Clock3,
+  anytime: Layers,
+  someday: Archive,
+  completed: CheckCheck,
+  starred: Star,
+};
 
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
   onOpenSettings?: () => void;
+  onOpenSettingsTab?: (tab: "notes" | "tasks" | "editor" | "extensions" | "shortcuts" | "about") => void;
   focusMode?: boolean;
   onToggleFocusMode?: () => void;
   rightPanelVisible?: boolean;
   onToggleRightPanel?: () => void;
+  onShowNotes?: () => void;
+  onShowTasks?: () => void;
+  onOpenTaskCapture?: () => void;
+  onReloadCurrentNote?: () => void;
   editorRef?: React.RefObject<Editor | null>;
   flushPendingSave?: (() => Promise<void>) | null;
 }
@@ -79,10 +127,15 @@ export function CommandPalette({
   open,
   onClose,
   onOpenSettings,
+  onOpenSettingsTab,
   focusMode,
   onToggleFocusMode,
   rightPanelVisible = true,
   onToggleRightPanel,
+  onShowNotes,
+  onShowTasks,
+  onOpenTaskCapture,
+  onReloadCurrentNote,
   editorRef,
   flushPendingSave,
 }: CommandPaletteProps) {
@@ -97,13 +150,50 @@ export function CommandPalette({
     unpinNote,
     notesFolder,
   } = useNotes();
-  const { setTheme, confirmDeletions, setConfirmDeletions } = useTheme();
+  const {
+    theme,
+    appearanceSettings,
+    resolvedTheme,
+    setTheme,
+    lightPresetId,
+    darkPresetId,
+    setLightPresetId,
+    setDarkPresetId,
+    setInterfaceZoom,
+    setPaneMode,
+    textDirection,
+    setTextDirection,
+    confirmDeletions,
+    setConfirmDeletions,
+  } = useTheme();
   const { status, gitAvailable, gitEnabled, commit, sync, isSyncing } = useGit();
+  const {
+    tasks,
+    today,
+    selectedView,
+    selectedTask,
+    selectedTaskId,
+    selectedTaskIds,
+    tagNames,
+    selectView,
+    selectTag,
+    selectTask,
+    setCompleted,
+    deleteTask: deleteTaskAction,
+    refreshTasks,
+  } = useTasks();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [activeSubmenu, setActiveSubmenu] = useState<"root" | "theme">("root");
+  const [recentCommandIds, setRecentCommandIds] = useState<string[]>([]);
+  const [themePreview, setThemePreview] = useState<{
+    kind: "light" | "dark";
+    originalPresetId: ThemePresetId;
+    committed: boolean;
+  } | null>(null);
   const dontAskAgainId = useId();
   const [localSearchResults, setLocalSearchResults] = useState<
     { id: string; title: string; preview: string; modified: number }[]
@@ -111,6 +201,78 @@ export function CommandPalette({
   const [settings, setSettings] = useState<Settings | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    try {
+      const raw = window.localStorage.getItem(RECENT_COMMANDS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        setRecentCommandIds(parsed.filter((id): id is string => typeof id === "string"));
+      }
+    } catch (error) {
+      console.error("Failed to load recent commands:", error);
+    }
+  }, [open]);
+
+  const rememberCommand = useCallback((id: string) => {
+    setRecentCommandIds((prev) => {
+      const next = [id, ...prev.filter((recentId) => recentId !== id)].slice(
+        0,
+        MAX_RECENT_COMMANDS,
+      );
+      try {
+        window.localStorage.setItem(
+          RECENT_COMMANDS_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+      } catch (error) {
+        console.error("Failed to save recent commands:", error);
+      }
+      return next;
+    });
+  }, []);
+
+  const applyThemePreviewVariables = useCallback(
+    (presetId?: ThemePresetId) => {
+      const nextAppearance = presetId
+        ? {
+            ...appearanceSettings,
+            [themePreview?.kind === "dark" ? "darkPresetId" : "lightPresetId"]:
+              presetId,
+          }
+        : appearanceSettings;
+      const previewTheme = themePreview?.kind ?? resolvedTheme;
+      const tokens = resolveThemeTokens(nextAppearance, previewTheme);
+
+      for (const [key, value] of Object.entries(themeColorsToCSSVariables(tokens))) {
+        document.documentElement.style.setProperty(key, value);
+      }
+    },
+    [appearanceSettings, resolvedTheme, themePreview?.kind],
+  );
+
+  const restoreThemePreview = useCallback(() => {
+    if (!themePreview) return;
+
+    if (!themePreview.committed) {
+      applyThemePreviewVariables(themePreview.originalPresetId);
+    }
+    setThemePreview(null);
+  }, [applyThemePreviewVariables, themePreview]);
+
+  const leaveThemeSubmenu = useCallback(() => {
+    restoreThemePreview();
+    setActiveSubmenu("root");
+    setQuery("");
+    setSelectedIndex(0);
+  }, [restoreThemePreview]);
+
+  const handlePaletteClose = useCallback(() => {
+    restoreThemePreview();
+    onClose();
+  }, [onClose, restoreThemePreview]);
 
   // Load settings when palette opens or current note changes
   useEffect(() => {
@@ -120,12 +282,14 @@ export function CommandPalette({
   }, [open, currentNote?.id]);
 
   // Memoize commands array
-  const commands = useMemo<Command[]>(() => {
-    const baseCommands: Command[] = [
+  const commands = useMemo<AppCommand[]>(() => {
+    const baseCommands: AppCommand[] = [
       {
         id: "new-note",
         label: "New Note",
+        section: "Notes",
         shortcut: `${mod} ${shift} N`,
+        keywords: ["create", "document", "markdown"],
         icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           createNote();
@@ -135,6 +299,8 @@ export function CommandPalette({
       {
         id: "new-folder",
         label: "New Folder",
+        section: "Notes",
+        keywords: ["create", "directory"],
         shortcut: undefined,
         icon: <FolderPlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
@@ -153,6 +319,8 @@ export function CommandPalette({
         {
           id: isPinned ? "unpin-note" : "pin-note",
           label: isPinned ? "Unpin Current Note" : "Pin Current Note",
+          section: "Notes",
+          keywords: ["favorite", "pinned"],
           icon: <PinIcon className="w-5 h-5 stroke-[1.3]" />,
           action: async () => {
             try {
@@ -171,6 +339,9 @@ export function CommandPalette({
         {
           id: "duplicate-note",
           label: "Duplicate Current Note",
+          section: "Notes",
+          shortcut: `${mod} D`,
+          keywords: ["copy", "clone"],
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -186,6 +357,8 @@ export function CommandPalette({
         {
           id: "open-note-window",
           label: "Open Current Note in New Window",
+          section: "Notes",
+          keywords: ["preview", "detached", "separate"],
           icon: <SquareArrowOutUpRight className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -201,6 +374,8 @@ export function CommandPalette({
         {
           id: "delete-note",
           label: "Delete Current Note",
+          section: "Notes",
+          keywords: ["remove", "trash"],
           icon: <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             if (!confirmDeletions) {
@@ -219,8 +394,22 @@ export function CommandPalette({
           },
         },
         {
+          id: "reload-note",
+          label: "Reload Current Note",
+          section: "Notes",
+          shortcut: `${mod} R`,
+          keywords: ["refresh", "external changes"],
+          icon: <RefreshCwIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: () => {
+            onReloadCurrentNote?.();
+            onClose();
+          },
+        },
+        {
           id: "copy-markdown",
           label: "Copy Markdown",
+          section: "Editor",
+          keywords: ["clipboard", "export"],
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -248,6 +437,8 @@ export function CommandPalette({
         {
           id: "copy-plain",
           label: "Copy Plain Text",
+          section: "Editor",
+          keywords: ["clipboard", "text"],
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -276,6 +467,8 @@ export function CommandPalette({
         {
           id: "copy-html",
           label: "Copy HTML",
+          section: "Editor",
+          keywords: ["clipboard", "markup"],
           icon: <CopyIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -296,6 +489,8 @@ export function CommandPalette({
         {
           id: "download-pdf",
           label: "Print as PDF",
+          section: "Editor",
+          keywords: ["export", "download"],
           icon: <DownloadIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -315,6 +510,8 @@ export function CommandPalette({
         {
           id: "download-markdown",
           label: "Export Markdown",
+          section: "Editor",
+          keywords: ["download", "save"],
           icon: <DownloadIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             try {
@@ -357,6 +554,8 @@ export function CommandPalette({
         baseCommands.push({
           id: "git-commit",
           label: "Git: Quick Commit",
+          section: "Git",
+          keywords: ["version control", "snapshot"],
           icon: <GitCommitIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             const success = await commit("Quick commit from Sly");
@@ -374,6 +573,8 @@ export function CommandPalette({
         baseCommands.push({
           id: "git-sync",
           label: "Git: Sync (Pull and Push)",
+          section: "Git",
+          keywords: ["version control", "push", "pull"],
           icon: <RefreshCwIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
           action: async () => {
             const result = await sync();
@@ -388,12 +589,180 @@ export function CommandPalette({
       }
     }
 
+    const selectedTaskActionIds =
+      selectedTaskIds.length > 0
+        ? selectedTaskIds
+        : selectedTaskId
+          ? [selectedTaskId]
+          : [];
+
+    baseCommands.push(
+      {
+        id: "new-task",
+        label: "New Task",
+        section: "Tasks",
+        shortcut: `${mod} ${shift} T`,
+        keywords: ["create", "capture", "quick add", "todo"],
+        icon: <Plus className="w-4.5 h-4.5 stroke-[1.8]" />,
+        action: () => {
+          onOpenTaskCapture?.();
+          onClose();
+        },
+      },
+      {
+        id: "new-task-current-view",
+        label: `New Task in ${TASK_VIEW_LABELS[selectedView]}`,
+        section: "Tasks",
+        shortcut: `${mod} N`,
+        keywords: ["create", "inline", "todo"],
+        icon: <Plus className="w-4.5 h-4.5 stroke-[1.8]" />,
+        action: () => {
+          onShowTasks?.();
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent("start-inline-task-create"));
+          });
+          onClose();
+        },
+      },
+      {
+        id: "search-tasks",
+        label: "Search Tasks",
+        section: "Tasks",
+        shortcut: `${mod} ${shift} F`,
+        keywords: ["find", "all tasks", "todo"],
+        icon: <SearchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          onShowTasks?.();
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent("open-tasks-search"));
+          });
+          onClose();
+        },
+      },
+      {
+        id: "refresh-tasks",
+        label: "Refresh Tasks",
+        section: "Tasks",
+        keywords: ["reload", "sync"],
+        icon: <RefreshCwIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: async () => {
+          await refreshTasks();
+          onClose();
+        },
+      },
+    );
+
+    for (const view of TASK_VIEW_ORDER) {
+      const Icon = TASK_VIEW_ICONS[view];
+      baseCommands.push({
+        id: `task-view-${view}`,
+        label: `Show ${TASK_VIEW_LABELS[view]} Tasks`,
+        section: "Tasks",
+        keywords: ["tasks", "view", "list", TASK_VIEW_LABELS[view]],
+        icon: <Icon className="w-4.5 h-4.5 stroke-[1.7]" />,
+        action: () => {
+          selectView(view);
+          onShowTasks?.();
+          onClose();
+        },
+      });
+    }
+
+    for (const tagName of tagNames) {
+      baseCommands.push({
+        id: `task-tag-${tagName}`,
+        label: `Show Task Tag: ${tagName}`,
+        section: "Tasks",
+        keywords: ["tasks", "tag", tagName],
+        icon: <FolderIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          selectTag(tagName);
+          onShowTasks?.();
+          onClose();
+        },
+      });
+    }
+
+    if (selectedTaskActionIds.length > 0) {
+      const taskCountLabel =
+        selectedTaskActionIds.length > 1
+          ? `${selectedTaskActionIds.length} Selected Tasks`
+          : "Current Task";
+      const isCurrentTaskCompleted = Boolean(selectedTask?.completedAt);
+      baseCommands.push(
+        {
+          id: "toggle-current-task-complete",
+          label: `${isCurrentTaskCompleted ? "Reopen" : "Complete"} ${taskCountLabel}`,
+          section: "Tasks",
+          keywords: ["done", "finish", "checkbox"],
+          icon: <CheckCheck className="w-4.5 h-4.5 stroke-[1.7]" />,
+          action: async () => {
+            await Promise.all(
+              selectedTaskActionIds.map((id) =>
+                setCompleted(id, !isCurrentTaskCompleted),
+              ),
+            );
+            onClose();
+          },
+        },
+        {
+          id: "delete-current-task",
+          label: `Delete ${taskCountLabel}`,
+          section: "Tasks",
+          keywords: ["remove", "trash"],
+          icon: <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: async () => {
+            await Promise.all(selectedTaskActionIds.map((id) => deleteTaskAction(id)));
+            onClose();
+          },
+        },
+      );
+    }
+
     // Focus mode and source toggle
     baseCommands.push(
       {
+        id: "show-notes",
+        label: "Switch to Notes",
+        section: "Navigation",
+        shortcut: `${mod} 1`,
+        keywords: ["workspace", "mode"],
+        icon: <FileText className="w-4.5 h-4.5 stroke-[1.7]" />,
+        action: () => {
+          onShowNotes?.();
+          onClose();
+        },
+      },
+      {
+        id: "show-tasks",
+        label: "Switch to Tasks",
+        section: "Tasks",
+        shortcut: `${mod} 2`,
+        keywords: ["workspace", "mode"],
+        icon: <CheckSquare className="w-4.5 h-4.5 stroke-[1.7]" />,
+        action: () => {
+          onShowTasks?.();
+          onClose();
+        },
+      },
+      {
+        id: "search-notes",
+        label: "Search Notes",
+        section: "Navigation",
+        shortcut: `${mod} ${shift} F`,
+        keywords: ["find", "all notes", "sidebar"],
+        icon: <SearchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          window.dispatchEvent(new CustomEvent("open-notes-search"));
+          onClose();
+        },
+      },
+      {
         id: "toggle-outline-panel",
         label: `${rightPanelVisible ? "Hide" : "Show"} Right Pane`,
-        shortcut: shortcut(...TOGGLE_RIGHT_PANE_KEYS),
+        section: "Navigation",
+        shortcut: `${mod} ${shift} ]`,
+        keywords: ["outline", "assistant", "panel"],
         icon: <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           onToggleRightPanel?.();
@@ -403,7 +772,9 @@ export function CommandPalette({
       {
         id: "focus-mode",
         label: focusMode ? "Exit Focus Mode" : "Enter Focus Mode",
+        section: "Editor",
         shortcut: `${mod} ${shift} Enter`,
+        keywords: ["zen", "writing"],
         icon: <ZenIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           onToggleFocusMode?.();
@@ -413,10 +784,48 @@ export function CommandPalette({
       {
         id: "toggle-source",
         label: "Toggle Markdown Source",
+        section: "Editor",
         shortcut: `${mod} ${shift} M`,
+        keywords: ["source mode", "markdown"],
         icon: <MarkdownIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           window.dispatchEvent(new CustomEvent("toggle-source-mode"));
+          onClose();
+        },
+      },
+      {
+        id: "pane-one",
+        label: "Switch to 1-Pane View",
+        section: "Navigation",
+        shortcut: `${mod} ${shift} J`,
+        keywords: ["layout", "workspace"],
+        icon: <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setPaneMode(1);
+          onClose();
+        },
+      },
+      {
+        id: "pane-two",
+        label: "Switch to 2-Pane View",
+        section: "Navigation",
+        shortcut: `${mod} ${shift} K`,
+        keywords: ["layout", "workspace"],
+        icon: <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setPaneMode(2);
+          onClose();
+        },
+      },
+      {
+        id: "pane-three",
+        label: "Switch to 3-Pane View",
+        section: "Navigation",
+        shortcut: `${mod} ${shift} L`,
+        keywords: ["layout", "workspace"],
+        icon: <PanelLeft className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setPaneMode(3);
           onClose();
         },
       },
@@ -426,7 +835,9 @@ export function CommandPalette({
     if (notesFolder) {
       baseCommands.push({
         id: "open-folder",
-        label: "Open Notes Folder",
+        label: "Open Notes Folder in Finder",
+        section: "System",
+        keywords: ["reveal", "file manager", "directory"],
         icon: <FolderIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: async () => {
           try {
@@ -445,7 +856,9 @@ export function CommandPalette({
       {
         id: "settings",
         label: "Settings",
+        section: "Settings",
         shortcut: `${mod} ,`,
+        keywords: ["preferences"],
         icon: <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           onOpenSettings?.();
@@ -453,8 +866,33 @@ export function CommandPalette({
         },
       },
       {
-        id: "theme-light",
-        label: `Switch Theme to Light Mode`,
+        id: "settings-shortcuts",
+        label: "Keyboard Shortcuts",
+        section: "Settings",
+        shortcut: `${mod} /`,
+        keywords: ["help", "markdown guide"],
+        icon: <KeyboardIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          onOpenSettingsTab?.("shortcuts");
+          onClose();
+        },
+      },
+      {
+        id: "settings-about",
+        label: "About Sly",
+        section: "Settings",
+        keywords: ["version", "updates"],
+        icon: <InfoIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          onOpenSettingsTab?.("about");
+          onClose();
+        },
+      },
+      {
+        id: "theme-mode-light",
+        label: "Use Light Mode",
+        section: "Settings",
+        keywords: ["appearance", "theme"],
         icon: <SwatchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           setTheme("light");
@@ -462,8 +900,10 @@ export function CommandPalette({
         },
       },
       {
-        id: "theme-dark",
-        label: `Switch Theme to Dark Mode`,
+        id: "theme-mode-dark",
+        label: "Use Dark Mode",
+        section: "Settings",
+        keywords: ["appearance", "theme"],
         icon: <SwatchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           setTheme("dark");
@@ -471,11 +911,83 @@ export function CommandPalette({
         },
       },
       {
-        id: "theme-system",
-        label: `Switch Theme to System Mode`,
+        id: "theme-mode-system",
+        label: "Use System Appearance",
+        section: "Settings",
+        keywords: ["appearance", "theme", "auto"],
         icon: <SwatchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           setTheme("system");
+          onClose();
+        },
+      },
+      {
+        id: "change-theme",
+        label: "Change Theme...",
+        section: "Settings",
+        keywords: ["appearance", "preset", "colors", "swatch"],
+        icon: <SwatchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          const resolvedPresetKind = theme === "system" ? resolvedTheme : theme;
+          const selectedPresetId =
+            resolvedPresetKind === "dark" ? darkPresetId : lightPresetId;
+          const selectedPresetIndex = (
+            resolvedPresetKind === "dark" ? DARK_THEME_PRESETS : LIGHT_THEME_PRESETS
+          ).findIndex((preset) => preset.id === selectedPresetId);
+          setActiveSubmenu("theme");
+          setThemePreview({
+            kind: resolvedPresetKind,
+            originalPresetId: selectedPresetId,
+            committed: false,
+          });
+          setQuery("");
+          setSelectedIndex(Math.max(selectedPresetIndex, 0));
+        },
+      },
+      {
+        id: "toggle-text-direction",
+        label: `Use ${textDirection === "rtl" ? "Left-to-Right" : "Right-to-Left"} Text Direction`,
+        section: "Settings",
+        keywords: ["editor", "writing", "rtl", "ltr"],
+        icon: <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setTextDirection(textDirection === "rtl" ? "ltr" : "rtl");
+          onClose();
+        },
+      },
+      {
+        id: "zoom-in",
+        label: "Zoom In",
+        section: "Navigation",
+        shortcut: `${mod} =`,
+        keywords: ["interface", "scale"],
+        icon: <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setInterfaceZoom((prev) => prev + 0.05);
+          onClose();
+        },
+      },
+      {
+        id: "zoom-out",
+        label: "Zoom Out",
+        section: "Navigation",
+        shortcut: `${mod} -`,
+        keywords: ["interface", "scale"],
+        icon: <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setInterfaceZoom((prev) => prev - 0.05);
+          onClose();
+        },
+      },
+      {
+        id: "zoom-reset",
+        label: "Reset Zoom",
+        section: "Navigation",
+        shortcut: `${mod} 0`,
+        keywords: ["interface", "scale"],
+        icon: <SettingsIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          setInterfaceZoom(1);
           onClose();
         },
       },
@@ -491,13 +1003,36 @@ export function CommandPalette({
     flushPendingSave,
     onClose,
     onOpenSettings,
+    onOpenSettingsTab,
+    onShowNotes,
+    onShowTasks,
+    onOpenTaskCapture,
+    onReloadCurrentNote,
     setTheme,
+    theme,
+    resolvedTheme,
+    darkPresetId,
+    lightPresetId,
+    setInterfaceZoom,
+    setPaneMode,
+    textDirection,
+    setTextDirection,
     gitEnabled,
     gitAvailable,
     status,
     commit,
     sync,
     isSyncing,
+    selectedView,
+    selectedTask,
+    selectedTaskId,
+    selectedTaskIds,
+    tagNames,
+    selectView,
+    selectTag,
+    setCompleted,
+    deleteTaskAction,
+    refreshTasks,
     selectNote,
     refreshNotes,
     settings,
@@ -508,6 +1043,41 @@ export function CommandPalette({
     onToggleRightPanel,
     rightPanelVisible,
     notesFolder,
+  ]);
+
+  const activeThemePresets = useMemo(() => {
+    const resolvedPresetKind = theme === "system" ? resolvedTheme : theme;
+    return resolvedPresetKind === "dark" ? DARK_THEME_PRESETS : LIGHT_THEME_PRESETS;
+  }, [resolvedTheme, theme]);
+
+  const activeThemeKind = theme === "system" ? resolvedTheme : theme;
+  const activeThemePresetId =
+    activeThemeKind === "dark" ? darkPresetId : lightPresetId;
+  const setActiveThemePreset =
+    activeThemeKind === "dark" ? setDarkPresetId : setLightPresetId;
+
+  const themeCommands = useMemo<AppCommand[]>(() => {
+    return activeThemePresets.map((preset) => ({
+      id: `theme-preset-${preset.id}`,
+      label: `${preset.label}${preset.id === activeThemePresetId ? " (Current)" : ""}`,
+      section: "Settings",
+      keywords: ["theme", "appearance", "preset", activeThemeKind],
+      icon: <SwatchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+      action: () => {
+        setThemePreview((preview) =>
+          preview ? { ...preview, committed: true } : preview,
+        );
+        setActiveThemePreset(preset.id);
+        toast.success(`Theme changed to ${preset.label}`);
+        onClose();
+      },
+    }));
+  }, [
+    activeThemeKind,
+    activeThemePresetId,
+    activeThemePresets,
+    onClose,
+    setActiveThemePreset,
   ]);
 
   // Debounced search using Tantivy (local state, doesn't affect sidebar)
@@ -554,27 +1124,81 @@ export function CommandPalette({
     return localSearchResults;
   }, [query, notes, localSearchResults]);
 
+  const filteredTasks = useMemo(() => {
+    const trimmed = query.trim();
+    if (activeSubmenu !== "root" || !trimmed) return [];
+
+    return tasks
+      .filter((task) => taskMatchesQuery(task, trimmed))
+      .sort((a, b) => {
+        if (a.starred !== b.starred) return a.starred ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  }, [activeSubmenu, query, tasks]);
+
   // Memoize filtered commands
-  const filteredCommands = useMemo(() => {
-    if (!query.trim()) return commands;
-    const queryLower = query.toLowerCase();
-    return commands.filter((cmd) =>
-      cmd.label.toLowerCase().includes(queryLower),
+  const activeCommands = activeSubmenu === "theme" ? themeCommands : commands;
+
+  const filteredCommands = useMemo(
+    () => activeCommands.filter((cmd) => commandMatchesQuery(cmd, query)),
+    [query, activeCommands],
+  );
+
+  const recentCommands = useMemo(() => {
+    if (activeSubmenu !== "root" || query.trim()) return [];
+
+    const commandById = new Map(commands.map((cmd) => [cmd.id, cmd]));
+    return recentCommandIds
+      .map((id) => commandById.get(id))
+      .filter((cmd): cmd is AppCommand => Boolean(cmd))
+      .slice(0, MAX_RECENT_COMMANDS);
+  }, [activeSubmenu, commands, query, recentCommandIds]);
+
+  const primaryCommands = useMemo(() => {
+    if (recentCommands.length === 0) return filteredCommands;
+    const recentIds = new Set(recentCommands.map((cmd) => cmd.id));
+    return filteredCommands.filter((cmd) => !recentIds.has(cmd.id));
+  }, [filteredCommands, recentCommands]);
+
+  const commandItems = useMemo(
+    () => [...recentCommands, ...primaryCommands],
+    [primaryCommands, recentCommands],
+  );
+
+  useEffect(() => {
+    if (activeSubmenu !== "theme") return;
+    const highlightedTheme = commandItems[selectedIndex];
+    if (!highlightedTheme?.id.startsWith("theme-preset-")) return;
+
+    const preset = activeThemePresets.find(
+      (candidate) => `theme-preset-${candidate.id}` === highlightedTheme.id,
     );
-  }, [query, commands]);
+    if (!preset) return;
+
+    applyThemePreviewVariables(preset.id);
+  }, [
+    activeSubmenu,
+    activeThemePresets,
+    applyThemePreviewVariables,
+    commandItems,
+    selectedIndex,
+  ]);
 
   // Memoize all items (commands first, then notes)
   const allItems = useMemo(
     () => [
-      ...filteredCommands.map((cmd) => ({
+      ...commandItems.map((cmd) => ({
         type: "command" as const,
         id: cmd.id,
         label: cmd.label,
         shortcut: cmd.shortcut,
         icon: cmd.icon,
-        action: cmd.action,
+        action: () => {
+          rememberCommand(cmd.id);
+          cmd.action();
+        },
       })),
-      ...filteredNotes.slice(0, 10).map((note) => ({
+      ...(activeSubmenu === "root" ? filteredNotes.slice(0, 10) : []).map((note) => ({
         type: "note" as const,
         id: note.id,
         label: cleanTitle(note.title),
@@ -584,8 +1208,36 @@ export function CommandPalette({
           onClose();
         },
       })),
+      ...filteredTasks.slice(0, 10).map((task) => ({
+        type: "task" as const,
+        id: task.id,
+        label: task.title,
+        preview: [
+          task.description,
+          task.waitingFor ? `Waiting for ${task.waitingFor}` : "",
+          task.tags?.length ? task.tags.map((tag) => `#${tag}`).join(" ") : "",
+        ].find((value) => value.trim()) ?? TASK_VIEW_LABELS[deriveView(task, today)],
+        action: () => {
+          selectView(deriveView(task, today));
+          selectTask(task.id);
+          onShowTasks?.();
+          onClose();
+        },
+      })),
     ],
-    [filteredNotes, filteredCommands, selectNote, onClose],
+    [
+      activeSubmenu,
+      filteredNotes,
+      filteredTasks,
+      commandItems,
+      rememberCommand,
+      selectNote,
+      selectTask,
+      selectView,
+      onShowTasks,
+      today,
+      onClose,
+    ],
   );
 
   // Reset state when opened
@@ -593,6 +1245,8 @@ export function CommandPalette({
     if (open) {
       setQuery("");
       setSelectedIndex(0);
+      setActiveSubmenu("root");
+      setThemePreview(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -650,21 +1304,37 @@ export function CommandPalette({
         case "Escape":
           e.preventDefault();
           e.stopPropagation();
-          onClose();
+          if (activeSubmenu !== "root") {
+            leaveThemeSubmenu();
+            break;
+          }
+          handlePaletteClose();
           break;
       }
     },
-    [allItems, selectedIndex, onClose],
+    [
+      activeSubmenu,
+      allItems,
+      handlePaletteClose,
+      leaveThemeSubmenu,
+      selectedIndex,
+    ],
   );
 
   if (!open) return null;
 
-  const commandsCount = filteredCommands.length;
+  const commandsCount = commandItems.length;
+  const notesCount =
+    activeSubmenu === "root" ? Math.min(filteredNotes.length, 10) : 0;
+  const tasksStartIndex = commandsCount + notesCount;
 
   return (
     <>
       <DialogShell
-        onBackdropClick={onClose}
+        onBackdropClick={handlePaletteClose}
+        overlayClassName={
+          activeSubmenu === "theme" ? "ui-dialog-overlay-transparent" : undefined
+        }
         panelClassName="max-w-2xl h-full max-h-108 flex flex-col"
       >
         {/* Search input */}
@@ -675,7 +1345,11 @@ export function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search notes or type a command..."
+            placeholder={
+              activeSubmenu === "theme"
+                ? `Choose a ${theme === "system" ? resolvedTheme : theme} theme...`
+                : "Search notes, tasks, or type a command..."
+            }
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
@@ -696,20 +1370,61 @@ export function CommandPalette({
           ) : (
             <>
               {/* Commands section */}
-              {filteredCommands.length > 0 && (
+              {commandItems.length > 0 && (
                 <div className="space-y-1 mb-5">
-                  <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
-                    Commands
+                  {recentCommands.length > 0 && (
+                    <>
+                      <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
+                        Recent
+                      </div>
+                      {recentCommands.map((cmd, i) => {
+                        return (
+                          <div key={cmd.id} data-index={i}>
+                            <CommandItem
+                              label={cmd.label}
+                              shortcut={cmd.shortcut}
+                              icon={cmd.icon}
+                              isSelected={selectedIndex === i}
+                              onClick={() => {
+                                rememberCommand(cmd.id);
+                                cmd.action();
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium text-text-muted">
+                    {activeSubmenu !== "root" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          leaveThemeSubmenu();
+                        }}
+                        className="flex h-6 w-6 items-center justify-center rounded-[var(--ui-radius-sm)] text-text-muted hover:bg-bg-muted hover:text-text"
+                        aria-label="Back to commands"
+                      >
+                        <ArrowLeft className="h-4 w-4 stroke-[1.6]" />
+                      </button>
+                    )}
+                    <span>
+                      {activeSubmenu === "theme" ? "Themes" : "Commands"}
+                    </span>
                   </div>
-                  {filteredCommands.map((cmd, i) => {
+                  {primaryCommands.map((cmd, i) => {
+                    const index = recentCommands.length + i;
                     return (
-                      <div key={cmd.id} data-index={i}>
+                      <div key={cmd.id} data-index={index}>
                         <CommandItem
                           label={cmd.label}
                           shortcut={cmd.shortcut}
                           icon={cmd.icon}
-                          isSelected={selectedIndex === i}
-                          onClick={cmd.action}
+                          isSelected={selectedIndex === index}
+                          onClick={() => {
+                            rememberCommand(cmd.id);
+                            cmd.action();
+                          }}
                         />
                       </div>
                     );
@@ -718,8 +1433,8 @@ export function CommandPalette({
               )}
 
               {/* Notes section */}
-              {filteredNotes.length > 0 && (
-                <div className="space-y-1">
+              {activeSubmenu === "root" && filteredNotes.length > 0 && (
+                <div className="space-y-1 mb-5">
                   <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
                     Notes
                   </div>
@@ -737,6 +1452,31 @@ export function CommandPalette({
                           variant="note"
                           isSelected={selectedIndex === index}
                           onClick={allItems[index].action}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Tasks section */}
+              {activeSubmenu === "root" && filteredTasks.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-text-muted px-2.5 py-1.5">
+                    Tasks
+                  </div>
+                  {filteredTasks.slice(0, 10).map((task, i) => {
+                    const index = tasksStartIndex + i;
+                    const item = allItems[index];
+                    return (
+                      <div key={task.id} data-index={index}>
+                        <CommandItem
+                          label={task.title}
+                          subtitle={item?.type === "task" ? item.preview : undefined}
+                          icon={<CheckSquare className="w-4.5 h-4.5 stroke-[1.7]" />}
+                          variant="command"
+                          isSelected={selectedIndex === index}
+                          onClick={item?.action}
                         />
                       </div>
                     );

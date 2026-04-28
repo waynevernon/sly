@@ -1915,10 +1915,15 @@ function AppContent() {
           open={paletteOpen}
           onClose={handleClosePalette}
           onOpenSettings={openSettings}
+          onOpenSettingsTab={openSettings}
           focusMode={focusMode}
           onToggleFocusMode={toggleFocusMode}
           rightPanelVisible={rightPanelVisible}
           onToggleRightPanel={toggleRightPanel}
+          onShowNotes={showNotesMode}
+          onShowTasks={showTasksMode}
+          onOpenTaskCapture={openTaskCapture}
+          onReloadCurrentNote={reloadCurrentNote}
           editorRef={editorRef}
           flushPendingSave={flushPendingSave}
         />
