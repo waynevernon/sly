@@ -84,6 +84,12 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(default_note_name) = patch.default_note_name {
         settings.default_note_name = default_note_name;
     }
+    if let Some(daily_note_name) = patch.daily_note_name {
+        settings.daily_note_name = daily_note_name;
+    }
+    if let Some(daily_note_folder) = patch.daily_note_folder {
+        settings.daily_note_folder = daily_note_folder;
+    }
     if let Some(ollama_model) = patch.ollama_model {
         settings.ollama_model = ollama_model;
     }
@@ -190,6 +196,28 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
             changed = true;
         } else if trimmed != default_note_name {
             settings.default_note_name = Some(trimmed.to_string());
+            changed = true;
+        }
+    }
+
+    if let Some(daily_note_name) = &settings.daily_note_name {
+        let trimmed = daily_note_name.trim();
+        if trimmed.is_empty() {
+            settings.daily_note_name = None;
+            changed = true;
+        } else if trimmed != daily_note_name {
+            settings.daily_note_name = Some(trimmed.to_string());
+            changed = true;
+        }
+    }
+
+    if let Some(daily_note_folder) = &settings.daily_note_folder {
+        let trimmed = daily_note_folder.trim().trim_matches('/');
+        if trimmed.is_empty() {
+            settings.daily_note_folder = None;
+            changed = true;
+        } else if trimmed != daily_note_folder {
+            settings.daily_note_folder = Some(trimmed.to_string());
             changed = true;
         }
     }

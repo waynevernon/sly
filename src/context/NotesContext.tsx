@@ -92,6 +92,7 @@ interface NotesActionsContextValue {
   selectPinnedNotes: () => void;
   selectRecentNotes: () => void;
   createNote: () => Promise<void>;
+  openDailyNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
   renameNote: (id: string, newName: string) => Promise<Note>;
@@ -1305,6 +1306,28 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create note");
+    }
+  }, [recordRecentNoteView, refreshNotes, setSelectionState]);
+
+  const openDailyNote = useCallback(async () => {
+    try {
+      const note = await notesService.openDailyNote();
+      selectRequestIdRef.current += 1;
+      recentlySavedRef.current.add(note.id);
+      await refreshNotes();
+      setCurrentNote(note);
+      setSelectedNoteId(note.id);
+      setSelectionState([note.id], { anchorId: note.id, rangeEndId: note.id });
+      const parentFolder = getParentFolderPath(note.id);
+      setSelectedScope(parentFolder ? { type: "folder", path: parentFolder } : { type: "all" });
+      setSearchQuery("");
+      setSearchResults([]);
+      void recordRecentNoteView(note.id);
+      setTimeout(() => {
+        recentlySavedRef.current.delete(note.id);
+      }, 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open daily note");
     }
   }, [recordRecentNoteView, refreshNotes, setSelectionState]);
 
@@ -2562,6 +2585,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       selectPinnedNotes,
       selectRecentNotes,
       createNote,
+      openDailyNote,
       consumePendingNewNote,
       saveNote,
       renameNote,
@@ -2605,6 +2629,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       selectPinnedNotes,
       selectRecentNotes,
       createNote,
+      openDailyNote,
       consumePendingNewNote,
       saveNote,
       renameNote,

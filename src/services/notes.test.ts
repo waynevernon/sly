@@ -24,6 +24,23 @@ describe("notes service", () => {
     ]);
   });
 
+  it("routes open_daily_note without a payload", async () => {
+    const calls: Array<{ cmd: string; payload: unknown }> = [];
+    mockIPC((cmd, payload) => {
+      calls.push({ cmd, payload });
+      return { id: "2026-04-28", title: "2026 04 28", content: "", path: "", modified: 0 };
+    });
+
+    await notesService.openDailyNote();
+
+    expect(calls).toEqual([
+      {
+        cmd: "open_daily_note",
+        payload: {},
+      },
+    ]);
+  });
+
   it("routes patch_settings with the provided shallow patch", async () => {
     const calls: Array<{ cmd: string; payload: unknown }> = [];
     mockIPC((cmd, payload) => {

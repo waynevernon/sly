@@ -46,6 +46,7 @@ describe("GeneralSettingsSection", () => {
 
     vi.mocked(notesContext.useNotes).mockReturnValue({
       notesFolder: "/tmp/notes",
+      knownFolders: ["Journal"],
       setNotesFolder: vi.fn(),
     } as never);
     vi.mocked(gitContext.useGit).mockReturnValue({

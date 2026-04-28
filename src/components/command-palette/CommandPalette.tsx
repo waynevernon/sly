@@ -119,6 +119,7 @@ interface CommandPaletteProps {
   onShowTasks?: () => void;
   onOpenTaskCapture?: () => void;
   onReloadCurrentNote?: () => void;
+  onOpenDailyNote?: () => void;
   editorRef?: React.RefObject<Editor | null>;
   flushPendingSave?: (() => Promise<void>) | null;
 }
@@ -136,6 +137,7 @@ export function CommandPalette({
   onShowTasks,
   onOpenTaskCapture,
   onReloadCurrentNote,
+  onOpenDailyNote,
   editorRef,
   flushPendingSave,
 }: CommandPaletteProps) {
@@ -293,6 +295,18 @@ export function CommandPalette({
         icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           createNote();
+          onClose();
+        },
+      },
+      {
+        id: "daily-note",
+        label: "Daily Note",
+        section: "Notes",
+        shortcut: `${mod} ${shift} D`,
+        keywords: ["today", "journal", "date"],
+        icon: <Sun className="w-4.5 h-4.5 stroke-[1.5]" />,
+        action: () => {
+          onOpenDailyNote?.();
           onClose();
         },
       },
@@ -996,6 +1010,7 @@ export function CommandPalette({
     return baseCommands;
   }, [
     createNote,
+    onOpenDailyNote,
     currentNote,
     confirmDeletions,
     deleteNote,

@@ -426,6 +426,7 @@ function AppContent() {
   const {
     clearNoteSelection,
     createNote,
+    openDailyNote,
     duplicateNote,
     consumePendingNewNote,
     pinNote,
@@ -1427,6 +1428,18 @@ function AppContent() {
         (e.metaKey || e.ctrlKey) &&
         e.shiftKey &&
         !e.altKey &&
+        e.key.toLowerCase() === "d"
+      ) {
+        e.preventDefault();
+        showNotesMode();
+        openDailyNote();
+        return;
+      }
+
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        !e.altKey &&
         e.key.toLowerCase() === "t"
       ) {
         e.preventDefault();
@@ -1744,6 +1757,7 @@ function AppContent() {
     };
   }, [
     createNote,
+    openDailyNote,
     applyPaneModeSelection,
     cycleWorkspacePaneMode,
     duplicateNote,
@@ -1924,6 +1938,7 @@ function AppContent() {
           onShowTasks={showTasksMode}
           onOpenTaskCapture={openTaskCapture}
           onReloadCurrentNote={reloadCurrentNote}
+          onOpenDailyNote={openDailyNote}
           editorRef={editorRef}
           flushPendingSave={flushPendingSave}
         />

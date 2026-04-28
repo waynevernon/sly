@@ -201,6 +201,8 @@ export interface Settings {
   showNoteCounts: boolean;
   showNotesFromSubfolders: boolean;
   defaultNoteName?: string | null;
+  dailyNoteName?: string | null;
+  dailyNoteFolder?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
   taskTagIcons?: Record<string, FolderAppearance> | null;
@@ -226,6 +228,8 @@ export interface SettingsPatch {
   showNoteCounts?: boolean | null;
   showNotesFromSubfolders?: boolean | null;
   defaultNoteName?: string | null;
+  dailyNoteName?: string | null;
+  dailyNoteFolder?: string | null;
   ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
   taskTagIcons?: Record<string, FolderAppearance> | null;

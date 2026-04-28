@@ -44,6 +44,10 @@ export async function createNote(targetFolder?: string): Promise<Note> {
   return invoke("create_note", { targetFolder: targetFolder ?? null });
 }
 
+export async function openDailyNote(): Promise<Note> {
+  return invoke("open_daily_note");
+}
+
 export async function listFolders(): Promise<string[]> {
   return invoke("list_folders");
 }

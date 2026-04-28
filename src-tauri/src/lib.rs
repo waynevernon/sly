@@ -552,6 +552,10 @@ pub struct Settings {
     pub show_notes_from_subfolders: bool,
     #[serde(rename = "defaultNoteName")]
     pub default_note_name: Option<String>,
+    #[serde(rename = "dailyNoteName", skip_serializing_if = "Option::is_none")]
+    pub daily_note_name: Option<String>,
+    #[serde(rename = "dailyNoteFolder", skip_serializing_if = "Option::is_none")]
+    pub daily_note_folder: Option<String>,
     #[serde(rename = "ollamaModel")]
     pub ollama_model: Option<String>,
     #[serde(rename = "folderIcons", default)]
@@ -605,6 +609,8 @@ impl Default for Settings {
             show_note_counts: true,
             show_notes_from_subfolders: false,
             default_note_name: None,
+            daily_note_name: None,
+            daily_note_folder: None,
             ollama_model: None,
             folder_icons: None,
             task_tag_icons: None,
@@ -642,6 +648,10 @@ pub struct SettingsPatch {
     pub show_notes_from_subfolders: Option<Option<bool>>,
     #[serde(default)]
     pub default_note_name: Option<Option<String>>,
+    #[serde(default)]
+    pub daily_note_name: Option<Option<String>>,
+    #[serde(default)]
+    pub daily_note_folder: Option<Option<String>>,
     #[serde(default)]
     pub ollama_model: Option<Option<String>>,
     #[serde(default)]
@@ -966,6 +976,19 @@ fn sanitize_filename(title: &str) -> String {
 
 fn note_id_dir_prefix(id: &str) -> Option<&str> {
     id.rfind('/').map(|pos| &id[..pos])
+}
+
+fn note_id_leaf(id: &str) -> &str {
+    id.rsplit('/').next().unwrap_or(id)
+}
+
+fn daily_note_id_from_parts(template: &str, target_folder: Option<&str>) -> String {
+    let expanded = expand_note_name_template(template);
+    let sanitized = sanitize_filename(&expanded);
+    target_folder
+        .filter(|folder| !folder.trim().is_empty())
+        .map(|folder| format!("{}/{}", folder.trim().trim_matches('/'), sanitized))
+        .unwrap_or(sanitized)
 }
 
 #[cfg(test)]
@@ -2580,6 +2603,84 @@ async fn create_note(
         .unwrap_or(0);
 
     // Update search index
+    {
+        let index = state.search_index.lock().expect("search index mutex");
+        if let Some(ref search_index) = *index {
+            let _ = search_index.index_note(&final_id, &display_title, &content, modified);
+        }
+    }
+
+    Ok(Note {
+        id: final_id,
+        title: display_title,
+        content,
+        path: file_path.to_string_lossy().into_owned(),
+        modified,
+    })
+}
+
+#[tauri::command]
+async fn open_daily_note(state: State<'_, AppState>) -> Result<Note, String> {
+    let folder = {
+        let app_config = state.app_config.read().expect("app_config read lock");
+        app_config
+            .notes_folder
+            .clone()
+            .ok_or("Notes folder not set")?
+    };
+    let folder_path = PathBuf::from(&folder);
+    let _mutation_guard = state.note_mutation_lock.lock().await;
+
+    let (template, target_folder) = {
+        let settings = state.settings.read().expect("settings read lock");
+        (
+            settings
+                .daily_note_name
+                .clone()
+                .unwrap_or_else(|| "{date}".to_string()),
+            settings.daily_note_folder.clone(),
+        )
+    };
+
+    let final_id = daily_note_id_from_parts(&template, target_folder.as_deref());
+    let file_path = abs_path_from_id(&folder_path, &final_id)?;
+
+    if file_path.exists() {
+        let content = fs::read_to_string(&file_path).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::InvalidData {
+                "File is not valid UTF-8. Sly only supports UTF-8 encoded notes.".to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
+        let metadata = fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        return Ok(Note {
+            id: final_id,
+            title: extract_title(&content),
+            content,
+            path: file_path.to_string_lossy().into_owned(),
+            modified,
+        });
+    }
+
+    let display_title = note_id_leaf(&final_id).to_string();
+    let content = format!("# {}\n\n", display_title);
+    write_new_note_file(&file_path, content.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let modified = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
     {
         let index = state.search_index.lock().expect("search index mutex");
         if let Some(ref search_index) = *index {
@@ -6206,6 +6307,7 @@ pub fn run() {
             delete_note,
             delete_notes,
             create_note,
+            open_daily_note,
             duplicate_note,
             list_folders,
             create_folder,
@@ -7066,6 +7168,29 @@ mod tests {
     }
 
     #[test]
+    fn note_id_leaf_preserves_filename_text() {
+        assert_eq!(note_id_leaf("2026-04-28"), "2026-04-28");
+        assert_eq!(note_id_leaf("Journal/2026-04-28"), "2026-04-28");
+    }
+
+    #[test]
+    fn daily_note_id_defaults_to_iso_date_filename() {
+        let note_id = daily_note_id_from_parts("{date}", None);
+        assert_eq!(note_id.len(), "2026-04-28".len());
+        assert_eq!(note_id.chars().nth(4), Some('-'));
+        assert_eq!(note_id.chars().nth(7), Some('-'));
+        assert!(note_id.chars().all(|char| char.is_ascii_digit() || char == '-'));
+    }
+
+    #[test]
+    fn daily_note_id_preserves_folder_prefix() {
+        let note_id = daily_note_id_from_parts("{date}", Some("Journal/Daily"));
+        assert!(note_id.starts_with("Journal/Daily/"));
+        assert_eq!(note_id["Journal/Daily/".len()..].chars().nth(4), Some('-'));
+        assert_eq!(note_id["Journal/Daily/".len()..].chars().nth(7), Some('-'));
+    }
+
+    #[test]
     fn apply_settings_patch_updates_only_requested_fields() {
         let mut settings = Settings {
             schema_version: persistence::workspace_settings::current_settings_schema_version(),
@@ -7077,6 +7202,8 @@ mod tests {
             show_note_counts: true,
             show_notes_from_subfolders: false,
             default_note_name: Some("Untitled".to_string()),
+            daily_note_name: None,
+            daily_note_folder: None,
             ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
             task_tag_icons: None,

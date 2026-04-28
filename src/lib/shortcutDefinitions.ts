@@ -54,6 +54,11 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: "Notes",
   },
   {
+    keys: [mod, shift, "D"],
+    description: "Open today's daily note",
+    category: "Notes",
+  },
+  {
     keys: [mod, shift, "T"],
     description: "Create new task from anywhere",
     category: "Tasks",
