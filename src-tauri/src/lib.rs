@@ -7453,8 +7453,8 @@ mod tests {
         assert!(settings.show_note_counts);
         assert!(!settings.show_notes_from_subfolders);
         assert_eq!(settings.folder_sort_mode, FolderSortMode::NameAsc);
-        assert_eq!(settings.pinned_note_ids.as_ref().map(Vec::len), Some(2));
-        assert_eq!(settings.recent_note_ids.as_ref().map(Vec::len), Some(5));
+        assert_eq!(settings.pinned_note_ids.as_ref().map(Vec::len), Some(3));
+        assert_eq!(settings.recent_note_ids.as_ref().map(Vec::len), Some(6));
         assert_eq!(settings.folder_icons.as_ref().map(HashMap::len), Some(8));
     }
 
