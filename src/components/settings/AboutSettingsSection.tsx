@@ -85,10 +85,10 @@ export function AboutSettingsSection() {
           />
           <h2 className="text-xl font-medium mb-1">About Sly</h2>
           <p className="text-sm text-text-muted mb-4">
-            Sly is a local-first workspace for notes and tasks. It keeps your
-            notes as plain markdown files on your own disk, brings structured
-            task management into the same workspace, and adds optional AI and
-            Git — without locking anything into a cloud service. Learn more in{" "}
+            Sly is a Mac workspace for markdown notes and task planning. It
+            works from a folder you choose, keeps notes as plain files, and adds
+            keyboard navigation, optional AI, Git, and terminal access. Learn
+            more in{" "}
             <button
               onClick={() => handleOpenUrl(REPOSITORY_URL)}
               className="ui-inline-link cursor-pointer"

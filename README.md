@@ -3,11 +3,11 @@
 </p>
 
 # Sly
-Markdown notes and task planning, local by default.
+Markdown notes and tasks for your Mac.
 
-Sly is a macOS workspace for people who want a real app without giving up their files. Open a folder of markdown notes and get a calm editor, fast navigation, built-in task planning, local AI hooks, Git, and a scriptable CLI.
+Sly turns a folder of markdown files into a fast writing and planning app. You get a calm editor, task lists that live with your notes, keyboard-first navigation, optional AI, Git, and a CLI for the terminal habits you already have.
 
-Your notes stay on disk as plain `.md` files. Your tasks live with the same workspace. Nothing gets trapped in someone else's cloud.
+The center is still plain files on disk. Open the folder anywhere, sync it however you like, or keep it only on this machine.
 
 Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fork of [Scratch](https://github.com/erictli/scratch), the original project by Eric Li.
 
@@ -20,7 +20,7 @@ Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fo
 
 ## What Sly is
 
-Sly is for local notes, serious task capture, and keyboard-driven work. It gives you the shape of a modern productivity app while keeping the files simple enough to open anywhere.
+Sly is for notes you want to keep, tasks you actually need to see, and work that moves faster from the keyboard. It feels like a native productivity app, but the workspace stays simple enough to understand from Finder.
 
 - Work directly in a folder of markdown files.
 - Write in a polished rich text editor, or switch to markdown source when you want the raw file.
@@ -28,15 +28,15 @@ Sly is for local notes, serious task capture, and keyboard-driven work. It gives
 - Add dates, due dates, tags, links, waiting-for notes, stars, and recurrence.
 - Search notes and tasks quickly, open commands from the keyboard, and keep recent work close.
 - Use 1, 2, or 3 panes, detach notes into their own windows, and tune the editor width.
-- Bring your own AI through Claude Code, OpenAI Codex, OpenCode, or Ollama.
+- Use Claude Code, OpenAI Codex, OpenCode, or Ollama when you want AI help inside your workspace.
 - Initialize, commit, and push Git repos from the app.
 - Use the `sly` CLI for capture, search, scripting, and opening notes from the terminal.
 
 ## Why it exists
 
-Most notes apps eventually ask you to choose between comfort and ownership. Sly tries to avoid that bargain. It feels like an app, but it behaves like a folder.
+I want notes software to feel good without making the storage mysterious. Sly is built around that preference: a proper Mac app on top, boring markdown files underneath.
 
-That means your daily workspace can have nice things: focus mode, wikilinks, Mermaid diagrams, KaTeX math, tables, image support, syntax-highlighted code, task planning, themes, fonts, zoom, and Git. But the center stays boring in the best way: markdown on disk.
+That leaves room for useful app things: focus mode, wikilinks, Mermaid diagrams, KaTeX math, tables, images, syntax-highlighted code, task planning, themes, fonts, zoom, and Git. None of those should make it hard to leave, inspect your files, or script around your own workspace.
 
 ## Installation
 

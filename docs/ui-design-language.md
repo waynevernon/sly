@@ -229,7 +229,7 @@ Named semantic state tokens should cover starred, warning, danger, success, and 
 
 ## Copy and Launch Surfaces
 
-- The canonical product description: "A local-first workspace for notes and tasks — plain markdown files, keyboard-first, with optional AI and Git." Use this as the anchor for About screens, onboarding, release notes, and any marketing surface.
+- The canonical product description: "A Mac workspace for markdown notes and task planning, built around plain files, keyboard navigation, optional AI, Git, and a CLI." Use this as the anchor for About screens, onboarding, release notes, and any marketing surface.
 - Tone is calm, warm, and direct — concrete about what Sly does, honest about constraints, friendly without being cutesy. Write like you're describing a tool you actually use and trust.
 - About screens, readmes, release copy, and menu labels should reuse the same core phrasing instead of drifting into separate tones.
 - Credit upstream work plainly and professionally. Attribution should be visible, but it should not overpower Sly's own product identity.
