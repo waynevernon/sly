@@ -15,6 +15,8 @@ import { compareTasks, getDefaultTaskSortMode, groupByView, localDateString, MAN
 import { useNotesData } from "./NotesContext";
 import { sanitizeFolderAppearances, type FolderAppearanceMap } from "../lib/folderIcons";
 
+const MIDNIGHT_ROLLOVER_BUFFER_MS = 1_000;
+
 interface TasksContextValue {
   // Data
   tasks: TaskMetadata[];
@@ -58,6 +60,15 @@ interface TasksContextValue {
 
 const TasksContext = createContext<TasksContextValue | null>(null);
 
+function msUntilNextLocalMidnight(now = new Date()): number {
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0);
+  return Math.max(
+    MIDNIGHT_ROLLOVER_BUFFER_MS,
+    nextMidnight.getTime() - now.getTime() + MIDNIGHT_ROLLOVER_BUFFER_MS,
+  );
+}
+
 export function TasksProvider({ children }: { children: ReactNode }) {
   const { notesFolder, settings } = useNotesData();
   const tasksEnabled = settings?.tasksEnabled ?? true;
@@ -73,6 +84,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
+  const [today, setToday] = useState(() => localDateString());
 
   const refreshRequestIdRef = useRef(0);
   const hasLoadedRef = useRef(false);
@@ -84,7 +96,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   selectedTaskIdRef.current = selectedTaskId;
   selectedTaskIdsRef.current = selectedTaskIds;
 
-  const today = localDateString();
   const buckets = useMemo(() => groupByView(tasks, today), [tasks, today]);
   const tagBuckets = useMemo(() => {
     const next: Record<string, TaskMetadata[]> = {};
@@ -205,6 +216,25 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       if (isInitialLoad) setIsLoading(false);
     }
   }, [tasksEnabled, notesFolder]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+
+    const scheduleRollover = () => {
+      timer = window.setTimeout(() => {
+        setToday(localDateString());
+        scheduleRollover();
+      }, msUntilNextLocalMidnight());
+    };
+
+    scheduleRollover();
+
+    return () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, []);
 
   // Load the full Task when selectedTaskId changes.
   useEffect(() => {
