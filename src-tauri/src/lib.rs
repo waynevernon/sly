@@ -955,6 +955,32 @@ impl Default for AppState {
     }
 }
 
+const MAX_CLIPBOARD_IMAGE_BYTES: usize = 15 * 1024 * 1024;
+const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+const ALLOWED_ASSET_IMAGE_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico", "avif",
+];
+
+fn validate_clipboard_png(image_data: &[u8]) -> Result<(), String> {
+    if image_data.is_empty() {
+        return Err("Decoded image data is empty".to_string());
+    }
+
+    if image_data.len() > MAX_CLIPBOARD_IMAGE_BYTES {
+        return Err("Clipboard image is too large".to_string());
+    }
+
+    if !image_data.starts_with(PNG_SIGNATURE) {
+        return Err("Clipboard image data is not a valid PNG".to_string());
+    }
+
+    Ok(())
+}
+
+fn is_allowed_asset_image_extension(extension: &str) -> bool {
+    ALLOWED_ASSET_IMAGE_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
 // Utility: Sanitize filename from title
 fn sanitize_filename(title: &str) -> String {
     let sanitized: String = title
@@ -4151,10 +4177,7 @@ async fn save_clipboard_image(
         .decode(&base64_data)
         .map_err(|_| "Failed to decode base64 image data".to_string())?;
 
-    // Guard against zero-byte files
-    if image_data.is_empty() {
-        return Err("Decoded image data is empty".to_string());
-    }
+    validate_clipboard_png(&image_data)?;
 
     // Create assets folder path
     let assets_dir = PathBuf::from(&folder).join("assets");
@@ -4211,11 +4234,7 @@ async fn copy_image_to_assets(
         .and_then(|e| e.to_str())
         .ok_or("Invalid file extension")?;
 
-    const ALLOWED_IMAGE_EXTENSIONS: &[&str] = &[
-        "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "tiff", "tif", "ico", "avif",
-    ];
-    let ext_lower = extension.to_lowercase();
-    if !ALLOWED_IMAGE_EXTENSIONS.contains(&ext_lower.as_str()) {
+    if !is_allowed_asset_image_extension(extension) {
         return Err("Only image files can be copied to assets".to_string());
     }
 
@@ -7025,6 +7044,24 @@ mod tests {
     fn sanitize_filename_normalizes_empty_and_invalid_characters() {
         assert_eq!(sanitize_filename("  My:/Note  "), "My--Note");
         assert_eq!(sanitize_filename(" \u{00A0}\u{FEFF} "), "Untitled");
+    }
+
+    #[test]
+    fn validate_clipboard_png_rejects_empty_large_and_non_png_payloads() {
+        assert!(validate_clipboard_png(&[]).is_err());
+        assert!(validate_clipboard_png(b"not a png").is_err());
+        assert!(validate_clipboard_png(&vec![0; MAX_CLIPBOARD_IMAGE_BYTES + 1]).is_err());
+
+        let mut png = PNG_SIGNATURE.to_vec();
+        png.extend_from_slice(b"payload");
+        assert!(validate_clipboard_png(&png).is_ok());
+    }
+
+    #[test]
+    fn asset_import_extensions_do_not_allow_svg() {
+        assert!(is_allowed_asset_image_extension("png"));
+        assert!(is_allowed_asset_image_extension("JPG"));
+        assert!(!is_allowed_asset_image_extension("svg"));
     }
 
     #[test]
