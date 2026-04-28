@@ -100,6 +100,20 @@
       },
       "colorId": "green"
     },
+    "idea": {
+      "icon": {
+        "kind": "lucide",
+        "name": "lightbulb"
+      },
+      "colorId": "amber"
+    },
+    "inbox": {
+      "icon": {
+        "kind": "lucide",
+        "name": "inbox"
+      },
+      "colorId": "blue"
+    },
     "keyboard": {
       "icon": {
         "kind": "lucide",
