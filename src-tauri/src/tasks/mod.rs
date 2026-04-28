@@ -991,14 +991,24 @@ pub(crate) fn set_task_view_order(
     view: &str,
     task_ids: &[String],
 ) -> Result<()> {
-    let conn = open_tasks_db(notes_root)?;
-    conn.execute("DELETE FROM task_view_order WHERE view = ?1", [view])?;
-    for (i, id) in task_ids.iter().enumerate() {
-        conn.execute(
+    let mut conn = open_tasks_db(notes_root)?;
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM task_view_order WHERE view = ?1", [view])?;
+
+    let mut ordered_ids = Vec::new();
+    for id in task_ids {
+        if !ordered_ids.contains(id) {
+            ordered_ids.push(id.clone());
+        }
+    }
+
+    for (i, id) in ordered_ids.iter().enumerate() {
+        tx.execute(
             "INSERT INTO task_view_order (view, task_id, position) VALUES (?1, ?2, ?3)",
             params![view, id, i as i64],
         )?;
     }
+    tx.commit()?;
     Ok(())
 }
 
@@ -1394,6 +1404,30 @@ mod tests {
 
         delete_task(root.path(), &task.id).unwrap();
         assert!(read_task(root.path(), &task.id).is_err());
+    }
+
+    #[test]
+    fn set_task_view_order_deduplicates_ids() {
+        let root = make_root();
+        let first = create_task(root.path(), "First").unwrap();
+        let second = create_task(root.path(), "Second").unwrap();
+
+        set_task_view_order(
+            root.path(),
+            "inbox",
+            &[
+                first.id.clone(),
+                second.id.clone(),
+                first.id.clone(),
+                second.id.clone(),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            get_task_view_order(root.path(), "inbox").unwrap(),
+            vec![first.id, second.id],
+        );
     }
 
     #[test]

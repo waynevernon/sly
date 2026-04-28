@@ -120,12 +120,25 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     [buckets, selectedTag, selectedView, tagBuckets, taskSortMode, taskViewOrders],
   );
 
+  const persistTaskViewOrder = useCallback(
+    async (view: TaskView, ids: string[]) => {
+      if (!notesFolder) return;
+
+      try {
+        await tasksService.setTaskViewOrder(view, ids);
+      } catch (err) {
+        setLastError(
+          err instanceof Error ? err.message : "Failed to save task order",
+        );
+      }
+    },
+    [notesFolder],
+  );
+
   const setTaskViewOrder = useCallback((view: TaskView, ids: string[]) => {
     setTaskViewOrdersState((prev) => ({ ...prev, [view]: ids }));
-    if (notesFolder) {
-      void tasksService.setTaskViewOrder(view, ids);
-    }
-  }, [notesFolder]);
+    void persistTaskViewOrder(view, ids);
+  }, [persistTaskViewOrder]);
 
   const setTaskSortMode = useCallback((mode: TaskSortMode) => {
     setTaskSortModes((prev) => ({ ...prev, [selectedView]: mode }));
@@ -136,11 +149,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         if (prev[selectedView] !== undefined) return prev;
         return { ...prev, [selectedView]: visibleTaskIds };
       });
-      if (notesFolder && taskViewOrders[selectedView] === undefined) {
-        void tasksService.setTaskViewOrder(selectedView, visibleTaskIds);
+      if (taskViewOrders[selectedView] === undefined) {
+        void persistTaskViewOrder(selectedView, visibleTaskIds);
       }
     }
-  }, [selectedView, visibleTaskIds, taskViewOrders, notesFolder]);
+  }, [selectedView, visibleTaskIds, taskViewOrders, persistTaskViewOrder]);
 
   const setSelectionState = useCallback(
     (
