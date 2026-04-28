@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { showUpdateToast } from "../../App";
+import appIcon from "../../../src-tauri/icons/128x128@2x.png";
 import { Button, LoadingSpinner } from "../ui";
 import { RefreshCwIcon, GithubIcon } from "../icons";
 
@@ -76,13 +77,18 @@ export function AboutSettingsSection() {
       {/* About Section */}
       <section className="space-y-4">
         <div>
+          <img
+            src={appIcon}
+            alt="Sly app icon"
+            className="mb-4 h-18 w-18 rounded-[var(--ui-radius-lg)]"
+            draggable={false}
+          />
           <h2 className="text-xl font-medium mb-1">About Sly</h2>
           <p className="text-sm text-text-muted mb-4">
             Sly is a local-first workspace for notes and tasks. It keeps your
             notes as plain markdown files on your own disk, brings structured
             task management into the same workspace, and adds optional AI and
-            Git — without locking anything into a cloud service.
-            Learn more in{" "}
+            Git — without locking anything into a cloud service. Learn more in{" "}
             <button
               onClick={() => handleOpenUrl(REPOSITORY_URL)}
               className="ui-inline-link cursor-pointer"
@@ -98,8 +104,8 @@ export function AboutSettingsSection() {
               className="ui-inline-link cursor-pointer"
             >
               Wayne Vernon
-            </button>
-            {" "}as an independent fork of{" "}
+            </button>{" "}
+            as an independent fork of{" "}
             <button
               onClick={() => handleOpenUrl(UPSTREAM_URL)}
               className="ui-inline-link cursor-pointer"
