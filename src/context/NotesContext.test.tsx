@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { listen } from "@tauri-apps/api/event";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as notesService from "../services/notes";
@@ -112,6 +113,121 @@ describe("NotesContext", () => {
 
     expect(result.current.searchResults).toEqual([]);
     expect(result.current.isSearching).toBe(false);
+  });
+
+  it("does not flag delayed internal save events as external changes when content matches", async () => {
+    let fileChangeListener:
+      | ((event: {
+          payload: {
+            changed_ids: string[];
+            folder_structure_changed: boolean;
+          };
+        }) => void)
+      | undefined;
+
+    vi.mocked(listen).mockImplementation((async (event, callback) => {
+      if (event === "file-change") {
+        fileChangeListener = callback as typeof fileChangeListener;
+      }
+      return () => {};
+    }) as typeof listen);
+
+    vi.mocked(notesService.readNote)
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nBody",
+        path: "/notes/alpha.md",
+        modified: 2,
+      })
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nBody",
+        path: "/notes/alpha.md",
+        modified: 3,
+      });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await act(async () => {
+      fileChangeListener?.({
+        payload: {
+          changed_ids: ["alpha"],
+          folder_structure_changed: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasExternalChanges).toBe(false);
+      expect(result.current.currentNote?.modified).toBe(3);
+    });
+  });
+
+  it("flags active note file events as external changes when disk content differs", async () => {
+    let fileChangeListener:
+      | ((event: {
+          payload: {
+            changed_ids: string[];
+            folder_structure_changed: boolean;
+          };
+        }) => void)
+      | undefined;
+
+    vi.mocked(listen).mockImplementation((async (event, callback) => {
+      if (event === "file-change") {
+        fileChangeListener = callback as typeof fileChangeListener;
+      }
+      return () => {};
+    }) as typeof listen);
+
+    vi.mocked(notesService.readNote)
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nBody",
+        path: "/notes/alpha.md",
+        modified: 2,
+      })
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nExternal edit",
+        path: "/notes/alpha.md",
+        modified: 3,
+      });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    await act(async () => {
+      fileChangeListener?.({
+        payload: {
+          changed_ids: ["alpha"],
+          folder_structure_changed: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasExternalChanges).toBe(true);
+    });
   });
 
   it("shows instant local matches before async search resolves", async () => {

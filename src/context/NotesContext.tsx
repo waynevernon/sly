@@ -579,6 +579,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // Ref to access selectedNoteId in file watcher without re-registering listener
   const selectedNoteIdRef = useRef<string | null>(null);
   selectedNoteIdRef.current = selectedNoteId;
+  const currentNoteRef = useRef<Note | null>(null);
+  currentNoteRef.current = currentNote;
   const selectedNoteIdsRef = useRef<string[]>([]);
   selectedNoteIdsRef.current = selectedNoteIds;
   // Ref to access notes in search callback without re-creating it on every notes change
@@ -1036,6 +1038,34 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       refreshNotes();
     }, 300);
   }, [refreshNotes]);
+
+  const checkActiveNoteExternalChange = useCallback(async (noteId: string) => {
+    try {
+      const diskNote = await notesService.readNote(noteId);
+      const activeNote = currentNoteRef.current;
+
+      if (
+        selectedNoteIdRef.current !== noteId ||
+        activeNote?.id !== noteId
+      ) {
+        return;
+      }
+
+      if (diskNote.content === activeNote.content) {
+        setHasExternalChanges(false);
+        setCurrentNote((prevNote) =>
+          prevNote?.id === noteId && prevNote.modified !== diskNote.modified
+            ? diskNote
+            : prevNote,
+        );
+        return;
+      }
+
+      setHasExternalChanges(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to check note changes");
+    }
+  }, []);
 
   const selectScope = useCallback(
     (scope: NoteScope) => {
@@ -2307,10 +2337,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       if (externalChanges.length > 0) {
         scheduleRefresh();
 
-        // If the currently selected note was changed externally, set flag (don't auto-reload)
+        // If the currently selected note was changed, verify the content before
+        // showing a reload affordance. Some platforms can deliver delayed write
+        // events for saves that Sly already handled.
         const currentId = selectedNoteIdRef.current;
         if (currentId && externalChanges.includes(currentId)) {
-          setHasExternalChanges(true);
+          void checkActiveNoteExternalChange(currentId);
         }
       }
 
@@ -2332,7 +2364,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         unlisten();
       }
     };
-  }, [refreshKnownFolders, scheduleRefresh]);
+  }, [checkActiveNoteExternalChange, refreshKnownFolders, scheduleRefresh]);
 
   useEffect(() => {
     const scheduleRefresh = () => {

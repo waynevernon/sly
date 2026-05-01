@@ -8,6 +8,7 @@ export type LucideIconComponent = ComponentType<LucideProps> | LucideIcon;
 export interface LucideIconCatalogEntry {
   name: string;
   searchText: string;
+  aliases: string[];
   Component: LucideIconComponent;
 }
 
@@ -54,6 +55,31 @@ function isLucideIconExport(
   return isLucideComponentExportValue(exportedValue);
 }
 
+function getDisplayName(
+  component: LucideIconComponent,
+  fallbackName: string,
+): string {
+  return component !== null &&
+    (typeof component === "function" || typeof component === "object") &&
+    "displayName" in component
+    ? String(component.displayName ?? fallbackName)
+    : fallbackName;
+}
+
+function getCanonicalIconName(
+  component: LucideIconComponent,
+  aliases: string[],
+): string {
+  const displayName = toKebabCase(getDisplayName(component, aliases[0] ?? "icon"));
+  if (aliases.includes(displayName)) return displayName;
+
+  return (
+    aliases.find((alias) => !alias.startsWith("lucide-")) ??
+    aliases[0] ??
+    displayName
+  );
+}
+
 export function buildLucideIconMap(module: Record<string, unknown>) {
   const iconMap = new Map<string, LucideIconComponent>();
 
@@ -72,14 +98,38 @@ export function buildLucideIconMap(module: Record<string, unknown>) {
 }
 
 export function buildLucideIconCatalog(module: Record<string, unknown>) {
-  const iconMap = buildLucideIconMap(module);
+  const iconsByComponent = new Map<
+    LucideIconComponent,
+    { Component: LucideIconComponent; aliases: Set<string> }
+  >();
 
-  return Array.from(iconMap.entries())
-    .map(([name, Component]) => ({
-      name,
-      searchText: `${name} ${name.replace(/-/g, " ")}`,
-      Component,
-    }))
+  for (const [exportName, exportedValue] of Object.entries(module)) {
+    if (!isLucideIconExport(exportName, exportedValue)) {
+      continue;
+    }
+
+    const aliases = iconsByComponent.get(exportedValue) ?? {
+      Component: exportedValue,
+      aliases: new Set<string>(),
+    };
+    aliases.aliases.add(toKebabCase(exportName));
+    iconsByComponent.set(exportedValue, aliases);
+  }
+
+  return Array.from(iconsByComponent.values())
+    .map(({ Component, aliases }) => {
+      const searchableAliases = Array.from(aliases).sort();
+      const name = getCanonicalIconName(Component, searchableAliases);
+
+      return {
+        name,
+        searchText: [name, name.replace(/-/g, " "), ...searchableAliases].join(
+          " ",
+        ),
+        aliases: searchableAliases,
+        Component,
+      };
+    })
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -98,6 +148,10 @@ const lucideIconSearchIndex = buildCatalogSearchIndex(
     terms: [
       { text: icon.name, kind: "primary" as const },
       { text: icon.name.replace(/-/g, " "), kind: "alias" as const },
+      ...icon.aliases.flatMap((alias) => [
+        { text: alias, kind: "alias" as const },
+        { text: alias.replace(/-/g, " "), kind: "alias" as const },
+      ]),
     ],
   })),
 );

@@ -23,6 +23,7 @@ import {
 import { cn } from "../../lib/utils";
 import {
   LUCIDE_ICON_CATALOG,
+  LUCIDE_ICON_MAP,
   type LucideIconCatalogEntry,
   searchLucideIcons,
 } from "../../lib/lucideIcons";
@@ -218,6 +219,9 @@ export function FolderIconPickerModal({
   const selectedColorId = draftAppearance?.colorId ?? null;
   const selectedLucideName =
     draftAppearance?.icon?.kind === "lucide" ? draftAppearance.icon.name : null;
+  const selectedLucideComponent = selectedLucideName
+    ? LUCIDE_ICON_MAP.get(selectedLucideName) ?? null
+    : null;
   const selectedEmojiShortcode =
     draftAppearance?.icon?.kind === "emoji"
       ? draftAppearance.icon.shortcode
@@ -500,7 +504,7 @@ export function FolderIconPickerModal({
                               const index = startIndex + columnIndex;
                               const isSelected =
                                 item.kind === "icon"
-                                  ? item.icon.name === selectedLucideName
+                                  ? item.icon.Component === selectedLucideComponent
                                   : item.id === selectedEmojiId;
                               const isActive = index === activeIndex;
 
