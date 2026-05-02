@@ -1,5 +1,6 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { sanitizeMarkdownExportFilename } from "../lib/exportFilename";
 
 /**
  * Opens a dedicated print window for the current note.
@@ -23,7 +24,7 @@ export async function downloadMarkdown(
   markdown: string,
   noteTitle: string
 ): Promise<boolean> {
-  const sanitizedTitle = sanitizeFilename(noteTitle);
+  const sanitizedTitle = sanitizeMarkdownExportFilename(noteTitle);
 
   // Show native save dialog
   const filePath = await save({
@@ -42,15 +43,4 @@ export async function downloadMarkdown(
   });
 
   return true;
-}
-
-/**
- * Sanitizes a filename by removing invalid characters.
- * Replaces filesystem-unsafe characters with dashes.
- *
- * @param name - The filename to sanitize
- * @returns A filesystem-safe filename
- */
-function sanitizeFilename(name: string): string {
-  return name.replace(/[/\\?%*:|"<>]/g, "-").trim() || "note";
 }
