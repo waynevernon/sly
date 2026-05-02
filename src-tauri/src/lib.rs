@@ -956,6 +956,7 @@ impl Default for AppState {
 }
 
 const MAX_CLIPBOARD_IMAGE_BYTES: usize = 15 * 1024 * 1024;
+const MAX_ASSET_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
 const MAX_MARKDOWN_EXPORT_BYTES: usize = 25 * 1024 * 1024;
 const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 const ALLOWED_ASSET_IMAGE_EXTENSIONS: &[&str] = &[
@@ -980,6 +981,46 @@ fn validate_clipboard_png(image_data: &[u8]) -> Result<(), String> {
 
 fn is_allowed_asset_image_extension(extension: &str) -> bool {
     ALLOWED_ASSET_IMAGE_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
+fn validate_asset_image_data(extension: &str, image_data: &[u8]) -> Result<(), String> {
+    if image_data.is_empty() {
+        return Err("Image file is empty".to_string());
+    }
+
+    let ext = extension.to_ascii_lowercase();
+    let is_valid = match ext.as_str() {
+        "png" => image_data.starts_with(PNG_SIGNATURE),
+        "jpg" | "jpeg" => {
+            image_data.len() >= 3
+                && image_data[0] == 0xff
+                && image_data[1] == 0xd8
+                && image_data[2] == 0xff
+        }
+        "gif" => image_data.starts_with(b"GIF87a") || image_data.starts_with(b"GIF89a"),
+        "webp" => {
+            image_data.len() >= 12
+                && &image_data[0..4] == b"RIFF"
+                && &image_data[8..12] == b"WEBP"
+        }
+        "bmp" => image_data.starts_with(b"BM"),
+        "tif" | "tiff" => {
+            image_data.starts_with(b"II*\0") || image_data.starts_with(b"MM\0*")
+        }
+        "ico" => image_data.starts_with(b"\0\0\x01\0"),
+        "avif" => {
+            image_data.len() >= 12
+                && &image_data[4..8] == b"ftyp"
+                && (&image_data[8..12] == b"avif" || &image_data[8..12] == b"avis")
+        }
+        _ => false,
+    };
+
+    if is_valid {
+        Ok(())
+    } else {
+        Err("Image file type does not match its extension".to_string())
+    }
 }
 
 fn validate_markdown_export_path(path: &str, contents_len: usize) -> Result<PathBuf, String> {
@@ -4288,7 +4329,10 @@ async fn copy_image_to_assets(
     };
 
     let source = PathBuf::from(&source_path);
-    if !source.exists() {
+    let source = source
+        .canonicalize()
+        .map_err(|_| "Source image file does not exist".to_string())?;
+    if !source.is_file() {
         return Err("Source image file does not exist".to_string());
     }
 
@@ -4301,6 +4345,18 @@ async fn copy_image_to_assets(
     if !is_allowed_asset_image_extension(extension) {
         return Err("Only image files can be copied to assets".to_string());
     }
+
+    let metadata = fs::metadata(&source)
+        .await
+        .map_err(|_| "Failed to read image metadata".to_string())?;
+    if metadata.len() > MAX_ASSET_IMAGE_BYTES {
+        return Err("Image file is too large".to_string());
+    }
+
+    let image_data = fs::read(&source)
+        .await
+        .map_err(|_| "Failed to read image file".to_string())?;
+    validate_asset_image_data(extension, &image_data)?;
 
     // Get original filename (without extension)
     let original_name = source
@@ -4328,8 +4384,9 @@ async fn copy_image_to_assets(
         counter += 1;
     }
 
-    // Copy the file
-    fs::copy(&source, &target_path)
+    // Write the validated bytes. The destination name is generated inside the
+    // workspace assets directory, so the copied payload cannot alter its target.
+    fs::write(&target_path, &image_data)
         .await
         .map_err(|_| "Failed to copy image".to_string())?;
 
@@ -7126,6 +7183,22 @@ mod tests {
         assert!(is_allowed_asset_image_extension("png"));
         assert!(is_allowed_asset_image_extension("JPG"));
         assert!(!is_allowed_asset_image_extension("svg"));
+    }
+
+    #[test]
+    fn asset_import_validation_checks_file_signatures() {
+        let mut png = PNG_SIGNATURE.to_vec();
+        png.extend_from_slice(b"payload");
+        assert!(validate_asset_image_data("png", &png).is_ok());
+        assert!(validate_asset_image_data("jpg", &[0xff, 0xd8, 0xff, 0x00]).is_ok());
+        assert!(validate_asset_image_data("gif", b"GIF89apayload").is_ok());
+        assert!(validate_asset_image_data("webp", b"RIFFxxxxWEBPpayload").is_ok());
+        assert!(validate_asset_image_data("bmp", b"BMpayload").is_ok());
+        assert!(validate_asset_image_data("tiff", b"II*\0payload").is_ok());
+        assert!(validate_asset_image_data("ico", b"\0\0\x01\0payload").is_ok());
+        assert!(validate_asset_image_data("avif", b"\0\0\0\x18ftypavifpayload").is_ok());
+        assert!(validate_asset_image_data("png", b"not a png").is_err());
+        assert!(validate_asset_image_data("svg", b"<svg></svg>").is_err());
     }
 
     #[test]

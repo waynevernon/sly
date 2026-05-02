@@ -880,7 +880,7 @@ function EditorImpl({
       filters: [
         {
           name: "Images",
-          extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
+          extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif", "ico", "avif"],
         },
       ],
     });
@@ -897,6 +897,7 @@ function EditorImpl({
         currentEditor.chain().focus().setImage({ src: assetUrl }).run();
       } catch (error) {
         console.error("Failed to add image:", error);
+        toast.error("Failed to add image");
       }
     }
   }, []);
