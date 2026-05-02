@@ -887,7 +887,6 @@ impl SearchIndex {
         if notes_folder.exists() {
             use walkdir::WalkDir;
             for entry in WalkDir::new(notes_folder)
-                .max_depth(10)
                 .into_iter()
                 .filter_entry(is_visible_notes_entry)
                 .flatten()
@@ -2088,7 +2087,6 @@ fn rebuild_notes_cache_incrementally(
     let mut next_cache = HashMap::with_capacity(existing_cache.len());
 
     for entry in WalkDir::new(notes_root)
-        .max_depth(10)
         .into_iter()
         .filter_entry(is_visible_notes_entry)
         .flatten()
@@ -2949,7 +2947,6 @@ async fn list_folders(state: State<'_, AppState>) -> Result<Vec<String>, String>
         let mut folders = Vec::new();
         use walkdir::WalkDir;
         for entry in WalkDir::new(&fp)
-            .max_depth(10)
             .into_iter()
             .filter_entry(is_visible_notes_entry)
             .flatten()
