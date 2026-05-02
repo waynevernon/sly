@@ -214,6 +214,12 @@ Use the same state grammar across editor save state, Git state, AI state, settin
 
 All warning, error, and success messaging should use shared status-panel primitives. Do not hand-build tinted message boxes with raw palette utilities.
 
+User-triggered import and export failures must surface a short, actionable toast or inline status. Do not leave failed picker, import, copy, or export flows as console-only errors.
+
+File picker filters must match the backend-supported formats exactly. If Rust rejects a type, the picker should not offer it unless the rejection path is part of an intentional validation flow with clear user feedback.
+
+Relative date labels must update while the app remains open. This applies to Today, Yesterday, overdue, Upcoming, days-ago labels, and any list metadata derived from the current local date.
+
 When semantic tokens exist, use them. Avoid raw palette classes such as `text-orange-700`, `text-white`, `text-amber-400`, or one-off surface colors in product UI.
 
 Product UI should not use hardcoded Tailwind motion durations such as `duration-100` or `duration-200`; use `--ui-motion-*` tokens.
