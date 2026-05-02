@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NoteList, type NoteListItem } from "./NoteList";
 
@@ -130,6 +130,25 @@ describe("NoteList", () => {
     render(<NoteList items={[baseItem]} emptyState={baseEmptyState} />);
 
     expect(screen.getByText("Yesterday")).toBeInTheDocument();
+  });
+
+  it("refreshes relative date labels after local midnight", async () => {
+    vi.setSystemTime(new Date(2026, 2, 26, 23, 59, 59, 500));
+    const todayItem: NoteListItem = {
+      ...baseItem,
+      modified: Math.floor(new Date(2026, 2, 26, 12, 0, 0).getTime() / 1000),
+    };
+
+    render(<NoteList items={[todayItem]} emptyState={baseEmptyState} />);
+
+    expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+
+    act(() => {
+      vi.setSystemTime(new Date(2026, 2, 27, 0, 0, 0, 100));
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(screen.getByText("Yesterday · work/")).toBeInTheDocument();
   });
 
   it("renders the filename in the metadata line when enabled", async () => {
@@ -309,7 +328,7 @@ describe("NoteList", () => {
     const row = screen.getByRole("option", { name: /Alpha note/ });
     fireEvent.contextMenu(row);
     fireEvent.click(screen.getByRole("menuitem", { name: "Rename File…" }));
-    vi.runAllTimers();
+    vi.runOnlyPendingTimers();
 
     expect(dispatchEventSpy).toHaveBeenCalledWith(
       expect.objectContaining({

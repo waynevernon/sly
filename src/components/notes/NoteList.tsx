@@ -74,9 +74,36 @@ function NoteListEmptyStateIcon({ kind }: Pick<NoteListEmptyState, "kind">) {
   return <AddNoteIcon />;
 }
 
-function formatDate(timestamp: number): string {
+function msUntilNextLocalMidnight(now = new Date()): number {
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0);
+  return Math.max(1000, nextMidnight.getTime() - now.getTime());
+}
+
+function useLocalDateNow(): Date {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    let timer: ReturnType<typeof window.setTimeout> | null = null;
+
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        setNow(new Date());
+        schedule();
+      }, msUntilNextLocalMidnight());
+    };
+
+    schedule();
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
+
+  return now;
+}
+
+function formatDate(timestamp: number, now: Date): string {
   const date = new Date(timestamp * 1000);
-  const now = new Date();
 
   const startOfToday = new Date(
     now.getFullYear(),
@@ -141,6 +168,7 @@ interface NoteItemProps {
   noteListPreviewLines: 0 | 1 | 2 | 3;
   showNoteListFilename: boolean;
   showNoteListFolderPath: boolean;
+  localDateNow: Date;
 }
 
 const NoteItem = memo(function NoteItem({
@@ -157,6 +185,7 @@ const NoteItem = memo(function NoteItem({
   noteListPreviewLines,
   showNoteListFilename,
   showNoteListFolderPath,
+  localDateNow,
 }: NoteItemProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -186,7 +215,7 @@ const NoteItem = memo(function NoteItem({
         : null;
   const subtitleLines: 1 | 2 | 3 | undefined =
     noteListPreviewLines === 0 ? undefined : noteListPreviewLines;
-  const metaText = [timestamp === null ? null : formatDate(timestamp), pathLabel]
+  const metaText = [timestamp === null ? null : formatDate(timestamp, localDateNow), pathLabel]
     .filter(Boolean)
     .join(" · ");
 
@@ -255,6 +284,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
   noteListPreviewLines,
   showNoteListFilename,
   showNoteListFolderPath,
+  localDateNow,
 }: NoteItemWithMenuProps) {
   const isPartOfBatchSelection =
     selectedNoteIds.length > 1 && selectedNoteIds.includes(id);
@@ -321,6 +351,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
             noteListPreviewLines={noteListPreviewLines}
             showNoteListFilename={showNoteListFilename}
             showNoteListFolderPath={showNoteListFolderPath}
+            localDateNow={localDateNow}
           />
         </div>
       </ContextMenu.Trigger>
@@ -442,6 +473,7 @@ export function NoteList({
   const [dontAskAgain, setDontAskAgain] = useState(false);
   const dontAskAgainId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const localDateNow = useLocalDateNow();
 
   const pinnedIds = useMemo(
     () => new Set(settings.pinnedNoteIds || []),
@@ -655,6 +687,7 @@ export function NoteList({
               noteListPreviewLines={noteListPreviewLines}
               showNoteListFilename={showNoteListFilename}
               showNoteListFolderPath={showNoteListFolderPath}
+              localDateNow={localDateNow}
             />
           );
         })}
