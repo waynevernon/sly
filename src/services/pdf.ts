@@ -36,7 +36,7 @@ export async function downloadMarkdown(
   // Convert string to bytes and write file using Tauri command
   const encoder = new TextEncoder();
   const uint8Array = encoder.encode(markdown);
-  await invoke("write_file", {
+  await invoke("write_markdown_export", {
     path: filePath,
     contents: Array.from(uint8Array)
   });

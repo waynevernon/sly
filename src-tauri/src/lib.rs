@@ -956,6 +956,7 @@ impl Default for AppState {
 }
 
 const MAX_CLIPBOARD_IMAGE_BYTES: usize = 15 * 1024 * 1024;
+const MAX_MARKDOWN_EXPORT_BYTES: usize = 25 * 1024 * 1024;
 const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 const ALLOWED_ASSET_IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico", "avif",
@@ -979,6 +980,24 @@ fn validate_clipboard_png(image_data: &[u8]) -> Result<(), String> {
 
 fn is_allowed_asset_image_extension(extension: &str) -> bool {
     ALLOWED_ASSET_IMAGE_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
+fn validate_markdown_export_path(path: &str, contents_len: usize) -> Result<PathBuf, String> {
+    if contents_len > MAX_MARKDOWN_EXPORT_BYTES {
+        return Err("Markdown export is too large".to_string());
+    }
+
+    let target = PathBuf::from(path);
+    match target.extension().and_then(|e| e.to_str()) {
+        Some(ext) if ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown") => {}
+        _ => return Err("Markdown exports must use .md or .markdown".to_string()),
+    }
+
+    if target.exists() && target.is_dir() {
+        return Err("Export path is a directory".to_string());
+    }
+
+    Ok(target)
 }
 
 // Utility: Sanitize filename from title
@@ -3620,10 +3639,11 @@ fn update_git_enabled(
 }
 
 #[tauri::command]
-async fn write_file(path: String, contents: Vec<u8>) -> Result<(), String> {
-    fs::write(&path, contents)
+async fn write_markdown_export(path: String, contents: Vec<u8>) -> Result<(), String> {
+    let target = validate_markdown_export_path(&path, contents.len())?;
+    fs::write(&target, contents)
         .await
-        .map_err(|_| "Failed to write file".to_string())
+        .map_err(|_| "Failed to write markdown export".to_string())
 }
 
 #[tauri::command]
@@ -6387,7 +6407,7 @@ pub fn run() {
             patch_settings,
             update_git_enabled,
             preview_note_name,
-            write_file,
+            write_markdown_export,
             search_notes,
             start_file_watcher,
             rebuild_search_index,
@@ -7106,6 +7126,27 @@ mod tests {
         assert!(is_allowed_asset_image_extension("png"));
         assert!(is_allowed_asset_image_extension("JPG"));
         assert!(!is_allowed_asset_image_extension("svg"));
+    }
+
+    #[test]
+    fn markdown_export_validation_rejects_wrong_extension_directory_and_large_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(validate_markdown_export_path(
+            &dir.path().join("note.md").to_string_lossy(),
+            1024
+        )
+        .is_ok());
+        assert!(validate_markdown_export_path(
+            &dir.path().join("note.txt").to_string_lossy(),
+            1024
+        )
+        .is_err());
+        assert!(validate_markdown_export_path(&dir.path().to_string_lossy(), 1024).is_err());
+        assert!(validate_markdown_export_path(
+            &dir.path().join("huge.md").to_string_lossy(),
+            MAX_MARKDOWN_EXPORT_BYTES + 1
+        )
+        .is_err());
     }
 
     #[test]
