@@ -354,6 +354,8 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 - Any UI that derives buckets or labels from the current local date must refresh at local midnight while the app stays open. Do not rely on incidental re-renders for Today, Upcoming, overdue, or due-date state.
 - Command palettes, suggestion lists, tree views, and selectable collections must use either native controls or a documented composite pattern such as `listbox`, `tree`, `aria-activedescendant`, or roving tabindex. Do not add new `role="button"` plus `tabIndex={-1}` rows without documenting the container-level keyboard model.
 - Any command that imports files or base64 data into the workspace must validate size, type/signature, extension, and destination. SVG requires explicit sanitization or a documented reason to allow it.
+- Any command that writes to an arbitrary user-selected path must be purpose-specific and validate extension, type, size, and destination assumptions in Rust. Do not expose generic renderer-driven file write commands.
+- Workspace filename and path sanitization is backend-owned. Frontend sanitizers are only for display previews or non-workspace export defaults, and any intentional difference from backend naming rules needs a named helper with tests.
 
 ### Testing
 
