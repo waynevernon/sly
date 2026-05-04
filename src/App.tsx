@@ -1802,6 +1802,7 @@ function AppContent() {
       notes,
       hasExternalChanges,
       reloadVersion,
+      settings,
       saveNote,
       renameNote,
       reloadCurrentNote,
@@ -1825,6 +1826,7 @@ function AppContent() {
       saveNote,
       selectNote,
       selectedNoteId,
+      settings,
       unpinNote,
     ],
   );

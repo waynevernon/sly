@@ -58,7 +58,6 @@ import {
   menuSeparatorClassName,
   menuSurfaceClassName,
 } from "../ui";
-import * as notesService from "../../services/notes";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
 import type { NoteMetadata, PaneMode, Settings } from "../../types/note";
 import {
@@ -576,6 +575,7 @@ export interface WorkspaceEditorData {
   notes: NoteMetadata[];
   hasExternalChanges: boolean;
   reloadVersion: number;
+  settings: Settings;
   saveNote: (content: string, noteId?: string) => Promise<void>;
   renameNote: (noteId: string, newName: string) => Promise<{ id: string }>;
   reloadCurrentNote: () => Promise<void>;
@@ -710,7 +710,10 @@ function EditorImpl({
   // Force re-render when selection changes to update toolbar active states
   const [, setSelectionKey] = useState(0);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const settings =
+    previewMode
+      ? null
+      : workspaceMode?.settings ?? notesCtx?.settings ?? null;
   const [documentTitle, setDocumentTitle] = useState(
     currentNote?.title ?? "Untitled",
   );
@@ -743,18 +746,6 @@ function EditorImpl({
 
   // Keep ref in sync with current note ID
   currentNoteIdRef.current = currentNote?.id ?? null;
-
-  // Load settings when note changes or notes are refreshed (e.g., after pin/unpin)
-  useEffect(() => {
-    if (currentNote?.id && !previewMode) {
-      notesService
-        .getSettings()
-        .then(setSettings)
-        .catch((error) => {
-          console.error("Failed to load settings:", error);
-        });
-    }
-  }, [currentNote?.id, notes, previewMode]);
 
   // Calculate if current note is pinned
   const isPinned =
@@ -1400,8 +1391,6 @@ function EditorImpl({
                           await pinNote(currentNote.id);
                           toast.success("Note pinned");
                         }
-                        const updatedSettings = await notesService.getSettings();
-                        setSettings(updatedSettings);
                       } catch (error) {
                         console.error("Failed to pin/unpin note:", error);
                         toast.error(

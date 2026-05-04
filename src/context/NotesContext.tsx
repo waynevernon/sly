@@ -2248,7 +2248,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setSelectedNoteId(null);
       setSelectionState([], { anchorId: null, rangeEndId: null });
       setCurrentNote(null);
-      // Start file watcher after setting folder
+      const notesList = await notesService.listNotes();
+      notesRef.current = notesList;
+      setNotes(notesList);
       await notesService.startFileWatcher();
       await refreshKnownFolders(path);
       await refreshSettings(path);
@@ -2274,6 +2276,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setSelectionState([], { anchorId: null, rangeEndId: null });
       setCurrentNote(null);
       const notesList = await notesService.listNotes();
+      notesRef.current = notesList;
       setNotes(notesList);
       await refreshKnownFolders(path);
       await notesService.startFileWatcher();
@@ -2297,6 +2300,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
             notesService.listNotes(),
             notesService.listFolders(),
           ]);
+          notesRef.current = notesList;
           setNotes(notesList);
           setKnownFolders(folders);
           setHasLoadedFolders(true);
@@ -2414,13 +2418,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       unlisten.then((fn) => fn());
     };
   }, [selectNote, refreshNotes]);
-
-  // Refresh notes when folder changes
-  useEffect(() => {
-    if (notesFolder) {
-      refreshNotes();
-    }
-  }, [notesFolder, refreshNotes]);
 
   const pinnedNotes = useMemo(
     () =>

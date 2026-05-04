@@ -1,5 +1,15 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import { useEditor, ReactNodeViewRenderer, type Editor as TiptapEditor } from "@tiptap/react";
+import {
+  useEffect,
+  useRef,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
+import {
+  useEditor,
+  ReactNodeViewRenderer,
+  type Editor as TiptapEditor,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
@@ -137,6 +147,17 @@ export function useSlyEditor({
   textDirection,
   finalizeProvisionalFilename,
 }: UseSlyEditorOptions) {
+  const selectionFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (selectionFrameRef.current !== null) {
+        cancelAnimationFrame(selectionFrameRef.current);
+        selectionFrameRef.current = null;
+      }
+    };
+  }, []);
+
   return useEditor({
     textDirection,
     extensions: [
@@ -266,7 +287,12 @@ export function useSlyEditor({
       scheduleSave();
     },
     onSelectionUpdate: () => {
-      setSelectionKey((k) => k + 1);
+      if (!isLoadingRef.current && selectionFrameRef.current === null) {
+        selectionFrameRef.current = requestAnimationFrame(() => {
+          selectionFrameRef.current = null;
+          setSelectionKey((k) => k + 1);
+        });
+      }
       if (
         provisionalFilenameNoteIdRef.current &&
         editorRef.current &&

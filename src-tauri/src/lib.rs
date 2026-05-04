@@ -7,6 +7,7 @@ use notify::{
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant};
@@ -1436,55 +1437,12 @@ fn rewrite_content_heading(content: &str, new_title: &str) -> String {
 // Utility: Generate preview from content (strip markdown formatting)
 fn generate_preview(content: &str) -> String {
     let body = strip_frontmatter(content);
-    let preview_limit = NOTE_PREVIEW_MAX_CHARS;
-    let preview_limit_without_ellipsis =
-        preview_limit.saturating_sub(NOTE_PREVIEW_ELLIPSIS.chars().count());
     let mut preview = String::new();
 
     // Skip the first line (title), then collect enough body text to fill the UI clamp.
     for line in body.lines().skip(1) {
-        let trimmed = line.trim();
-        if !trimmed.is_empty() {
-            let stripped = strip_markdown(trimmed);
-            if !stripped.is_empty() {
-                let normalized = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
-                if normalized.is_empty() {
-                    continue;
-                }
-
-                let prefix_len = if preview.is_empty() { 0 } else { 1 };
-                let next_len = preview.chars().count() + prefix_len + normalized.chars().count();
-
-                if next_len <= preview_limit {
-                    if !preview.is_empty() {
-                        preview.push(' ');
-                    }
-                    preview.push_str(&normalized);
-                    continue;
-                }
-
-                let remaining = preview_limit_without_ellipsis
-                    .saturating_sub(preview.chars().count() + prefix_len);
-
-                if !preview.is_empty() {
-                    preview.push(' ');
-                }
-
-                if remaining > 0 {
-                    let chunk: String = normalized.chars().take(remaining).collect();
-                    preview.push_str(chunk.trim_end());
-                }
-
-                while preview.ends_with(' ') {
-                    preview.pop();
-                }
-
-                if !preview.is_empty() {
-                    preview.push_str(NOTE_PREVIEW_ELLIPSIS);
-                }
-
-                return preview;
-            }
+        if append_preview_line(&mut preview, line) {
+            return preview;
         }
     }
 
@@ -2052,6 +2010,7 @@ fn resolve_created_timestamp(created: Option<i64>, modified: i64) -> i64 {
     created.unwrap_or(modified)
 }
 
+#[cfg(test)]
 fn build_note_metadata(id: String, content: &str, modified: i64, created: i64) -> NoteMetadata {
     NoteMetadata {
         id,
@@ -2060,6 +2019,147 @@ fn build_note_metadata(id: String, content: &str, modified: i64, created: i64) -
         modified,
         created,
     }
+}
+
+fn append_preview_line(preview: &mut String, line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let stripped = strip_markdown(trimmed);
+    if stripped.is_empty() {
+        return false;
+    }
+
+    let normalized = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return false;
+    }
+
+    let preview_limit = NOTE_PREVIEW_MAX_CHARS;
+    let preview_limit_without_ellipsis =
+        preview_limit.saturating_sub(NOTE_PREVIEW_ELLIPSIS.chars().count());
+    let prefix_len = if preview.is_empty() { 0 } else { 1 };
+    let next_len = preview.chars().count() + prefix_len + normalized.chars().count();
+
+    if next_len <= preview_limit {
+        if !preview.is_empty() {
+            preview.push(' ');
+        }
+        preview.push_str(&normalized);
+        return false;
+    }
+
+    let remaining =
+        preview_limit_without_ellipsis.saturating_sub(preview.chars().count() + prefix_len);
+
+    if !preview.is_empty() {
+        preview.push(' ');
+    }
+
+    if remaining > 0 {
+        let chunk: String = normalized.chars().take(remaining).collect();
+        preview.push_str(chunk.trim_end());
+    }
+
+    while preview.ends_with(' ') {
+        preview.pop();
+    }
+
+    if !preview.is_empty() {
+        preview.push_str(NOTE_PREVIEW_ELLIPSIS);
+    }
+
+    true
+}
+
+fn process_metadata_body_line(
+    line: &str,
+    title: &mut Option<String>,
+    preview: &mut String,
+    body_line_index: &mut usize,
+) -> bool {
+    if title.is_none() {
+        let trimmed = line.trim();
+        if let Some(heading) = trimmed.strip_prefix("# ") {
+            let heading = heading.trim();
+            if !is_effectively_empty(heading) {
+                *title = Some(heading.to_string());
+            }
+        } else if !is_effectively_empty(trimmed) {
+            *title = Some(trimmed.chars().take(50).collect());
+        }
+    }
+
+    let preview_complete = *body_line_index > 0 && append_preview_line(preview, line);
+    *body_line_index += 1;
+
+    title.is_some() && preview_complete
+}
+
+fn build_note_metadata_from_path(
+    id: String,
+    file_path: &Path,
+    modified: i64,
+    created: i64,
+) -> Option<NoteMetadata> {
+    let file = std::fs::File::open(file_path).ok()?;
+    let reader = BufReader::new(file);
+    let mut title: Option<String> = None;
+    let mut preview = String::new();
+    let mut body_line_index = 0usize;
+    let mut frontmatter_checked = false;
+    let mut pending_frontmatter: Option<Vec<String>> = None;
+
+    for line in reader.lines() {
+        let line = line.ok()?;
+
+        if !frontmatter_checked {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            frontmatter_checked = true;
+            if line.trim() == "---" {
+                pending_frontmatter = Some(vec![line]);
+                continue;
+            }
+        }
+
+        if let Some(frontmatter_lines) = pending_frontmatter.as_mut() {
+            frontmatter_lines.push(line);
+            if frontmatter_lines
+                .last()
+                .map(|line| line.trim() == "---")
+                .unwrap_or(false)
+                && frontmatter_lines.len() > 1
+            {
+                pending_frontmatter = None;
+            }
+            continue;
+        }
+
+        if process_metadata_body_line(&line, &mut title, &mut preview, &mut body_line_index) {
+            break;
+        }
+    }
+
+    if let Some(frontmatter_lines) = pending_frontmatter {
+        for line in frontmatter_lines {
+            if process_metadata_body_line(&line, &mut title, &mut preview, &mut body_line_index) {
+                break;
+            }
+        }
+    }
+
+    Some(NoteMetadata {
+        id,
+        title: title.unwrap_or_else(|| "Untitled".to_string()),
+        preview,
+        modified,
+        created,
+    })
 }
 
 fn refresh_note_metadata_from_path(
@@ -2074,8 +2174,7 @@ fn refresh_note_metadata_from_path(
         preserved_created.or_else(|| metadata_time_secs(metadata.created())),
         modified,
     );
-    let content = std::fs::read_to_string(file_path).ok()?;
-    Some(build_note_metadata(id, &content, modified, created))
+    build_note_metadata_from_path(id, file_path, modified, created)
 }
 
 fn rebuild_notes_cache_incrementally(
@@ -2129,11 +2228,10 @@ fn rebuild_notes_cache_incrementally(
             .filter(|created| *created > 0)
             .unwrap_or(created_from_disk);
 
-        if let Ok(content) = std::fs::read_to_string(file_path) {
-            next_cache.insert(
-                id.clone(),
-                build_note_metadata(id, &content, modified, created),
-            );
+        if let Some(metadata) =
+            build_note_metadata_from_path(id.clone(), file_path, modified, created)
+        {
+            next_cache.insert(id, metadata);
         }
     }
 
@@ -2442,6 +2540,35 @@ async fn save_note(
         if let Some(ref search_index) = *index {
             let _ = search_index.index_note(&final_id, &title, &content, modified);
         }
+    }
+
+    let cache_root_matches = state
+        .notes_cache_root
+        .read()
+        .expect("cache root read lock")
+        .as_deref()
+        == Some(folder.as_str());
+    if cache_root_matches {
+        let preview = generate_preview(&content);
+        let created = {
+            let cache = state.notes_cache.read().expect("cache read lock");
+            cache
+                .get(&final_id)
+                .map(|note| note.created)
+                .unwrap_or(modified)
+        };
+
+        let mut cache = state.notes_cache.write().expect("cache write lock");
+        cache.insert(
+            final_id.clone(),
+            NoteMetadata {
+                id: final_id.clone(),
+                title: title.clone(),
+                preview,
+                modified,
+                created,
+            },
+        );
     }
 
     Ok(Note {
@@ -7094,6 +7221,40 @@ mod tests {
 
         assert!(preview.ends_with("..."));
         assert!(preview.chars().count() <= NOTE_PREVIEW_MAX_CHARS);
+    }
+
+    #[test]
+    fn build_note_metadata_from_path_matches_full_content_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("long.md");
+        let content = format!(
+            "---\nkind: note\n---\n# Long Note\n{}\n{}",
+            "body ".repeat(80),
+            "tail ".repeat(20_000),
+        );
+        std::fs::write(&path, &content).unwrap();
+
+        let expected = build_note_metadata("long".to_string(), &content, 10, 9);
+        let actual = build_note_metadata_from_path("long".to_string(), &path, 10, 9).unwrap();
+
+        assert_eq!(actual.title, expected.title);
+        assert_eq!(actual.preview, expected.preview);
+        assert_eq!(actual.modified, expected.modified);
+        assert_eq!(actual.created, expected.created);
+    }
+
+    #[test]
+    fn build_note_metadata_from_path_handles_unclosed_frontmatter_like_content_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("unclosed.md");
+        let content = "---\n# Not frontmatter\nBody";
+        std::fs::write(&path, content).unwrap();
+
+        let expected = build_note_metadata("unclosed".to_string(), content, 10, 9);
+        let actual = build_note_metadata_from_path("unclosed".to_string(), &path, 10, 9).unwrap();
+
+        assert_eq!(actual.title, expected.title);
+        assert_eq!(actual.preview, expected.preview);
     }
 
     #[test]
