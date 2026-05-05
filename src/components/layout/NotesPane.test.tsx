@@ -333,8 +333,8 @@ describe("NotesPane", () => {
     const sortButton = screen.getByRole("button", { name: "Note list options" });
 
     await user.click(sortButton);
-    expect(screen.getByText("Sort This Folder")).toBeInTheDocument();
-    expect(screen.getByText("View Options")).toBeInTheDocument();
+    expect(screen.getByText("Sort docs")).toBeInTheDocument();
+    expect(screen.getByText("View options")).toBeInTheDocument();
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Modified")).toBeInTheDocument();
     expect(screen.getByText("2 Lines")).toBeInTheDocument();
@@ -369,7 +369,7 @@ describe("NotesPane", () => {
       screen.getByRole("button", { name: "Note list options" }),
     );
 
-    expect(screen.getByText("Sort Notes")).toBeInTheDocument();
+    expect(screen.getByText("Sort notes")).toBeInTheDocument();
     expect(
       screen.getByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),
     ).toBeInTheDocument();
@@ -413,8 +413,8 @@ describe("NotesPane", () => {
       screen.getByRole("button", { name: "Note list options" }),
     );
 
-    expect(screen.queryByText("Recent View")).not.toBeInTheDocument();
-    expect(screen.getByText("View Options")).toBeInTheDocument();
+    expect(screen.queryByText("Recent view")).not.toBeInTheDocument();
+    expect(screen.getByText("View options")).toBeInTheDocument();
     expect(screen.queryByText("Last Modified")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("menuitemcheckbox", { name: /Notes From Subfolders/i }),

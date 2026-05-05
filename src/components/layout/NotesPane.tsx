@@ -123,11 +123,10 @@ function getNotesRootLabel(notesFolder: string | null): string {
   return parts[parts.length - 1] || "Notes";
 }
 
-function getSortMenuTitle(scope: NoteScope): string {
-  if (scope.type === "pinned") return "Sort pinned";
-  if (scope.type === "recent") return "Recent view";
-  if (scope.type === "all") return "Sort notes";
-  return "Sort this folder";
+function getSortMenuTitle(scope: NoteScope, sectionLabel: string): string {
+  if (scope.type === "recent") return `${sectionLabel} view`;
+  if (scope.type === "all" && sectionLabel === "Notes") return "Sort notes";
+  return `Sort ${sectionLabel}`;
 }
 
 function getDateModeLabel(mode: NoteListDateMode): string {
@@ -246,7 +245,7 @@ export function NotesPane() {
     : selectedScope.type === "all"
       ? getNotesRootLabel(notesFolder)
       : getScopeLabel(selectedScope, selectedFolderPath);
-  const sortMenuTitle = getSortMenuTitle(selectedScope);
+  const sortMenuTitle = getSortMenuTitle(selectedScope, heading);
   const showSortItems = selectedScope.type !== "recent";
   const scopeSupportsSubfolderToggle =
     selectedScope.type === "all" || selectedScope.type === "folder";
@@ -425,7 +424,7 @@ export function NotesPane() {
                     <DropdownMenu.Separator className={menuSeparatorClassName} />
                   )}
                   <DropdownMenu.Label className={menuLabelClassName}>
-                    View Options
+                    View options
                   </DropdownMenu.Label>
                   <DropdownMenu.Separator className={menuSeparatorClassName} />
                   {scopeSupportsSubfolderToggle && (
