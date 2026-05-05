@@ -1,0 +1,23 @@
+{
+  "version": "1.6.3",
+  "notes": "Sly opens notes faster and keeps task rollovers steadier while the app stays open. Update when you are ready.",
+  "pub_date": "2026-05-05T12:42:37.941Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5VkVCbkJBbFpYTHVzd0tLaXlUSzM0TlJNK0dUbGR3cG1PeEVoelBXZ3Fyd2xnZmx1TkF6VzlvcWw3UkxTWURGSHVUZUtCU1BnTSs3YXhmdGl2d3NVWlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3OTg0OTUwCWZpbGU6U2x5LmFwcC50YXIuZ3oKcTJ6WmtJWmN3bmRLVjRWYVRKajZUVXVZOVdMc1hIc1dmUnpMYXpGdXBwMlRXbWpkNG1rSnhTeFN4bFNEbnRnNVNGcmFhZEFGVnZRcnpkWGlFblpwRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.6.3/Sly_universal.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5VkVCbkJBbFpYTHVzd0tLaXlUSzM0TlJNK0dUbGR3cG1PeEVoelBXZ3Fyd2xnZmx1TkF6VzlvcWw3UkxTWURGSHVUZUtCU1BnTSs3YXhmdGl2d3NVWlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3OTg0OTUwCWZpbGU6U2x5LmFwcC50YXIuZ3oKcTJ6WmtJWmN3bmRLVjRWYVRKajZUVXVZOVdMc1hIc1dmUnpMYXpGdXBwMlRXbWpkNG1rSnhTeFN4bFNEbnRnNVNGcmFhZEFGVnZRcnpkWGlFblpwRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.6.3/Sly_universal.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5VkVCbkJBbFpYTHVzd0tLaXlUSzM0TlJNK0dUbGR3cG1PeEVoelBXZ3Fyd2xnZmx1TkF6VzlvcWw3UkxTWURGSHVUZUtCU1BnTSs3YXhmdGl2d3NVWlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3OTg0OTUwCWZpbGU6U2x5LmFwcC50YXIuZ3oKcTJ6WmtJWmN3bmRLVjRWYVRKajZUVXVZOVdMc1hIc1dmUnpMYXpGdXBwMlRXbWpkNG1rSnhTeFN4bFNEbnRnNVNGcmFhZEFGVnZRcnpkWGlFblpwRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.6.3/Sly_universal.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdGxjSm1qUDd5VkVCbkJBbFpYTHVzd0tLaXlUSzM0TlJNK0dUbGR3cG1PeEVoelBXZ3Fyd2xnZmx1TkF6VzlvcWw3UkxTWURGSHVUZUtCU1BnTSs3YXhmdGl2d3NVWlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3OTg0OTUwCWZpbGU6U2x5LmFwcC50YXIuZ3oKcTJ6WmtJWmN3bmRLVjRWYVRKajZUVXVZOVdMc1hIc1dmUnpMYXpGdXBwMlRXbWpkNG1rSnhTeFN4bFNEbnRnNVNGcmFhZEFGVnZRcnpkWGlFblpwRHc9PQo=",
+      "url": "https://github.com/waynevernon/sly/releases/download/v1.6.3/Sly_universal.app.tar.gz"
+    }
+  }
+}
