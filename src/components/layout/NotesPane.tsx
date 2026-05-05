@@ -124,10 +124,10 @@ function getNotesRootLabel(notesFolder: string | null): string {
 }
 
 function getSortMenuTitle(scope: NoteScope): string {
-  if (scope.type === "pinned") return "Sort Pinned";
-  if (scope.type === "recent") return "Recent View";
-  if (scope.type === "all") return "Sort Notes";
-  return "Sort This Folder";
+  if (scope.type === "pinned") return "Sort pinned";
+  if (scope.type === "recent") return "Recent view";
+  if (scope.type === "all") return "Sort notes";
+  return "Sort this folder";
 }
 
 function getDateModeLabel(mode: NoteListDateMode): string {
@@ -413,6 +413,7 @@ export function NotesPane() {
                 <SortMenuButton
                   title="Note list options"
                   menuTitle={sortMenuTitle}
+                  menuClassName="min-w-60"
                   showMenuHeader={showSortItems}
                   value={noteSortMode}
                   items={showSortItems ? noteSortItems : []}
@@ -463,7 +464,6 @@ export function NotesPane() {
                           className={`${menuSurfaceClassName} min-w-44 z-50`}
                         >
                           <DropdownMenu.RadioGroup
-                            className="flex flex-col gap-1"
                             value={String(noteListPreviewLines)}
                             onValueChange={(value) => {
                               void setNoteListViewOptions({
@@ -480,7 +480,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>3 Lines</span>
@@ -491,7 +491,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>2 Lines</span>
@@ -502,7 +502,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>1 Line</span>
@@ -513,7 +513,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>None</span>
@@ -539,7 +539,6 @@ export function NotesPane() {
                           className={`${menuSurfaceClassName} min-w-44 z-50`}
                         >
                           <DropdownMenu.RadioGroup
-                            className="flex flex-col gap-1"
                             value={noteListDateMode}
                             onValueChange={(value) => {
                               void setNoteListViewOptions({
@@ -553,7 +552,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>Modified</span>
@@ -564,7 +563,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>Created</span>
@@ -575,7 +574,7 @@ export function NotesPane() {
                             >
                               <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
                                 <DropdownMenu.ItemIndicator>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                  <Check className="h-3 w-3 stroke-[2.2]" />
                                 </DropdownMenu.ItemIndicator>
                               </span>
                               <span>None</span>

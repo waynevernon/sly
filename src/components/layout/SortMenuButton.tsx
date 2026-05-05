@@ -25,6 +25,7 @@ export interface SortMenuItem<T extends string> {
 interface SortMenuButtonProps<T extends string> {
   title: string;
   menuTitle?: string;
+  menuClassName?: string;
   showMenuHeader?: boolean;
   value: T;
   items: SortMenuItem<T>[];
@@ -35,6 +36,7 @@ interface SortMenuButtonProps<T extends string> {
 export function SortMenuButton<T extends string>({
   title,
   menuTitle,
+  menuClassName,
   showMenuHeader = true,
   value,
   items,
@@ -91,7 +93,7 @@ export function SortMenuButton<T extends string>({
             setTooltipOpen(false);
             event.preventDefault();
           }}
-          className={`${menuSurfaceClassName} min-w-52 z-50`}
+          className={cn(menuSurfaceClassName, "min-w-52 z-50", menuClassName)}
         >
           {showMenuHeader && (
             <DropdownMenu.Label className={menuLabelClassName}>
