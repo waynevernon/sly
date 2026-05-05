@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Sparkles, TextAlignJustify, TextCursor, Trash2 } from "lucide-react";
+import { Check, Sparkles, TextAlignJustify, TextCursor, Trash2 } from "lucide-react";
 import type {
   AssistantAssistantTurn,
   AssistantProposal,
@@ -123,9 +123,9 @@ function AssistantSelectMenu<T extends string>({
                 className={cn(menuItemClassName, "gap-2 leading-none")}
               >
                 <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                  {item.value === value ? (
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  ) : null}
+                  <DropdownMenu.ItemIndicator>
+                    <Check className="h-3 w-3 stroke-[2.2]" />
+                  </DropdownMenu.ItemIndicator>
                 </span>
                 {item.leading ? (
                   <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
