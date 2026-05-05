@@ -94,6 +94,7 @@ interface NotesActionsContextValue {
   createNote: () => Promise<void>;
   openDailyNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
+  consumePendingDailyNoteBodyFocus: (id: string) => boolean;
   saveNote: (content: string, noteId?: string) => Promise<void>;
   renameNote: (id: string, newName: string) => Promise<Note>;
   deleteNote: (id: string) => Promise<void>;
@@ -602,6 +603,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const searchRequestIdRef = useRef(0);
   // Tracks the ID of a newly created note so Editor can focus its title.
   const pendingNewNoteIdRef = useRef<string | null>(null);
+  const pendingDailyNoteBodyFocusIdRef = useRef<string | null>(null);
   const noteIdRedirectsRef = useRef<Map<string, string>>(new Map());
   const notesFolderRef = useRef<string | null>(notesFolder);
   notesFolderRef.current = notesFolder;
@@ -1344,6 +1346,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       const note = await notesService.openDailyNote();
       selectRequestIdRef.current += 1;
       recentlySavedRef.current.add(note.id);
+      if (note.content.trim() === `# ${note.title}`) {
+        pendingDailyNoteBodyFocusIdRef.current = note.id;
+      }
       await refreshNotes();
       setCurrentNote(note);
       setSelectedNoteId(note.id);
@@ -1367,6 +1372,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       return false;
     }
     pendingNewNoteIdRef.current = null;
+    return true;
+  }, []);
+
+  const consumePendingDailyNoteBodyFocus = useCallback((id: string) => {
+    if (pendingDailyNoteBodyFocusIdRef.current !== id) {
+      pendingDailyNoteBodyFocusIdRef.current = null;
+      return false;
+    }
+    pendingDailyNoteBodyFocusIdRef.current = null;
     return true;
   }, []);
 
@@ -2616,6 +2630,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createNote,
       openDailyNote,
       consumePendingNewNote,
+      consumePendingDailyNoteBodyFocus,
       saveNote,
       renameNote,
       deleteNote,
@@ -2660,6 +2675,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       createNote,
       openDailyNote,
       consumePendingNewNote,
+      consumePendingDailyNoteBodyFocus,
       saveNote,
       renameNote,
       deleteNote,

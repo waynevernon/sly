@@ -29,7 +29,10 @@ describe("deriveView", () => {
     ["completed", meta({ completedAt: "2026-04-09T12:00:00Z" })],
     ["today",     meta({ actionAt: "2026-04-09T18:00:00Z" })],
     ["today",     meta({ actionAt: "2026-04-08T18:00:00Z" })],
+    ["today",     meta({ dueAt: "2026-04-09T18:00:00Z" })],
+    ["today",     meta({ dueAt: "2026-04-08T18:00:00Z" })],
     ["upcoming",  meta({ actionAt: "2026-04-10T18:00:00Z" })],
+    ["upcoming",  meta({ dueAt: "2026-04-10T18:00:00Z" })],
     ["anytime",   meta({ scheduleBucket: "anytime" })],
     ["someday",   meta({ scheduleBucket: "someday" })],
     ["inbox",     meta()],
@@ -44,6 +47,10 @@ describe("deriveView", () => {
 describe("isOverdue", () => {
   it("returns true for past action_at not completed", () => {
     expect(isOverdue(meta({ actionAt: "2026-04-08T18:00:00Z" }), TODAY)).toBe(true);
+  });
+
+  it("returns true for past due_at not completed", () => {
+    expect(isOverdue(meta({ dueAt: "2026-04-08T18:00:00Z" }), TODAY)).toBe(true);
   });
 
   it("returns false for today", () => {

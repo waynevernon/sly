@@ -175,7 +175,7 @@ describe("WorkspaceNavigation", () => {
     });
 
     expect(moveFolder).toHaveBeenCalledWith("source/moved", "target");
-    expect(revealFolder).toHaveBeenCalledWith("target");
+    expect(revealFolder).not.toHaveBeenCalled();
   });
 
   it("passes an optimistic folder path change while a folder move is pending", async () => {

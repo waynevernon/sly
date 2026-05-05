@@ -428,7 +428,7 @@ export function RightPanel({
                         )}
                         style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
                       >
-                        <span className="line-clamp-2 break-words">{item.text}</span>
+                        <span className="min-w-0 truncate">{item.text}</span>
                       </button>
                     );
                   })}

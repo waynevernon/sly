@@ -803,12 +803,23 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
             let mode = recurrence_mode(rule);
             let base_date = if mode == "schedule" {
                 action_at_to_local_date(existing.action_at.as_deref())
+                    .or_else(|| action_at_to_local_date(existing.due_at.as_deref()))
                     .unwrap_or_else(|| today_local.clone())
             } else {
                 today_local.clone()
             };
             let next_date = compute_next_occurrence(&base_date, rule, &today_local)?;
-            let next_action_at = local_date_to_action_at(&next_date)?;
+            let next_timestamp = local_date_to_action_at(&next_date)?;
+            let next_action_at = if existing.action_at.is_some() {
+                Some(next_timestamp.clone())
+            } else {
+                None
+            };
+            let next_due_at = if existing.action_at.is_none() && existing.due_at.is_some() {
+                Some(next_timestamp)
+            } else {
+                None
+            };
             let next_id = new_task_id();
             let next_created_at = now_rfc3339();
             tx.execute(
@@ -827,7 +838,7 @@ pub(crate) fn set_task_completed(notes_root: &Path, id: &str, completed: bool) -
                     next_created_at,
                     Option::<String>::None,
                     0i64,
-                    Option::<String>::None,
+                    next_due_at,
                     &existing.recurrence,
                     serialize_tags(&existing.tags)?,
                 ],
@@ -1602,6 +1613,34 @@ mod tests {
         assert_eq!(spawned.len(), 1);
         assert!(spawned[0].completed_at.is_none());
         assert_eq!(spawned[0].recurrence.as_deref(), Some("daily:schedule"));
+    }
+
+    #[test]
+    fn recurring_due_only_task_spawns_due_only_occurrence() {
+        let root = make_root();
+        let task = create_task(root.path(), "Pay rent").unwrap();
+        update_task(
+            root.path(),
+            &task.id,
+            TaskPatch {
+                due_at: Some(Some("2026-04-10T17:00:00Z".to_string())),
+                recurrence: Some(Some("monthly:schedule:10".to_string())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        set_task_completed(root.path(), &task.id, true).unwrap();
+
+        let all = list_tasks(root.path()).unwrap();
+        let spawned: Vec<_> = all
+            .iter()
+            .filter(|t| t.id != task.id && t.title == "Pay rent")
+            .collect();
+        assert_eq!(spawned.len(), 1);
+        assert!(spawned[0].action_at.is_none());
+        assert!(spawned[0].due_at.is_some());
+        assert_eq!(spawned[0].recurrence.as_deref(), Some("monthly:schedule:10"));
     }
 
     #[test]

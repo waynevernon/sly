@@ -328,9 +328,6 @@ export function WorkspaceNavigation({
         });
         try {
           await moveFolder(folderPath, targetFolder);
-          if (targetFolder) {
-            revealFolder(targetFolder);
-          }
         } finally {
           setPendingFolderPath((currentPath) =>
             currentPath === folderPath ? null : currentPath,

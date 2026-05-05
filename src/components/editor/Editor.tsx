@@ -581,6 +581,7 @@ export interface WorkspaceEditorData {
   reloadCurrentNote: () => Promise<void>;
   createNote: () => Promise<void>;
   consumePendingNewNote: (id: string) => boolean;
+  consumePendingDailyNoteBodyFocus: (id: string) => boolean;
   pinNote: ((id: string) => Promise<void>) | undefined;
   unpinNote: ((id: string) => Promise<void>) | undefined;
   selectNote: ((id: string) => Promise<void>) | undefined;
@@ -676,6 +677,9 @@ function EditorImpl({
   const createNote = workspaceMode?.createNote ?? notesCtx?.createNote;
   const consumePendingNewNote =
     workspaceMode?.consumePendingNewNote ?? notesCtx?.consumePendingNewNote;
+  const consumePendingDailyNoteBodyFocus =
+    workspaceMode?.consumePendingDailyNoteBodyFocus ??
+    notesCtx?.consumePendingDailyNoteBodyFocus;
   const hasExternalChanges = previewMode
     ? previewMode.hasExternalChanges
     : workspaceMode
@@ -764,6 +768,7 @@ function EditorImpl({
     sourceContent,
     toggleSourceMode,
   } = useEditorDocumentLifecycle({
+    consumePendingDailyNoteBodyFocus,
     consumePendingNewNote,
     currentNote,
     currentNoteIdRef,
@@ -1228,7 +1233,7 @@ function EditorImpl({
     // Preview mode: show loading state (content not yet loaded)
     if (previewMode) {
       return (
-        <div className="flex-1 flex flex-col bg-bg">
+        <div className="flex-1 flex min-w-[360px] flex-col bg-bg">
           {!printMode && (
             <>
               <div className="ui-pane-drag-region" data-tauri-drag-region></div>
@@ -1245,7 +1250,7 @@ function EditorImpl({
     // A note is selected but not yet loaded — show loading spinner to avoid empty state flash
     if (showPendingSelectionSpinner) {
       return (
-        <div className="flex-1 flex flex-col bg-bg">
+        <div className="flex-1 flex min-w-[360px] flex-col bg-bg">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header" />
           <div className="flex-1 flex items-center justify-center">
@@ -1257,7 +1262,7 @@ function EditorImpl({
 
     // Folder mode: show empty state with "New Note" button
     return (
-      <div className="flex-1 flex flex-col bg-bg">
+      <div className="flex-1 flex min-w-[360px] flex-col bg-bg">
         <div className="ui-pane-drag-region" data-tauri-drag-region></div>
         <div className="ui-pane-header" />
         <PanelEmptyState
@@ -1283,7 +1288,7 @@ function EditorImpl({
   return (
     <div
       className={cn(
-        "flex-1 flex flex-col bg-bg overflow-hidden",
+        "flex-1 flex min-w-[360px] flex-col bg-bg overflow-hidden",
         printMode && "print-note-editor overflow-visible",
       )}
     >
@@ -1511,10 +1516,10 @@ function EditorImpl({
         >
           {effectiveSourceMode ? (
             /* Markdown source editor */
-            <div className="h-full">
+            <div className="h-full min-w-[360px]">
               <div
                 className={cn(
-                  "min-h-full px-6 pt-6 pb-24",
+                  "min-h-full min-w-[360px] px-6 pt-6 pb-24",
                   !sourceModeWordWrap && "w-max min-w-full",
                 )}
                 style={{
@@ -1565,11 +1570,11 @@ function EditorImpl({
                 </div>
               )}
               <div
-                className="h-full"
+                className="h-full min-w-[360px]"
                 onContextMenu={handleContextMenu}
               >
                 <div
-                  className="min-h-full px-6 pt-6 pb-24"
+                  className="min-h-full min-w-[360px] px-6 pt-6 pb-24"
                   style={{
                     maxWidth: "var(--editor-max-width, 48rem)",
                     minHeight: "100%",

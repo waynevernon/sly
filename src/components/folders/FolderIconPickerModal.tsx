@@ -77,6 +77,7 @@ export function FolderIconPickerModal({
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridMeasureRef = useRef<HTMLDivElement>(null);
+  const shouldScrollActiveItemRef = useRef(false);
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<FolderStyleSource>("icons");
   const [draftAppearance, setDraftAppearance] = useState<FolderAppearance | null>(
@@ -84,6 +85,8 @@ export function FolderIconPickerModal({
   );
   const [gridWidth, setGridWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [showKeyboardActiveItem, setShowKeyboardActiveItem] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
@@ -155,6 +158,8 @@ export function FolderIconPickerModal({
     setDraftAppearance(value ?? null);
     setSource(value?.icon?.kind === "emoji" ? "emoji" : "icons");
     setActiveIndex(0);
+    setHoveredIndex(null);
+    setShowKeyboardActiveItem(false);
   }, [open, value]);
 
   useEffect(() => {
@@ -210,7 +215,8 @@ export function FolderIconPickerModal({
   }, [resultCount]);
 
   useEffect(() => {
-    if (!open || resultCount === 0) return;
+    if (!open || resultCount === 0 || !shouldScrollActiveItemRef.current) return;
+    shouldScrollActiveItemRef.current = false;
     rowVirtualizer.scrollToIndex(Math.floor(activeIndex / lanes), {
       align: "auto",
     });
@@ -292,16 +298,25 @@ export function FolderIconPickerModal({
     switch (event.key) {
       case "ArrowRight":
         event.preventDefault();
+        shouldScrollActiveItemRef.current = true;
+        setHoveredIndex(null);
+        setShowKeyboardActiveItem(true);
         setActiveIndex((current) =>
           resultCount === 0 ? 0 : Math.min(current + 1, resultCount - 1),
         );
         break;
       case "ArrowLeft":
         event.preventDefault();
+        shouldScrollActiveItemRef.current = true;
+        setHoveredIndex(null);
+        setShowKeyboardActiveItem(true);
         setActiveIndex((current) => Math.max(current - 1, 0));
         break;
       case "ArrowDown":
         event.preventDefault();
+        shouldScrollActiveItemRef.current = true;
+        setHoveredIndex(null);
+        setShowKeyboardActiveItem(true);
         setActiveIndex((current) =>
           resultCount === 0
             ? 0
@@ -310,6 +325,9 @@ export function FolderIconPickerModal({
         break;
       case "ArrowUp":
         event.preventDefault();
+        shouldScrollActiveItemRef.current = true;
+        setHoveredIndex(null);
+        setShowKeyboardActiveItem(true);
         setActiveIndex((current) => Math.max(current - lanes, 0));
         break;
       case "Enter": {
@@ -422,8 +440,11 @@ export function FolderIconPickerModal({
                       key={nextSource}
                       type="button"
                       onClick={() => {
+                        shouldScrollActiveItemRef.current = true;
                         setSource(nextSource);
                         setActiveIndex(0);
+                        setHoveredIndex(null);
+                        setShowKeyboardActiveItem(false);
                       }}
                       className={cn(
                         "ui-focus-ring relative flex-1 rounded-[calc(var(--ui-radius-md)-2px)] px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--ui-motion-duration-fade)]",
@@ -456,6 +477,10 @@ export function FolderIconPickerModal({
           <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             <div
               ref={scrollRef}
+              onPointerLeave={() => {
+                setHoveredIndex(null);
+                setShowKeyboardActiveItem(false);
+              }}
               className="ui-scrollbar-overlay min-h-0 flex-1 overflow-auto rounded-[var(--ui-radius-lg)] border border-border/80 bg-bg-secondary/70 p-2.5 scrollbar-gutter-stable"
             >
               {visibleResults.length === 0 ? (
@@ -507,6 +532,7 @@ export function FolderIconPickerModal({
                                   ? item.icon.Component === selectedLucideComponent
                                   : item.id === selectedEmojiId;
                               const isActive = index === activeIndex;
+                              const isHovered = index === hoveredIndex;
 
                               return (
                                 <button
@@ -515,15 +541,27 @@ export function FolderIconPickerModal({
                                   title={item.label}
                                   aria-label={item.label}
                                   aria-selected={isSelected}
-                                  onMouseEnter={() => setActiveIndex(index)}
-                                  onFocus={() => setActiveIndex(index)}
+                                  onMouseEnter={() => {
+                                    setHoveredIndex(index);
+                                    setShowKeyboardActiveItem(false);
+                                    setActiveIndex(index);
+                                  }}
+                                  onFocus={(event) => {
+                                    shouldScrollActiveItemRef.current =
+                                      event.currentTarget.matches(":focus-visible");
+                                    setHoveredIndex(null);
+                                    setShowKeyboardActiveItem(
+                                      event.currentTarget.matches(":focus-visible"),
+                                    );
+                                    setActiveIndex(index);
+                                  }}
                                   onClick={() => handleSelectResult(item)}
-                                  className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-lg)] border px-2 py-2.5 text-center transition-[border-color,background-color,transform,box-shadow] duration-[var(--ui-motion-duration-fade)] ${
+                                  className={`group ui-focus-ring relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[var(--ui-radius-md)] border px-2 py-2.5 text-center transition-[border-color,background-color] duration-[var(--ui-motion-duration-fade)] ${
                                     isSelected
                                       ? "border-accent bg-accent/7 shadow-[0_0_0_1px_var(--color-accent)]"
-                                      : isActive
-                                        ? "border-text-muted/45 bg-bg shadow-sm"
-                                        : "border-transparent bg-bg/75 hover:border-border hover:bg-bg"
+                                      : isHovered || (showKeyboardActiveItem && isActive)
+                                        ? "border-transparent bg-bg-muted/70"
+                                        : "border-transparent bg-transparent"
                                   }`}
                                 >
                                   {isSelected && (

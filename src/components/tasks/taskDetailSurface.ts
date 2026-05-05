@@ -9,5 +9,8 @@ export const TASK_DETAIL_DIVIDER_CLASS = "border-t border-border/40";
 export const TASK_DETAIL_FIELD_INPUT_CLASS =
   "w-full bg-transparent text-sm leading-relaxed text-text outline-none placeholder:text-text-muted/40";
 
+export const TASK_DETAIL_EMPTY_TRIGGER_CLASS =
+  "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/45 px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted/70 hover:text-text";
+
 export const TASK_DETAIL_FILLED_TRIGGER_CLASS =
-  "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted";
+  "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted";

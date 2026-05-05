@@ -5,6 +5,7 @@ export const menuSurfaceClassName = "ui-surface-menu";
 export const menuLabelClassName = "ui-menu-label";
 export const menuSeparatorClassName = "ui-menu-separator";
 export const menuItemClassName = "ui-menu-item";
+export const selectedMenuItemClassName = "ui-menu-item-selected";
 export const destructiveMenuItemClassName = cn(
   menuItemClassName,
   "ui-menu-item-destructive",

@@ -195,6 +195,84 @@ describe("useEditorDocumentLifecycle", () => {
     });
   });
 
+  it("focuses the first body line for a newly created daily note", () => {
+    const setTextSelection = vi.fn(() => chain);
+    const insertContentAt = vi.fn(() => chain);
+    const focus = vi.fn(() => chain);
+    const run = vi.fn(() => true);
+    const chain = {
+      focus,
+      insertContentAt,
+      setTextSelection,
+      run,
+    };
+    const editor = {
+      state: {
+        doc: {
+          content: { size: 9 },
+          descendants: vi.fn((callback) => {
+            callback(
+              {
+                type: { name: "heading" },
+                attrs: { level: 1 },
+                nodeSize: 7,
+              },
+              0,
+            );
+          }),
+        },
+      },
+      storage: {
+        markdown: {
+          manager: {
+            serialize: vi.fn(() => "# May 4, 2026\n\n"),
+            parse: vi.fn((value: string) => value),
+          },
+        },
+      },
+      getJSON: vi.fn(() => ({})),
+      getText: vi.fn(() => "# May 4, 2026\n\n"),
+      chain: vi.fn(() => chain),
+      commands: {
+        setContent: vi.fn(),
+        blur: vi.fn(),
+        focus: vi.fn(),
+        selectAll: vi.fn(),
+      },
+    } as unknown as TiptapEditor;
+
+    const focusAndSelectTitle = vi.fn(() => true);
+
+    renderHook(() =>
+      useEditorDocumentLifecycle({
+        consumePendingDailyNoteBodyFocus: vi.fn(() => true),
+        consumePendingNewNote: vi.fn(() => false),
+        currentNote: {
+          id: "Daily/2026-05-04",
+          title: "May 4, 2026",
+          content: "# May 4, 2026\n\n",
+          modified: 1,
+        },
+        currentNoteIdRef: { current: "Daily/2026-05-04" },
+        editorReady: true,
+        editorRef: { current: editor },
+        focusAndSelectTitle,
+        printMode: false,
+        reloadVersion: 0,
+        saveNote: vi.fn().mockResolvedValue(undefined),
+        notesFolder: null,
+        scrollContainerRef: { current: null },
+        sourceEditorRef: { current: null },
+      }),
+    );
+
+    expect(focusAndSelectTitle).not.toHaveBeenCalled();
+    expect(insertContentAt).not.toHaveBeenCalled();
+    expect(focus).toHaveBeenCalled();
+    expect(setTextSelection).toHaveBeenCalledWith(8);
+    expect(run).toHaveBeenCalled();
+  });
+
   it("flushes pending source-mode saves before returning", async () => {
     const saveNote = vi.fn().mockResolvedValue(undefined);
 

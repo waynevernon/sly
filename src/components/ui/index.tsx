@@ -39,6 +39,7 @@ export {
   menuLabelClassName,
   menuSeparatorClassName,
   menuItemClassName,
+  selectedMenuItemClassName,
   destructiveMenuItemClassName,
 } from "./MenuSurface";
 export {

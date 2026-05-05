@@ -29,6 +29,7 @@ interface DocumentNote {
 
 interface UseEditorDocumentLifecycleOptions {
   consumePendingNewNote?: (id: string) => boolean;
+  consumePendingDailyNoteBodyFocus?: (id: string) => boolean;
   currentNote: DocumentNote | null;
   currentNoteIdRef: MutableRefObject<string | null>;
   onDocumentTitleChange?: (title: string) => void;
@@ -98,8 +99,43 @@ export function blockIndexToPos(
   return pos;
 }
 
+function focusFirstBodyLine(editor: TiptapEditor): boolean {
+  const doc = editor.state.doc;
+  let headingEnd: number | null = null;
+
+  doc.descendants((node, pos) => {
+    if (pos === 0 && node.type.name === "heading" && node.attrs.level === 1) {
+      headingEnd = pos + node.nodeSize;
+    }
+    return headingEnd === null;
+  });
+
+  if (headingEnd === null) {
+    editor.commands.focus("end");
+    return false;
+  }
+
+  if (headingEnd >= doc.content.size) {
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(headingEnd, { type: "paragraph" })
+      .setTextSelection(headingEnd + 1)
+      .run();
+    return true;
+  }
+
+  editor
+    .chain()
+    .focus()
+    .setTextSelection(Math.min(headingEnd + 1, doc.content.size))
+    .run();
+  return true;
+}
+
 export function useEditorDocumentLifecycle({
   consumePendingNewNote,
+  consumePendingDailyNoteBodyFocus,
   currentNote,
   currentNoteIdRef,
   onDocumentTitleChange,
@@ -590,6 +626,12 @@ export function useEditorDocumentLifecycle({
 
       isLoadingRef.current = false;
 
+      if (consumePendingDailyNoteBodyFocus?.(loadingNoteId)) {
+        provisionalFilenameNoteIdRef.current = null;
+        focusFirstBodyLine(currentEditor);
+        return;
+      }
+
       if (consumePendingNewNote?.(loadingNoteId)) {
         provisionalFilenameNoteIdRef.current =
           isDefaultPlaceholderNoteId(loadingNoteId) ||
@@ -614,6 +656,7 @@ export function useEditorDocumentLifecycle({
       }
     });
   }, [
+    consumePendingDailyNoteBodyFocus,
     consumePendingNewNote,
     currentNote,
     currentNoteIdRef,

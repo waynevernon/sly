@@ -294,7 +294,7 @@ function InlineFolderRow({
         isSelected ? "bg-bg-muted ring-1 ring-text-muted/20" : "bg-bg-muted/70"
       }`}
     >
-      <div className="flex items-center gap-1.5 pr-2 py-2" style={{ paddingLeft: `${depth * 12}px` }}>
+      <div className="flex items-center gap-1.5 pr-3 py-2" style={{ paddingLeft: `${depth * 12}px` }}>
         <div className="min-w-0 flex flex-1 items-center gap-2">
           <span className="ml-2 h-5 w-5 flex items-center justify-center shrink-0 text-text-muted/70">
             {showCollapseToggle ? (
@@ -499,7 +499,7 @@ const FolderItem = memo(function FolderItem({
           onContextMenu={() => onContextSelectFolder(folder.path)}
         >
           <div
-            className="flex items-center gap-1.5 pr-2 py-2"
+            className="flex items-center gap-1.5 pr-3 py-2"
             style={{ paddingLeft: `${depth * TREE_INDENT_WIDTH}px` }}
           >
             {hasNestedFolders ? (
@@ -1084,6 +1084,21 @@ export function FolderTreeView({
       window.removeEventListener("create-new-folder", handleCreateFolder);
   }, [selectedFolderPath, startCreateFolder]);
 
+  useEffect(() => {
+    const handleCollapseAllFolders = () => {
+      locallyToggledCollapsedPathsRef.current = new Set(allFolderPaths);
+      setForcedCollapsedFolderPath(null);
+      setInlineEditState(null);
+      setCollapsedFoldersState(new Set(allFolderPaths));
+      void persistCollapsedFolders(allFolderPaths);
+      focusTree();
+    };
+
+    window.addEventListener("collapse-all-folders", handleCollapseAllFolders);
+    return () =>
+      window.removeEventListener("collapse-all-folders", handleCollapseAllFolders);
+  }, [allFolderPaths, focusTree, persistCollapsedFolders]);
+
   const handleSelectFolder = useCallback((path: string) => {
     focusTree();
     expandFolder(path);
@@ -1512,7 +1527,7 @@ export function FolderTreeView({
                 focusTree();
                 selectPinnedNotes();
               }}
-              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "pinned"
                   ? "bg-bg-muted"
                   : "hover:bg-bg-muted/80"
@@ -1546,7 +1561,7 @@ export function FolderTreeView({
                 focusTree();
                 selectRecentNotes();
               }}
-              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
+              className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "recent"
                   ? "bg-bg-muted"
                   : "hover:bg-bg-muted/80"
@@ -1597,7 +1612,7 @@ export function FolderTreeView({
                   focusTree();
                   selectFolder(null);
                 }}
-                className="w-full flex items-center gap-3 pl-3 pr-2 py-2 text-left"
+                className="w-full flex items-center gap-3 px-3 py-2 text-left"
               >
                 <span className="flex items-center gap-2 min-w-0 flex-1">
                   <FolderGlyph

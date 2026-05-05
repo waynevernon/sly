@@ -46,7 +46,7 @@ function TasksSectionInner({
   showLabel,
 }: TasksSectionInnerProps) {
   return (
-    <section className="px-1.5 pb-1.5" aria-label="Tasks">
+    <section className="px-1.5" aria-label="Tasks">
       {showLabel && (
         <div className="px-3 pb-1 pt-0.5">
           <span className="select-none text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted/55">
@@ -120,7 +120,7 @@ function TaskViewButton({
         aria-pressed={isSelected}
         onClick={onSelect}
         className={cn(
-          "ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200",
+          "ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-200",
           isTaskDropOver
             ? "bg-accent/10 text-text ring-1 ring-inset ring-accent/35"
             : isSelected

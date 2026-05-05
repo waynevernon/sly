@@ -176,8 +176,8 @@ function TaskTagsSection() {
   if (tagNames.length === 0) return null;
 
   return (
-    <section className="mt-2 px-1.5 pt-2" aria-label="Tags">
-      <div className="mx-3 mb-2 border-t border-border/50" />
+    <section className="px-1.5" aria-label="Tags">
+      <div className="mx-3 my-1.5 border-t border-border/50" />
       <nav className="space-y-1" aria-label="Task tags">
         {tagNames.map((tag) => {
           const appearance = getFolderAppearance(taskTagAppearances, tag);
@@ -190,7 +190,7 @@ function TaskTagsSection() {
             <ContextMenu.Root key={tag}>
               <ContextMenu.Trigger asChild>
                 {renamingTag === tag ? (
-                  <div className="flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] bg-bg-muted pl-3 pr-2 py-2">
+                  <div className="flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] bg-bg-muted px-3 py-2">
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       <FolderGlyph
                         icon={appearance?.icon ?? { kind: "lucide", name: "hash" }}
@@ -218,7 +218,7 @@ function TaskTagsSection() {
                     type="button"
                     aria-pressed={isSelected}
                     onClick={() => selectTag(tag)}
-                    className={`ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-colors ${
+                    className={`ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-colors ${
                       isSelected ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted/80"
                     }`}
                     style={style}

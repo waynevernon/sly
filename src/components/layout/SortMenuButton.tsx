@@ -10,6 +10,7 @@ import {
   menuItemClassName,
   menuLabelClassName,
   menuSeparatorClassName,
+  selectedMenuItemClassName,
   menuSurfaceClassName,
 } from "../ui";
 
@@ -102,30 +103,28 @@ export function SortMenuButton<T extends string>({
               {showMenuHeader && (
                 <DropdownMenu.Separator className={menuSeparatorClassName} />
               )}
-              <div className="flex flex-col gap-1">
-                {items.map((item) => {
-                  const isActive = item.isActive(value);
-                  return (
-                    <DropdownMenu.Item
-                      key={item.key}
-                      className={cn(menuItemClassName, isActive && "bg-bg-muted")}
-                      onSelect={() => {
-                        onChange(item.getNextValue(value));
-                      }}
+              {items.map((item) => {
+                const isActive = item.isActive(value);
+                return (
+                  <DropdownMenu.Item
+                    key={item.key}
+                    className={cn(menuItemClassName, isActive && selectedMenuItemClassName)}
+                    onSelect={() => {
+                      onChange(item.getNextValue(value));
+                    }}
+                  >
+                    <span
+                      className={cn(
+                        "inline-flex h-4 w-4 shrink-0 items-center justify-center",
+                        isActive ? "text-text" : "text-text-muted",
+                      )}
                     >
-                      <span
-                        className={cn(
-                          "inline-flex h-4 w-4 shrink-0 items-center justify-center",
-                          isActive ? "text-text" : "text-text-muted",
-                        )}
-                      >
-                        {item.renderIcon(value, isActive)}
-                      </span>
-                      {item.label}
-                    </DropdownMenu.Item>
-                  );
-                })}
-              </div>
+                      {item.renderIcon(value, isActive)}
+                    </span>
+                    {item.label}
+                  </DropdownMenu.Item>
+                );
+              })}
             </>
           )}
           {children}

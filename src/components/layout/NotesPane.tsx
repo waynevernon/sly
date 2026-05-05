@@ -449,139 +449,141 @@ export function NotesPane() {
                     </>
                   )}
                   <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger className={menuItemClassName}>
-                      <span className="inline-flex h-4 w-4 shrink-0" />
-                      <span>Text Preview</span>
-                      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
-                        {getPreviewLinesLabel(noteListPreviewLines)}
-                        <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-                      </span>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.SubContent
-                        sideOffset={6}
-                        className={`${menuSurfaceClassName} min-w-44 z-50`}
-                      >
-                        <DropdownMenu.RadioGroup
-                          value={String(noteListPreviewLines)}
-                          onValueChange={(value) => {
-                            void setNoteListViewOptions({
-                              noteListPreviewLines:
-                                value === "0"
-                                  ? 0
-                                  : (Number(value) as NoteListPreviewLines),
-                            });
-                          }}
+                      <DropdownMenu.SubTrigger className={menuItemClassName}>
+                        <span className="inline-flex h-4 w-4 shrink-0" />
+                        <span>Text Preview</span>
+                        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
+                          {getPreviewLinesLabel(noteListPreviewLines)}
+                          <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                        </span>
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent
+                          sideOffset={6}
+                          className={`${menuSurfaceClassName} min-w-44 z-50`}
                         >
-                          <DropdownMenu.RadioItem
-                            value="3"
-                            className={menuItemClassName}
+                          <DropdownMenu.RadioGroup
+                            className="flex flex-col gap-1"
+                            value={String(noteListPreviewLines)}
+                            onValueChange={(value) => {
+                              void setNoteListViewOptions({
+                                noteListPreviewLines:
+                                  value === "0"
+                                    ? 0
+                                    : (Number(value) as NoteListPreviewLines),
+                              });
+                            }}
                           >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>3 Lines</span>
-                          </DropdownMenu.RadioItem>
-                          <DropdownMenu.RadioItem
-                            value="2"
-                            className={menuItemClassName}
-                          >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>2 Lines</span>
-                          </DropdownMenu.RadioItem>
-                          <DropdownMenu.RadioItem
-                            value="1"
-                            className={menuItemClassName}
-                          >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>1 Line</span>
-                          </DropdownMenu.RadioItem>
-                          <DropdownMenu.RadioItem
-                            value="0"
-                            className={menuItemClassName}
-                          >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>None</span>
-                          </DropdownMenu.RadioItem>
-                        </DropdownMenu.RadioGroup>
-                      </DropdownMenu.SubContent>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Sub>
+                            <DropdownMenu.RadioItem
+                              value="3"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>3 Lines</span>
+                            </DropdownMenu.RadioItem>
+                            <DropdownMenu.RadioItem
+                              value="2"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>2 Lines</span>
+                            </DropdownMenu.RadioItem>
+                            <DropdownMenu.RadioItem
+                              value="1"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>1 Line</span>
+                            </DropdownMenu.RadioItem>
+                            <DropdownMenu.RadioItem
+                              value="0"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>None</span>
+                            </DropdownMenu.RadioItem>
+                          </DropdownMenu.RadioGroup>
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Sub>
                   <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger
-                      className={menuItemClassName}
-                    >
-                      <span className="inline-flex h-4 w-4 shrink-0" />
-                      <span>Date</span>
-                      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
-                        {getDateModeLabel(noteListDateMode)}
-                        <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
-                      </span>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.SubContent
-                        sideOffset={6}
-                        className={`${menuSurfaceClassName} min-w-44 z-50`}
+                      <DropdownMenu.SubTrigger
+                        className={menuItemClassName}
                       >
-                        <DropdownMenu.RadioGroup
-                          value={noteListDateMode}
-                          onValueChange={(value) => {
-                            void setNoteListViewOptions({
-                              noteListDateMode: value as NoteListDateMode,
-                            });
-                          }}
+                        <span className="inline-flex h-4 w-4 shrink-0" />
+                        <span>Date</span>
+                        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
+                          {getDateModeLabel(noteListDateMode)}
+                          <ChevronRightIcon className="w-4 h-4 stroke-[1.6]" />
+                        </span>
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent
+                          sideOffset={6}
+                          className={`${menuSurfaceClassName} min-w-44 z-50`}
                         >
-                          <DropdownMenu.RadioItem
-                            value="modified"
-                            className={menuItemClassName}
+                          <DropdownMenu.RadioGroup
+                            className="flex flex-col gap-1"
+                            value={noteListDateMode}
+                            onValueChange={(value) => {
+                              void setNoteListViewOptions({
+                                noteListDateMode: value as NoteListDateMode,
+                              });
+                            }}
                           >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>Modified</span>
-                          </DropdownMenu.RadioItem>
-                          <DropdownMenu.RadioItem
-                            value="created"
-                            className={menuItemClassName}
-                          >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>Created</span>
-                          </DropdownMenu.RadioItem>
-                          <DropdownMenu.RadioItem
-                            value="off"
-                            className={menuItemClassName}
-                          >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
-                              <DropdownMenu.ItemIndicator>
-                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              </DropdownMenu.ItemIndicator>
-                            </span>
-                            <span>None</span>
-                          </DropdownMenu.RadioItem>
-                        </DropdownMenu.RadioGroup>
-                      </DropdownMenu.SubContent>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Sub>
+                            <DropdownMenu.RadioItem
+                              value="modified"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>Modified</span>
+                            </DropdownMenu.RadioItem>
+                            <DropdownMenu.RadioItem
+                              value="created"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>Created</span>
+                            </DropdownMenu.RadioItem>
+                            <DropdownMenu.RadioItem
+                              value="off"
+                              className={menuItemClassName}
+                            >
+                              <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-text">
+                                <DropdownMenu.ItemIndicator>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                </DropdownMenu.ItemIndicator>
+                              </span>
+                              <span>None</span>
+                            </DropdownMenu.RadioItem>
+                          </DropdownMenu.RadioGroup>
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Sub>
                   <DropdownMenu.CheckboxItem
                     checked={showNoteListFolderPath}
                     className={menuItemClassName}

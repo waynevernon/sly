@@ -25,6 +25,7 @@ import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
   TASK_DETAIL_DIVIDER_CLASS,
+  TASK_DETAIL_EMPTY_TRIGGER_CLASS,
   TASK_DETAIL_FIELD_INPUT_CLASS,
   TASK_DETAIL_FILLED_TRIGGER_CLASS,
   TASK_DETAIL_LABEL_CLASS,
@@ -591,6 +592,7 @@ export function GlobalTaskCaptureDialog({
               title="Waiting"
               placeholder="Waiting…"
               icon={<Clock3 className="h-4 w-4 stroke-[1.7]" />}
+              showHeader={false}
               suggestions={waitingForSuggestions}
               renderTrigger={({ openEditor }) =>
                 hasWaitingFor ? (
@@ -604,16 +606,14 @@ export function GlobalTaskCaptureDialog({
                     <span className="truncate text-left">{waitingFor}</span>
                   </button>
                 ) : (
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={openEditor}
-                    className="gap-2"
+                    className={TASK_DETAIL_EMPTY_TRIGGER_CLASS}
                   >
-                    <Clock3 className="h-4 w-4 stroke-[1.7]" />
+                    <Clock3 className="h-4 w-4 stroke-[1.7] transition-colors group-hover:text-text" />
                     <span>Waiting</span>
-                  </Button>
+                  </button>
                 )
               }
             />
@@ -716,7 +716,7 @@ export function GlobalTaskCaptureDialog({
                       removeTag(tags[tags.length - 1]);
                     }
                   }}
-                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50"
+                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
                 />
               </div>
               {isTagInputFocused && knownTagSuggestions.length > 0 ? (

@@ -172,7 +172,7 @@ export function RecurrencePicker({ recurrence, actionDate, onChange }: Recurrenc
           ref={triggerRef}
           type="button"
           onClick={handleOpen}
-          className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[280px] items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
+          className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[280px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] bg-bg-muted/70 px-3 text-sm text-text transition-colors hover:bg-bg-muted"
         >
           <Repeat2 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
           <span className="truncate">{pillLabel(parsed, actionDate)}</span>
@@ -182,10 +182,10 @@ export function RecurrencePicker({ recurrence, actionDate, onChange }: Recurrenc
           ref={triggerRef}
           type="button"
           onClick={handleOpen}
-          className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+          className="ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[280px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
         >
           <Repeat2 className="h-4 w-4 shrink-0 stroke-[1.7] transition-colors" />
-          <span>Repeat</span>
+          <span className="min-w-0 truncate">Repeat</span>
         </button>
       )}
 

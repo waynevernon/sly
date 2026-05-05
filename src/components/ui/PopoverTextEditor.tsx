@@ -21,6 +21,7 @@ interface PopoverTextEditorProps {
   inputClassName?: string;
   maxSuggestions?: number;
   isSubmitting?: boolean;
+  showHeader?: boolean;
   renderAuxiliaryContent?: (controls: {
     draft: string;
     setDraft: React.Dispatch<React.SetStateAction<string>>;
@@ -43,6 +44,7 @@ export function PopoverTextEditor({
   inputClassName,
   maxSuggestions = 6,
   isSubmitting = false,
+  showHeader = true,
   renderAuxiliaryContent,
 }: PopoverTextEditorProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -228,27 +230,34 @@ export function PopoverTextEditor({
                 width: position.width,
               }}
               className={cn(
-                "z-50 animate-slide-down overflow-hidden p-0",
+                "z-50 animate-slide-down gap-0 overflow-hidden p-0",
                 popoverClassName,
               )}
             >
-              <div className="flex items-center justify-between px-3.5 py-2.5">
-                <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
-                  <span className="shrink-0">{icon}</span>
-                  <span className="truncate">{title}</span>
+              {showHeader ? (
+                <div className="flex items-center justify-between px-3.5 py-2.5">
+                  <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
+                    <span className="shrink-0">{icon}</span>
+                    <span className="truncate">{title}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cancelAndClose}
+                    disabled={isSubmitting}
+                    className="ui-focus-ring inline-flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
+                    aria-label={`Close ${title.toLocaleLowerCase()}`}
+                  >
+                    <X className="h-3.5 w-3.5 stroke-[1.7]" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={cancelAndClose}
-                  disabled={isSubmitting}
-                  className="ui-focus-ring inline-flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text"
-                  aria-label={`Close ${title.toLocaleLowerCase()}`}
-                >
-                  <X className="h-3.5 w-3.5 stroke-[1.7]" />
-                </button>
-              </div>
+              ) : null}
 
-              <div className="border-t border-border/50 px-3.5 py-3">
+              <div
+                className={cn(
+                  "px-3.5 py-3",
+                  showHeader && "border-t border-border/50",
+                )}
+              >
                 <Input
                   ref={inputRef}
                   value={draft}

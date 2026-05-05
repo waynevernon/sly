@@ -349,6 +349,21 @@ body {
 
 .ui-menu-item:hover,
 .ui-menu-item:focus {
+  background: color-mix(in srgb, var(--color-bg-muted) 80%, transparent);
+}
+
+.ui-menu-item-selected,
+.ui-menu-item[data-state="checked"],
+.ui-menu-item[aria-checked="true"] {
+  background: var(--color-bg-muted);
+}
+
+.ui-menu-item-selected:hover,
+.ui-menu-item-selected:focus,
+.ui-menu-item[data-state="checked"]:hover,
+.ui-menu-item[data-state="checked"]:focus,
+.ui-menu-item[aria-checked="true"]:hover,
+.ui-menu-item[aria-checked="true"]:focus {
   background: var(--color-bg-muted);
 }
 

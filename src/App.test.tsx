@@ -79,6 +79,7 @@ const notesActionsState = {
   renameNote: vi.fn(),
   syncNotesFolder: vi.fn(),
   consumePendingNewNote: vi.fn(() => false),
+  consumePendingDailyNoteBodyFocus: vi.fn(() => false),
   pinNote: vi.fn(),
   unpinNote: vi.fn(),
 };

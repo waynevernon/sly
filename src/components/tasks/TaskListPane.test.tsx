@@ -591,6 +591,64 @@ describe("TaskListPane", () => {
     expect(screen.getByRole("button", { name: "Reschedule" })).toBeInTheDocument();
   });
 
+  it("treats due-only tasks as overdue in the today view", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+
+    vi.mocked(tasksContext.useTasks).mockReturnValue(
+      makeTasksHookValue({
+        selectedView: "today",
+        buckets: {
+          inbox: [],
+          today: [
+            {
+              id: "task-due-overdue",
+              title: "File renewal",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-08T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: null,
+              starred: false,
+              dueAt: localDateToNormalizedActionAt("2026-04-08"),
+              recurrence: null,
+            },
+            {
+              id: "task-due-today",
+              title: "Send invoice",
+              description: "",
+              link: "",
+              waitingFor: "",
+              createdAt: "2026-04-09T12:00:00Z",
+              actionAt: null,
+              scheduleBucket: null,
+              completedAt: null,
+              starred: false,
+              dueAt: localDateToNormalizedActionAt("2026-04-09"),
+              recurrence: null,
+            },
+          ],
+          upcoming: [],
+          waiting: [],
+          anytime: [],
+          someday: [],
+          completed: [],
+          starred: [],
+        },
+      }),
+    );
+
+    render(
+      <TooltipProvider>
+        <TaskListPane />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getAllByTestId("task-row")).toHaveLength(2);
+  });
+
   it("groups completed tasks into recency sections", async () => {
     const tasksContext = await import("../../context/TasksContext");
 

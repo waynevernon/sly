@@ -113,6 +113,7 @@ function AssistantSelectMenu<T extends string>({
           className={`${menuSurfaceClassName} min-w-[var(--radix-dropdown-menu-trigger-width)] z-50`}
         >
           <DropdownMenu.RadioGroup
+            className="flex flex-col gap-1"
             value={value}
             onValueChange={(nextValue) => onChange(nextValue as T)}
           >

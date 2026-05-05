@@ -25,7 +25,6 @@ import {
 import { cn } from "../../lib/utils";
 import type { TaskPatch, TaskScheduleBucket } from "../../types/tasks";
 import {
-  Button,
   IconButton,
   PanelEmptyState,
   PopoverTextEditor,
@@ -35,6 +34,7 @@ import { DueDatePicker, TaskDatePicker } from "./TaskDatePicker";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
   TASK_DETAIL_DIVIDER_CLASS,
+  TASK_DETAIL_EMPTY_TRIGGER_CLASS,
   TASK_DETAIL_FIELD_INPUT_CLASS,
   TASK_DETAIL_FILLED_TRIGGER_CLASS,
   TASK_DETAIL_LABEL_CLASS,
@@ -308,7 +308,7 @@ export function TaskDetailPanel() {
     }
 
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col px-6 py-7 sm:px-8">
+      <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col px-6 py-7 sm:px-8">
         <div
           className="grid gap-x-4 gap-y-4"
           style={{ gridTemplateColumns: "20px minmax(0, 1fr)" }}
@@ -361,7 +361,7 @@ export function TaskDetailPanel() {
           </div>
 
           <div />
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
             <TaskDatePicker
               actionDate={actionDate}
               scheduleBucket={scheduleBucket}
@@ -388,6 +388,7 @@ export function TaskDetailPanel() {
               title="Waiting"
               placeholder="Waiting…"
               icon={<Clock3 className="h-4 w-4 stroke-[1.7]" />}
+              showHeader={false}
               suggestions={waitingForSuggestions}
               renderTrigger={({ openEditor }) =>
                 hasWaitingFor ? (
@@ -398,19 +399,17 @@ export function TaskDetailPanel() {
                     className={TASK_DETAIL_FILLED_TRIGGER_CLASS}
                   >
                     <Clock3 className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
-                    <span className="truncate text-left">{waitingFor}</span>
+                    <span className="min-w-0 truncate text-left">{waitingFor}</span>
                   </button>
                 ) : (
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={openEditor}
-                    className="gap-2"
+                    className={TASK_DETAIL_EMPTY_TRIGGER_CLASS}
                   >
-                    <Clock3 className="h-4 w-4 stroke-[1.7]" />
-                    <span>Waiting</span>
-                  </Button>
+                    <Clock3 className="h-4 w-4 stroke-[1.7] transition-colors group-hover:text-text" />
+                    <span className="min-w-0 truncate">Waiting</span>
+                  </button>
                 )
               }
             />
@@ -421,7 +420,7 @@ export function TaskDetailPanel() {
             <div className={TASK_DETAIL_LABEL_CLASS}>Tags</div>
             <div className="relative">
               <div
-                className="flex min-h-[calc(var(--ui-control-height-compact)+0.5rem)] flex-wrap items-center gap-1.5 bg-transparent py-1"
+                className="flex max-h-[4.5rem] min-h-[calc(var(--ui-control-height-compact)+0.5rem)] flex-wrap items-center gap-1.5 overflow-hidden bg-transparent py-1"
                 onMouseDown={(event) => {
                   if (event.target === event.currentTarget) {
                     event.preventDefault();
@@ -507,7 +506,7 @@ export function TaskDetailPanel() {
                       removeTag(tags[tags.length - 1]);
                     }
                   }}
-                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/50"
+                  className="h-[var(--ui-control-height-compact)] min-w-24 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-text-muted/40"
                 />
               </div>
               {isTagInputFocused && knownTagSuggestions.length > 0 ? (
@@ -599,17 +598,17 @@ export function TaskDetailPanel() {
           <div className={TASK_DETAIL_DIVIDER_CLASS} />
 
           <div />
-          <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted/50">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <span>Created {formatTaskTimestamp(selectedTask.createdAt)}</span>
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-text-muted/50">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              <span className="min-w-0 truncate">Created {formatTaskTimestamp(selectedTask.createdAt)}</span>
               {selectedTask.completedAt ? (
                 <>
-                  <span className="text-text-muted/30">·</span>
-                  <span>Completed {formatTaskTimestamp(selectedTask.completedAt)}</span>
+                  <span className="shrink-0 text-text-muted/30">·</span>
+                  <span className="min-w-0 truncate">Completed {formatTaskTimestamp(selectedTask.completedAt)}</span>
                 </>
               ) : null}
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto shrink-0">
               <IconButton
                 type="button"
                 variant="ghost"
@@ -629,7 +628,7 @@ export function TaskDetailPanel() {
   return (
     <div
       data-task-detail-panel
-      className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-bg"
+      className="flex h-full min-w-[360px] flex-1 flex-col overflow-hidden bg-bg"
     >
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">

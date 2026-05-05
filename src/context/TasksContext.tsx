@@ -236,19 +236,30 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let timer: number | undefined;
 
+    const syncToday = () => {
+      setToday((current) => {
+        const next = localDateString();
+        return current === next ? current : next;
+      });
+    };
+
     const scheduleRollover = () => {
       timer = window.setTimeout(() => {
-        setToday(localDateString());
+        syncToday();
         scheduleRollover();
       }, msUntilNextLocalMidnight());
     };
 
     scheduleRollover();
+    window.addEventListener("focus", syncToday);
+    document.addEventListener("visibilitychange", syncToday);
 
     return () => {
       if (timer !== undefined) {
         window.clearTimeout(timer);
       }
+      window.removeEventListener("focus", syncToday);
+      document.removeEventListener("visibilitychange", syncToday);
     };
   }, []);
 
@@ -525,12 +536,15 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       if (selectedTaskId === id) {
         setSelectedTask(task);
       }
+      if (completed && task.recurrence) {
+        void refreshTasks();
+      }
       return task;
     } catch (err) {
       setLastError(err instanceof Error ? err.message : "Failed to update task");
       return null;
     }
-  }, [selectedTaskId]);
+  }, [refreshTasks, selectedTaskId]);
 
   const deleteTask = useCallback(async (id: string): Promise<void> => {
     try {

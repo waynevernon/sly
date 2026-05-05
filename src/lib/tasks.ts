@@ -95,8 +95,8 @@ export interface DetectedTaskTags {
  * Derive which primary horizon view a task belongs to.
  * Priority (first match wins):
  *  1. completed_at set              → completed
- *  2. action_at local-date <= today → today (includes overdue)
- *  3. action_at local-date > today  → upcoming
+ *  2. action_at/due_at local-date <= today → today (includes overdue)
+ *  3. action_at/due_at local-date > today  → upcoming
  *  4. schedule_bucket = anytime     → anytime
  *  5. schedule_bucket = someday     → someday
  *  6. otherwise                     → inbox
@@ -106,27 +106,33 @@ export interface DetectedTaskTags {
  * waiting bucket in `groupByView`.
  */
 export function deriveView(
-  task: Pick<TaskMetadata, "completedAt" | "actionAt" | "scheduleBucket">,
+  task: Pick<TaskMetadata, "completedAt" | "actionAt" | "dueAt" | "scheduleBucket">,
   today: string,
 ): TaskView {
   if (task.completedAt) return "completed";
-  const actionDate = actionAtToLocalDate(task.actionAt);
-  if (actionDate) {
-    return actionDate <= today ? "today" : "upcoming";
+  const horizonDate = taskHorizonDate(task);
+  if (horizonDate) {
+    return horizonDate <= today ? "today" : "upcoming";
   }
   if (task.scheduleBucket === "anytime") return "anytime";
   if (task.scheduleBucket === "someday") return "someday";
   return "inbox";
 }
 
-/** True if the task is overdue (action_at in the past, not completed). */
+/** True if the task is overdue (action_at/due_at in the past, not completed). */
 export function isOverdue(
-  task: Pick<TaskMetadata, "completedAt" | "actionAt">,
+  task: Pick<TaskMetadata, "completedAt" | "actionAt" | "dueAt">,
   today: string,
 ): boolean {
-  const actionDate = actionAtToLocalDate(task.actionAt);
-  if (task.completedAt || !actionDate) return false;
-  return actionDate < today;
+  const horizonDate = taskHorizonDate(task);
+  if (task.completedAt || !horizonDate) return false;
+  return horizonDate < today;
+}
+
+export function taskHorizonDate(
+  task: Pick<TaskMetadata, "actionAt" | "dueAt">,
+): string | null {
+  return actionAtToLocalDate(task.actionAt) ?? actionAtToLocalDate(task.dueAt);
 }
 
 /** Group a flat task list into per-view buckets. */

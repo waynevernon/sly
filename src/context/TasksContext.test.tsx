@@ -63,4 +63,45 @@ describe("TasksContext", () => {
 
     expect(result.current.today).toBe("2026-04-10");
   });
+
+  it("updates the derived local date when the app regains focus after midnight", async () => {
+    const { result } = renderHook(() => useTasks(), { wrapper: Wrapper });
+
+    expect(result.current.today).toBe("2026-04-09");
+
+    vi.setSystemTime(new Date("2026-04-10T09:00:00"));
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    expect(result.current.today).toBe("2026-04-10");
+  });
+
+  it("refreshes after completing a recurring task so the spawned occurrence appears", async () => {
+    vi.mocked(tasksService.setTaskCompleted).mockResolvedValue({
+      id: "task-1",
+      title: "Daily review",
+      description: "",
+      link: "",
+      waitingFor: "",
+      createdAt: "2026-04-09T12:00:00Z",
+      actionAt: "2026-04-09T17:00:00Z",
+      scheduleBucket: null,
+      completedAt: "2026-04-10T14:00:00Z",
+      starred: false,
+      dueAt: null,
+      recurrence: "daily:schedule",
+      tags: [],
+    });
+
+    const { result } = renderHook(() => useTasks(), { wrapper: Wrapper });
+    const listCallsBeforeCompletion = vi.mocked(tasksService.listTasks).mock.calls.length;
+
+    await act(async () => {
+      await result.current.setCompleted("task-1", true);
+    });
+
+    expect(tasksService.listTasks).toHaveBeenCalledTimes(listCallsBeforeCompletion + 1);
+  });
 });

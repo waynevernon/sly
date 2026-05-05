@@ -65,7 +65,7 @@ import { TaskDatePickerPanel } from "./TaskDatePicker";
 import { TaskRow } from "./TaskRow";
 import { isMac, mod, shift, shortcut } from "../../lib/platform";
 import { cn } from "../../lib/utils";
-import { compareTasks, createTaskOrderRank, MANUAL_SORT_VIEWS, taskMatchesQuery } from "../../lib/tasks";
+import { compareTasks, createTaskOrderRank, MANUAL_SORT_VIEWS, taskHorizonDate, taskMatchesQuery } from "../../lib/tasks";
 import type { TaskMetadata, TaskScheduleBucket, TaskSortMode, TaskView } from "../../types/tasks";
 
 const EMPTY_MESSAGES: Record<string, { title: string; message: string }> = {
@@ -1340,8 +1340,8 @@ function getTaskSections(
     const todayItems: typeof tasks = [];
 
     for (const task of tasks) {
-      const actionDate = actionAtToLocalDate(task.actionAt);
-      if (actionDate && actionDate < today) {
+      const horizonDate = taskHorizonDate(task);
+      if (horizonDate && horizonDate < today) {
         overdue.push(task);
       } else {
         todayItems.push(task);
@@ -1362,12 +1362,12 @@ function getTaskSections(
     const laterItems: typeof tasks = [];
 
     for (const task of tasks) {
-      const actionDate = actionAtToLocalDate(task.actionAt);
-      if (!actionDate) {
+      const horizonDate = taskHorizonDate(task);
+      if (!horizonDate) {
         laterItems.push(task);
-      } else if (actionDate === tomorrow) {
+      } else if (horizonDate === tomorrow) {
         tomorrowItems.push(task);
-      } else if (actionDate <= weekEnd) {
+      } else if (horizonDate <= weekEnd) {
         thisWeekItems.push(task);
       } else {
         laterItems.push(task);
@@ -1444,11 +1444,11 @@ function getHorizonTaskSections(
   const unscheduledItems: typeof tasks = [];
 
   for (const task of tasks) {
-    const actionDate = actionAtToLocalDate(task.actionAt);
-    if (actionDate) {
-      if (actionDate < today) {
+    const horizonDate = taskHorizonDate(task);
+    if (horizonDate) {
+      if (horizonDate < today) {
         overdue.push(task);
-      } else if (actionDate === today) {
+      } else if (horizonDate === today) {
         todayItems.push(task);
       } else {
         upcomingItems.push(task);

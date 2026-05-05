@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowDownAZ, ArrowUpAZ, Check, CheckSquare, FileText } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, Check, CheckSquare, ChevronsDownUp, FileText } from "lucide-react";
 import { useNotes } from "../../context/NotesContext";
 import type { FolderSortMode } from "../../types/note";
 import type { FolderPathChange } from "../../lib/folderTree";
@@ -98,6 +98,15 @@ export function FoldersPane({
           </div>
         )}
         <div className="ui-pane-header-actions">
+          <IconButton
+            variant="ghost"
+            title="Collapse all folders"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("collapse-all-folders"));
+            }}
+          >
+            <ChevronsDownUp className="w-4.25 h-4.25 stroke-[1.5]" />
+          </IconButton>
           <SortMenuButton
             title="Sort folders"
             value={folderSortMode}

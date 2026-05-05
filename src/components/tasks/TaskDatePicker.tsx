@@ -19,6 +19,7 @@ import {
 import type { TaskScheduleBucket } from "../../types/tasks";
 import { cn } from "../../lib/utils";
 import { IconButton, PopoverSurface } from "../ui";
+import { TASK_DETAIL_EMPTY_TRIGGER_CLASS } from "./taskDetailSurface";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_LABELS = [
@@ -124,14 +125,14 @@ export function TaskDatePicker({
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
-          "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
+          "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
           actionDate || scheduleBucket
             ? "bg-bg-muted/70 text-text hover:bg-bg-muted"
-            : "text-text-muted hover:bg-bg-muted hover:text-text",
+            : TASK_DETAIL_EMPTY_TRIGGER_CLASS,
         )}
       >
         <CalendarDays className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
-        <span>{formattedValue}</span>
+        <span className="min-w-0 truncate">{formattedValue}</span>
       </button>
 
       {isOpen && popoverPosition
@@ -234,14 +235,14 @@ export function DueDatePicker({
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
-          "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
+          "ui-focus-ring group inline-flex h-[var(--ui-control-height-standard)] max-w-[320px] min-w-0 items-center gap-2 rounded-[var(--ui-radius-md)] px-3 text-sm transition-colors",
           dueDate
             ? "bg-bg-muted/70 text-text hover:bg-bg-muted"
-            : "text-text-muted hover:bg-bg-muted hover:text-text",
+            : TASK_DETAIL_EMPTY_TRIGGER_CLASS,
         )}
       >
         <Flag className="h-4 w-4 shrink-0 stroke-[1.7] text-text-muted transition-colors group-hover:text-text" />
-        <span>{formattedValue}</span>
+        <span className="min-w-0 truncate">{formattedValue}</span>
       </button>
 
       {isOpen && popoverPosition
