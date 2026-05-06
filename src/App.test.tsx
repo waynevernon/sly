@@ -69,6 +69,7 @@ const notesDataState = {
 
 const notesActionsState = {
   createNote: vi.fn(),
+  openDailyNote: vi.fn(),
   duplicateNote: vi.fn(),
   selectNote: vi.fn(),
   selectNoteRange: vi.fn(),
@@ -450,6 +451,23 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(notesActionsState.createNote).toHaveBeenCalled();
+      expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
+    });
+    expect(screen.getByText("editor")).toBeInTheDocument();
+  });
+
+  it("opens the daily note from anywhere with Cmd/Ctrl+Shift+D", async () => {
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
+
+    await waitFor(() => {
+      expect(notesActionsState.openDailyNote).toHaveBeenCalled();
       expect(screen.getByText("workspace-navigation:notes")).toBeInTheDocument();
     });
     expect(screen.getByText("editor")).toBeInTheDocument();

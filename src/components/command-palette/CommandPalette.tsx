@@ -294,6 +294,7 @@ export function CommandPalette({
         keywords: ["create", "document", "markdown"],
         icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
+          onShowNotes?.();
           createNote();
           onClose();
         },
@@ -306,6 +307,7 @@ export function CommandPalette({
         keywords: ["today", "journal", "date"],
         icon: <Sun className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
+          onShowNotes?.();
           onOpenDailyNote?.();
           onClose();
         },
@@ -361,6 +363,7 @@ export function CommandPalette({
             try {
               const newNote = await duplicateNote(currentNote.id);
               await refreshNotes();
+              onShowNotes?.();
               selectNote(newNote.id);
               onClose();
             } catch (error) {
@@ -767,7 +770,10 @@ export function CommandPalette({
         keywords: ["find", "all notes", "sidebar"],
         icon: <SearchIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
-          window.dispatchEvent(new CustomEvent("open-notes-search"));
+          onShowNotes?.();
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent("open-notes-search"));
+          });
           onClose();
         },
       },
@@ -1219,6 +1225,7 @@ export function CommandPalette({
         label: cleanTitle(note.title),
         preview: note.preview,
         action: () => {
+          onShowNotes?.();
           selectNote(note.id);
           onClose();
         },
@@ -1247,6 +1254,7 @@ export function CommandPalette({
       commandItems,
       rememberCommand,
       selectNote,
+      onShowNotes,
       selectTask,
       selectView,
       onShowTasks,
