@@ -834,7 +834,7 @@ export function TaskListPane() {
               title="Mark selected tasks complete"
               onClick={() => void handleCompleteTasks(selectedTaskIds)}
             >
-              <CheckCheck className="h-4 w-4 stroke-[1.6]" />
+              <CheckCheck className="h-4.5 w-4.5 stroke-[1.6]" />
             </IconButton>
             <IconButton
               type="button"
@@ -842,14 +842,14 @@ export function TaskListPane() {
               title="Delete selected tasks"
               onClick={() => void handleDeleteTasks(selectedTaskIds)}
             >
-              <Trash2 className="h-4 w-4 stroke-[1.6]" />
+              <Trash2 className="h-4.5 w-4.5 stroke-[1.6]" />
             </IconButton>
             <IconButton
               type="button"
               title="Clear selection"
               onClick={clearTaskSelection}
             >
-              <X className="h-4 w-4 stroke-[1.6]" />
+              <X className="h-4.5 w-4.5 stroke-[1.6]" />
             </IconButton>
           </div>
         ) : (
@@ -879,9 +879,9 @@ export function TaskListPane() {
               onClick={toggleSearch}
             >
               {searchOpen ? (
-                <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                <SearchOffIcon className="w-4.5 h-4.5 stroke-[1.5]" />
               ) : (
-                <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                <SearchIcon className="w-4.5 h-4.5 stroke-[1.5]" />
               )}
             </IconButton>
             {canInlineCreate && !isSearching && (
@@ -892,7 +892,7 @@ export function TaskListPane() {
                 variant="ghost"
                 onClick={handleStartCreate}
               >
-                <Plus className="h-4 w-4 stroke-[1.8]" />
+                <Plus className="h-4.5 w-4.5 stroke-[1.8]" />
               </IconButton>
             )}
           </div>

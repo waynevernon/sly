@@ -622,9 +622,9 @@ export function NotesPane() {
                 aria-label="Search notes"
               >
                 {searchOpen ? (
-                  <SearchOffIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                  <SearchOffIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                 ) : (
-                  <SearchIcon className="w-4.25 h-4.25 stroke-[1.5]" />
+                  <SearchIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                 )}
               </IconButton>
               <IconButton
@@ -635,7 +635,7 @@ export function NotesPane() {
                 title={`New note (${mod}${isMac ? "" : "+"}N)`}
                 aria-label="New note"
               >
-                <FilePlusCorner className="w-4.75 h-4.75 stroke-[1.5]" />
+                <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />
               </IconButton>
             </>
           )}

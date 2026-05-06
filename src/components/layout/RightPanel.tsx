@@ -390,7 +390,7 @@ export function RightPanel({
                         : "text-text-muted hover:bg-state-hover hover:text-text",
                     )}
                   >
-                    <Icon className="h-4 w-4 stroke-[1.7]" />
+                    <Icon className="h-4.5 w-4.5 stroke-[1.7]" />
                   </button>
                 </Tooltip>
               ))}

@@ -77,7 +77,7 @@ export function SortMenuButton<T extends string>({
                 setSuppressTooltip(false);
               }}
             >
-              <ListFilter className="w-4.25 h-4.25 stroke-[1.5]" />
+              <ListFilter className="w-4.5 h-4.5 stroke-[1.5]" />
             </IconButton>
           </DropdownMenu.Trigger>
         </TooltipTrigger>

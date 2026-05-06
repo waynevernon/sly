@@ -105,7 +105,7 @@ export function FoldersPane({
               window.dispatchEvent(new CustomEvent("collapse-all-folders"));
             }}
           >
-            <ChevronsDownUp className="w-4.25 h-4.25 stroke-[1.5]" />
+            <ChevronsDownUp className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
           <SortMenuButton
             title="Sort folders"
@@ -172,7 +172,7 @@ export function FoldersPane({
               window.dispatchEvent(new CustomEvent("create-new-folder"));
             }}
           >
-            <FolderPlusIcon className="w-4.75 h-4.75 stroke-[1.5]" />
+            <FolderPlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />
           </IconButton>
         </div>
       </div>

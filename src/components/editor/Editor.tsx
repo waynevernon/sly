@@ -1366,7 +1366,7 @@ function EditorImpl({
                     onClick={reloadCurrentNote}
                     className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-text-muted hover:bg-bg-muted hover:text-text transition-colors font-medium"
                   >
-                    <RefreshCwIcon className="w-4 h-4 stroke-[1.6]" />
+                    <RefreshCwIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     <span>Refresh</span>
                   </button>
                 </Tooltip>
@@ -1404,14 +1404,14 @@ function EditorImpl({
                       }
                     }}
                   >
-                    <PinIcon className={cn("w-5 h-5 stroke-[1.3]", isPinned && "fill-current")} />
+                    <PinIcon className={cn("w-4.5 h-4.5 stroke-[1.5]", isPinned && "fill-current")} />
                   </IconButton>
                 </Tooltip>
               )}
               {currentNote && (
                 <Tooltip content={`Find in note (${mod}${isMac ? "" : "+"}F)`}>
                   <IconButton onClick={openEditorSearch}>
-                    <TextSearch className="w-4.25 h-4.25 stroke-[1.6]" />
+                    <TextSearch className="w-4.5 h-4.5 stroke-[1.5]" />
                   </IconButton>
                 </Tooltip>
               )}
@@ -1425,9 +1425,9 @@ function EditorImpl({
                 >
                   <IconButton onClick={toggleSourceMode}>
                     {effectiveSourceMode ? (
-                      <MarkdownOffIcon className="w-4.75 h-4.75 stroke-[1.4]" />
+                      <MarkdownOffIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     ) : (
-                      <MarkdownIcon className="w-4.75 h-4.75 stroke-[1.4]" />
+                      <MarkdownIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     )}
                   </IconButton>
                 </Tooltip>
@@ -1436,7 +1436,7 @@ function EditorImpl({
                 <Tooltip content={`Export (${mod}${isMac ? "" : "+"}${shift}${isMac ? "" : "+"}C)`}>
                   <DropdownMenu.Trigger asChild>
                     <IconButton>
-                      <ShareIcon className="w-4.25 h-4.25 stroke-[1.6]" />
+                      <ShareIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     </IconButton>
                   </DropdownMenu.Trigger>
                 </Tooltip>
@@ -1486,7 +1486,7 @@ function EditorImpl({
                     {saveToFolderDisabled ? (
                       <LoadingSpinner size="md" tone="inherit" />
                     ) : (
-                      <FolderPlusIcon className="w-4.25 h-4.25 stroke-[1.6]" />
+                      <FolderPlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     )}
                   </IconButton>
                 </Tooltip>
