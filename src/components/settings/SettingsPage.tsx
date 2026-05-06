@@ -153,7 +153,7 @@ export function SettingsPage({
                 onClick={() => setActiveTab(tab.id)}
                 aria-pressed={isActive}
                 className={`ui-focus-ring flex w-full items-center justify-between gap-3 rounded-[var(--ui-radius-md)] pl-3 pr-2 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
-                  isActive ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted/80"
+                  isActive ? "bg-state-selected text-text" : "text-text hover:bg-state-hover"
                 }`}
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2">

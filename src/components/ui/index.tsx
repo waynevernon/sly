@@ -74,8 +74,8 @@ export function ToolbarButton({
       className={cn(
         "ui-focus-ring h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] flex items-center justify-center rounded-[var(--ui-radius-md)] text-sm transition-colors shrink-0",
         isActive
-          ? "bg-bg-muted text-text"
-          : "hover:bg-bg-muted hover:text-text text-text-muted",
+          ? "bg-state-selected text-text"
+          : "hover:bg-state-hover hover:text-text text-text-muted",
         className
       )}
       aria-label={title}
@@ -205,10 +205,10 @@ export function ListItem({
         "focus:outline-none focus-visible:outline-none",
         hasSecondaryRow ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
         isActive
-          ? "bg-bg-emphasis"
+          ? "bg-state-active"
           : selectionState === "selected"
-            ? "bg-bg-muted/75 hover:bg-bg-muted"
-            : "hover:bg-bg-muted",
+            ? "bg-state-selected hover:bg-state-active"
+            : "hover:bg-state-hover",
         className
       )}
     >
@@ -312,7 +312,7 @@ export function CommandItem({
       onClick={onClick}
       className={cn(
         "ui-focus-ring w-full text-left px-3 py-2 rounded-[var(--ui-radius-md)] flex items-center justify-between transition-colors cursor-pointer",
-        isSelected ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted"
+        isSelected ? "bg-state-selected text-text" : "text-text hover:bg-state-hover"
       )}
     >
       <div className="flex items-center gap-3 min-w-0">

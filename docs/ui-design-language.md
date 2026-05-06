@@ -202,9 +202,9 @@ Segmented controls and scope toggles use a single sliding indicator pill that tr
 
 ## State Language
 
-- `hover`: slight fill or stronger text, never noisy contrast jumps
+- `hover`: slight fill or stronger text, never noisy contrast jumps; primary navigation and selectable rows use `bg-state-hover` so light themes carry a small amount of accent color
 - `focus-visible`: one shared outline/ring style
-- `active/selected`: the active item (currently open or focused) uses `bg-bg-emphasis`; multi-selected items use `bg-bg-muted/75`. The active state must be visually distinct from hover (`bg-bg-muted`) and from multi-selection. Never let an active item look indistinguishable from a hovered-but-inactive one.
+- `active/selected`: the active item (currently open or focused) uses `bg-state-active`; selected navigation and multi-selected rows use `bg-state-selected`. The active state must be visually distinct from hover (`bg-state-hover`) and from multi-selection. Never let an active item look indistinguishable from a hovered-but-inactive one.
 - `disabled`: lower opacity plus interaction lock
 - `success`: quiet confirmation
 - `warning`: tinted container with a clear next step

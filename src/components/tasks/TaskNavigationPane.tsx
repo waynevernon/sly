@@ -131,7 +131,7 @@ export function TaskNavigationPane({
                 type="button"
                 aria-pressed={false}
                 onClick={onShowNotes}
-                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-state-hover hover:text-text outline-none"
               >
                 <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
               </button>
@@ -141,7 +141,7 @@ export function TaskNavigationPane({
                 type="button"
                 aria-pressed={true}
                 onClick={onShowTasks}
-                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
+                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-state-selected px-2 h-[var(--ui-control-height-compact)] outline-none"
               >
                 <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
                 <span className="ui-pane-mode-label">Tasks</span>
@@ -219,7 +219,7 @@ function TaskTagsSection() {
                     aria-pressed={isSelected}
                     onClick={() => selectTag(tag)}
                     className={`ui-focus-ring flex w-full items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-colors ${
-                      isSelected ? "bg-bg-muted text-text" : "text-text hover:bg-bg-muted/80"
+                      isSelected ? "bg-state-selected text-text" : "text-text hover:bg-state-hover"
                     }`}
                     style={style}
                   >

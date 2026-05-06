@@ -217,7 +217,7 @@ describe("FolderTreeView", () => {
 
     expect(
       screen.getByRole("button", { name: /Pinned/i }).className,
-    ).toMatch(/(^|\s)bg-bg-muted($|\s)/);
+    ).toMatch(/(^|\s)bg-state-selected($|\s)/);
 
     vi.mocked(notesContext.useNotes).mockReturnValue(
       makeNotesHookValue({
@@ -235,11 +235,11 @@ describe("FolderTreeView", () => {
 
     expect(
       screen.getByRole("button", { name: /Pinned/i }).className,
-    ).not.toMatch(/(^|\s)bg-bg-muted($|\s)/);
+    ).not.toMatch(/(^|\s)bg-state-selected($|\s)/);
     expect(
       screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }).parentElement
         ?.className,
-    ).toContain("bg-bg-muted");
+    ).toContain("bg-state-selected");
   });
 
   it("hides the pinned notes row when the setting is disabled", async () => {
@@ -401,6 +401,89 @@ describe("FolderTreeView", () => {
     await user.click(screen.getByRole("menuitem", { name: /^New Note$/i }));
 
     expect(createNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not persist an empty collapsed-folder list before folders arrive", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const setCollapsedFolders = vi.fn();
+    let knownFolders: string[] = [];
+
+    vi.mocked(notesContext.useNotes).mockImplementation(() =>
+      makeNotesHookValue({
+        knownFolders,
+        settings: {
+          schemaVersion: 1,
+          showNoteCounts: true,
+          showNotesFromSubfolders: false,
+          noteListDateMode: "modified",
+          showNoteListFilename: false,
+          showNoteListFolderPath: true,
+          showNoteListPreview: true,
+          noteListPreviewLines: 2,
+          noteSortMode: "modifiedDesc",
+          folderSortMode: "nameAsc",
+        },
+        setCollapsedFolders,
+      }),
+    );
+
+    const { rerender } = render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^Notes(?: \d+)?$/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(setCollapsedFolders).not.toHaveBeenCalled();
+
+    knownFolders = ["docs", "docs/reference"];
+    rerender(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(setCollapsedFolders).toHaveBeenCalledWith([
+        "docs",
+        "docs/reference",
+      ]);
+    });
+    expect(screen.queryByText("reference")).not.toBeInTheDocument();
+  });
+
+  it("reveals folders for note visibility without persisting expansion", async () => {
+    const notesContext = await import("../../context/NotesContext");
+    const setCollapsedFolders = vi.fn();
+
+    vi.mocked(notesContext.useNotes).mockReturnValue(
+      makeNotesHookValue({
+        knownFolders: ["docs", "docs/reference"],
+        settings: {
+          schemaVersion: 1,
+          showNoteCounts: true,
+          showNotesFromSubfolders: false,
+          noteListDateMode: "modified",
+          showNoteListFilename: false,
+          showNoteListFolderPath: true,
+          showNoteListPreview: true,
+          noteListPreviewLines: 2,
+          noteSortMode: "modifiedDesc",
+          folderSortMode: "nameAsc",
+          collapsedFolders: ["docs"],
+        },
+        folderRevealRequest: {
+          path: "docs",
+          persist: false,
+          version: 1,
+        },
+        setCollapsedFolders,
+      }),
+    );
+
+    render(<FolderTreeView />);
+
+    await waitFor(() => {
+      expect(screen.getByText("reference")).toBeInTheDocument();
+    });
+    expect(setCollapsedFolders).not.toHaveBeenCalledWith([]);
   });
 
   it("does not briefly expand a collapsed folder while renaming it", async () => {

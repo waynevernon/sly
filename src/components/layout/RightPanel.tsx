@@ -386,8 +386,8 @@ export function RightPanel({
                     className={cn(
                       "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] items-center justify-center rounded-[var(--ui-radius-md)] transition-colors",
                       activeTab === tab
-                        ? "bg-bg-muted text-text"
-                        : "text-text-muted hover:bg-bg-muted hover:text-text",
+                        ? "bg-state-selected text-text"
+                        : "text-text-muted hover:bg-state-hover hover:text-text",
                     )}
                   >
                     <Icon className="h-4 w-4 stroke-[1.7]" />
@@ -423,8 +423,8 @@ export function RightPanel({
                         className={cn(
                           "ui-focus-ring flex w-full items-start rounded-[var(--ui-radius-md)] px-2 py-1.5 text-left text-sm transition-colors",
                           isActive
-                            ? "bg-bg-muted text-text"
-                            : "text-text-muted hover:bg-bg-muted hover:text-text",
+                            ? "bg-state-selected text-text"
+                            : "text-text-muted hover:bg-state-hover hover:text-text",
                         )}
                         style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
                       >

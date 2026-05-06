@@ -65,6 +65,9 @@
   --color-bg-secondary: #fafaf9;
   --color-bg-muted: rgba(28, 25, 23, 0.06);
   --color-bg-emphasis: rgba(28, 25, 23, 0.09);
+  --color-state-hover: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-muted));
+  --color-state-selected: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-muted));
+  --color-state-active: color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-emphasis));
   --color-text: #1c1917;
   --color-text-muted: #78716c;
   --color-text-inverse: #fafaf9;
@@ -162,6 +165,9 @@
   --color-bg-secondary: rgb(14, 12, 11);
   --color-bg-muted: rgba(250, 249, 249, 0.05);
   --color-bg-emphasis: rgba(250, 249, 249, 0.08);
+  --color-state-hover: color-mix(in srgb, var(--color-accent) 7%, var(--color-bg-muted));
+  --color-state-selected: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-muted));
+  --color-state-active: color-mix(in srgb, var(--color-accent) 13%, var(--color-bg-emphasis));
   --color-text: #fafaf9;
   --color-text-muted: #a8a29e;
   --color-text-inverse: #0c0a09;
@@ -219,6 +225,9 @@
   --color-bg-secondary: var(--color-bg-secondary);
   --color-bg-muted: var(--color-bg-muted);
   --color-bg-emphasis: var(--color-bg-emphasis);
+  --color-state-hover: var(--color-state-hover);
+  --color-state-selected: var(--color-state-selected);
+  --color-state-active: var(--color-state-active);
 
   /* Text colors */
   --color-text: var(--color-text);
@@ -353,13 +362,13 @@ body {
 
 .ui-menu-item:hover,
 .ui-menu-item:focus {
-  background: color-mix(in srgb, var(--color-bg-muted) 80%, transparent);
+  background: var(--color-state-hover);
 }
 
 .ui-menu-item-selected,
 .ui-menu-item[data-state="checked"],
 .ui-menu-item[aria-checked="true"] {
-  background: var(--color-bg-muted);
+  background: var(--color-state-selected);
 }
 
 .ui-menu-item-selected:hover,
@@ -368,7 +377,7 @@ body {
 .ui-menu-item[data-state="checked"]:focus,
 .ui-menu-item[aria-checked="true"]:hover,
 .ui-menu-item[aria-checked="true"]:focus {
-  background: var(--color-bg-muted);
+  background: var(--color-state-active);
 }
 
 .ui-menu-item-destructive {

@@ -140,6 +140,19 @@ function getFolderIconStyle(
   return color ? { color } : undefined;
 }
 
+function getLocallyAdjustedCollapsedFolders(
+  paths: string[] | null | undefined,
+  locallyToggledPaths: Set<string>,
+): Set<string> {
+  const next = new Set<string>();
+  paths?.forEach((path) => {
+    if (!locallyToggledPaths.has(path)) {
+      next.add(path);
+    }
+  });
+  return next;
+}
+
 function FolderRowTrailing({
   count,
   isActive = false,
@@ -291,7 +304,7 @@ function InlineFolderRow({
   return (
     <div
       className={`rounded-[var(--ui-radius-md)] ${
-        isSelected ? "bg-bg-muted ring-1 ring-text-muted/20" : "bg-bg-muted/70"
+        isSelected ? "bg-state-selected ring-1 ring-text-muted/20" : "bg-bg-muted/70"
       }`}
     >
       <div className="flex items-center gap-1.5 pr-3 py-2" style={{ paddingLeft: `${depth * 12}px` }}>
@@ -424,8 +437,8 @@ const FolderItem = memo(function FolderItem({
     isOver && isContainerDropActive
       ? "bg-accent/12 ring-1 ring-accent/60"
       : selectedFolderPath === folder.path
-        ? "bg-bg-muted"
-        : "hover:bg-bg-muted/80"
+        ? "bg-state-selected"
+        : "hover:bg-state-hover"
   }`;
   const hasNestedFolders = folder.children.length > 0 || isCreatingChild;
 
@@ -509,7 +522,7 @@ const FolderItem = memo(function FolderItem({
                   event.stopPropagation();
                   onToggleCollapse(folder.path);
                 }}
-                className="ml-2 h-5 w-5 rounded-[var(--ui-radius-sm)] text-text-muted/70 hover:bg-bg-muted/80 flex items-center justify-center shrink-0"
+                className="ml-2 h-5 w-5 rounded-[var(--ui-radius-sm)] text-text-muted/70 hover:bg-state-hover flex items-center justify-center shrink-0"
                 aria-label={isCollapsed ? "Expand folder" : "Collapse folder"}
               >
                 {isCollapsed ? (
@@ -952,6 +965,8 @@ export function FolderTreeView({
   useEffect(() => {
     setCollapsedFoldersState(new Set());
     setHasInitializedCollapseState(false);
+    locallyToggledCollapsedPathsRef.current = new Set();
+    setForcedCollapsedFolderPath(null);
   }, [notesFolder]);
 
   useEffect(() => {
@@ -960,8 +975,17 @@ export function FolderTreeView({
     }
 
     if (settings.collapsedFolders !== undefined) {
-      setCollapsedFoldersState(new Set(settings.collapsedFolders));
+      setCollapsedFoldersState(
+        getLocallyAdjustedCollapsedFolders(
+          settings.collapsedFolders,
+          locallyToggledCollapsedPathsRef.current,
+        ),
+      );
       setHasInitializedCollapseState(true);
+      return;
+    }
+
+    if (allFolderPaths.length === 0) {
       return;
     }
 
@@ -982,7 +1006,12 @@ export function FolderTreeView({
       return;
     }
 
-    setCollapsedFoldersState(new Set(settings.collapsedFolders));
+    setCollapsedFoldersState(
+      getLocallyAdjustedCollapsedFolders(
+        settings.collapsedFolders,
+        locallyToggledCollapsedPathsRef.current,
+      ),
+    );
   }, [hasInitializedCollapseState, settings.collapsedFolders]);
 
   const { active } = useDndContext();
@@ -1012,16 +1041,25 @@ export function FolderTreeView({
   }, [focusTree]);
 
   const commitCollapsedFolders = useCallback(
-    (updater: (prev: Set<string>) => Set<string>) => {
+    (
+      updater: (prev: Set<string>) => Set<string>,
+      options: { persist?: boolean } = {},
+    ) => {
       const next = updater(new Set(collapsedFoldersRef.current));
       setCollapsedFoldersState(next);
-      void persistCollapsedFolders([...next]);
+      if (options.persist !== false) {
+        void persistCollapsedFolders([...next]);
+      }
     },
     [persistCollapsedFolders],
   );
 
-  const expandFolder = useCallback((folderPath: string) => {
+  const expandFolder = useCallback((
+    folderPath: string,
+    options: { persist?: boolean } = {},
+  ) => {
     if (!folderPath) return;
+    const shouldPersist = options.persist ?? true;
 
     const parts = folderPath.split("/");
     for (let index = 1; index <= parts.length; index += 1) {
@@ -1044,7 +1082,7 @@ export function FolderTreeView({
         next.delete(parts.slice(0, index).join("/"));
       }
       return next;
-    });
+    }, { persist: shouldPersist });
   }, [commitCollapsedFolders, forcedCollapsedFolderPath]);
 
   const startCreateFolder = useCallback((parentPath: string) => {
@@ -1071,7 +1109,9 @@ export function FolderTreeView({
       return;
     }
 
-    expandFolder(folderRevealRequest.path);
+    expandFolder(folderRevealRequest.path, {
+      persist: folderRevealRequest.persist,
+    });
   }, [expandFolder, folderRevealRequest]);
 
   useEffect(() => {
@@ -1529,8 +1569,8 @@ export function FolderTreeView({
               }}
               className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "pinned"
-                  ? "bg-bg-muted"
-                  : "hover:bg-bg-muted/80"
+                  ? "bg-state-selected"
+                  : "hover:bg-state-hover"
               }`}
             >
               <span className="flex items-center gap-2 min-w-0 flex-1">
@@ -1563,8 +1603,8 @@ export function FolderTreeView({
               }}
               className={`w-full flex items-center gap-3 rounded-[var(--ui-radius-md)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-200 ${
                 selectedScope.type === "recent"
-                  ? "bg-bg-muted"
-                  : "hover:bg-bg-muted/80"
+                  ? "bg-state-selected"
+                  : "hover:bg-state-hover"
               }`}
             >
               <span className="flex items-center gap-2 min-w-0 flex-1">
@@ -1600,8 +1640,8 @@ export function FolderTreeView({
                 isOverRoot && isContainerDropActive
                   ? "bg-accent/12 ring-1 ring-accent/60"
                   : selectedScope.type === "all"
-                    ? "bg-bg-muted"
-                    : "hover:bg-bg-muted/80"
+                    ? "bg-state-selected"
+                    : "hover:bg-state-hover"
               }`}
               onContextMenu={() => selectFolder(null)}
             >

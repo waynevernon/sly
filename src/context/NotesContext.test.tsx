@@ -1023,6 +1023,7 @@ describe("NotesContext", () => {
 
     expect(result.current.folderRevealRequest).toEqual({
       path: "docs",
+      persist: true,
       version: 1,
     });
 
@@ -1032,7 +1033,43 @@ describe("NotesContext", () => {
 
     expect(result.current.folderRevealRequest).toEqual({
       path: "docs",
+      persist: true,
       version: 2,
+    });
+  });
+
+  it("reveals parent folders without persisting expansion when opening a note", async () => {
+    vi.mocked(notesService.listNotes).mockResolvedValue([
+      {
+        id: "docs/alpha",
+        title: "Alpha note",
+        preview: "planning",
+        modified: 2,
+        created: 2,
+      },
+    ]);
+    vi.mocked(notesService.readNote).mockResolvedValue({
+      id: "docs/alpha",
+      title: "Alpha note",
+      content: "",
+      path: "/notes/docs/alpha.md",
+      modified: 2,
+    });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("docs/alpha");
+    });
+
+    expect(result.current.folderRevealRequest).toEqual({
+      path: "docs",
+      persist: false,
+      version: 1,
     });
   });
 

@@ -526,7 +526,7 @@ export function TaskDetailPanel() {
                         onClick={() => applyTagSuggestion(tag)}
                         className={cn(
                           "ui-focus-ring flex w-full items-center gap-2 rounded-[var(--ui-radius-md)] px-2.5 py-1.5 text-left text-sm text-text transition-colors",
-                          isActive ? "bg-bg-muted" : "hover:bg-bg-muted",
+                          isActive ? "bg-state-selected" : "hover:bg-state-hover",
                         )}
                         style={textColor ? { color: textColor } : undefined}
                       >

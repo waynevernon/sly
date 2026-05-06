@@ -335,14 +335,14 @@ describe("RightPanel", () => {
     const detailButton = screen.getByRole("button", { name: "Detail" });
 
     await waitFor(() => {
-      expect(titleButton.className).toMatch(/bg-bg-muted/);
+      expect(titleButton.className).toMatch(/bg-state-selected/);
     });
 
     editor.state.selection.from = positions[2].pos + 1;
     editor.emit("selectionUpdate");
 
     await waitFor(() => {
-      expect(detailButton.className).toMatch(/bg-bg-muted/);
+      expect(detailButton.className).toMatch(/bg-state-selected/);
     });
 
     topByPos.set(positions[0].pos, -180);
@@ -351,7 +351,7 @@ describe("RightPanel", () => {
     fireEvent.scroll(scrollContainer);
 
     await waitFor(() => {
-      expect(detailButton.className).toMatch(/bg-bg-muted/);
+      expect(detailButton.className).toMatch(/bg-state-selected/);
     });
   });
 
@@ -413,7 +413,7 @@ describe("RightPanel", () => {
     editor.emit("selectionUpdate");
 
     await waitFor(() => {
-      expect(detailButton.className).toMatch(/bg-bg-muted/);
+      expect(detailButton.className).toMatch(/bg-state-selected/);
     });
 
     const updatedDoc = schema.node("doc", null, [
@@ -453,7 +453,7 @@ describe("RightPanel", () => {
     editor.emit("update");
 
     await waitFor(() => {
-      expect(detailButton.className).toMatch(/bg-bg-muted/);
+      expect(detailButton.className).toMatch(/bg-state-selected/);
     }, {
       timeout: 1000,
     });

@@ -124,8 +124,8 @@ function TaskViewButton({
           isTaskDropOver
             ? "bg-accent/10 text-text ring-1 ring-inset ring-accent/35"
             : isSelected
-              ? "bg-bg-muted text-text"
-              : "text-text hover:bg-bg-muted/80"
+              ? "bg-state-selected text-text"
+              : "text-text hover:bg-state-hover"
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">

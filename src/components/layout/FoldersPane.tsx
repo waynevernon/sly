@@ -74,7 +74,7 @@ export function FoldersPane({
                 type="button"
                 aria-pressed={true}
                 onClick={onShowNotes}
-                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-bg-muted px-2 h-[var(--ui-control-height-compact)] outline-none"
+                className="ui-focus-ring ui-pane-mode-active flex shrink-0 items-center gap-1.5 rounded-[var(--ui-radius-md)] font-medium text-base text-text bg-state-selected px-2 h-[var(--ui-control-height-compact)] outline-none"
               >
                 <FileText className="h-4 w-4 shrink-0 stroke-[1.7]" />
                 <span className="ui-pane-mode-label">Notes</span>
@@ -85,7 +85,7 @@ export function FoldersPane({
                 type="button"
                 aria-pressed={false}
                 onClick={onShowTasks}
-                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-bg-muted hover:text-text outline-none"
+                className="ui-focus-ring flex items-center h-[var(--ui-control-height-compact)] px-2 rounded-[var(--ui-radius-md)] text-text-muted transition-colors hover:bg-state-hover hover:text-text outline-none"
               >
                 <CheckSquare className="h-4 w-4 shrink-0 stroke-[1.7]" />
               </button>

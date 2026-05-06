@@ -286,7 +286,7 @@ export function GeneralSettingsSection() {
                 <DropdownMenu.Trigger asChild>
                   <button
                     type="button"
-                    className="ui-focus-ring ui-settings-panel flex min-h-10 flex-1 items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-muted"
+                    className="ui-focus-ring ui-settings-panel flex min-h-10 flex-1 items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-state-hover"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <FolderOpen className="h-4.5 w-4.5 shrink-0 stroke-[1.5] text-text-muted" />

@@ -87,7 +87,7 @@ function AssistantSelectMenu<T extends string>({
           aria-label={ariaLabel}
           className={cn(
             "ui-focus-ring flex h-[var(--ui-control-height-standard)] w-full items-center gap-2 rounded-[var(--ui-radius-md)] border border-border bg-bg px-3 text-left text-sm leading-none text-text transition-colors",
-            "hover:bg-bg-muted data-[state=open]:bg-bg-muted",
+            "hover:bg-state-hover data-[state=open]:bg-state-selected",
             triggerClassName,
           )}
         >
@@ -501,7 +501,7 @@ export function RightPanelAssistant({
                 items={providerItems}
                 onChange={onProviderChange}
                 ariaLabel="Assistant provider"
-                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-state-hover data-[state=open]:bg-state-selected"
               />
             </div>
             <div className="min-w-0 flex-1">
@@ -510,7 +510,7 @@ export function RightPanelAssistant({
                 items={scopeItems}
                 onChange={onScopeChange}
                 ariaLabel="Assistant scope"
-                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-bg-muted data-[state=open]:bg-bg-muted"
+                triggerClassName="h-[var(--ui-control-height-compact)] border-transparent bg-transparent px-2 text-xs hover:bg-state-hover data-[state=open]:bg-state-selected"
               />
             </div>
             <div className="shrink-0">

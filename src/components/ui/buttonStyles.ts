@@ -27,10 +27,10 @@ export const iconButtonSizeClasses: Record<ButtonSize, string> = {
 
 export const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary: "bg-accent text-text-inverse hover:bg-accent/90",
-  default: "bg-bg-muted text-text hover:bg-bg-emphasis",
-  secondary: "bg-bg-muted text-text hover:bg-bg-emphasis",
-  ghost: "hover:bg-bg-muted text-text-muted hover:text-text",
-  outline: "border border-border bg-transparent text-text hover:bg-bg-muted",
+  default: "bg-bg-muted text-text hover:bg-state-active",
+  secondary: "bg-bg-muted text-text hover:bg-state-active",
+  ghost: "hover:bg-state-hover text-text-muted hover:text-text",
+  outline: "border border-border bg-transparent text-text hover:bg-state-hover",
   link: "text-text-muted underline-offset-4 hover:text-text hover:underline",
   destructive:
     "bg-[var(--color-danger-muted)] text-[var(--color-danger)] hover:bg-[var(--color-danger-muted)]/90",

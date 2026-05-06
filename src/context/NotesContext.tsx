@@ -39,6 +39,7 @@ import { normalizeTaskTag } from "../lib/tasks";
 
 interface FolderRevealRequest {
   path: string;
+  persist: boolean;
   version: number;
 }
 
@@ -112,7 +113,7 @@ interface NotesActionsContextValue {
   createFolder: (parentPath: string, name: string) => Promise<void>;
   deleteFolder: (path: string) => Promise<void>;
   renameFolder: (oldPath: string, newName: string) => Promise<void>;
-  revealFolder: (path: string | null) => void;
+  revealFolder: (path: string | null, options?: { persist?: boolean }) => void;
   moveNote: (id: string, targetFolder: string) => Promise<void>;
   moveSelectedNotes: (targetFolder: string) => Promise<void>;
   moveFolder: (path: string, targetParent: string) => Promise<void>;
@@ -684,7 +685,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [notesFolder]);
 
-  const revealFolder = useCallback((path: string | null) => {
+  const revealFolder = useCallback((
+    path: string | null,
+    options: { persist?: boolean } = {},
+  ) => {
     if (!path) {
       return;
     }
@@ -692,6 +696,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     folderRevealVersionRef.current += 1;
     setFolderRevealRequest({
       path,
+      persist: options.persist ?? true,
       version: folderRevealVersionRef.current,
     });
   }, []);
@@ -1214,7 +1219,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         selectedScopeRef.current.type !== "recent" &&
         selectedScopeRef.current.type !== "pinned"
       ) {
-        revealFolder(parentFolder);
+        revealFolder(parentFolder, { persist: false });
       }
       const note = await notesService.readNote(resolvedId);
       if (requestId !== selectRequestIdRef.current) return;
