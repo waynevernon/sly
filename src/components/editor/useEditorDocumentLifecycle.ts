@@ -552,6 +552,7 @@ export function useEditorDocumentLifecycle({
         lastSave?.noteId === loadedNoteIdRef.current &&
         lastSave?.content === currentNote.content
       ) {
+        currentNoteIdRef.current = currentNote.id;
         loadedNoteIdRef.current = currentNote.id;
         loadedModifiedRef.current = currentNote.modified;
         lastSaveRef.current = null;

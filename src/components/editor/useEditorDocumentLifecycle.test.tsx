@@ -195,6 +195,88 @@ describe("useEditorDocumentLifecycle", () => {
     });
   });
 
+  it("keeps the caret stable when a background save renames the current note", async () => {
+    const editor = {
+      storage: {
+        markdown: {
+          manager: {
+            serialize: vi.fn(() => "# Renamed\nBody"),
+            parse: vi.fn((value: string) => value),
+          },
+        },
+      },
+      getJSON: vi.fn(() => ({})),
+      getText: vi.fn(() => "# Renamed\nBody"),
+      commands: {
+        setContent: vi.fn(),
+        blur: vi.fn(),
+        focus: vi.fn(),
+        selectAll: vi.fn(),
+      },
+    } as unknown as TiptapEditor;
+
+    const currentNoteIdRef = { current: "Untitled" };
+    const saveNote = vi.fn().mockResolvedValue(undefined);
+
+    const { result, rerender } = renderHook(
+      ({
+        currentNote,
+      }: {
+        currentNote: {
+          id: string;
+          title: string;
+          content: string;
+          modified: number;
+        };
+      }) =>
+        useEditorDocumentLifecycle({
+          currentNote,
+          currentNoteIdRef,
+          editorReady: true,
+          editorRef: { current: editor },
+          focusAndSelectTitle: vi.fn(() => false),
+          printMode: false,
+          reloadVersion: 0,
+          saveNote,
+          notesFolder: null,
+          scrollContainerRef: { current: null },
+          sourceEditorRef: { current: null },
+        }),
+      {
+        initialProps: {
+          currentNote: {
+            id: "Untitled",
+            title: "Untitled",
+            content: "# Untitled\n",
+            modified: 1,
+          },
+        },
+      },
+    );
+
+    expect((editor.commands.setContent as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+
+    await act(async () => {
+      result.current.scheduleSave();
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(saveNote).toHaveBeenCalledWith("# Renamed\nBody", "Untitled");
+
+    rerender({
+      currentNote: {
+        id: "Renamed",
+        title: "Renamed",
+        content: "# Renamed\nBody",
+        modified: 2,
+      },
+    });
+
+    expect((editor.commands.setContent as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect((editor.commands.blur as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect(currentNoteIdRef.current).toBe("Renamed");
+  });
+
   it("focuses the first body line for a newly created daily note", () => {
     const setTextSelection = vi.fn(() => chain);
     const insertContentAt = vi.fn(() => chain);
