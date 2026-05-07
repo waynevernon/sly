@@ -204,11 +204,9 @@ export function ListItem({
         "w-full text-left px-2.5 transition-colors cursor-pointer select-none rounded-[var(--ui-radius-md)]",
         "focus:outline-none focus-visible:outline-none",
         hasSecondaryRow ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
-        isActive
-          ? "bg-state-active"
-          : selectionState === "selected"
-            ? "bg-state-selected hover:bg-state-active"
-            : "hover:bg-state-hover",
+        isActive || selectionState === "selected"
+          ? "bg-state-selected hover:bg-state-selected"
+          : "hover:bg-state-hover",
         className
       )}
     >

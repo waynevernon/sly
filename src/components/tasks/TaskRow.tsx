@@ -145,11 +145,9 @@ export function TaskRow({
             className={cn(
               "flex cursor-pointer items-start gap-2.5 rounded-[var(--ui-radius-md)] pl-2.5 pr-2.5 transition-colors duration-[var(--ui-motion-duration-fade)]",
               secondaryLabel || dueDateLabel ? "py-[var(--ui-list-item-py-tall)]" : "py-[var(--ui-list-item-py)]",
-              isActive
-                ? "bg-state-active"
-                : isSelected
-                  ? "bg-state-selected"
-                  : "hover:bg-state-hover",
+              isActive || isSelected
+                ? "bg-state-selected"
+                : "hover:bg-state-hover",
             )}
           >
             <button
