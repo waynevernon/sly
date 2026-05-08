@@ -1,6 +1,6 @@
 [package]
 name = "sly"
-version = "1.6.4"
+version = "1.6.5"
 description = "Markdown notes and task planning for Mac"
 authors = ["Wayne Vernon"]
 edition = "2021"
