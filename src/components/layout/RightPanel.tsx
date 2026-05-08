@@ -57,6 +57,17 @@ const RIGHT_PANEL_TABS: Array<{
   },
 ];
 
+function scrollNodeToTopOfContainer(
+  scrollContainer: HTMLDivElement,
+  node: HTMLElement,
+) {
+  const containerRect = scrollContainer.getBoundingClientRect();
+  const nodeRect = node.getBoundingClientRect();
+  const top = scrollContainer.scrollTop + nodeRect.top - containerRect.top;
+
+  scrollContainer.scrollTo({ top, behavior: "auto" });
+}
+
 export function RightPanel({
   editor,
   scrollContainer,
@@ -305,16 +316,13 @@ export function RightPanel({
       );
 
       editor.view.dispatch(transaction);
-      editor.commands.focus();
+      editor.view.dom.focus({ preventScroll: true });
       setActiveOutlineId(item.id);
 
       if (scrollContainer) {
         const node = editor.view.nodeDOM(item.pos);
         if (node instanceof HTMLElement) {
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const nodeRect = node.getBoundingClientRect();
-          const delta = nodeRect.top - containerRect.top;
-          scrollContainer.scrollTop += delta - 8;
+          scrollNodeToTopOfContainer(scrollContainer, node);
         }
       }
     },
