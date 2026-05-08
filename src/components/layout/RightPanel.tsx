@@ -57,50 +57,6 @@ const RIGHT_PANEL_TABS: Array<{
   },
 ];
 
-function scrollNodeToTopOfContainer(
-  scrollContainer: HTMLDivElement,
-  node: HTMLElement,
-) {
-  const containerRect = scrollContainer.getBoundingClientRect();
-  const nodeRect = node.getBoundingClientRect();
-  const top = scrollContainer.scrollTop + nodeRect.top - containerRect.top;
-
-  scrollContainer.scrollTop = top;
-}
-
-function scrollOutlineItemToTop(
-  editor: TiptapEditor,
-  scrollContainer: HTMLDivElement | null,
-  item: OutlineItem,
-) {
-  if (!scrollContainer) return;
-
-  const node = editor.view.nodeDOM(item.pos);
-  if (node instanceof HTMLElement) {
-    scrollNodeToTopOfContainer(scrollContainer, node);
-  }
-}
-
-function settleOutlineScrollToTop(
-  editor: TiptapEditor,
-  scrollContainer: HTMLDivElement | null,
-  item: OutlineItem,
-) {
-  scrollOutlineItemToTop(editor, scrollContainer, item);
-
-  requestAnimationFrame(() => {
-    scrollOutlineItemToTop(editor, scrollContainer, item);
-
-    requestAnimationFrame(() => {
-      scrollOutlineItemToTop(editor, scrollContainer, item);
-    });
-  });
-
-  window.setTimeout(() => {
-    scrollOutlineItemToTop(editor, scrollContainer, item);
-  }, 80);
-}
-
 export function RightPanel({
   editor,
   scrollContainer,
@@ -344,17 +300,15 @@ export function RightPanel({
       if (!editor) return;
 
       const selectionPos = Math.min(item.pos + 1, editor.state.doc.content.size);
-      const transaction = editor.state.tr.setSelection(
-        TextSelection.create(editor.state.doc, selectionPos),
-      );
+      const transaction = editor.state.tr
+        .setSelection(TextSelection.create(editor.state.doc, selectionPos))
+        .scrollIntoView();
 
       editor.view.dispatch(transaction);
       editor.commands.focus(undefined, { scrollIntoView: false });
       setActiveOutlineId(item.id);
-
-      settleOutlineScrollToTop(editor, scrollContainer, item);
     },
-    [editor, scrollContainer],
+    [editor],
   );
 
   const emptyState = useMemo(() => {

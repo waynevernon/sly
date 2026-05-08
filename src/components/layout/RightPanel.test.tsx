@@ -213,18 +213,6 @@ describe("RightPanel", () => {
     const editor = new FakeEditor(doc, nodeMap);
     const scrollContainer = document.createElement("div");
     scrollContainer.scrollTop = 40;
-    scrollContainer.getBoundingClientRect = () =>
-      ({
-        top: 24,
-        bottom: 400,
-        left: 0,
-        right: 300,
-        width: 300,
-        height: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
 
     renderRightPanel(
       <RightPanel
@@ -241,11 +229,11 @@ describe("RightPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Detail" }));
 
     expect(editor.state.tr.setSelection).toHaveBeenCalled();
+    expect(editor.state.tr.scrollIntoView).toHaveBeenCalled();
     expect(editor.view.dispatch).toHaveBeenCalledWith(editor.state.tr);
     expect(editor.commands.focus).toHaveBeenCalledWith(undefined, {
       scrollIntoView: false,
     });
-    expect(scrollContainer.scrollTop).toBe(336);
   });
 
   it("updates the active outline item from selection and scroll state", async () => {
