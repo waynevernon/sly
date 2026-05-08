@@ -40,7 +40,6 @@ class FakeEditor {
   view: {
     nodeDOM: (pos: number) => HTMLElement | null;
     dispatch: ReturnType<typeof vi.fn>;
-    dom: HTMLElement;
   };
 
   commands = {
@@ -65,9 +64,7 @@ class FakeEditor {
     this.view = {
       nodeDOM: (pos) => this.nodeMap.get(pos) ?? null,
       dispatch: vi.fn(),
-      dom: document.createElement("div"),
     };
-    this.view.dom.focus = vi.fn();
   }
 
   on(event: "update" | "selectionUpdate", callback: () => void) {
@@ -250,7 +247,7 @@ describe("RightPanel", () => {
 
     expect(editor.state.tr.setSelection).toHaveBeenCalled();
     expect(editor.view.dispatch).toHaveBeenCalledWith(editor.state.tr);
-    expect(editor.view.dom.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(editor.commands.focus).toHaveBeenCalled();
     expect(scrollTo).toHaveBeenCalledWith({
       top: 336,
       behavior: "auto",
