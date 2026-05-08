@@ -37,6 +37,10 @@ The interface should read as:
 
 ## Tokens
 
+User-visible state colors such as danger, warning, success, selection, focus, code errors, and print output must use named tokens. Do not place raw hex values or one-off palette utilities in components or global CSS unless the value is part of a token definition.
+
+Print and export styles may intentionally differ from the active app theme, but they still need dedicated print tokens such as `--color-print-text`, `--color-print-code-bg`, and `--color-print-border`.
+
 ### Geometry
 
 | Token | Value | Use |
@@ -102,7 +106,7 @@ Use a `4px` spacing grid for layout rhythm. Shared pane headers should align to 
 - supporting copy: `12px` to `13px`
 - utility counters, pills, and keycaps: `11px` to `12px`
 
-Large `17px` inputs are reserved for command-style surfaces such as the command palette or AI prompt, not routine settings or small inline tools.
+Large `17px` inputs are reserved for command-style surfaces such as the command palette, not routine settings or small inline tools.
 
 ### Icons
 
@@ -175,7 +179,7 @@ All transient surfaces should derive from one of three shells:
 
 - menu shell: menus, context menus, dropdowns
 - popover shell: search toolbar, inline editors, suggestion lists
-- dialog shell: command palette, AI modal, picker flows, destructive confirmation
+- dialog shell: command palette, picker flows, destructive confirmation
 
 ### Settings
 
@@ -187,6 +191,8 @@ All transient surfaces should derive from one of three shells:
 ### Segmented Controls
 
 Segmented controls and scope toggles use a single sliding indicator pill that translates between positions with `transition-transform`. Do not toggle background color per button — the pill moves, the buttons only change text color. This makes the selected position readable as a continuous spatial property, not a series of independent toggle states.
+
+Do not keep tab, segmented-control, or mode affordances when only one option remains. Collapse the UI and remove stale frontend state unless the value is intentionally reserved for a near-term option and covered by a migration/canonicalization test.
 
 ### Navigation Collections
 
@@ -210,7 +216,7 @@ Segmented controls and scope toggles use a single sliding indicator pill that tr
 - `warning`: tinted container with a clear next step
 - `destructive`: tinted emphasis, not plain red text alone
 
-Use the same state grammar across editor save state, Git state, AI state, settings errors, and toasts.
+Use the same state grammar across editor save state, Git state, settings errors, and toasts.
 
 All warning, error, and success messaging should use shared status-panel primitives. Do not hand-build tinted message boxes with raw palette utilities.
 
@@ -235,7 +241,7 @@ Named semantic state tokens should cover starred, warning, danger, success, and 
 
 ## Copy and Launch Surfaces
 
-- The canonical product description: "A Mac workspace for markdown notes and task planning, built around plain files, keyboard navigation, optional AI, Git, and a CLI." Use this as the anchor for About screens, onboarding, release notes, and any marketing surface.
+- The canonical product description: "A Mac workspace for markdown notes and task planning, built around plain files, keyboard navigation, Git, and a CLI." Use this as the anchor for About screens, onboarding, release notes, and any marketing surface.
 - Tone is calm, warm, and direct — concrete about what Sly does, honest about constraints, friendly without being cutesy. Write like you're describing a tool you actually use and trust.
 - About screens, readmes, release copy, and menu labels should reuse the same core phrasing instead of drifting into separate tones.
 - Credit upstream work plainly and professionally. Attribution should be visible, but it should not overpower Sly's own product identity.

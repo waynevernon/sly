@@ -25,6 +25,8 @@ npm run tauri build  # Build production app
 cargo test           # Run Rust unit tests
 ```
 
+For review or release-readiness work, run `npm run build` in addition to lint and tests. TypeScript test files are part of the build contract, so a green Vitest run does not replace the production build check.
+
 ## CI/CD
 
 ### CI (`ci.yml`)
@@ -231,12 +233,15 @@ All backend operations go through Tauri commands in `src-tauri/src/lib.rs`. Fron
 
 Prefer service wrappers in `src/services/` over calling `invoke()` directly from components. Tests should usually target those service wrappers, context logic, and pure helpers rather than raw command calls from UI code.
 
+Reusable app operations such as clipboard writes, safe URL opening, file-manager opening, and app restart should also go through service wrappers. Components should not call `invoke()` directly for those flows unless the command is truly local to that component.
+
 ### State Management
 
 - `NotesContext` manages note state, CRUD, search, file watching, and folder operations
 - `GitContext` manages Git availability, status, commit, and sync flows
 - `ThemeContext` manages theme mode, theme presets, fonts, typography, text direction, editor width, interface zoom, and pane mode
 - Async loads tied to folder, note, or workspace identity must use stale-request guards so older responses cannot overwrite newer state.
+- Task date parsing, local-date offsetting, week boundaries, and user-facing task date labels belong in `src/lib/tasks.ts`. Components should import those helpers instead of defining local date utilities unless the behavior is intentionally component-specific and documented.
 
 ### Settings Storage
 
@@ -251,6 +256,7 @@ Persistence ownership rules:
 - Frontend code may keep small UI fallbacks for rendering, but it must not act as a second migration layer or invent persisted defaults on load.
 - When adding a persisted field, update the Rust struct, migration/canonicalization path, Tauri command payload, and the matching TypeScript type together.
 - When changing the meaning, name, or shape of persisted data, add an explicit backend migration step and a Rust test with a legacy JSON fixture.
+- When removing a persisted field, tab, or UI mode, add or keep a migration/canonicalization test for existing user config that still contains the old value.
 - `serde(default)` is fine for additive fields with obvious defaults. Renames, moved fields, default rewrites, enum/value changes, or cleanup of legacy invalid data should be handled explicitly in backend migration/canonicalization.
 - Load flow for persisted files should stay: read raw JSON, migrate raw value to latest schema, deserialize latest struct, canonicalize, and write back only if the canonical form changed.
 
