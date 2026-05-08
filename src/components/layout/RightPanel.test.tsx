@@ -213,11 +213,6 @@ describe("RightPanel", () => {
     const editor = new FakeEditor(doc, nodeMap);
     const scrollContainer = document.createElement("div");
     scrollContainer.scrollTop = 40;
-    const scrollTo = vi.fn((arg1?: ScrollToOptions | number, arg2?: number) => {
-      scrollContainer.scrollTop =
-        typeof arg1 === "number" ? Number(arg2 ?? 0) : Number(arg1?.top ?? 0);
-    }) as typeof scrollContainer.scrollTo;
-    scrollContainer.scrollTo = scrollTo;
     scrollContainer.getBoundingClientRect = () =>
       ({
         top: 24,
@@ -250,10 +245,7 @@ describe("RightPanel", () => {
     expect(editor.commands.focus).toHaveBeenCalledWith(undefined, {
       scrollIntoView: false,
     });
-    expect(scrollTo).toHaveBeenCalledWith({
-      top: 336,
-      behavior: "auto",
-    });
+    expect(scrollContainer.scrollTop).toBe(336);
   });
 
   it("updates the active outline item from selection and scroll state", async () => {

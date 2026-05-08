@@ -65,7 +65,7 @@ function scrollNodeToTopOfContainer(
   const nodeRect = node.getBoundingClientRect();
   const top = scrollContainer.scrollTop + nodeRect.top - containerRect.top;
 
-  scrollContainer.scrollTo({ top, behavior: "auto" });
+  scrollContainer.scrollTop = top;
 }
 
 function scrollOutlineItemToTop(
@@ -79,6 +79,26 @@ function scrollOutlineItemToTop(
   if (node instanceof HTMLElement) {
     scrollNodeToTopOfContainer(scrollContainer, node);
   }
+}
+
+function settleOutlineScrollToTop(
+  editor: TiptapEditor,
+  scrollContainer: HTMLDivElement | null,
+  item: OutlineItem,
+) {
+  scrollOutlineItemToTop(editor, scrollContainer, item);
+
+  requestAnimationFrame(() => {
+    scrollOutlineItemToTop(editor, scrollContainer, item);
+
+    requestAnimationFrame(() => {
+      scrollOutlineItemToTop(editor, scrollContainer, item);
+    });
+  });
+
+  window.setTimeout(() => {
+    scrollOutlineItemToTop(editor, scrollContainer, item);
+  }, 80);
 }
 
 export function RightPanel({
@@ -332,10 +352,7 @@ export function RightPanel({
       editor.commands.focus(undefined, { scrollIntoView: false });
       setActiveOutlineId(item.id);
 
-      scrollOutlineItemToTop(editor, scrollContainer, item);
-      requestAnimationFrame(() => {
-        scrollOutlineItemToTop(editor, scrollContainer, item);
-      });
+      settleOutlineScrollToTop(editor, scrollContainer, item);
     },
     [editor, scrollContainer],
   );
