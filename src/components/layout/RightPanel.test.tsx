@@ -247,7 +247,9 @@ describe("RightPanel", () => {
 
     expect(editor.state.tr.setSelection).toHaveBeenCalled();
     expect(editor.view.dispatch).toHaveBeenCalledWith(editor.state.tr);
-    expect(editor.commands.focus).toHaveBeenCalled();
+    expect(editor.commands.focus).toHaveBeenCalledWith(undefined, {
+      scrollIntoView: false,
+    });
     expect(scrollTo).toHaveBeenCalledWith({
       top: 336,
       behavior: "auto",

@@ -329,7 +329,7 @@ export function RightPanel({
       );
 
       editor.view.dispatch(transaction);
-      editor.commands.focus();
+      editor.commands.focus(undefined, { scrollIntoView: false });
       setActiveOutlineId(item.id);
 
       scrollOutlineItemToTop(editor, scrollContainer, item);
