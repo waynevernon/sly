@@ -75,8 +75,6 @@ export type ThemePresetId =
   | "things-dark"
   | "obsidian-light"
   | "obsidian-dark"
-  | "claude-light"
-  | "claude-dark"
   | "evernote-light"
   | "evernote-dark"
   | "apple-notes-light"
@@ -122,7 +120,6 @@ export interface ThemeColors {
 export type TextDirection = "auto" | "ltr" | "rtl";
 export type EditorWidth = "narrow" | "normal" | "wide" | "full" | "custom";
 export type PaneMode = 1 | 2 | 3;
-export type RightPanelTab = "outline" | "assistant";
 export type NoteListDateMode = "modified" | "created" | "off";
 export type NoteListPreviewLines = 1 | 2 | 3;
 export type NoteSortMode =
@@ -183,7 +180,6 @@ export interface AppearanceSettings {
   notesPaneWidth: number;
   rightPanelVisible: boolean;
   rightPanelWidth: number;
-  rightPanelTab: RightPanelTab;
   customLightColors?: ThemeColors | null;
   customDarkColors?: ThemeColors | null;
   confirmDeletions: boolean;
@@ -203,7 +199,6 @@ export interface Settings {
   defaultNoteName?: string | null;
   dailyNoteName?: string | null;
   dailyNoteFolder?: string | null;
-  ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
   taskTagIcons?: Record<string, FolderAppearance> | null;
   collapsedFolders?: string[] | null;
@@ -230,7 +225,6 @@ export interface SettingsPatch {
   defaultNoteName?: string | null;
   dailyNoteName?: string | null;
   dailyNoteFolder?: string | null;
-  ollamaModel?: string | null;
   folderIcons?: Record<string, FolderAppearance> | null;
   taskTagIcons?: Record<string, FolderAppearance> | null;
   collapsedFolders?: string[] | null;

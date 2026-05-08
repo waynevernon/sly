@@ -5,8 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RightPanel } from "./RightPanel";
 import { extractOutlineItems } from "./rightPanelOutline";
 import { TooltipProvider } from "../ui";
-import type { AiProvider } from "../../services/ai";
-import type { RightPanelAssistantProps } from "./RightPanelAssistant";
 
 const schema = new Schema({
   nodes: {
@@ -93,29 +91,6 @@ function makeDoc() {
   ]);
 }
 
-function makeAssistantProps(): RightPanelAssistantProps {
-  return {
-    hasNote: true,
-    providerCheckComplete: true,
-    availableProviders: ["claude"] as AiProvider[],
-    thread: {
-      provider: "claude" as const,
-      scope: "note" as const,
-      scopeManual: false,
-      draft: "",
-      turns: [],
-      pending: false,
-      lastSuccessfulSnapshotHash: null,
-    },
-    onProviderChange: vi.fn(),
-    onScopeChange: vi.fn(),
-    onDraftChange: vi.fn(),
-    onClearThread: vi.fn(),
-    onSubmit: vi.fn(),
-    onApplyProposal: vi.fn(),
-  };
-}
-
 function renderRightPanel(ui: ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 }
@@ -198,10 +173,7 @@ describe("RightPanel", () => {
         hasNote
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -221,18 +193,18 @@ describe("RightPanel", () => {
     const positions = extractOutlineItems(doc);
     const nodeMap = new Map<number, HTMLElement>();
 
-    positions.forEach((item) => {
+    positions.forEach((item, index) => {
       const element = document.createElement("h2");
       element.getBoundingClientRect = () =>
         ({
-          top: 0,
-          bottom: 20,
+          top: index * 160,
+          bottom: index * 160 + 20,
           left: 0,
           right: 100,
           width: 100,
           height: 20,
           x: 0,
-          y: 0,
+          y: index * 160,
           toJSON: () => ({}),
         }) as DOMRect;
       nodeMap.set(item.pos, element);
@@ -240,9 +212,15 @@ describe("RightPanel", () => {
 
     const editor = new FakeEditor(doc, nodeMap);
     const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 40;
+    const scrollTo = vi.fn((arg1?: ScrollToOptions | number, arg2?: number) => {
+      scrollContainer.scrollTop =
+        typeof arg1 === "number" ? Number(arg2 ?? 0) : Number(arg1?.top ?? 0);
+    }) as typeof scrollContainer.scrollTo;
+    scrollContainer.scrollTo = scrollTo;
     scrollContainer.getBoundingClientRect = () =>
       ({
-        top: 0,
+        top: 24,
         bottom: 400,
         left: 0,
         right: 300,
@@ -261,10 +239,7 @@ describe("RightPanel", () => {
         hasNote
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -273,6 +248,10 @@ describe("RightPanel", () => {
     expect(editor.state.tr.setSelection).toHaveBeenCalled();
     expect(editor.view.dispatch).toHaveBeenCalledWith(editor.state.tr);
     expect(editor.commands.focus).toHaveBeenCalled();
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 336,
+      behavior: "smooth",
+    });
   });
 
   it("updates the active outline item from selection and scroll state", async () => {
@@ -324,10 +303,7 @@ describe("RightPanel", () => {
         hasNote
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -400,10 +376,7 @@ describe("RightPanel", () => {
         hasNote
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -459,76 +432,6 @@ describe("RightPanel", () => {
     });
   });
 
-  it("renders assistant tab content inside the same panel shell", async () => {
-    renderRightPanel(
-      <RightPanel
-        editor={null}
-        scrollContainer={null}
-        noteId="alpha"
-        hasNote
-        visible
-        width={260}
-        activeTab="assistant"
-        onTabChange={vi.fn()}
-        onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Outline" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Assistant" })).toBeInTheDocument();
-    expect(screen.getByText("Beta")).toBeInTheDocument();
-    expect(
-      await screen.findByPlaceholderText(
-        "Ask about this note...",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("does not attach outline listeners while the assistant tab is active", () => {
-    const doc = makeDoc();
-    const positions = extractOutlineItems(doc);
-    const nodeMap = new Map<number, HTMLElement>();
-
-    positions.forEach((item) => {
-      const element = document.createElement("h2");
-      element.getBoundingClientRect = () =>
-        ({
-          top: 0,
-          bottom: 20,
-          left: 0,
-          right: 100,
-          width: 100,
-          height: 20,
-          x: 0,
-          y: 0,
-          toJSON: () => ({}),
-        }) as DOMRect;
-      nodeMap.set(item.pos, element);
-    });
-
-    const editor = new FakeEditor(doc, nodeMap);
-    const scrollContainer = document.createElement("div");
-
-    renderRightPanel(
-      <RightPanel
-        editor={editor as never}
-        scrollContainer={scrollContainer}
-        noteId="alpha"
-        hasNote
-        visible
-        width={260}
-        activeTab="assistant"
-        onTabChange={vi.fn()}
-        onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
-      />,
-    );
-
-    expect(editor.listeners.update.size).toBe(0);
-    expect(editor.listeners.selectionUpdate.size).toBe(0);
-  });
-
   it("shows the empty state when no note is selected even if the previous editor still exists", () => {
     const doc = makeDoc();
     const positions = extractOutlineItems(doc);
@@ -574,10 +477,7 @@ describe("RightPanel", () => {
         hasNote={false}
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -605,10 +505,7 @@ describe("RightPanel", () => {
         hasNote
         visible={false}
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -682,10 +579,7 @@ describe("RightPanel", () => {
         hasNote
         visible
         width={260}
-        activeTab="outline"
-        onTabChange={vi.fn()}
         onWidthChange={vi.fn()}
-        assistantProps={makeAssistantProps()}
       />,
     );
 
@@ -700,10 +594,7 @@ describe("RightPanel", () => {
           hasNote
           visible
           width={260}
-          activeTab="outline"
-          onTabChange={vi.fn()}
           onWidthChange={vi.fn()}
-          assistantProps={makeAssistantProps()}
         />
       </TooltipProvider>,
     );

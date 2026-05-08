@@ -43,7 +43,6 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   notesPaneWidth: 304,
   rightPanelVisible: true,
   rightPanelWidth: 260,
-  rightPanelTab: "outline",
   confirmDeletions: true,
   sourceModeWordWrap: false,
 };
@@ -1690,34 +1689,6 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       syntaxAttr: "#6ee7b7",
     },
   },
-  "claude-light": {
-    id: "claude-light",
-    label: "Claude Light",
-    mode: "light",
-    tokens: {
-      bg: "#faf9f7",
-      bgSecondary: "#f0ede8",
-      bgMuted: "rgba(40, 30, 20, 0.06)",
-      bgEmphasis: "rgba(40, 30, 20, 0.10)",
-      text: "#1a1512",
-      textMuted: "#7a6e65",
-      textInverse: "#ffffff",
-      border: "rgba(40, 30, 20, 0.10)",
-      borderSolid: "#e0d9d2",
-      accent: "#da7756",
-      selection: "rgba(218, 119, 86, 0.15)",
-      code: "#c45230",
-      syntaxKeyword: "#c45230",
-      syntaxString: "#5a8a52",
-      syntaxNumber: "#9b6b9f",
-      syntaxComment: "#9a8e87",
-      syntaxFunction: "#da7756",
-      syntaxVariable: "#c45230",
-      syntaxType: "#3d7f9b",
-      syntaxOperator: "#c45230",
-      syntaxAttr: "#3d7f9b",
-    },
-  },
   "evernote-light": {
     id: "evernote-light",
     label: "Evernote Light",
@@ -1774,34 +1745,6 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
       syntaxAttr: "#5fb3e8",
     },
   },
-  "claude-dark": {
-    id: "claude-dark",
-    label: "Claude Dark",
-    mode: "dark",
-    tokens: {
-      bg: "#1a1613",
-      bgSecondary: "#131210",
-      bgMuted: "rgba(250, 240, 225, 0.07)",
-      bgEmphasis: "rgba(250, 240, 225, 0.11)",
-      text: "#ede8e0",
-      textMuted: "#87796e",
-      textInverse: "#1a1613",
-      border: "rgba(250, 240, 225, 0.10)",
-      borderSolid: "#362e28",
-      accent: "#e8896a",
-      selection: "rgba(232, 137, 106, 0.18)",
-      code: "#e8896a",
-      syntaxKeyword: "#e8896a",
-      syntaxString: "#a8c080",
-      syntaxNumber: "#c4a0cc",
-      syntaxComment: "#6b5e52",
-      syntaxFunction: "#e8a880",
-      syntaxVariable: "#e8896a",
-      syntaxType: "#7bbac8",
-      syntaxOperator: "#e8896a",
-      syntaxAttr: "#7bbac8",
-    },
-  },
 };
 
 export const LIGHT_THEME_PRESETS = [
@@ -1810,7 +1753,6 @@ export const LIGHT_THEME_PRESETS = [
   THEME_PRESETS["ayu-light"],
   THEME_PRESETS["bear-light"],
   THEME_PRESETS["catppuccin-latte"],
-  THEME_PRESETS["claude-light"],
   THEME_PRESETS["evernote-light"],
   THEME_PRESETS["everforest-light"],
   THEME_PRESETS["github-light-colorblind"],
@@ -1839,7 +1781,6 @@ export const DARK_THEME_PRESETS = [
   THEME_PRESETS["catppuccin-frappe"],
   THEME_PRESETS["catppuccin-macchiato"],
   THEME_PRESETS["catppuccin-mocha"],
-  THEME_PRESETS["claude-dark"],
   THEME_PRESETS.dracula,
   THEME_PRESETS["evernote-dark"],
   THEME_PRESETS["everforest-dark"],
@@ -1934,7 +1875,8 @@ export function resolveThemeTokens(
 ): ThemeColors {
   const presetId =
     mode === "light" ? appearance.lightPresetId : appearance.darkPresetId;
-  const preset = THEME_PRESETS[presetId];
+  const fallbackPresetId = mode === "light" ? "sly-light" : "sly-dark";
+  const preset = THEME_PRESETS[presetId] ?? THEME_PRESETS[fallbackPresetId];
   const overrides =
     mode === "light"
       ? appearance.customLightColors

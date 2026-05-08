@@ -60,7 +60,7 @@ const notesDataState = {
     path: "/notes/alpha.md",
     modified: 1,
   },
-  settings: { ollamaModel: "qwen3:8b", tasksEnabled: false },
+  settings: { tasksEnabled: false },
   searchQuery: "",
   searchResults: [],
   hasExternalChanges: false,
@@ -93,10 +93,8 @@ const themeState = {
   cyclePaneMode: vi.fn(),
   rightPanelVisible: true,
   rightPanelWidth: 260,
-  rightPanelTab: "outline" as "outline" | "assistant",
   setRightPanelVisible: vi.fn(),
   setRightPanelWidth: vi.fn(),
-  setRightPanelTab: vi.fn(),
 };
 
 const tasksState = {
@@ -301,7 +299,6 @@ describe("App", () => {
     };
     themeState.paneMode = 3;
     themeState.rightPanelVisible = true;
-    themeState.rightPanelTab = "outline";
     notesDataState.settings.tasksEnabled = false;
     tasksState.selectedView = "inbox";
     tasksState.selectedTaskId = "task-1";
@@ -325,32 +322,6 @@ describe("App", () => {
     fireEvent.click(screen.getByText("open settings"));
 
     expect(await screen.findByText("settings-page")).toBeInTheDocument();
-  });
-
-  it("only attaches assistant selection listeners while the assistant tab is active", async () => {
-    const { rerender } = render(<App />);
-
-    await waitFor(() => {
-      expect(fakeEditor.on).not.toHaveBeenCalledWith(
-        "selectionUpdate",
-        expect.any(Function),
-      );
-    });
-
-    themeState.rightPanelTab = "assistant";
-    rerender(<App />);
-
-    await waitFor(() => {
-      expect(fakeEditor.on.mock.calls.length).toBeGreaterThanOrEqual(2);
-      expect(editorListeners.selectionUpdate.size).toBe(2);
-    });
-
-    themeState.rightPanelTab = "outline";
-    rerender(<App />);
-
-    await waitFor(() => {
-      expect(editorListeners.selectionUpdate.size).toBe(0);
-    });
   });
 
   it("allows the native context menu inside CodeMirror source mode", () => {
