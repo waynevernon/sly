@@ -5,7 +5,7 @@
 # Sly
 Markdown notes and tasks for your Mac.
 
-Sly turns a folder of markdown files into a fast writing and planning app. You get a calm editor, task lists that live with your notes, keyboard-first navigation, optional AI, Git, and a CLI for the terminal habits you already have.
+Sly turns a folder of markdown files into a fast writing and planning app. You get a calm editor, task lists that live with your notes, keyboard-first navigation, Git, and a CLI for the terminal habits you already have.
 
 The center is still plain files on disk. Open the folder anywhere, sync it however you like, or keep it only on this machine.
 
@@ -28,7 +28,6 @@ Sly is for notes you want to keep, tasks you actually need to see, and work that
 - Add dates, due dates, tags, links, waiting-for notes, stars, and recurrence.
 - Search notes and tasks quickly, open commands from the keyboard, and keep recent work close.
 - Use 1, 2, or 3 panes, detach notes into their own windows, and tune the editor width.
-- Use Claude Code, OpenAI Codex, OpenCode, or Ollama when you want AI help inside your workspace.
 - Initialize, commit, and push Git repos from the app.
 - Use the `sly` CLI for capture, search, scripting, and opening notes from the terminal.
 
@@ -81,7 +80,7 @@ Open Settings > Shortcuts inside the app for the full reference.
 
 ## CLI
 
-On macOS, install the CLI from Settings > Assistant & CLI. The `sly` command keeps the app launch behavior you would expect:
+On macOS, install the CLI from Settings > Integrations. The `sly` command keeps the app launch behavior you would expect:
 
 - `sly` launches Sly
 - `sly .` opens a notes folder

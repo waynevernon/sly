@@ -1,6 +1,5 @@
 import {
   memo,
-  startTransition,
   useState,
   useEffect,
   useCallback,
@@ -28,7 +27,6 @@ import {
 } from "./components/ui";
 import { WorkspaceNavigation } from "./components/layout/WorkspaceNavigation";
 import { RightPanel } from "./components/layout/RightPanel";
-import type { RightPanelAssistantProps } from "./components/layout/RightPanelAssistant";
 import { Editor } from "./components/editor/Editor";
 import { TaskDetailPanel } from "./components/tasks/TaskDetailPanel";
 import { GlobalTaskCaptureDialog } from "./components/tasks/GlobalTaskCaptureDialog";
@@ -36,35 +34,16 @@ import { TasksProvider, useTasks } from "./context/TasksContext";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { FolderPicker } from "./components/layout/FolderPicker";
 import { SettingsPage } from "./components/settings";
-import type { PaneMode, RightPanelTab } from "./types/note";
+import type { PaneMode } from "./types/note";
 import type { SettingsTab } from "./components/settings/SettingsPage";
 import {
   check as checkForUpdate,
 } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import * as aiService from "./services/ai";
-import * as assistantService from "./services/assistant";
-import type { AiProvider } from "./services/ai";
-import type {
-  AssistantAssistantTurn,
-  AssistantProposal,
-  AssistantThreadState,
-  AssistantTurn,
-} from "./types/assistant";
 import { isMac, mod, shift, shortcut } from "./lib/platform";
 import { matchesInAppTaskQuickAddShortcut } from "./lib/taskQuickAddShortcut";
 import { canInlineCreateTaskInView } from "./lib/tasks";
 import { UpdateToast } from "./components/updater/UpdateToast";
-import {
-  applyLineReplacement,
-  buildAssistantDocumentContext,
-  getAutoAssistantScope,
-  hashText,
-  hasMeaningfulAssistantSelection,
-  isProposalRangeWithinScope,
-  serializeEditorMarkdown,
-  type AssistantSelectionSnapshot,
-} from "./lib/assistant";
 import type { WorkspaceEditorData } from "./components/editor/Editor";
 
 const loadCommandPalette = () => import("./components/command-palette/CommandPalette");
@@ -182,54 +161,6 @@ function getNextTaskPaneMode(mode: PaneMode): PaneMode {
   return mode === 3 ? 2 : 3;
 }
 
-function getDefaultAssistantProvider(
-  providers: AiProvider[],
-): AiProvider {
-  return providers[0] ?? "claude";
-}
-
-function createAssistantThreadState(
-  provider: AiProvider,
-): AssistantThreadState {
-  return {
-    provider,
-    scope: "note",
-    scopeManual: false,
-    draft: "",
-    turns: [],
-    pending: false,
-    lastSuccessfulSnapshotHash: null,
-  };
-}
-
-function getMeaningfulEditorSelectionSnapshot(
-  editor: TiptapEditor | null,
-): AssistantSelectionSnapshot | null {
-  if (!editor || !hasMeaningfulAssistantSelection(editor)) {
-    return null;
-  }
-
-  const { from, to } = editor.state.selection;
-  return { from, to };
-}
-
-function createAssistantTurnId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function toAssistantHistory(turns: AssistantTurn[]) {
-  return turns
-    .filter(
-      (turn): turn is Extract<AssistantTurn, { kind: "user" | "assistant" }> =>
-        turn.kind === "user" || turn.kind === "assistant",
-    )
-    .slice(-8)
-    .map((turn) => ({
-      role: turn.kind,
-      text: turn.kind === "user" ? turn.text : turn.replyText,
-    }));
-}
-
 function FullScreenFallback({ label }: { label: string }) {
   return (
     <div className="h-screen flex items-center justify-center bg-bg-secondary">
@@ -253,12 +184,9 @@ interface WorkspaceMainProps {
   focusMode: boolean;
   showRightPanel: boolean;
   rightPanelWidth: number;
-  rightPanelTab: RightPanelTab;
   editorInstance: TiptapEditor | null;
   editorScrollContainer: HTMLDivElement | null;
   currentNoteId: string | null;
-  currentAssistantSelection: AssistantSelectionSnapshot | null;
-  assistantProps: RightPanelAssistantProps;
   workspaceEditorData: WorkspaceEditorData;
   onOpenSettings: (tab?: SettingsTab) => void;
   onEditorSourceModeChange: (sourceMode: boolean) => void;
@@ -267,7 +195,6 @@ interface WorkspaceMainProps {
     flushPendingSave: (() => Promise<void>) | null,
   ) => void;
   onEditorReady: (editor: TiptapEditor | null) => void;
-  onRightPanelTabChange: (tab: RightPanelTab) => void;
   onRightPanelWidthChange: (width: number) => void;
 }
 
@@ -279,19 +206,15 @@ const WorkspaceMain = memo(function WorkspaceMain({
   focusMode,
   showRightPanel,
   rightPanelWidth,
-  rightPanelTab,
   editorInstance,
   editorScrollContainer,
   currentNoteId,
-  currentAssistantSelection,
-  assistantProps,
   workspaceEditorData,
   onOpenSettings,
   onEditorSourceModeChange,
   onRegisterScrollContainer,
   onRegisterFlushPendingSave,
   onEditorReady,
-  onRightPanelTabChange,
   onRightPanelWidthChange,
 }: WorkspaceMainProps) {
   const isTasksModeActive = workspaceMode === "tasks";
@@ -332,7 +255,6 @@ const WorkspaceMain = memo(function WorkspaceMain({
               focusMode={focusMode}
               hasPinnedRightTitlebarControl={!focusMode && !showRightPanel}
               workspaceMode={workspaceEditorData}
-              assistantSelection={currentAssistantSelection}
               onSourceModeChange={onEditorSourceModeChange}
               onRegisterScrollContainer={onRegisterScrollContainer}
               onRegisterFlushPendingSave={onRegisterFlushPendingSave}
@@ -345,10 +267,7 @@ const WorkspaceMain = memo(function WorkspaceMain({
               hasNote={Boolean(currentNoteId)}
               visible={showRightPanel}
               width={rightPanelWidth}
-              activeTab={rightPanelTab}
-              onTabChange={onRightPanelTabChange}
               onWidthChange={onRightPanelWidthChange}
-              assistantProps={assistantProps}
             />
           </>
         )}
@@ -454,10 +373,8 @@ function AppContent() {
     setPaneMode,
     rightPanelVisible,
     rightPanelWidth,
-    rightPanelTab,
     setRightPanelVisible,
     setRightPanelWidth,
-    setRightPanelTab,
   } = useTheme();
   const interfaceZoomRef = useRef(interfaceZoom);
   interfaceZoomRef.current = interfaceZoom;
@@ -486,22 +403,6 @@ function AppContent() {
   const [editorScrollContainer, setEditorScrollContainer] =
     useState<HTMLDivElement | null>(null);
   const [editorSourceMode, setEditorSourceMode] = useState(false);
-  const [availableAssistantProviders, setAvailableAssistantProviders] = useState<
-    AiProvider[]
-  >([]);
-  const [assistantProvidersLoaded, setAssistantProvidersLoaded] = useState(false);
-  const [assistantThreads, setAssistantThreads] = useState<
-    Record<string, AssistantThreadState>
-  >({});
-  const [assistantSelectionState, setAssistantSelectionState] = useState<{
-    noteId: string;
-    selection: AssistantSelectionSnapshot;
-  } | null>(null);
-  const lastAssistantSelectionRef = useRef<{
-    noteId: string;
-    selection: AssistantSelectionSnapshot;
-  } | null>(null);
-
   // Refs for volatile state consumed by the keydown handler so the effect
   // doesn't need to re-register on every note selection or filter change.
   const focusModeRef = useRef(focusMode);
@@ -571,92 +472,6 @@ function AppContent() {
     return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
-  const refreshAssistantProviders = useCallback(async () => {
-    setAssistantProvidersLoaded(false);
-    try {
-      const providers = await aiService.getAvailableAiProviders();
-      setAvailableAssistantProviders(providers);
-    } catch (error) {
-      console.error("Failed to detect assistant providers:", error);
-      setAvailableAssistantProviders([]);
-    } finally {
-      setAssistantProvidersLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadProviders = async () => {
-      setAssistantProvidersLoaded(false);
-      try {
-        const providers = await aiService.getAvailableAiProviders();
-        if (active) {
-          setAvailableAssistantProviders(providers);
-        }
-      } catch (error) {
-        console.error("Failed to detect assistant providers:", error);
-        if (active) {
-          setAvailableAssistantProviders([]);
-        }
-      } finally {
-        if (active) {
-          setAssistantProvidersLoaded(true);
-        }
-      }
-    };
-
-    void loadProviders();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!currentNote?.id) {
-      return;
-    }
-
-    const defaultProvider = getDefaultAssistantProvider(availableAssistantProviders);
-    setAssistantThreads((prev) => {
-      const existing = prev[currentNote.id];
-      if (!existing) {
-        return {
-          ...prev,
-          [currentNote.id]: createAssistantThreadState(defaultProvider),
-        };
-      }
-      if (
-        availableAssistantProviders.length > 0 &&
-        !availableAssistantProviders.includes(existing.provider)
-      ) {
-        return {
-          ...prev,
-          [currentNote.id]: {
-            ...existing,
-            provider: defaultProvider,
-          },
-        };
-      }
-      return prev;
-    });
-  }, [currentNote?.id, availableAssistantProviders]);
-
-  useEffect(() => {
-    if (!currentNote?.id) {
-      lastAssistantSelectionRef.current = null;
-      setAssistantSelectionState(null);
-      return;
-    }
-
-    const storedSelection = lastAssistantSelectionRef.current;
-    if (storedSelection && storedSelection.noteId !== currentNote.id) {
-      lastAssistantSelectionRef.current = null;
-      setAssistantSelectionState(null);
-    }
-  }, [currentNote?.id]);
-
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
       // Don't enter focus mode without a selected note
@@ -685,150 +500,6 @@ function AppContent() {
     setSettingsInitialTab(undefined);
     setView("notes");
   }, []);
-
-  const updateCurrentAssistantThread = useCallback(
-    (updater: (thread: AssistantThreadState) => AssistantThreadState) => {
-      if (!currentNote?.id) {
-        return;
-      }
-
-      const defaultProvider = getDefaultAssistantProvider(availableAssistantProviders);
-      setAssistantThreads((prev) => {
-        const currentThread =
-          prev[currentNote.id] ?? createAssistantThreadState(defaultProvider);
-        const nextThread = updater(currentThread);
-        if (nextThread === currentThread && prev[currentNote.id]) {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          [currentNote.id]: nextThread,
-        };
-      });
-    },
-    [availableAssistantProviders, currentNote?.id],
-  );
-
-  const currentAssistantThread = currentNote
-    ? assistantThreads[currentNote.id] ??
-      createAssistantThreadState(
-        getDefaultAssistantProvider(availableAssistantProviders),
-      )
-    : null;
-  const currentAssistantSelection =
-    currentNote && assistantSelectionState?.noteId === currentNote.id
-      ? assistantSelectionState.selection
-      : null;
-  const assistantSyncActive = showRightPanel && rightPanelTab === "assistant";
-
-  const syncAssistantSelectionFromEditor = useCallback(
-    (options?: { clearWhenEmpty?: boolean }) => {
-      const currentEditor = editorRef.current;
-      const noteId = currentNote?.id;
-      if (!noteId || !currentEditor) {
-        return null;
-      }
-
-      const nextSelection = getMeaningfulEditorSelectionSnapshot(currentEditor);
-      if (nextSelection) {
-        const nextStoredSelection = {
-          noteId,
-          selection: nextSelection,
-        };
-        lastAssistantSelectionRef.current = nextStoredSelection;
-        startTransition(() => {
-          setAssistantSelectionState(nextStoredSelection);
-        });
-        return nextSelection;
-      }
-
-      if (options?.clearWhenEmpty !== false) {
-        lastAssistantSelectionRef.current = null;
-        startTransition(() => {
-          setAssistantSelectionState(null);
-        });
-      }
-
-      return null;
-    },
-    [currentNote?.id],
-  );
-
-  const syncAutoAssistantScopeFromEditor = useCallback(
-    (
-      selection: AssistantSelectionSnapshot | null,
-      threadOverride?: AssistantThreadState | null,
-    ) => {
-      const noteId = currentNote?.id;
-      const currentEditor = editorRef.current;
-      const threadState = threadOverride ?? currentAssistantThread;
-
-      if (!noteId || !currentEditor || !threadState || threadState.scopeManual) {
-        return threadState?.scope ?? "note";
-      }
-
-      const nextScope = getAutoAssistantScope(currentEditor, selection);
-      if (threadState.scope !== nextScope) {
-        updateCurrentAssistantThread((thread) => {
-          if (thread.scopeManual || thread.scope === nextScope) {
-            return thread;
-          }
-
-          return {
-            ...thread,
-            scope: nextScope,
-          };
-        });
-      }
-
-      return nextScope;
-    },
-    [currentAssistantThread, currentNote?.id, updateCurrentAssistantThread],
-  );
-
-  useEffect(() => {
-    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
-      return;
-    }
-
-    const syncStoredAssistantSelection = () => {
-      syncAssistantSelectionFromEditor({ clearWhenEmpty: editorInstance.isFocused });
-    };
-
-    syncStoredAssistantSelection();
-    editorInstance.on("selectionUpdate", syncStoredAssistantSelection);
-
-    return () => {
-      editorInstance.off("selectionUpdate", syncStoredAssistantSelection);
-    };
-  }, [assistantSyncActive, currentNote?.id, editorInstance, syncAssistantSelectionFromEditor]);
-
-  useEffect(() => {
-    if (!assistantSyncActive || !currentNote?.id || !editorInstance) {
-      return;
-    }
-
-    const syncAutoAssistantScope = () => {
-      const storedSelection = syncAssistantSelectionFromEditor({
-        clearWhenEmpty: editorInstance.isFocused,
-      });
-      syncAutoAssistantScopeFromEditor(storedSelection);
-    };
-
-    syncAutoAssistantScope();
-    editorInstance.on("selectionUpdate", syncAutoAssistantScope);
-
-    return () => {
-      editorInstance.off("selectionUpdate", syncAutoAssistantScope);
-    };
-  }, [
-    assistantSyncActive,
-    currentNote?.id,
-    editorInstance,
-    syncAssistantSelectionFromEditor,
-    syncAutoAssistantScopeFromEditor,
-  ]);
 
   const applyPaneModeSelection = useCallback(
     (mode: PaneMode) => {
@@ -1001,326 +672,6 @@ function AppContent() {
     toggleFocusMode,
     toggleRightPanel,
   ]);
-
-  const handleAssistantProviderChange = useCallback(
-    (provider: AiProvider) => {
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        provider,
-      }));
-    },
-    [updateCurrentAssistantThread],
-  );
-
-  const handleAssistantScopeChange = useCallback(
-    (scope: AssistantThreadState["scope"]) => {
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        scope,
-        scopeManual: true,
-      }));
-    },
-    [updateCurrentAssistantThread],
-  );
-
-  const handleAssistantDraftChange = useCallback(
-    (draft: string) => {
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        draft,
-      }));
-    },
-    [updateCurrentAssistantThread],
-  );
-
-  const handleClearAssistantThread = useCallback(() => {
-    const storedSelection = syncAssistantSelectionFromEditor();
-    const nextScope = getAutoAssistantScope(editorRef.current, storedSelection);
-
-    updateCurrentAssistantThread((thread) => ({
-      ...thread,
-      scope: nextScope,
-      draft: "",
-      scopeManual: false,
-      turns: [],
-      pending: false,
-      lastSuccessfulSnapshotHash: null,
-    }));
-  }, [syncAssistantSelectionFromEditor, updateCurrentAssistantThread]);
-
-  const handleAssistantSubmit = useCallback(async () => {
-    if (!currentNote || !currentAssistantThread || currentAssistantThread.pending) {
-      return;
-    }
-
-    const prompt = currentAssistantThread.draft.trim();
-    if (!prompt) {
-      return;
-    }
-
-    try {
-      await flushPendingSave?.();
-
-      const markdown = serializeEditorMarkdown(
-        editorRef.current,
-        currentNote.content,
-      );
-      const storedSelection = syncAssistantSelectionFromEditor();
-      const effectiveScope = currentAssistantThread.scopeManual
-        ? currentAssistantThread.scope
-        : syncAutoAssistantScopeFromEditor(
-            storedSelection,
-            currentAssistantThread,
-          );
-      const context = buildAssistantDocumentContext(
-        markdown,
-        editorRef.current,
-        effectiveScope,
-        storedSelection,
-      );
-      const createdAt = Date.now();
-      const userTurn: Extract<AssistantTurn, { kind: "user" }> = {
-        id: createAssistantTurnId("assistant-user"),
-        kind: "user",
-        text: prompt,
-        createdAt,
-        scope: effectiveScope,
-        scopeLabel: context.scopeLabel,
-        lineLabel: context.lineLabel,
-        snapshotHash: context.snapshotHash,
-        notice: context.notice,
-      };
-
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        draft: "",
-        pending: true,
-        turns: [...thread.turns, userTurn],
-      }));
-
-      const result = await assistantService.executeAssistantTurn({
-        provider: currentAssistantThread.provider,
-        noteId: currentNote.id,
-        notePath: currentNote.path,
-        noteTitle: currentNote.title,
-        scope: context.effectiveScope === "note" ? "note" : context.effectiveScope,
-        scopeLabel: context.scopeLabel,
-        startLine: context.startLine,
-        endLine: context.endLine,
-        snapshotHash: context.snapshotHash,
-        numberedContent: context.numberedContent,
-        userPrompt: prompt,
-        history: toAssistantHistory(currentAssistantThread.turns),
-        ollamaModel:
-          currentAssistantThread.provider === "ollama"
-            ? settings.ollamaModel || "qwen3:8b"
-            : undefined,
-      });
-
-      const assistantTurn: AssistantAssistantTurn = {
-        id: createAssistantTurnId("assistant-response"),
-        kind: "assistant",
-        replyText: result.replyText,
-        proposals: result.proposals,
-        createdAt: Date.now(),
-        snapshotHash: context.snapshotHash,
-        snapshotMarkdown: context.fullMarkdown,
-        scopeStartLine: context.startLine,
-        scopeEndLine: context.endLine,
-        warning: result.warning ?? null,
-        executionDir: result.executionDir ?? null,
-        invalidReason: null,
-        invalidProposalIds: [],
-      };
-
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        pending: false,
-        turns: [...thread.turns, assistantTurn],
-        lastSuccessfulSnapshotHash: context.snapshotHash,
-      }));
-    } catch (error) {
-      console.error("[Assistant] Error:", error);
-      const message =
-        error instanceof Error ? error.message : "Unknown assistant error";
-      updateCurrentAssistantThread((thread) => ({
-        ...thread,
-        pending: false,
-        turns: [
-          ...thread.turns,
-          {
-            id: createAssistantTurnId("assistant-system"),
-            kind: "system",
-            text: `Assistant request failed: ${message}`,
-            createdAt: Date.now(),
-          },
-        ],
-      }));
-      toast.error(`Assistant request failed: ${message}`);
-    }
-  }, [
-    currentAssistantThread,
-    currentNote,
-    flushPendingSave,
-    settings.ollamaModel,
-    syncAssistantSelectionFromEditor,
-    syncAutoAssistantScopeFromEditor,
-    updateCurrentAssistantThread,
-  ]);
-
-  const handleApplyAssistantProposal = useCallback(
-    async (turn: AssistantAssistantTurn, proposal: AssistantProposal) => {
-      if (!currentNote || !currentAssistantThread) {
-        return;
-      }
-
-      try {
-        await flushPendingSave?.();
-
-        const latestMarkdown = serializeEditorMarkdown(
-          editorRef.current,
-          currentNote.content,
-        );
-        const latestHash = hashText(latestMarkdown);
-
-        if (latestHash !== turn.snapshotHash) {
-          updateCurrentAssistantThread((threadState) => ({
-            ...threadState,
-            turns: threadState.turns.flatMap((item) => {
-              if (item.kind === "assistant" && item.id === turn.id) {
-                return [{ ...item, stale: true }];
-              }
-
-              return [item];
-            }).concat({
-              id: createAssistantTurnId("assistant-system"),
-              kind: "system",
-              text: "The note changed after this proposal was generated. Send a new request before applying edits.",
-              createdAt: Date.now(),
-            }),
-          }));
-          return;
-        }
-
-        const totalLines = latestMarkdown.split(/\r?\n/).length;
-        if (
-          proposal.startLine < 1 ||
-          proposal.endLine < proposal.startLine ||
-          proposal.endLine > totalLines
-        ) {
-          updateCurrentAssistantThread((threadState) => ({
-            ...threadState,
-            turns: threadState.turns.map((item) => {
-              if (item.kind !== "assistant" || item.id !== turn.id) {
-                return item;
-              }
-
-              const invalidProposalIds = Array.from(
-                new Set([...(item.invalidProposalIds ?? []), proposal.id]),
-              );
-
-              return {
-                ...item,
-                invalidProposalIds,
-                invalidReason:
-                  "One or more proposals from this response contained invalid line ranges and cannot be applied.",
-              };
-            }).concat({
-              id: createAssistantTurnId("assistant-system"),
-              kind: "system",
-              text: `Could not apply “${proposal.title}” because the returned line range was invalid.`,
-              createdAt: Date.now(),
-            }),
-          }));
-          return;
-        }
-
-        if (
-          !isProposalRangeWithinScope(
-            proposal.startLine,
-            proposal.endLine,
-            turn.scopeStartLine,
-            turn.scopeEndLine,
-          )
-        ) {
-          updateCurrentAssistantThread((threadState) => ({
-            ...threadState,
-            turns: threadState.turns.map((item) => {
-              if (item.kind !== "assistant" || item.id !== turn.id) {
-                return item;
-              }
-
-              const invalidProposalIds = Array.from(
-                new Set([...(item.invalidProposalIds ?? []), proposal.id]),
-              );
-
-              return {
-                ...item,
-                invalidProposalIds,
-                invalidReason:
-                  "One or more proposals from this response fell outside the scoped excerpt and cannot be applied.",
-              };
-            }).concat({
-              id: createAssistantTurnId("assistant-system"),
-              kind: "system",
-              text: `Could not apply “${proposal.title}” because it falls outside the original ${turn.scopeStartLine === turn.scopeEndLine ? `line ${turn.scopeStartLine}` : `lines ${turn.scopeStartLine}-${turn.scopeEndLine}`} scope that Sly sent to the assistant.`,
-              createdAt: Date.now(),
-            }),
-          }));
-          return;
-        }
-
-        const nextMarkdown = applyLineReplacement(
-          latestMarkdown,
-          proposal.startLine,
-          proposal.endLine,
-          proposal.replacement,
-        );
-
-        await saveNote(nextMarkdown, currentNote.id);
-        await reloadCurrentNote();
-
-        updateCurrentAssistantThread((threadState) => ({
-          ...threadState,
-          turns: [
-            ...threadState.turns,
-            {
-              id: createAssistantTurnId("assistant-system"),
-              kind: "system",
-              text: `Applied “${proposal.title}”.`,
-              createdAt: Date.now(),
-            },
-          ],
-        }));
-        toast.success(`Applied “${proposal.title}”`);
-      } catch (error) {
-        console.error("[Assistant] Apply failed:", error);
-        const message =
-          error instanceof Error ? error.message : "Unknown apply error";
-        updateCurrentAssistantThread((threadState) => ({
-          ...threadState,
-          turns: [
-            ...threadState.turns,
-            {
-              id: createAssistantTurnId("assistant-system"),
-              kind: "system",
-              text: `Failed to apply “${proposal.title}”: ${message}`,
-              createdAt: Date.now(),
-            },
-          ],
-        }));
-        toast.error(`Failed to apply “${proposal.title}”`);
-      }
-    },
-    [
-      currentAssistantThread,
-      currentNote,
-      flushPendingSave,
-      reloadCurrentNote,
-      saveNote,
-      updateCurrentAssistantThread,
-    ],
-  );
 
   // Memoize display items to prevent unnecessary recalculations
   const displayItems = useMemo(() => {
@@ -1834,33 +1185,6 @@ function AppContent() {
     ],
   );
 
-  const assistantProps = useMemo<RightPanelAssistantProps>(
-    () => ({
-      hasNote: Boolean(currentNote),
-      providerCheckComplete: assistantProvidersLoaded,
-      availableProviders: availableAssistantProviders,
-      thread: currentAssistantThread,
-      onProviderChange: handleAssistantProviderChange,
-      onScopeChange: handleAssistantScopeChange,
-      onDraftChange: handleAssistantDraftChange,
-      onClearThread: handleClearAssistantThread,
-      onSubmit: handleAssistantSubmit,
-      onApplyProposal: handleApplyAssistantProposal,
-    }),
-    [
-      assistantProvidersLoaded,
-      availableAssistantProviders,
-      currentAssistantThread,
-      currentNote,
-      handleApplyAssistantProposal,
-      handleAssistantDraftChange,
-      handleAssistantProviderChange,
-      handleAssistantScopeChange,
-      handleAssistantSubmit,
-      handleClearAssistantThread,
-    ],
-  );
-
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-bg-secondary">
@@ -1898,9 +1222,6 @@ function AppContent() {
             key={settingsKey}
             onBack={closeSettings}
             initialTab={settingsInitialTab}
-            availableAiProviders={availableAssistantProviders}
-            aiProvidersLoading={!assistantProvidersLoaded}
-            onRefreshAiProviders={refreshAssistantProviders}
           />
         ) : (
           <WorkspaceMain
@@ -1911,19 +1232,15 @@ function AppContent() {
             focusMode={focusMode}
             showRightPanel={showRightPanel}
             rightPanelWidth={rightPanelWidth}
-            rightPanelTab={rightPanelTab}
             editorInstance={editorInstance}
             editorScrollContainer={editorScrollContainer}
             currentNoteId={currentNote?.id ?? null}
-            currentAssistantSelection={currentAssistantSelection}
-            assistantProps={assistantProps}
             workspaceEditorData={workspaceEditorData}
             onOpenSettings={openSettings}
             onEditorSourceModeChange={setEditorSourceMode}
             onRegisterScrollContainer={setEditorScrollContainer}
             onRegisterFlushPendingSave={handleRegisterFlushPendingSave}
             onEditorReady={handleEditorReady}
-            onRightPanelTabChange={setRightPanelTab}
             onRightPanelWidthChange={setRightPanelWidth}
           />
         )}

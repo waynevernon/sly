@@ -497,7 +497,6 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
     next.showNotesFromSubfolders,
   );
   assignNullableField("defaultNoteName", current.defaultNoteName, next.defaultNoteName);
-  assignNullableField("ollamaModel", current.ollamaModel, next.ollamaModel);
   assignNullableField("folderIcons", current.folderIcons, next.folderIcons);
   assignNullableField(
     "folderNoteSortModes",

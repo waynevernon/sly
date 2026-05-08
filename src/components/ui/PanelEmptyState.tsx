@@ -39,11 +39,15 @@ export function PanelEmptyState({
             ) : null}
           </div>
         ) : null}
-        {action ? (
-          <div className="mt-4 flex max-w-full justify-center overflow-hidden">
-            {action}
-          </div>
-        ) : null}
+        <div
+          className={cn(
+            "mt-4 flex h-[var(--ui-control-height-standard)] max-w-full justify-center overflow-hidden",
+            !action && "invisible",
+          )}
+          aria-hidden={action ? undefined : true}
+        >
+          {action}
+        </div>
       </div>
     </div>
   );

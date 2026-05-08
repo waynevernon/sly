@@ -213,6 +213,18 @@ describe("RightPanel", () => {
     const editor = new FakeEditor(doc, nodeMap);
     const scrollContainer = document.createElement("div");
     scrollContainer.scrollTop = 40;
+    scrollContainer.getBoundingClientRect = () =>
+      ({
+        top: 24,
+        bottom: 400,
+        left: 0,
+        right: 300,
+        width: 300,
+        height: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     renderRightPanel(
       <RightPanel

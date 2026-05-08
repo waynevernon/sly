@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckSquare, Sparkles } from "lucide-react";
+import { CheckSquare, Plug } from "lucide-react";
 import {
   ArrowLeftIcon,
   NoteIcon,
@@ -16,14 +16,10 @@ import { ShortcutsSettingsSection } from "./ShortcutsSettingsSection";
 import { AboutSettingsSection } from "./AboutSettingsSection";
 import { isMac, mod, shortcut } from "../../lib/platform";
 import { SETTINGS_TAB_SHORTCUT_KEYS } from "../../lib/shortcutDefinitions";
-import type { AiProvider } from "../../services/ai";
 
 interface SettingsPageProps {
   onBack: () => void;
   initialTab?: SettingsTab;
-  availableAiProviders: AiProvider[];
-  aiProvidersLoading: boolean;
-  onRefreshAiProviders: () => Promise<void>;
 }
 
 export type SettingsTab = "notes" | "tasks" | "editor" | "extensions" | "shortcuts" | "about";
@@ -55,7 +51,7 @@ const tabs: {
   {
     id: "extensions",
     label: "Integrations",
-    icon: Sparkles,
+    icon: Plug,
     shortcutLabel: shortcut(...SETTINGS_TAB_SHORTCUT_KEYS.extensions),
   },
   {
@@ -75,9 +71,6 @@ const tabs: {
 export function SettingsPage({
   onBack,
   initialTab,
-  availableAiProviders,
-  aiProvidersLoading,
-  onRefreshAiProviders,
 }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "notes");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -185,13 +178,7 @@ export function SettingsPage({
             {activeTab === "notes" && <GeneralSettingsSection />}
             {activeTab === "tasks" && <TasksSettingsSection />}
             {activeTab === "editor" && <AppearanceSettingsSection />}
-            {activeTab === "extensions" && (
-              <ExtensionsSettingsSection
-                aiProviders={availableAiProviders}
-                aiProvidersLoading={aiProvidersLoading}
-                onRefreshAiProviders={onRefreshAiProviders}
-              />
-            )}
+            {activeTab === "extensions" && <ExtensionsSettingsSection />}
             {activeTab === "shortcuts" && <ShortcutsSettingsSection />}
             {activeTab === "about" && <AboutSettingsSection />}
           </div>

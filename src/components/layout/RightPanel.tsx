@@ -8,11 +8,10 @@ import {
 } from "react";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
-import { ListTree, Sparkles } from "lucide-react";
+import { ListTree } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { finishNoteOpenTiming, markNoteOpenTiming } from "../../lib/noteOpenTiming";
-import type { RightPanelTab } from "../../types/note";
-import { PanelEmptyState, Tooltip } from "../ui";
+import { PanelEmptyState } from "../ui";
 import {
   extractOutlineItems,
   findActiveOutlineFromHeadingTops,
@@ -20,10 +19,6 @@ import {
   type OutlineItem,
 } from "./rightPanelOutline";
 import { PaneResizeHandle } from "./PaneResizeHandle";
-import {
-  RightPanelAssistant,
-  type RightPanelAssistantProps,
-} from "./RightPanelAssistant";
 
 interface RightPanelProps {
   editor: TiptapEditor | null;
@@ -32,30 +27,11 @@ interface RightPanelProps {
   hasNote: boolean;
   visible: boolean;
   width: number;
-  activeTab: RightPanelTab;
-  onTabChange: (tab: RightPanelTab) => void;
   onWidthChange: (width: number) => void;
-  assistantProps: RightPanelAssistantProps;
 }
 
 const ACTIVE_HEADING_TOP_OFFSET = 72;
 const OUTLINE_UPDATE_DEBOUNCE_MS = 120;
-const RIGHT_PANEL_TABS: Array<{
-  tab: RightPanelTab;
-  label: string;
-  Icon: typeof ListTree;
-}> = [
-  {
-    tab: "outline",
-    label: "Outline",
-    Icon: ListTree,
-  },
-  {
-    tab: "assistant",
-    label: "Assistant",
-    Icon: Sparkles,
-  },
-];
 
 export function RightPanel({
   editor,
@@ -64,10 +40,7 @@ export function RightPanel({
   hasNote,
   visible,
   width,
-  activeTab,
-  onTabChange,
   onWidthChange,
-  assistantProps,
 }: RightPanelProps) {
   const [outlineItems, setOutlineItems] = useState<OutlineItem[]>([]);
   const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
@@ -84,9 +57,9 @@ export function RightPanel({
   const [hydratedPanelKey, setHydratedPanelKey] = useState<string | null>(null);
   outlineItemsRef.current = outlineItems;
   liveWidthRef.current = liveWidth;
-  const outlineActive = visible && activeTab === "outline";
+  const outlineActive = visible;
   const panelHydrationKey =
-    visible && hasNote && noteId ? `${noteId}:${activeTab}` : null;
+    visible && hasNote && noteId ? `${noteId}:outline` : null;
   const panelHydrated =
     panelHydrationKey !== null && hydratedPanelKey === panelHydrationKey;
 
@@ -177,10 +150,7 @@ export function RightPanel({
     startTransition(() => {
       setHydratedPanelKey(panelHydrationKey);
     });
-    if (activeTab === "assistant" && noteId) {
-      finishNoteOpenTiming(noteId, "assistant panel hydrated");
-    }
-  }, [activeTab, noteId, panelHydrationKey]);
+  }, [noteId, panelHydrationKey]);
 
   useEffect(() => {
     if (!editor || !hasNote || !outlineActive || !panelHydrated || !noteId) {
@@ -324,21 +294,6 @@ export function RightPanel({
     };
   }, [hasNote]);
 
-  const headerTitle = useMemo(() => {
-    if (activeTab === "assistant") {
-      return (
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate">Assistant</span>
-          <span className="inline-flex shrink-0 rounded-full border border-border bg-bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-text-muted">
-            Beta
-          </span>
-        </div>
-      );
-    }
-
-    return "Outline";
-  }, [activeTab]);
-
   return (
     <div className={cn("relative h-full shrink-0", isResizing && "select-none")}>
       {visible && (
@@ -362,77 +317,49 @@ export function RightPanel({
         <div className="flex h-full min-h-0 flex-col">
           <div className="ui-pane-drag-region" data-tauri-drag-region></div>
           <div className="ui-pane-header border-border/80">
-            <div className="min-w-0 font-medium text-base text-text">
-              {headerTitle}
-            </div>
-            <div className="ui-pane-header-actions ml-auto">
-              {RIGHT_PANEL_TABS.map(({ tab, label, Icon }) => (
-                <Tooltip key={tab} content={label}>
-                  <button
-                    type="button"
-                    aria-label={label}
-                    aria-pressed={activeTab === tab}
-                    onClick={() => onTabChange(tab)}
-                    className={cn(
-                      "ui-focus-ring inline-flex h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)] items-center justify-center rounded-[var(--ui-radius-md)] transition-colors",
-                      activeTab === tab
-                        ? "bg-state-selected text-text"
-                        : "text-text-muted hover:bg-state-hover hover:text-text",
-                    )}
-                  >
-                    <Icon className="h-4.5 w-4.5 stroke-[1.7]" />
-                  </button>
-                </Tooltip>
-              ))}
+            <div className="flex min-w-0 items-center gap-2 font-medium text-base text-text">
+              <ListTree className="h-4.25 w-4.25 shrink-0 text-text-muted/80 stroke-[1.7]" />
+              Outline
             </div>
           </div>
 
-          {activeTab === "outline" ? (
-            <div
-              ref={outlineScrollRef}
-              className="ui-scrollbar-overlay flex flex-1 flex-col overflow-y-auto px-2 pt-2.5 pb-2"
-            >
-              {!panelHydrated && hasNote ? (
-                <PanelEmptyState message="Loading outline..." />
-              ) : outlineItems.length === 0 ? (
-                <PanelEmptyState
-                  icon={<ListTree />}
-                  title={emptyState.title}
-                  message={emptyState.message}
-                />
-              ) : (
-                <div className="space-y-1">
-                  {outlineItems.map((item) => {
-                    const isActive = item.id === activeOutlineId;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        data-outline-id={item.id}
-                        onClick={() => handleOutlineSelect(item)}
-                        className={cn(
-                          "ui-focus-ring flex w-full items-start rounded-[var(--ui-radius-md)] px-2 py-1.5 text-left text-sm transition-colors",
-                          isActive
-                            ? "bg-state-selected text-text"
-                            : "text-text-muted hover:bg-state-hover hover:text-text",
-                        )}
-                        style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
-                      >
-                        <span className="min-w-0 truncate">{item.text}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : panelHydrated || !hasNote ? (
-            <RightPanelAssistant {...assistantProps} />
-          ) : (
-            <PanelEmptyState
-              icon={<Sparkles />}
-              message="Preparing assistant..."
-            />
-          )}
+          <div
+            ref={outlineScrollRef}
+            className="ui-scrollbar-overlay flex flex-1 flex-col overflow-y-auto px-2 pt-2.5 pb-2"
+          >
+            {!panelHydrated && hasNote ? (
+              <PanelEmptyState message="Loading outline..." />
+            ) : outlineItems.length === 0 ? (
+              <PanelEmptyState
+                icon={<ListTree />}
+                title={emptyState.title}
+                message={emptyState.message}
+              />
+            ) : (
+              <div className="space-y-1">
+                {outlineItems.map((item) => {
+                  const isActive = item.id === activeOutlineId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      data-outline-id={item.id}
+                      onClick={() => handleOutlineSelect(item)}
+                      className={cn(
+                        "ui-focus-ring flex w-full items-start rounded-[var(--ui-radius-md)] px-2 py-1.5 text-left text-sm transition-colors",
+                        isActive
+                          ? "bg-state-selected text-text"
+                          : "text-text-muted hover:bg-state-hover hover:text-text",
+                      )}
+                      style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
+                    >
+                      <span className="min-w-0 truncate">{item.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

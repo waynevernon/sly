@@ -34,9 +34,6 @@ import { normalizeUrl } from "./linkUtils";
 import { SlyBlockMath } from "./MathExtensions";
 
 export const searchHighlightPluginKey = new PluginKey("searchHighlight");
-export const persistedSelectionHighlightPluginKey = new PluginKey(
-  "persistedSelectionHighlight",
-);
 
 export type SlyEditorPasteHandler = (
   view: EditorView,
@@ -78,34 +75,6 @@ const SearchHighlight = Extension.create<SearchHighlightOptions>({
           decorations: (state) => {
             return searchHighlightPluginKey.getState(state);
           },
-        },
-      }),
-    ];
-  },
-});
-
-const PersistedSelectionHighlight = Extension.create({
-  name: "persistedSelectionHighlight",
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: persistedSelectionHighlightPluginKey,
-        state: {
-          init: () => DecorationSet.empty,
-          apply: (tr, oldSet) => {
-            const set = oldSet.map(tr.mapping, tr.doc);
-            const meta = tr.getMeta(persistedSelectionHighlightPluginKey);
-            if (meta !== undefined) {
-              return meta.decorationSet;
-            }
-
-            return set;
-          },
-        },
-        props: {
-          decorations: (state) =>
-            persistedSelectionHighlightPluginKey.getState(state),
         },
       }),
     ];
@@ -226,7 +195,6 @@ export function useSlyEditor({
       Frontmatter,
       Emoji,
       Markdown.configure({}),
-      PersistedSelectionHighlight,
       SearchHighlight.configure({
         matches: [],
         currentIndex: 0,

@@ -90,9 +90,6 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(daily_note_folder) = patch.daily_note_folder {
         settings.daily_note_folder = daily_note_folder;
     }
-    if let Some(ollama_model) = patch.ollama_model {
-        settings.ollama_model = ollama_model;
-    }
     if let Some(folder_icons) = patch.folder_icons {
         settings.folder_icons = folder_icons;
     }
@@ -222,17 +219,6 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
         }
     }
 
-    if let Some(ollama_model) = &settings.ollama_model {
-        let trimmed = ollama_model.trim();
-        if trimmed.is_empty() {
-            settings.ollama_model = None;
-            changed = true;
-        } else if trimmed != ollama_model {
-            settings.ollama_model = Some(trimmed.to_string());
-            changed = true;
-        }
-    }
-
     if settings.tasks_enabled.is_none() {
         settings.tasks_enabled = Some(true);
         changed = true;
@@ -309,7 +295,6 @@ fn canonicalize_settings_value(value: &mut Value) {
     normalize_bool_field(object, "showNoteCounts");
     normalize_bool_field(object, "showNotesFromSubfolders");
     normalize_optional_string_field(object, "defaultNoteName");
-    normalize_optional_string_field(object, "ollamaModel");
     normalize_folder_icons_field(object, "folderIcons");
     normalize_folder_icons_field(object, "taskTagIcons");
     normalize_optional_string_array_field(object, "collapsedFolders");

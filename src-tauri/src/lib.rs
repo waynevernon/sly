@@ -512,8 +512,6 @@ pub struct AppConfig {
     )]
     pub schema_version: u32,
     pub notes_folder: Option<String>,
-    #[serde(rename = "aiWorkingDirectory")]
-    pub ai_working_directory: Option<String>,
     #[serde(default)]
     pub appearance: AppearanceSettings,
 }
@@ -523,7 +521,6 @@ impl Default for AppConfig {
         Self {
             schema_version: persistence::app_config::current_app_config_schema_version(),
             notes_folder: None,
-            ai_working_directory: None,
             appearance: AppearanceSettings::default(),
         }
     }
@@ -557,8 +554,6 @@ pub struct Settings {
     pub daily_note_name: Option<String>,
     #[serde(rename = "dailyNoteFolder", skip_serializing_if = "Option::is_none")]
     pub daily_note_folder: Option<String>,
-    #[serde(rename = "ollamaModel")]
-    pub ollama_model: Option<String>,
     #[serde(rename = "folderIcons", default)]
     pub folder_icons: Option<HashMap<String, FolderAppearance>>,
     #[serde(rename = "taskTagIcons", default)]
@@ -612,7 +607,6 @@ impl Default for Settings {
             default_note_name: None,
             daily_note_name: None,
             daily_note_folder: None,
-            ollama_model: None,
             folder_icons: None,
             task_tag_icons: None,
             collapsed_folders: None,
@@ -654,8 +648,6 @@ pub struct SettingsPatch {
     #[serde(default)]
     pub daily_note_folder: Option<Option<String>>,
     #[serde(default)]
-    pub ollama_model: Option<Option<String>>,
-    #[serde(default)]
     pub folder_icons: Option<Option<HashMap<String, FolderAppearance>>>,
     #[serde(default)]
     pub task_tag_icons: Option<Option<HashMap<String, FolderAppearance>>>,
@@ -691,61 +683,6 @@ pub struct SearchResult {
     pub preview: String,
     pub modified: i64,
     pub score: f32,
-}
-
-// AI execution result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AiExecutionResult {
-    pub success: bool,
-    pub output: String,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssistantHistoryEntry {
-    pub role: String,
-    pub text: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssistantTurnRequest {
-    pub provider: String,
-    pub note_id: String,
-    pub note_path: String,
-    pub note_title: String,
-    pub scope: String,
-    pub scope_label: String,
-    pub start_line: u32,
-    pub end_line: u32,
-    pub snapshot_hash: String,
-    pub numbered_content: String,
-    pub user_prompt: String,
-    pub history: Vec<AssistantHistoryEntry>,
-    pub ollama_model: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssistantProposal {
-    pub id: String,
-    pub title: String,
-    pub summary: String,
-    pub start_line: u32,
-    pub end_line: u32,
-    pub replacement: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssistantTurnResult {
-    pub reply_text: String,
-    pub proposals: Vec<AssistantProposal>,
-    pub warning: Option<String>,
-    #[serde(skip_deserializing)]
-    pub execution_dir: Option<String>,
 }
 
 // File watcher state
@@ -1452,7 +1389,6 @@ fn generate_preview(content: &str) -> String {
 static IMG_RE: OnceLock<regex::Regex> = OnceLock::new();
 static LINK_RE: OnceLock<regex::Regex> = OnceLock::new();
 static LIST_RE: OnceLock<regex::Regex> = OnceLock::new();
-static ANSI_RE: OnceLock<regex::Regex> = OnceLock::new();
 
 // Strip common markdown formatting from text
 fn strip_markdown(text: &str) -> String {
@@ -3659,39 +3595,6 @@ fn get_appearance_settings(state: State<AppState>) -> AppearanceSettings {
 }
 
 #[tauri::command]
-fn get_ai_working_directory(state: State<AppState>) -> Option<String> {
-    state
-        .app_config
-        .read()
-        .expect("app_config read lock")
-        .ai_working_directory
-        .clone()
-}
-
-#[tauri::command]
-fn set_ai_working_directory(
-    path: Option<String>,
-    app: AppHandle,
-    state: State<AppState>,
-) -> Result<Option<String>, String> {
-    if let Some(ref p) = path {
-        let trimmed = p.trim();
-        if !trimmed.is_empty() && !PathBuf::from(trimmed).is_dir() {
-            return Err(format!("'{}' is not a valid directory", trimmed));
-        }
-    }
-
-    let updated_config = {
-        let mut app_config = state.app_config.write().expect("app_config write lock");
-        app_config.ai_working_directory = path;
-        app_config.clone()
-    };
-
-    save_app_config(&app, &updated_config).map_err(|e| e.to_string())?;
-    Ok(updated_config.ai_working_directory)
-}
-
-#[tauri::command]
 fn update_appearance_settings(
     new_settings: AppearanceSettings,
     app: AppHandle,
@@ -4811,84 +4714,6 @@ async fn git_push_with_upstream(state: State<'_, AppState>) -> Result<git::GitRe
     }
 }
 
-// Check if Claude CLI is installed
-fn get_expanded_path() -> String {
-    let system_path = std::env::var("PATH").unwrap_or_default();
-    let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
-
-    if home.is_empty() {
-        return system_path;
-    }
-
-    // Common locations for node-installed CLIs (nvm, volta, fnm, mise, homebrew, global npm)
-    let candidate_dirs = vec![
-        format!("{home}/.nvm/versions/node"),
-        format!("{home}/.fnm/node-versions"),
-        format!("{home}/.local/share/mise/installs/node"),
-    ];
-    let static_dirs = vec![
-        format!("{home}/.bun/bin"),
-        format!("{home}/.volta/bin"),
-        format!("{home}/.local/bin"),
-        "/usr/local/bin".to_string(),
-        "/opt/homebrew/bin".to_string(),
-    ];
-
-    let mut expanded = Vec::new();
-
-    // Prefer well-known static locations (e.g. ~/.local/bin for native CLI installs)
-    for dir in static_dirs {
-        expanded.push(dir);
-    }
-
-    // Then scan nvm/fnm node version dirs containing a bin/ folder
-    for base in &candidate_dirs {
-        if let Ok(entries) = std::fs::read_dir(base) {
-            for entry in entries.flatten() {
-                let bin_path = entry.path().join("bin");
-                if bin_path.exists() {
-                    expanded.push(bin_path.to_string_lossy().to_string());
-                }
-            }
-        }
-    }
-
-    expanded.push(system_path);
-    expanded.join(":")
-}
-
-/// Create a `Command` that hides the console window on Windows.
-fn no_window_cmd(program: &str) -> std::process::Command {
-    let cmd = std::process::Command::new(program);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        let mut cmd = cmd;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        cmd
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        cmd
-    }
-}
-
-fn check_cli_exists(command_name: &str, path: &str) -> Result<bool, String> {
-    let which_cmd = if cfg!(target_os = "windows") {
-        "where"
-    } else {
-        "which"
-    };
-
-    let check_output = no_window_cmd(which_cmd)
-        .arg(command_name)
-        .env("PATH", path)
-        .output()
-        .map_err(|e| format!("Failed to check for {} CLI: {}", command_name, e))?;
-
-    Ok(check_output.status.success())
-}
-
 /// Marker comment embedded in CLI wrapper scripts installed by Sly.
 /// Used to identify and validate our own wrapper before modifying or removing it.
 #[cfg(target_os = "macos")]
@@ -5040,551 +4865,6 @@ fn uninstall_cli() -> Result<(), String> {
         }
         Ok(())
     }
-}
-
-#[tauri::command]
-async fn ai_check_claude_cli() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let path = get_expanded_path();
-        check_cli_exists("claude", &path)
-    })
-    .await
-    .map_err(|e| format!("Failed to check Claude CLI: {}", e))?
-}
-
-#[tauri::command]
-async fn ai_check_codex_cli() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let path = get_expanded_path();
-        check_cli_exists("codex", &path)
-    })
-    .await
-    .map_err(|e| format!("Failed to check Codex CLI: {}", e))?
-}
-
-#[tauri::command]
-async fn ai_check_opencode_cli() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let path = get_expanded_path();
-        check_cli_exists("opencode", &path)
-    })
-    .await
-    .map_err(|e| format!("Failed to check OpenCode CLI: {}", e))?
-}
-
-/// Shared AI CLI execution: spawns `command` with `args`, writes `stdin_input` to stdin,
-/// and returns the result with a 5-minute timeout.
-async fn execute_ai_cli(
-    cli_name: &str,
-    command: String,
-    args: Vec<String>,
-    stdin_input: String,
-    not_found_msg: String,
-    current_dir: Option<PathBuf>,
-    extra_env: Option<Vec<(String, String)>>,
-) -> Result<AiExecutionResult, String> {
-    use std::io::Write;
-    use std::process::{Child, Stdio};
-
-    let cli_name = cli_name.to_string();
-    let timeout_duration = std::time::Duration::from_secs(300);
-    let shared_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-    let child_for_task = Arc::clone(&shared_child);
-    let cli_name_task = cli_name.clone();
-
-    let mut task = tauri::async_runtime::spawn_blocking(move || {
-        // Blocking I/O: expand PATH and check CLI exists
-        let path = get_expanded_path();
-        match check_cli_exists(&command, &path) {
-            Ok(false) => {
-                return AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(not_found_msg),
-                };
-            }
-            Err(e) => {
-                return AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(e),
-                };
-            }
-            Ok(true) => {}
-        }
-
-        let mut cmd = no_window_cmd(&command);
-        cmd.env("PATH", &path);
-        if let Some(dir) = &current_dir {
-            cmd.current_dir(dir);
-        }
-        if let Some(env_pairs) = &extra_env {
-            for (key, value) in env_pairs {
-                cmd.env(key, value);
-            }
-        }
-        for arg in &args {
-            cmd.arg(arg);
-        }
-        let process = match cmd
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            Ok(p) => p,
-            Err(e) => {
-                return AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!("Failed to execute {}: {}", cli_name_task, e)),
-                };
-            }
-        };
-
-        // Store process in shared state so the timeout handler can kill it.
-        // We only take individual I/O handles below — the Child stays in the
-        // mutex so it remains reachable for kill().
-        if let Ok(mut guard) = child_for_task.lock() {
-            *guard = Some(process);
-        } else {
-            return AiExecutionResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!("Failed to lock {} process handle", cli_name_task)),
-            };
-        }
-
-        // Take stdin handle (briefly locks then releases)
-        let stdin_handle = child_for_task
-            .lock()
-            .ok()
-            .and_then(|mut g| g.as_mut().and_then(|p| p.stdin.take()));
-
-        if let Some(mut stdin) = stdin_handle {
-            if let Err(e) = stdin.write_all(stdin_input.as_bytes()) {
-                if let Ok(mut g) = child_for_task.lock() {
-                    if let Some(ref mut p) = *g {
-                        let _ = p.kill();
-                        let _ = p.wait();
-                    }
-                }
-                return AiExecutionResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!("Failed to write to {} stdin: {}", cli_name_task, e)),
-                };
-            }
-            // stdin dropped here — closes the pipe
-        } else {
-            if let Ok(mut g) = child_for_task.lock() {
-                if let Some(ref mut p) = *g {
-                    let _ = p.kill();
-                    let _ = p.wait();
-                }
-            }
-            return AiExecutionResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!("Failed to open stdin for {}", cli_name_task)),
-            };
-        }
-
-        // Take stdout/stderr handles so we can read without holding the lock.
-        // This allows the timeout handler to lock the mutex and kill the process.
-        let stdout_handle = child_for_task
-            .lock()
-            .ok()
-            .and_then(|mut g| g.as_mut().and_then(|p| p.stdout.take()));
-        let stderr_handle = child_for_task
-            .lock()
-            .ok()
-            .and_then(|mut g| g.as_mut().and_then(|p| p.stderr.take()));
-
-        use std::io::Read;
-
-        let mut stdout_str = String::new();
-        if let Some(mut out) = stdout_handle {
-            let _ = out.read_to_string(&mut stdout_str);
-        }
-
-        let mut stderr_str = String::new();
-        if let Some(mut err) = stderr_handle {
-            let _ = err.read_to_string(&mut stderr_str);
-        }
-
-        // Collect exit status — process has exited after stdout/stderr close
-        let success = child_for_task
-            .lock()
-            .ok()
-            .and_then(|mut g| g.as_mut().and_then(|p| p.wait().ok()))
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        // Strip ANSI escape sequences from output (e.g. Ollama progress spinners)
-        let ansi_re = ANSI_RE
-            .get_or_init(|| regex::Regex::new(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\].*?\x07").unwrap());
-        let stdout_clean = ansi_re.replace_all(&stdout_str, "").to_string();
-        let stderr_clean = ansi_re.replace_all(&stderr_str, "").trim().to_string();
-
-        if success {
-            AiExecutionResult {
-                success: true,
-                output: stdout_clean,
-                error: None,
-            }
-        } else {
-            AiExecutionResult {
-                success: false,
-                output: stdout_clean,
-                error: Some(stderr_clean),
-            }
-        }
-    });
-
-    let result = match tokio::time::timeout(timeout_duration, &mut task).await {
-        Ok(join_result) => {
-            join_result.map_err(|e| format!("Failed to join {} blocking task: {}", cli_name, e))?
-        }
-        Err(_) => {
-            // Kill through the shared handle — the Child is still in the mutex
-            // because the blocking task only takes I/O handles, not the Child.
-            // This sends SIGKILL, which closes the pipes and unblocks the reads.
-            if let Ok(mut guard) = shared_child.lock() {
-                if let Some(ref mut process) = *guard {
-                    let _ = process.kill();
-                }
-            }
-
-            match tokio::time::timeout(std::time::Duration::from_secs(5), task).await {
-                Ok(join_result) => {
-                    if let Err(e) = join_result {
-                        return Err(format!(
-                            "Failed to join {} blocking task after timeout: {}",
-                            cli_name, e
-                        ));
-                    }
-                }
-                Err(_) => {
-                    return Err(format!(
-                        "{} CLI timed out and failed to exit after kill signal",
-                        cli_name
-                    ));
-                }
-            }
-
-            AiExecutionResult {
-                success: false,
-                output: String::new(),
-                error: Some(format!("{} CLI timed out after 5 minutes", cli_name)),
-            }
-        }
-    };
-
-    Ok(result)
-}
-
-fn validate_markdown_note_path(file_path: &str, notes_root: &Path) -> Result<PathBuf, String> {
-    let path = PathBuf::from(file_path);
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !ext.eq_ignore_ascii_case("md") && !ext.eq_ignore_ascii_case("markdown") {
-        return Err("AI features are only supported for markdown files".to_string());
-    }
-
-    let canonical = path
-        .canonicalize()
-        .map_err(|_| "Invalid file path".to_string())?;
-    if !canonical.starts_with(notes_root) {
-        return Err("File must be within notes folder".to_string());
-    }
-
-    Ok(canonical)
-}
-
-fn resolve_ai_working_directory(
-    app_config: &AppConfig,
-    notes_root: &Path,
-) -> Result<PathBuf, String> {
-    let Some(path) = app_config.ai_working_directory.as_ref() else {
-        return Ok(notes_root.to_path_buf());
-    };
-
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Ok(notes_root.to_path_buf());
-    }
-
-    PathBuf::from(trimmed).canonicalize().map_err(|e| {
-        format!(
-            "AI reference folder '{}' is not accessible: {}. Clear or reselect it in Settings > Extensions.",
-            trimmed, e
-        )
-    })
-}
-
-fn resolve_assistant_workspace(
-    note_path: &str,
-    app_config: &AppConfig,
-) -> Result<(PathBuf, PathBuf), String> {
-    let notes_folder = app_config
-        .notes_folder
-        .clone()
-        .ok_or("Notes folder not set")?;
-    let notes_root = PathBuf::from(&notes_folder)
-        .canonicalize()
-        .map_err(|_| "Invalid notes folder".to_string())?;
-    let _canonical_note = validate_markdown_note_path(note_path, &notes_root)?;
-    let execution_dir = resolve_ai_working_directory(app_config, &notes_root)?;
-
-    Ok((notes_root, execution_dir))
-}
-
-fn strip_json_code_fences(raw: &str) -> String {
-    let trimmed = raw.trim();
-    if !trimmed.starts_with("```") {
-        return trimmed.to_string();
-    }
-
-    let mut lines = trimmed.lines();
-    let _ = lines.next();
-    let mut collected = lines.collect::<Vec<_>>();
-    if matches!(collected.last(), Some(line) if line.trim_start().starts_with("```")) {
-        let _ = collected.pop();
-    }
-    collected.join("\n").trim().to_string()
-}
-
-fn sanitize_assistant_result(mut result: AssistantTurnResult) -> AssistantTurnResult {
-    if result.reply_text.trim().is_empty() {
-        result.reply_text = "Assistant returned no plain-text reply.".to_string();
-    }
-
-    result.proposals = result
-        .proposals
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, mut proposal)| {
-            if proposal.start_line == 0 || proposal.end_line < proposal.start_line {
-                return None;
-            }
-
-            if proposal.id.trim().is_empty() {
-                proposal.id = format!("proposal-{}", index + 1);
-            }
-            if proposal.title.trim().is_empty() {
-                proposal.title = format!("Proposed edit {}", index + 1);
-            }
-            if proposal.summary.trim().is_empty() {
-                proposal.summary = "Replace the selected lines.".to_string();
-            }
-
-            Some(proposal)
-        })
-        .collect();
-
-    result
-}
-
-fn parse_assistant_result(raw_output: &str) -> AssistantTurnResult {
-    let trimmed = raw_output.trim();
-    let parsed = serde_json::from_str::<AssistantTurnResult>(trimmed).or_else(|_| {
-        let stripped = strip_json_code_fences(trimmed);
-        serde_json::from_str::<AssistantTurnResult>(&stripped)
-    });
-
-    match parsed {
-        Ok(result) => sanitize_assistant_result(result),
-        Err(_) => AssistantTurnResult {
-            reply_text: if trimmed.is_empty() {
-                "Assistant returned no output.".to_string()
-            } else {
-                trimmed.to_string()
-            },
-            proposals: Vec::new(),
-            warning: Some(
-                "Assistant returned non-JSON output, so Sly kept the reply as plain text."
-                    .to_string(),
-            ),
-            execution_dir: None,
-        },
-    }
-}
-
-fn build_assistant_prompt(request: &AssistantTurnRequest) -> String {
-    let history = if request.history.is_empty() {
-        "None.".to_string()
-    } else {
-        request
-            .history
-            .iter()
-            .map(|entry| format!("- {}: {}", entry.role, entry.text))
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-
-    format!(
-        "You are Sly's note assistant. You are helping with one markdown note.\n\
-         Reply with strict JSON only. Do not include markdown code fences.\n\
-         The JSON must match this exact shape:\n\
-         {{\"replyText\":\"string\",\"proposals\":[{{\"id\":\"string\",\"title\":\"string\",\"summary\":\"string\",\"startLine\":1,\"endLine\":1,\"replacement\":\"string\"}}],\"warning\":null}}\n\
-         Rules:\n\
-         - replyText must be a concise plain-text answer for the user.\n\
-         - proposals may be empty if discussion is enough.\n\
-         - If you propose edits, use the exact line numbers shown in the numbered content.\n\
-         - replacement must contain the complete replacement text for the inclusive line range.\n\
-         - Never mention JSON instructions or tool details in replyText.\n\
-         - warning should be null unless the provided scope is insufficient or ambiguous.\n\n\
-         Note title: {note_title}\n\
-         Note id: {note_id}\n\
-         Note path: {note_path}\n\
-         Scope: {scope} ({scope_label})\n\
-         Line range: {start_line}-{end_line}\n\
-         Snapshot hash: {snapshot_hash}\n\n\
-         Recent conversation:\n\
-         {history}\n\n\
-         Numbered markdown content:\n\
-         {numbered_content}\n\n\
-         User request:\n\
-         {user_prompt}\n",
-        note_title = request.note_title,
-        note_id = request.note_id,
-        note_path = request.note_path,
-        scope = request.scope,
-        scope_label = request.scope_label,
-        start_line = request.start_line,
-        end_line = request.end_line,
-        snapshot_hash = request.snapshot_hash,
-        history = history,
-        numbered_content = request.numbered_content,
-        user_prompt = request.user_prompt,
-    )
-}
-
-#[tauri::command]
-async fn ai_assistant_turn(
-    request: AssistantTurnRequest,
-    state: State<'_, AppState>,
-) -> Result<AssistantTurnResult, String> {
-    let app_config = state
-        .app_config
-        .read()
-        .expect("app_config read lock")
-        .clone();
-    let (_notes_root, execution_dir) =
-        resolve_assistant_workspace(&request.note_path, &app_config)?;
-
-    let execution_dir_str = execution_dir.to_string_lossy().to_string();
-
-    let prompt = build_assistant_prompt(&request);
-    let provider = request.provider.trim().to_lowercase();
-
-    let result = match provider.as_str() {
-        "claude" => execute_ai_cli(
-            "Claude",
-            "claude".to_string(),
-            vec!["--print".to_string()],
-            prompt,
-            "Claude CLI not found. Please install it from https://claude.ai/code".to_string(),
-            Some(execution_dir.clone()),
-            None,
-        )
-        .await?,
-        "codex" => execute_ai_cli(
-            "Codex",
-            "codex".to_string(),
-            vec![
-                "exec".to_string(),
-                "--skip-git-repo-check".to_string(),
-                "--dangerously-bypass-approvals-and-sandbox".to_string(),
-                "-".to_string(),
-            ],
-            prompt,
-            "Codex CLI not found. Please install it from https://github.com/openai/codex".to_string(),
-            Some(execution_dir.clone()),
-            None,
-        )
-        .await?,
-        "opencode" => execute_ai_cli(
-            "OpenCode",
-            "opencode".to_string(),
-            vec!["run".to_string(), "--".to_string(), prompt],
-            String::new(),
-            "OpenCode CLI not found. Please install it from https://opencode.ai".to_string(),
-            Some(execution_dir.clone()),
-            Some(vec![
-                (
-                    "OPENCODE_PERMISSION".to_string(),
-                    r#"{"*":"allow","bash":"deny","task":"deny","webfetch":"deny","websearch":"deny","codesearch":"deny","skill":"deny","external_directory":"deny","doom_loop":"deny"}"#.to_string(),
-                ),
-            ]),
-        )
-        .await?,
-        "ollama" => {
-            let model_name = request
-                .ollama_model
-                .as_deref()
-                .unwrap_or("qwen3:8b")
-                .trim()
-                .to_string();
-
-            if !model_name.contains("cloud") {
-                let mn = model_name.clone();
-                let available = tauri::async_runtime::spawn_blocking(move || {
-                    let path = get_expanded_path();
-                    let mut cmd = no_window_cmd("ollama");
-                    cmd.env("PATH", &path);
-                    cmd.args(["show", &mn]);
-                    cmd.stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null());
-                    match cmd.status() {
-                        Ok(status) => status.success(),
-                        Err(_) => false,
-                    }
-                })
-                .await
-                .unwrap_or(false);
-
-                if !available {
-                    return Err(format!(
-                        "Model '{}' is not installed. Run `ollama pull {}` in your terminal.",
-                        model_name, model_name
-                    ));
-                }
-            }
-
-            execute_ai_cli(
-                "Ollama",
-                "ollama".to_string(),
-                vec!["run".to_string(), model_name.clone()],
-                prompt,
-                "Ollama CLI not found. Please install it from https://ollama.com".to_string(),
-                Some(execution_dir.clone()),
-                None,
-            )
-            .await?
-        }
-        _ => return Err(format!("Unsupported assistant provider: {}", request.provider)),
-    };
-
-    if !result.success {
-        return Err(result
-            .error
-            .unwrap_or_else(|| "Assistant request failed.".to_string()));
-    }
-
-    let mut parsed = parse_assistant_result(&result.output);
-    parsed.execution_dir = Some(execution_dir_str);
-    Ok(parsed)
-}
-
-#[tauri::command]
-async fn ai_check_ollama_cli() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let path = get_expanded_path();
-        check_cli_exists("ollama", &path)
-    })
-    .await
-    .map_err(|e| format!("Failed to check Ollama CLI: {}", e))?
 }
 
 /// Check if a markdown file is inside the configured notes folder.
@@ -6582,8 +5862,6 @@ pub fn run() {
             move_folder,
             get_settings,
             get_appearance_settings,
-            get_ai_working_directory,
-            set_ai_working_directory,
             update_appearance_settings,
             patch_settings,
             update_git_enabled,
@@ -6608,11 +5886,6 @@ pub fn run() {
             git_pull,
             git_add_remote,
             git_push_with_upstream,
-            ai_check_claude_cli,
-            ai_check_codex_cli,
-            ai_check_opencode_cli,
-            ai_check_ollama_cli,
-            ai_assistant_turn,
             read_file_direct,
             save_file_direct,
             import_file_to_folder,
@@ -6849,65 +6122,6 @@ mod tests {
     }
 
     #[test]
-    fn load_app_config_trims_ai_working_directory_and_rewrites_empty_value() {
-        let path = temp_file_path("app-config-ai-working-directory");
-        std::fs::write(
-            &path,
-            r#"{
-  "schemaVersion": 1,
-  "notes_folder": "/notes",
-  "aiWorkingDirectory": "   ",
-  "appearance": {
-    "mode": "system",
-    "lightPresetId": "sly-light",
-    "darkPresetId": "sly-dark",
-    "uiFont": { "kind": "preset", "value": "inter" },
-    "noteFont": { "kind": "preset", "value": "atkinson-hyperlegible-next" },
-    "codeFont": { "kind": "preset", "value": "jetbrains-mono" },
-    "noteTypography": { "baseFontSize": 16, "boldWeight": 600, "lineHeight": 1.5 },
-    "textDirection": "auto",
-    "editorWidth": "normal",
-    "interfaceZoom": 1,
-    "paneMode": 3,
-    "foldersPaneWidth": 240,
-    "notesPaneWidth": 304,
-    "rightPanelVisible": true,
-    "rightPanelWidth": 260,
-    "rightPanelTab": "assistant",
-    "confirmDeletions": true
-  }
-}"#,
-        )
-        .unwrap();
-
-        let config = persistence::app_config::load_app_config_from_path(&path);
-
-        assert_eq!(config.ai_working_directory, None);
-
-        let rewritten: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(rewritten["aiWorkingDirectory"], serde_json::Value::Null);
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn canonicalize_app_config_trims_ai_working_directory() {
-        let mut config = AppConfig {
-            ai_working_directory: Some("  /tmp/reference  ".to_string()),
-            ..Default::default()
-        };
-
-        assert!(persistence::app_config::canonicalize_app_config(
-            &mut config
-        ));
-        assert_eq!(
-            config.ai_working_directory,
-            Some("/tmp/reference".to_string())
-        );
-    }
-
-    #[test]
     fn canonicalize_app_config_clamps_right_panel_width() {
         let mut config = AppConfig::default();
         config.appearance.right_panel_width = 999;
@@ -6918,128 +6132,6 @@ mod tests {
         ));
         assert_eq!(config.appearance.right_panel_width, 420);
         assert_eq!(config.appearance.right_panel_tab, "outline");
-    }
-
-    #[test]
-    fn resolve_assistant_workspace_uses_notes_folder_when_no_override_is_set() {
-        let notes_root = temp_dir_path("notes-root");
-        std::fs::create_dir_all(&notes_root).unwrap();
-        let note_path = notes_root.join("note.md");
-        std::fs::write(&note_path, "# Note\n").unwrap();
-
-        let config = AppConfig {
-            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
-            ..Default::default()
-        };
-
-        let (resolved_notes_root, execution_dir) =
-            resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
-
-        assert_eq!(resolved_notes_root, notes_root.canonicalize().unwrap());
-        assert_eq!(execution_dir, notes_root.canonicalize().unwrap());
-
-        let _ = std::fs::remove_file(note_path);
-        let _ = std::fs::remove_dir(notes_root);
-    }
-
-    #[test]
-    fn resolve_assistant_workspace_uses_custom_ai_working_directory_when_valid() {
-        let notes_root = temp_dir_path("notes-root");
-        let reference_root = temp_dir_path("reference-root");
-        std::fs::create_dir_all(&notes_root).unwrap();
-        std::fs::create_dir_all(&reference_root).unwrap();
-        let note_path = notes_root.join("note.md");
-        std::fs::write(&note_path, "# Note\n").unwrap();
-
-        let config = AppConfig {
-            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
-            ai_working_directory: Some(reference_root.to_string_lossy().into_owned()),
-            ..Default::default()
-        };
-
-        let (_resolved_notes_root, execution_dir) =
-            resolve_assistant_workspace(&note_path.to_string_lossy(), &config).unwrap();
-
-        assert_eq!(execution_dir, reference_root.canonicalize().unwrap());
-
-        let _ = std::fs::remove_file(note_path);
-        let _ = std::fs::remove_dir(notes_root);
-        let _ = std::fs::remove_dir(reference_root);
-    }
-
-    #[test]
-    fn resolve_assistant_workspace_rejects_invalid_ai_working_directory_override() {
-        let notes_root = temp_dir_path("notes-root");
-        let missing_reference_root = temp_dir_path("missing-reference-root");
-        std::fs::create_dir_all(&notes_root).unwrap();
-        let note_path = notes_root.join("note.md");
-        std::fs::write(&note_path, "# Note\n").unwrap();
-
-        let config = AppConfig {
-            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
-            ai_working_directory: Some(missing_reference_root.to_string_lossy().into_owned()),
-            ..Default::default()
-        };
-
-        let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
-            .expect_err("invalid override should fail");
-
-        assert!(
-            error.contains("AI reference folder") && error.contains("is not accessible"),
-            "unexpected error: {error}"
-        );
-
-        let _ = std::fs::remove_file(note_path);
-        let _ = std::fs::remove_dir(notes_root);
-    }
-
-    #[test]
-    fn resolve_assistant_workspace_still_rejects_note_outside_notes_folder_with_override() {
-        let notes_root = temp_dir_path("notes-root");
-        let reference_root = temp_dir_path("reference-root");
-        let external_root = temp_dir_path("external-root");
-        std::fs::create_dir_all(&notes_root).unwrap();
-        std::fs::create_dir_all(&reference_root).unwrap();
-        std::fs::create_dir_all(&external_root).unwrap();
-        let note_path = external_root.join("note.md");
-        std::fs::write(&note_path, "# Note\n").unwrap();
-
-        let config = AppConfig {
-            notes_folder: Some(notes_root.to_string_lossy().into_owned()),
-            ai_working_directory: Some(reference_root.to_string_lossy().into_owned()),
-            ..Default::default()
-        };
-
-        let error = resolve_assistant_workspace(&note_path.to_string_lossy(), &config)
-            .expect_err("note outside notes folder should fail");
-
-        assert_eq!(error, "File must be within notes folder");
-
-        let _ = std::fs::remove_file(note_path);
-        let _ = std::fs::remove_dir(notes_root);
-        let _ = std::fs::remove_dir(reference_root);
-        let _ = std::fs::remove_dir(external_root);
-    }
-
-    #[test]
-    fn parse_assistant_result_accepts_strict_json() {
-        let result = parse_assistant_result(
-            r#"{"replyText":"Done.","proposals":[{"id":"p1","title":"Rewrite intro","summary":"Tighten the opening.","startLine":3,"endLine":4,"replacement":"New intro"}],"warning":null}"#,
-        );
-
-        assert_eq!(result.reply_text, "Done.");
-        assert_eq!(result.proposals.len(), 1);
-        assert_eq!(result.proposals[0].id, "p1");
-        assert!(result.warning.is_none());
-    }
-
-    #[test]
-    fn parse_assistant_result_falls_back_to_plain_text_for_invalid_json() {
-        let result = parse_assistant_result("Not valid JSON");
-
-        assert_eq!(result.reply_text, "Not valid JSON");
-        assert!(result.proposals.is_empty());
-        assert!(result.warning.is_some());
     }
 
     #[test]
@@ -7112,7 +6204,6 @@ mod tests {
   "showNoteCounts": true,
   "showNotesFromSubfolders": false,
   "defaultNoteName": null,
-  "ollamaModel": null,
   "folderIcons": null,
   "taskTagIcons": null,
   "collapsedFolders": null,
@@ -7616,7 +6707,6 @@ mod tests {
             default_note_name: Some("Untitled".to_string()),
             daily_note_name: None,
             daily_note_folder: None,
-            ollama_model: Some("qwen3:8b".to_string()),
             folder_icons: None,
             task_tag_icons: None,
             collapsed_folders: None,
@@ -7644,7 +6734,6 @@ mod tests {
                 show_note_counts: Some(Some(false)),
                 show_notes_from_subfolders: Some(Some(true)),
                 default_note_name: Some(Some("Daily".to_string())),
-                ollama_model: Some(None),
                 note_list_date_mode: Some(NoteListDateMode::Off),
                 show_note_list_filename: Some(Some(true)),
                 show_note_list_folder_path: Some(Some(false)),
@@ -7660,7 +6749,6 @@ mod tests {
         );
 
         assert_eq!(settings.default_note_name.as_deref(), Some("Daily"));
-        assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.git_enabled, Some(true));
         assert_eq!(
             settings.recent_note_ids,
@@ -7798,7 +6886,6 @@ mod tests {
         assert!(settings.show_note_counts);
         assert!(!settings.show_notes_from_subfolders);
         assert_eq!(settings.default_note_name, None);
-        assert_eq!(settings.ollama_model, None);
         assert_eq!(settings.folder_icons, None);
         assert_eq!(settings.collapsed_folders, None);
         assert_eq!(settings.note_list_date_mode, NoteListDateMode::Modified);

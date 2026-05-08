@@ -119,17 +119,6 @@ pub(crate) fn canonicalize_app_config(config: &mut AppConfig) -> bool {
         }
     }
 
-    if let Some(ai_working_directory) = &config.ai_working_directory {
-        let trimmed = ai_working_directory.trim();
-        if trimmed.is_empty() {
-            config.ai_working_directory = None;
-            changed = true;
-        } else if trimmed != ai_working_directory {
-            config.ai_working_directory = Some(trimmed.to_string());
-            changed = true;
-        }
-    }
-
     changed |= canonicalize_appearance_settings(&mut config.appearance);
     changed
 }
@@ -213,7 +202,6 @@ fn canonicalize_app_config_value(value: &mut Value) {
     );
 
     normalize_optional_string_field(object, "notes_folder");
-    normalize_optional_string_field(object, "aiWorkingDirectory");
     normalize_appearance_value(object);
 }
 
@@ -254,7 +242,7 @@ fn normalize_appearance_value(root: &mut Map<String, Value>) {
     normalize_string_enum_field(
         appearance,
         "rightPanelTab",
-        &["outline", "assistant"],
+        &["outline"],
         Some(default_right_panel_tab()),
     );
     normalize_bool_field(appearance, "confirmDeletions");
@@ -336,7 +324,7 @@ fn canonicalize_appearance_settings(appearance: &mut AppearanceSettings) -> bool
 
     changed |= normalize_mode(
         &mut appearance.right_panel_tab,
-        &["outline", "assistant"],
+        &["outline"],
         default_right_panel_tab(),
     );
 
