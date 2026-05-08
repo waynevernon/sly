@@ -14,6 +14,9 @@ import {
 import {
   formatTaskDate,
   localDateString,
+  nextLocalMonday,
+  offsetLocalDate,
+  parseLocalDate,
   TASK_SCHEDULE_BUCKET_LABELS,
 } from "../../lib/tasks";
 import type { TaskScheduleBucket } from "../../types/tasks";
@@ -280,7 +283,7 @@ function DueDatePickerPanel({
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(dueDate || today));
   const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
   const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
-  const tomorrow = offsetDate(today, 1);
+  const tomorrow = offsetLocalDate(today, 1);
 
   return (
     <div className="flex flex-col gap-2">
@@ -371,8 +374,8 @@ export function TaskDatePickerPanel({
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(actionDate || today));
   const weeks = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
   const monthLabel = `${MONTH_LABELS[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
-  const tomorrow = offsetDate(today, 1);
-  const nextWeek = nextMonday(today);
+  const tomorrow = offsetLocalDate(today, 1);
+  const nextWeek = nextLocalMonday(today);
   const hasSelection = Boolean(actionDate || scheduleBucket);
 
   return (
@@ -552,27 +555,4 @@ function startOfMonth(value: string): Date {
 
 function addMonths(date: Date, offset: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + offset, 1);
-}
-
-function parseLocalDate(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return new Date();
-  }
-
-  return new Date(year, month - 1, day);
-}
-
-function offsetDate(date: string, days: number): string {
-  const d = parseLocalDate(date);
-  d.setDate(d.getDate() + days);
-  return localDateString(d);
-}
-
-function nextMonday(date: string): string {
-  const current = parseLocalDate(date);
-  const day = current.getDay();
-  const daysUntilMonday = ((8 - day) % 7) || 7;
-  current.setDate(current.getDate() + daysUntilMonday);
-  return localDateString(current);
 }

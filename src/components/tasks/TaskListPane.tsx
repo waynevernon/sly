@@ -43,8 +43,10 @@ import {
   detectTaskTagsFromTitle,
   detectTaskUrlFromTitle,
   deriveView,
-  localDateString,
+  endOfLocalWeek,
   localDateToNormalizedActionAt,
+  offsetLocalDate,
+  startOfLocalWeek,
   taskScheduleSelectionFromView,
   TASK_VIEW_LABELS,
   canInlineCreateTaskInView,
@@ -1356,7 +1358,7 @@ function getTaskSections(
 
   if (view === "upcoming") {
     const tomorrow = offsetLocalDate(today, 1);
-    const weekEnd = endOfWeek(today);
+    const weekEnd = endOfLocalWeek(today);
     const tomorrowItems: typeof tasks = [];
     const thisWeekItems: typeof tasks = [];
     const laterItems: typeof tasks = [];
@@ -1383,7 +1385,7 @@ function getTaskSections(
 
   if (view === "completed") {
     const yesterday = offsetLocalDate(today, -1);
-    const weekStart = startOfWeek(today);
+    const weekStart = startOfLocalWeek(today);
     const todayItems: typeof tasks = [];
     const yesterdayItems: typeof tasks = [];
     const thisWeekItems: typeof tasks = [];
@@ -1481,7 +1483,7 @@ function getCompletedTaskSections(
   idPrefix: string,
 ): Array<{ id: string; label: string; tasks: ReturnType<typeof useTasks>["tasks"] }> {
   const yesterday = offsetLocalDate(today, -1);
-  const weekStart = startOfWeek(today);
+  const weekStart = startOfLocalWeek(today);
   const todayItems: typeof tasks = [];
   const yesterdayItems: typeof tasks = [];
   const thisWeekItems: typeof tasks = [];
@@ -1768,32 +1770,4 @@ function TaskBulkRescheduleDialog({
       </PopoverSurface>
     </div>
   );
-}
-
-function parseLocalDate(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return new Date();
-  }
-
-  return new Date(year, month - 1, day);
-}
-
-function offsetLocalDate(date: string, days: number): string {
-  const nextDate = parseLocalDate(date);
-  nextDate.setDate(nextDate.getDate() + days);
-  return localDateString(nextDate);
-}
-
-function endOfWeek(date: string): string {
-  const currentDate = parseLocalDate(date);
-  const daysUntilSunday = 7 - currentDate.getDay();
-  currentDate.setDate(currentDate.getDate() + daysUntilSunday);
-  return localDateString(currentDate);
-}
-
-function startOfWeek(date: string): string {
-  const currentDate = parseLocalDate(date);
-  currentDate.setDate(currentDate.getDate() - currentDate.getDay());
-  return localDateString(currentDate);
 }

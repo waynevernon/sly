@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useNotes } from "../../context/NotesContext";
 import { useTheme } from "../../context/ThemeContext";
 import * as notesService from "../../services/notes";
+import { openInFileManager } from "../../services/system";
 import {
   Button,
   Input,
@@ -166,7 +167,7 @@ export function GeneralSettingsSection() {
   const handleOpenFolder = async () => {
     if (!notesFolder) return;
     try {
-      await invoke("open_in_file_manager", { path: notesFolder });
+      await openInFileManager(notesFolder);
     } catch (err) {
       console.error("Failed to open folder:", err);
       toast.error("Failed to open folder");

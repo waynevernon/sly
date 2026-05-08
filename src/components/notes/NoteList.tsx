@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useDraggable } from "@dnd-kit/core";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { Clock3, Search, SquareArrowOutUpRight } from "lucide-react";
@@ -33,6 +32,7 @@ import {
 } from "../ui";
 import { cleanPreviewText, cleanTitle } from "../../lib/utils";
 import * as notesService from "../../services/notes";
+import { copyToClipboard } from "../../services/system";
 import {
   AddNoteIcon,
   CopyIcon,
@@ -301,7 +301,7 @@ const NoteItemWithMenu = memo(function NoteItemWithMenu({
     try {
       const folder = await notesService.getNotesFolder();
       if (folder) {
-        await invoke("copy_to_clipboard", { text: `${folder}/${id}.md` });
+        await copyToClipboard(`${folder}/${id}.md`);
       }
     } catch (error) {
       console.error("Failed to copy filepath:", error);

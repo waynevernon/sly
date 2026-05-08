@@ -448,7 +448,7 @@ export function taskIsFullTask(task: TaskMetadata | Task): task is Task {
   return "description" in task;
 }
 
-function localDateToReference(date: string): Date {
+export function localDateToReference(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   if (!year || !month || !day) {
     return new Date();
@@ -457,11 +457,40 @@ function localDateToReference(date: string): Date {
   return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
-function offsetLocalDate(date: string, days: number): string {
+export function parseLocalDate(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
-  const nextDate = new Date(year, month - 1, day);
+  if (!year || !month || !day) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+export function offsetLocalDate(date: string, days: number): string {
+  const nextDate = parseLocalDate(date);
   nextDate.setDate(nextDate.getDate() + days);
   return localDateString(nextDate);
+}
+
+export function startOfLocalWeek(date: string): string {
+  const currentDate = parseLocalDate(date);
+  currentDate.setDate(currentDate.getDate() - currentDate.getDay());
+  return localDateString(currentDate);
+}
+
+export function endOfLocalWeek(date: string): string {
+  const currentDate = parseLocalDate(date);
+  const daysUntilSunday = 7 - currentDate.getDay();
+  currentDate.setDate(currentDate.getDate() + daysUntilSunday);
+  return localDateString(currentDate);
+}
+
+export function nextLocalMonday(date: string): string {
+  const currentDate = parseLocalDate(date);
+  const day = currentDate.getDay();
+  const daysUntilMonday = ((8 - day) % 7) || 7;
+  currentDate.setDate(currentDate.getDate() + daysUntilMonday);
+  return localDateString(currentDate);
 }
 
 function stripMatchedDateText(title: string, match: ParsedResult): string {

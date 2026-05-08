@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { CheckIcon, CopyIcon } from "../icons";
 import { cn } from "../../lib/utils";
+import { copyToClipboard } from "../../services/system";
 
 interface CodeCopyButtonProps {
   text: string;
@@ -34,7 +34,7 @@ export function CodeCopyButton({
 
   const handleCopy = useCallback(async () => {
     try {
-      await invoke("copy_to_clipboard", { text });
+      await copyToClipboard(text);
       setCopied(true);
 
       if (copyResetTimerRef.current !== null) {

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { showUpdateToast } from "../../App";
 import appIcon from "../../../src-tauri/icons/128x128@2x.png";
 import { Button, LoadingSpinner } from "../ui";
 import { RefreshCwIcon, GithubIcon } from "../icons";
+import { openUrlSafe } from "../../services/system";
 
 const REPOSITORY_URL = "https://github.com/waynevernon/sly";
 const ISSUES_URL = "https://github.com/waynevernon/sly/issues";
@@ -33,7 +33,7 @@ export function AboutSettingsSection() {
 
   const handleOpenUrl = async (url: string) => {
     try {
-      await invoke("open_url_safe", { url });
+      await openUrlSafe(url);
     } catch (err) {
       console.error("Failed to open URL:", err);
       toast.error(err instanceof Error ? err.message : "Failed to open URL");
@@ -87,7 +87,7 @@ export function AboutSettingsSection() {
           <p className="text-sm text-text-muted mb-4">
             Sly turns a folder of markdown files into a fast writing and
             planning app. It gives you a calm editor, task lists that live with
-            your notes, keyboard-first navigation, optional AI, Git, and
+            your notes, keyboard-first navigation, Git, and
             terminal access. Learn more in{" "}
             <button
               onClick={() => handleOpenUrl(REPOSITORY_URL)}

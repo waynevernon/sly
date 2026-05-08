@@ -4,7 +4,11 @@ import { CSS } from "@dnd-kit/utilities";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { CalendarDays, CheckCheck, Clock3, FileText, Flag, Link2, Repeat2, Star } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { actionAtToLocalDate, isOverdue } from "../../lib/tasks";
+import {
+  actionAtToLocalDate,
+  formatTaskDate,
+  isOverdue,
+} from "../../lib/tasks";
 import { menuSurfaceClassName } from "../ui";
 import type { TaskMetadata, TaskView } from "../../types/tasks";
 
@@ -57,10 +61,10 @@ export function TaskRow({
   const secondaryLabel = isCompletedViewItem
     ? formatCompletedAt(task.completedAt!)
       : actionDate && showActionDateLabel
-      ? formatDate(actionDate, today)
+      ? formatTaskDate(actionDate, today)
       : null;
   const dueDate = actionAtToLocalDate(task.dueAt);
-  const dueDateLabel = dueDate ? formatDate(dueDate, today) : null;
+  const dueDateLabel = dueDate ? formatTaskDate(dueDate, today) : null;
   const dueOverdue = !isCompleted && dueDate !== null && dueDate < today;
   const isSelected = selectionState !== "none";
   const isActive = selectionState === "active";
@@ -316,28 +320,9 @@ export function TaskRow({
   );
 }
 
-function formatDate(date: string, today: string): string {
-  if (date === today) return "Today";
-  const tomorrow = offsetDate(today, 1);
-  if (date === tomorrow) return "Tomorrow";
-  const [y, m, d] = date.split("-").map(Number);
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const todayYear = Number(today.split("-")[0]);
-  return `${names[m - 1]} ${d}${y !== todayYear ? `, ${y}` : ""}`;
-}
-
 function formatCompletedAt(iso: string): string {
   const date = iso.split("T")[0];
   const [y, m, d] = date.split("-").map(Number);
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${names[m - 1]} ${d}, ${y}`;
-}
-
-function offsetDate(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }

@@ -12,14 +12,13 @@ import {
   EditorContent,
   type Editor as TiptapEditor,
 } from "@tiptap/react";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
+import { copyToClipboard } from "../../services/system";
 import { mod, alt, shift, isMac } from "../../lib/platform";
-import type { AssistantSelectionSnapshot } from "../../lib/assistant";
 import { useBlockMathPopover } from "./useBlockMathPopover";
 import { useEditorDocumentLifecycle } from "./useEditorDocumentLifecycle";
 import { useEditorSearch } from "./useEditorSearch";
@@ -28,6 +27,7 @@ import { shouldParseMarkdownPaste } from "./markdownPaste";
 import { isAddLinkShortcut } from "./shortcutUtils";
 import { useLinkPopover } from "./useLinkPopover";
 import { useTableContextMenu } from "./useTableContextMenu";
+import * as notesService from "../../services/notes";
 import { computeFormatBarLayout } from "./formatBarLayout";
 import {
   MarkdownSourceEditor,
@@ -40,11 +40,7 @@ import { shouldShowPendingSelectionSpinner } from "./editorState";
 import { SearchToolbar } from "./SearchToolbar";
 import type { WikilinkStorage } from "./Wikilink";
 import { EditorWidthHandles } from "./EditorWidthHandle";
-import {
-  persistedSelectionHighlightPluginKey,
-  type SlyEditorPasteHandler,
-  useSlyEditor,
-} from "./useSlyEditor";
+import { type SlyEditorPasteHandler, useSlyEditor } from "./useSlyEditor";
 import { cn } from "../../lib/utils";
 import { plainTextFromMarkdown } from "../../lib/plainText";
 import {
@@ -600,7 +596,6 @@ interface EditorProps {
   onRegisterFlushPendingSave?: (
     flushPendingSave: (() => Promise<void>) | null,
   ) => void;
-  assistantSelection?: AssistantSelectionSnapshot | null;
   workspaceMode?: WorkspaceEditorData;
   onSaveToFolder?: () => void;
   saveToFolderDisabled?: boolean;
@@ -632,7 +627,6 @@ function EditorImpl({
   onSourceModeChange,
   onRegisterScrollContainer,
   onRegisterFlushPendingSave,
-  assistantSelection,
   previewMode,
   workspaceMode,
   onSaveToFolder,
@@ -816,12 +810,12 @@ function EditorImpl({
             const base64 = (reader.result as string).split(",")[1];
 
             try {
-              const relativePath = await invoke<string>(
-                "save_clipboard_image",
-                { base64Data: base64 },
-              );
+              const relativePath = await notesService.saveClipboardImage(base64);
 
-              const notesFolder = await invoke<string>("get_notes_folder");
+              const notesFolder = await notesService.getNotesFolder();
+              if (!notesFolder) {
+                throw new Error("Notes folder is not set");
+              }
               const absolutePath = await join(notesFolder, relativePath);
               const assetUrl = convertFileSrc(absolutePath);
 
@@ -882,11 +876,12 @@ function EditorImpl({
     });
     if (selected) {
       try {
-        const relativePath = await invoke<string>("copy_image_to_assets", {
-          sourcePath: selected as string,
-        });
+        const relativePath = await notesService.copyImageToAssets(selected as string);
 
-        const notesFolder = await invoke<string>("get_notes_folder");
+        const notesFolder = await notesService.getNotesFolder();
+        if (!notesFolder) {
+          throw new Error("Notes folder is not set");
+        }
         const absolutePath = await join(notesFolder, relativePath);
         const assetUrl = convertFileSrc(absolutePath);
 
@@ -964,39 +959,6 @@ function EditorImpl({
       onRegisterScrollContainer?.(null);
     };
   }, [onRegisterScrollContainer]);
-
-  const updatePersistedSelectionDecorations = useCallback(
-    (
-      selection: AssistantSelectionSnapshot | null | undefined,
-      currentEditor: TiptapEditor | null,
-    ) => {
-      if (!currentEditor) {
-        return;
-      }
-
-      const { state } = currentEditor;
-      const from = selection ? Math.max(0, selection.from) : 0;
-      const to = selection ? Math.min(selection.to, state.doc.content.size) : 0;
-      const decorationSet =
-        from < to
-          ? DecorationSet.create(state.doc, [
-              Decoration.inline(from, to, {
-                class: "assistant-persisted-selection",
-              }),
-            ])
-          : DecorationSet.empty;
-
-      const tr = state.tr.setMeta(persistedSelectionHighlightPluginKey, {
-        decorationSet,
-      });
-      currentEditor.view.dispatch(tr);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    updatePersistedSelectionDecorations(assistantSelection, editor);
-  }, [assistantSelection, editor, updatePersistedSelectionDecorations]);
 
   // Sync notes list into editor storage for wikilink autocomplete
   useEffect(() => {
@@ -1145,7 +1107,7 @@ function EditorImpl({
     if (!editor) return;
     try {
       const markdown = getMarkdown(editor);
-      await invoke("copy_to_clipboard", { text: markdown });
+      await copyToClipboard(markdown);
       toast.success("Copied as Markdown");
     } catch (error) {
       console.error("Failed to copy markdown:", error);
@@ -1158,7 +1120,7 @@ function EditorImpl({
     try {
       const markdown = getMarkdown(editor);
       const plainText = plainTextFromMarkdown(markdown);
-      await invoke("copy_to_clipboard", { text: plainText });
+      await copyToClipboard(plainText);
       toast.success("Copied as plain text");
     } catch (error) {
       console.error("Failed to copy plain text:", error);
@@ -1170,7 +1132,7 @@ function EditorImpl({
     if (!editor) return;
     try {
       const html = editor.getHTML();
-      await invoke("copy_to_clipboard", { text: html });
+      await copyToClipboard(html);
       toast.success("Copied as HTML");
     } catch (error) {
       console.error("Failed to copy HTML:", error);

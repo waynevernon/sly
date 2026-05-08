@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   Clock3,
   ListTodo,
@@ -9,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { openUrlSafe } from "../../services/system";
 import { useTasks } from "../../context/TasksContext";
 import { useTheme } from "../../context/ThemeContext";
 import { FolderGlyph } from "../folders/FolderGlyph";
@@ -289,7 +289,7 @@ export function TaskDetailPanel() {
   const handleOpenLink = useCallback(async () => {
     if (!openableLink) return;
     try {
-      await invoke("open_url_safe", { url: openableLink });
+      await openUrlSafe(openableLink);
     } catch (err) {
       console.error("Failed to open task link:", err);
       toast.error(err instanceof Error ? err.message : "Failed to open link");

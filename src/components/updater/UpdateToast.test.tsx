@@ -5,13 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { UpdateToast } from "./UpdateToast";
 
-const invokeMock = vi.fn();
+const openUrlSafeMock = vi.fn();
+const restartAppMock = vi.fn();
 const toastMock = vi.fn();
 const toastDismissMock = vi.fn();
 const toastErrorMock = vi.fn();
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
+vi.mock("../../services/system", () => ({
+  openUrlSafe: (...args: unknown[]) => openUrlSafeMock(...args),
+  restartApp: (...args: unknown[]) => restartAppMock(...args),
 }));
 
 vi.mock("sonner", () => {
@@ -24,7 +26,8 @@ vi.mock("sonner", () => {
 });
 
 beforeEach(() => {
-  invokeMock.mockReset();
+  openUrlSafeMock.mockReset();
+  restartAppMock.mockReset();
   toastMock.mockReset();
   toastDismissMock.mockReset();
   toastErrorMock.mockReset();
@@ -61,9 +64,9 @@ describe("UpdateToast", () => {
 
     await user.click(screen.getByRole("button", { name: "Release Notes" }));
 
-    expect(invokeMock).toHaveBeenCalledWith("open_url_safe", {
-      url: "https://github.com/waynevernon/sly/releases/tag/v0.4.0",
-    });
+    expect(openUrlSafeMock).toHaveBeenCalledWith(
+      "https://github.com/waynevernon/sly/releases/tag/v0.4.0",
+    );
   });
 
   it("prefers an explicit release-notes URL from raw metadata", async () => {
@@ -84,9 +87,9 @@ describe("UpdateToast", () => {
 
     await user.click(screen.getByRole("button", { name: "Release Notes" }));
 
-    expect(invokeMock).toHaveBeenCalledWith("open_url_safe", {
-      url: "https://example.com/releases/v0.4.0",
-    });
+    expect(openUrlSafeMock).toHaveBeenCalledWith(
+      "https://example.com/releases/v0.4.0",
+    );
   });
 
   it("omits the release notes button when no valid URL exists", () => {
@@ -133,6 +136,6 @@ describe("UpdateToast", () => {
 
     await user.click(screen.getByRole("button", { name: "Restart" }));
 
-    expect(invokeMock).toHaveBeenCalledWith("restart_app");
+    expect(restartAppMock).toHaveBeenCalled();
   });
 });

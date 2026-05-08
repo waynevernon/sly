@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { useGit } from "../../context/GitContext";
 import { Button, Input, LoadingSpinner } from "../ui";
+import { openUrlSafe } from "../../services/system";
 import { CloudPlusIcon, ExternalLinkIcon } from "../icons";
 
 function formatRemoteUrl(url: string | null): string {
@@ -47,7 +47,7 @@ export function GitSettingsSection() {
 
   const handleOpenUrl = async (url: string) => {
     try {
-      await invoke("open_url_safe", { url });
+      await openUrlSafe(url);
     } catch (err) {
       console.error("Failed to open URL:", err);
       toast.error(err instanceof Error ? err.message : "Failed to open URL");

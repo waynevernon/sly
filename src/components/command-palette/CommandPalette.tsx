@@ -7,7 +7,6 @@ import {
   useMemo,
   type KeyboardEvent,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   Archive,
@@ -32,6 +31,10 @@ import { useTheme } from "../../context/ThemeContext";
 import { useGit } from "../../context/GitContext";
 import { useTasks } from "../../context/TasksContext";
 import * as notesService from "../../services/notes";
+import {
+  copyToClipboard,
+  openInFileManager,
+} from "../../services/system";
 import { downloadPdf, downloadMarkdown } from "../../services/pdf";
 import type { Settings } from "../../types/note";
 import type { ThemePresetId } from "../../types/note";
@@ -442,7 +445,7 @@ export function CommandPalette({
                 }
               }
 
-              await invoke("copy_to_clipboard", { text: markdown });
+              await copyToClipboard(markdown);
               toast.success("Copied as Markdown");
               onClose();
             } catch (error) {
@@ -472,7 +475,7 @@ export function CommandPalette({
               }
 
               const plainText = plainTextFromMarkdown(markdown);
-              await invoke("copy_to_clipboard", { text: plainText });
+              await copyToClipboard(plainText);
               toast.success("Copied as plain text");
               onClose();
             } catch (error) {
@@ -494,7 +497,7 @@ export function CommandPalette({
                 return;
               }
               const html = editorRef.current.getHTML();
-              await invoke("copy_to_clipboard", { text: html });
+              await copyToClipboard(html);
               toast.success("Copied as HTML");
               onClose();
             } catch (error) {
@@ -782,7 +785,7 @@ export function CommandPalette({
         label: `${rightPanelVisible ? "Hide" : "Show"} Right Pane`,
         section: "Navigation",
         shortcut: `${mod} ${shift} ]`,
-        keywords: ["outline", "assistant", "panel"],
+        keywords: ["outline", "panel"],
         icon: <PanelRight className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: () => {
           onToggleRightPanel?.();
@@ -861,7 +864,7 @@ export function CommandPalette({
         icon: <FolderIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
         action: async () => {
           try {
-            await invoke("open_in_file_manager", { path: notesFolder });
+            await openInFileManager(notesFolder);
             onClose();
           } catch (error) {
             console.error("Failed to open folder:", error);
@@ -1114,15 +1117,7 @@ export function CommandPalette({
     // Debounce search calls
     const timer = setTimeout(async () => {
       try {
-        const results = await invoke<
-          {
-            id: string;
-            title: string;
-            preview: string;
-            modified: number;
-            score: number;
-          }[]
-        >("search_notes", { query: trimmed });
+        const results = await notesService.searchNotes(trimmed);
         setLocalSearchResults(results);
       } catch (err) {
         console.error("Search failed:", err);

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 import { ExternalLinkIcon } from "../icons";
 import { Button } from "../ui";
 import { getUpdateToastContent } from "../../lib/updateMetadata";
+import { openUrlSafe, restartApp } from "../../services/system";
 
 export function UpdateToast({
   update,
@@ -41,7 +41,7 @@ export function UpdateToast({
     if (!releaseNotesUrl) return;
 
     try {
-      await invoke("open_url_safe", { url: releaseNotesUrl });
+      await openUrlSafe(releaseNotesUrl);
     } catch (err) {
       console.error("Failed to open release notes:", err);
       toast.error(err instanceof Error ? err.message : "Failed to open URL");
@@ -81,7 +81,7 @@ export function UpdateToast({
 
 function InstalledUpdateToast() {
   const handleRestart = () => {
-    void invoke("restart_app");
+    void restartApp();
   };
 
   return (
