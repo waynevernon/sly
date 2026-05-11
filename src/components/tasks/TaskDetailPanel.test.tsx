@@ -236,6 +236,46 @@ describe("TaskDetailPanel", () => {
     expect(screen.getByPlaceholderText("Task name")).toHaveClass("truncate");
   });
 
+  it("reflects title changes for the selected task from outside the detail pane", async () => {
+    const tasksContext = await import("../../context/TasksContext");
+    let currentValue = makeTasksHookValue();
+
+    vi.mocked(tasksContext.useTasks).mockImplementation(() => currentValue);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Follow up")).toBeInTheDocument();
+
+    currentValue = makeTasksHookValue({
+      selectedTask: {
+        id: "task-1",
+        title: "Updated from list",
+        description: "",
+        link: "",
+        waitingFor: "",
+        createdAt: "2026-04-10T12:00:00Z",
+        actionAt: null,
+        scheduleBucket: null,
+        completedAt: null,
+        starred: false,
+        dueAt: null,
+        recurrence: null,
+      },
+    });
+
+    rerender(
+      <TooltipProvider>
+        <TaskDetailPanel />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Updated from list")).toBeInTheDocument();
+  });
+
   it("shows the completed timestamp when the task is done", async () => {
     const tasksContext = await import("../../context/TasksContext");
 

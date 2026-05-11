@@ -134,6 +134,12 @@ export function TaskDetailPanel() {
     setTags(selectedTask.tags ?? []);
   }, [selectedTask, selectedTaskTagsKey]);
 
+  useEffect(() => {
+    if (!selectedTask) return;
+    if ("title" in pendingPatchRef.current) return;
+    setTitle(selectedTask.title);
+  }, [selectedTask?.title, selectedTask]);
+
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(event.target.value);
     scheduleSave({ title: event.target.value });
