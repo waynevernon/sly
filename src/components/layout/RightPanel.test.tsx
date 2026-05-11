@@ -39,6 +39,7 @@ class FakeEditor {
 
   view: {
     nodeDOM: (pos: number) => HTMLElement | null;
+    domAtPos?: (pos: number) => { node: Node; offset: number };
     dispatch: ReturnType<typeof vi.fn>;
   };
 
@@ -252,6 +253,70 @@ describe("RightPanel", () => {
     });
     expect(scrollContainer.scrollTo).toHaveBeenCalledWith({
       top: 312,
+      behavior: "smooth",
+    });
+  });
+
+  it("scrolls to an outline heading when ProseMirror cannot resolve nodeDOM at the heading boundary", async () => {
+    const doc = makeDoc();
+    const positions = extractOutlineItems(doc);
+    const section = positions[1];
+    const headingElement = document.createElement("h2");
+    const textNode = document.createTextNode("Section");
+    headingElement.append(textNode);
+    headingElement.getBoundingClientRect = () =>
+      ({
+        top: 220,
+        bottom: 244,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 24,
+        x: 0,
+        y: 220,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    const editor = new FakeEditor(doc, new Map());
+    editor.view.domAtPos = (pos) => {
+      if (pos === section.pos + 1) {
+        return { node: textNode, offset: 0 };
+      }
+      return { node: document.createElement("p"), offset: 0 };
+    };
+    const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 40;
+    scrollContainer.scrollTo = vi.fn();
+    scrollContainer.getBoundingClientRect = () =>
+      ({
+        top: 24,
+        bottom: 400,
+        left: 0,
+        right: 300,
+        width: 300,
+        height: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    renderRightPanel(
+      <RightPanel
+        editor={editor as never}
+        scrollContainer={scrollContainer}
+        noteId="alpha"
+        hasNote
+        visible
+        width={260}
+        onWidthChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Section" }));
+
+    expect(editor.state.tr.scrollIntoView).not.toHaveBeenCalled();
+    expect(scrollContainer.scrollTo).toHaveBeenCalledWith({
+      top: 212,
       behavior: "smooth",
     });
   });

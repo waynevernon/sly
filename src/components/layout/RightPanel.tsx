@@ -33,6 +33,37 @@ interface RightPanelProps {
 const ACTIVE_HEADING_TOP_OFFSET = 72;
 const OUTLINE_UPDATE_DEBOUNCE_MS = 120;
 const OUTLINE_SCROLL_MARGIN = 24;
+const HEADING_SELECTOR = "h1,h2,h3,h4,h5,h6";
+
+function resolveHeadingElement(editor: TiptapEditor, pos: number): HTMLElement | null {
+  const node = editor.view.nodeDOM(pos);
+  if (node instanceof HTMLElement) {
+    return node.matches(HEADING_SELECTOR)
+      ? node
+      : node.closest<HTMLElement>(HEADING_SELECTOR);
+  }
+
+  if (node instanceof Text) {
+    return node.parentElement?.closest<HTMLElement>(HEADING_SELECTOR) ?? null;
+  }
+
+  const viewWithDomAtPos = editor.view as typeof editor.view & {
+    domAtPos?: (pos: number) => { node: Node; offset: number };
+  };
+
+  if (typeof viewWithDomAtPos.domAtPos !== "function") {
+    return null;
+  }
+
+  const { node: domNode } = viewWithDomAtPos.domAtPos(Math.min(pos + 1, editor.state.doc.content.size));
+  if (domNode instanceof HTMLElement) {
+    return domNode.matches(HEADING_SELECTOR)
+      ? domNode
+      : domNode.closest<HTMLElement>(HEADING_SELECTOR);
+  }
+
+  return domNode.parentElement?.closest<HTMLElement>(HEADING_SELECTOR) ?? null;
+}
 
 export function RightPanel({
   editor,
@@ -122,8 +153,8 @@ export function RightPanel({
     const thresholdTop = containerRect.top + ACTIVE_HEADING_TOP_OFFSET;
     const headingTops = items
       .map((item) => {
-        const node = editor.view.nodeDOM(item.pos);
-        if (!(node instanceof HTMLElement)) {
+        const node = resolveHeadingElement(editor, item.pos);
+        if (!node) {
           return null;
         }
 
@@ -271,9 +302,8 @@ export function RightPanel({
       if (!editor) return;
 
       const selectionPos = Math.min(item.pos + 1, editor.state.doc.content.size);
-      const headingElement = editor.view.nodeDOM(item.pos);
-      const canScrollHeading =
-        scrollContainer !== null && headingElement instanceof HTMLElement;
+      const headingElement = resolveHeadingElement(editor, item.pos);
+      const canScrollHeading = scrollContainer !== null && headingElement !== null;
       const transaction = editor.state.tr.setSelection(
         TextSelection.create(editor.state.doc, selectionPos),
       );
