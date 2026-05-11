@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   Clock3,
   ListTodo,
   ExternalLink,
@@ -331,9 +332,7 @@ export function TaskDetailPanel() {
             )}
           >
             {isCompleted && (
-              <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 fill-none stroke-current stroke-[2.5]">
-                <polyline points="1,4 4,7 9,1" />
-              </svg>
+              <Check className="h-3 w-3 stroke-[2.4]" />
             )}
           </button>
 
