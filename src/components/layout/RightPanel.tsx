@@ -32,6 +32,7 @@ interface RightPanelProps {
 
 const ACTIVE_HEADING_TOP_OFFSET = 72;
 const OUTLINE_UPDATE_DEBOUNCE_MS = 120;
+const OUTLINE_SCROLL_MARGIN = 24;
 
 export function RightPanel({
   editor,
@@ -270,15 +271,37 @@ export function RightPanel({
       if (!editor) return;
 
       const selectionPos = Math.min(item.pos + 1, editor.state.doc.content.size);
-      const transaction = editor.state.tr
-        .setSelection(TextSelection.create(editor.state.doc, selectionPos))
-        .scrollIntoView();
+      const headingElement = editor.view.nodeDOM(item.pos);
+      const canScrollHeading =
+        scrollContainer !== null && headingElement instanceof HTMLElement;
+      const transaction = editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, selectionPos),
+      );
+      if (!canScrollHeading) {
+        transaction.scrollIntoView();
+      }
 
       editor.view.dispatch(transaction);
       editor.commands.focus(undefined, { scrollIntoView: false });
+
+      if (canScrollHeading) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const headingRect = headingElement.getBoundingClientRect();
+        const targetScrollTop =
+          scrollContainer.scrollTop +
+          headingRect.top -
+          containerRect.top -
+          OUTLINE_SCROLL_MARGIN;
+
+        scrollContainer.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: "smooth",
+        });
+      }
+
       setActiveOutlineId(item.id);
     },
-    [editor],
+    [editor, scrollContainer],
   );
 
   const emptyState = useMemo(() => {

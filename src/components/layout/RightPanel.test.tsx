@@ -213,6 +213,7 @@ describe("RightPanel", () => {
     const editor = new FakeEditor(doc, nodeMap);
     const scrollContainer = document.createElement("div");
     scrollContainer.scrollTop = 40;
+    scrollContainer.scrollTo = vi.fn();
     scrollContainer.getBoundingClientRect = () =>
       ({
         top: 24,
@@ -241,10 +242,17 @@ describe("RightPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Detail" }));
 
     expect(editor.state.tr.setSelection).toHaveBeenCalled();
-    expect(editor.state.tr.scrollIntoView).toHaveBeenCalled();
+    expect(editor.state.tr.setSelection.mock.calls[0][0].from).toBe(
+      positions[2].pos + 1,
+    );
+    expect(editor.state.tr.scrollIntoView).not.toHaveBeenCalled();
     expect(editor.view.dispatch).toHaveBeenCalledWith(editor.state.tr);
     expect(editor.commands.focus).toHaveBeenCalledWith(undefined, {
       scrollIntoView: false,
+    });
+    expect(scrollContainer.scrollTo).toHaveBeenCalledWith({
+      top: 312,
+      behavior: "smooth",
     });
   });
 
