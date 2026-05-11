@@ -1351,6 +1351,43 @@ function App() {
     };
   }, [isPreviewMode, isPrintMode]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const setWindowFocused = (focused: boolean) => {
+      root.classList.toggle("window-inactive", !focused);
+    };
+
+    const handleFocus = () => setWindowFocused(true);
+    const handleBlur = () => setWindowFocused(false);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    const appWindow = getCurrentWindow();
+    if ("onFocusChanged" in appWindow) {
+      void appWindow.onFocusChanged(({ payload }) => {
+        setWindowFocused(payload);
+      }).then((fn) => {
+        if (disposed) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
+      });
+    }
+
+    setWindowFocused(document.hasFocus());
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      root.classList.remove("window-inactive");
+    };
+  }, []);
+
   // Check for app updates on startup (folder mode only)
   useEffect(() => {
     if (route.mode !== "folder") return;

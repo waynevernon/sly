@@ -115,6 +115,7 @@
   --ui-list-item-py-tall: 0.5625rem; /* 9px — multi-line list items (py-2.25) */
   --ui-titlebar-control-gap: 8px;
   --ui-titlebar-control-offset: 16px;
+  --ui-titlebar-inactive-stoplight-bg: var(--color-bg-emphasis);
   --ui-titlebar-leading-offset: calc(
     var(--ui-titlebar-control-offset) +
       var(--ui-control-height-compact) +
@@ -270,6 +271,19 @@ body,
 
 .platform-mac {
   --ui-titlebar-control-offset: 80px;
+}
+
+.platform-mac.platform-tauri.window-inactive:not(.dark)::before {
+  content: "";
+  position: fixed;
+  top: 12px;
+  left: 10px;
+  z-index: 20;
+  width: 72px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--ui-titlebar-inactive-stoplight-bg);
+  pointer-events: none;
 }
 
 body {
