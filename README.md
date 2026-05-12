@@ -23,6 +23,7 @@ Developed by [Wayne Vernon](https://github.com/waynevernon) as an independent fo
 Sly is for notes you want to keep, tasks you actually need to see, and work that moves faster from the keyboard. It feels like a native productivity app, but the workspace stays simple enough to understand from Finder.
 
 - Work directly in a folder of markdown files.
+- Keep notes in step when files change on disk, with a refresh prompt if your local edits might conflict.
 - Write in a polished rich text editor, or switch to markdown source when you want the raw file.
 - Capture tasks into Inbox, Today, Upcoming, Anytime, Someday, Waiting, Completed, and Starred.
 - Add dates, due dates, tags, links, waiting-for notes, stars, and recurrence.
