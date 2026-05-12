@@ -33,6 +33,7 @@ interface UseEditorDocumentLifecycleOptions {
   currentNote: DocumentNote | null;
   currentNoteIdRef: MutableRefObject<string | null>;
   onDocumentTitleChange?: (title: string) => void;
+  onDirtyStateChange?: (noteId: string | null, isDirty: boolean) => void;
   editorReady: boolean;
   editorRef: MutableRefObject<TiptapEditor | null>;
   focusAndSelectTitle: (editor: TiptapEditor) => boolean;
@@ -139,6 +140,7 @@ export function useEditorDocumentLifecycle({
   currentNote,
   currentNoteIdRef,
   onDocumentTitleChange,
+  onDirtyStateChange,
   editorReady,
   editorRef,
   focusAndSelectTitle,
@@ -166,6 +168,7 @@ export function useEditorDocumentLifecycle({
   const loadedModifiedRef = useRef<number | null>(null);
   const lastSaveRef = useRef<{ noteId: string; content: string } | null>(null);
   const lastReloadVersionRef = useRef(0);
+  const dirtyVersionRef = useRef(0);
   const sourceModeTransitionRef = useRef<{
     topBlockIndex: number;
     cursorBlockIndex: number;
@@ -187,6 +190,32 @@ export function useEditorDocumentLifecycle({
 
     return editorInstance.getText();
   }, [notesFolder]);
+
+  const setDocumentDirty = useCallback(
+    (noteId: string | null, isDirty: boolean) => {
+      onDirtyStateChange?.(noteId, isDirty);
+    },
+    [onDirtyStateChange],
+  );
+
+  const markDocumentDirty = useCallback(
+    (noteId: string | null) => {
+      dirtyVersionRef.current += 1;
+      setDocumentDirty(noteId, true);
+      return dirtyVersionRef.current;
+    },
+    [setDocumentDirty],
+  );
+
+  const clearDocumentDirty = useCallback(
+    (noteId: string | null, dirtyVersion?: number) => {
+      if (dirtyVersion !== undefined && dirtyVersion !== dirtyVersionRef.current) {
+        return;
+      }
+      setDocumentDirty(noteId, false);
+    },
+    [setDocumentDirty],
+  );
 
   const parseEditorContent = useCallback(
     (editorInstance: TiptapEditor, markdown: string) => {
@@ -224,6 +253,7 @@ export function useEditorDocumentLifecycle({
       try {
         lastSaveRef.current = { noteId: sourceNoteId, content: sourceContent };
         await saveNote(sourceContent, sourceNoteId);
+        clearDocumentDirty(sourceNoteId);
       } finally {
         setIsSaving(false);
       }
@@ -238,8 +268,10 @@ export function useEditorDocumentLifecycle({
       needsSaveRef.current = false;
       const markdown = getMarkdown(editorRef.current);
       await saveImmediately(loadedNoteIdRef.current, markdown);
+      clearDocumentDirty(loadedNoteIdRef.current);
     }
   }, [
+    clearDocumentDirty,
     currentNote?.id,
     currentNoteIdRef,
     editorRef,
@@ -305,6 +337,7 @@ export function useEditorDocumentLifecycle({
     if (!savingNoteId) return;
 
     needsSaveRef.current = true;
+    const dirtyVersion = markDocumentDirty(savingNoteId);
 
     saveTimeoutRef.current = window.setTimeout(async () => {
       if (currentNoteIdRef.current !== savingNoteId || !needsSaveRef.current) {
@@ -315,9 +348,18 @@ export function useEditorDocumentLifecycle({
         needsSaveRef.current = false;
         const markdown = getMarkdown(editorRef.current);
         await saveImmediately(savingNoteId, markdown);
+        clearDocumentDirty(savingNoteId, dirtyVersion);
       }
     }, 500);
-  }, [currentNote?.id, currentNoteIdRef, editorRef, getMarkdown, saveImmediately]);
+  }, [
+    clearDocumentDirty,
+    currentNote?.id,
+    currentNoteIdRef,
+    editorRef,
+    getMarkdown,
+    markDocumentDirty,
+    saveImmediately,
+  ]);
 
   const toggleSourceMode = useCallback(() => {
     const currentEditor = editorRef.current;
@@ -414,6 +456,8 @@ export function useEditorDocumentLifecycle({
     (value: string) => {
       setSourceContent(value);
       onDocumentTitleChange?.(deriveNoteTitleFromMarkdown(value));
+      const editingNoteId = currentNoteIdRef.current ?? currentNote?.id;
+      const dirtyVersion = markDocumentDirty(editingNoteId ?? null);
       if (sourceTimeoutRef.current) {
         clearTimeout(sourceTimeoutRef.current);
       }
@@ -424,6 +468,7 @@ export function useEditorDocumentLifecycle({
           try {
             lastSaveRef.current = { noteId: savingNoteId, content: value };
             await saveNote(value, savingNoteId);
+            clearDocumentDirty(savingNoteId, dirtyVersion);
           } catch (error) {
             console.error("Failed to save note:", error);
             toast.error("Failed to save note");
@@ -433,7 +478,14 @@ export function useEditorDocumentLifecycle({
         }
       }, 300);
     },
-    [currentNote, currentNoteIdRef, onDocumentTitleChange, saveNote],
+    [
+      clearDocumentDirty,
+      currentNote,
+      currentNoteIdRef,
+      markDocumentDirty,
+      onDocumentTitleChange,
+      saveNote,
+    ],
   );
 
   useEffect(() => {
@@ -581,6 +633,7 @@ export function useEditorDocumentLifecycle({
       if (isManualReload) {
         lastReloadVersionRef.current = reloadVersion;
         loadedModifiedRef.current = currentNote.modified;
+        clearDocumentDirty(currentNote.id);
         isLoadingRef.current = true;
         try {
           const parsed = parseEditorContent(currentEditor, currentNote.content);
@@ -603,6 +656,7 @@ export function useEditorDocumentLifecycle({
 
     loadedNoteIdRef.current = loadingNoteId;
     loadedModifiedRef.current = currentNote.modified;
+    clearDocumentDirty(loadingNoteId);
     isLoadingRef.current = true;
 
     currentEditor.commands.blur();
@@ -669,6 +723,7 @@ export function useEditorDocumentLifecycle({
     parseEditorContent,
     reloadVersion,
     scrollContainerRef,
+    clearDocumentDirty,
   ]);
 
   useEffect(() => {

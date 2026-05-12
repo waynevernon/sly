@@ -103,6 +103,10 @@ interface NotesActionsContextValue {
   duplicateNote: (id: string) => Promise<void>;
   refreshNotes: () => Promise<void>;
   reloadCurrentNote: () => Promise<void>;
+  setActiveNoteHasUnsavedChanges: (
+    noteId: string | null,
+    hasUnsavedChanges: boolean,
+  ) => void;
   setNotesFolder: (path: string) => Promise<void>;
   syncNotesFolder: (path: string) => Promise<void>;
   search: (query: string) => Promise<void>;
@@ -582,6 +586,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   selectedNoteIdRef.current = selectedNoteId;
   const currentNoteRef = useRef<Note | null>(null);
   currentNoteRef.current = currentNote;
+  const activeEditorUnsavedNoteIdRef = useRef<string | null>(null);
   const selectedNoteIdsRef = useRef<string[]>([]);
   selectedNoteIdsRef.current = selectedNoteIds;
   // Ref to access notes in search callback without re-creating it on every notes change
@@ -1067,11 +1072,32 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (activeEditorUnsavedNoteIdRef.current !== noteId) {
+        setCurrentNote(diskNote);
+        setHasExternalChanges(false);
+        setReloadVersion((v) => v + 1);
+        return;
+      }
+
       setHasExternalChanges(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to check note changes");
     }
   }, []);
+
+  const setActiveNoteHasUnsavedChanges = useCallback(
+    (noteId: string | null, hasUnsavedChanges: boolean) => {
+      if (hasUnsavedChanges) {
+        activeEditorUnsavedNoteIdRef.current = noteId;
+        return;
+      }
+
+      if (!noteId || activeEditorUnsavedNoteIdRef.current === noteId) {
+        activeEditorUnsavedNoteIdRef.current = null;
+      }
+    },
+    [],
+  );
 
   const selectScope = useCallback(
     (scope: NoteScope) => {
@@ -2642,6 +2668,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       duplicateNote,
       refreshNotes,
       reloadCurrentNote,
+      setActiveNoteHasUnsavedChanges,
       setNotesFolder,
       syncNotesFolder,
       search,
@@ -2687,6 +2714,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       duplicateNote,
       refreshNotes,
       reloadCurrentNote,
+      setActiveNoteHasUnsavedChanges,
       setNotesFolder,
       syncNotesFolder,
       search,

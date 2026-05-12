@@ -573,6 +573,10 @@ export interface WorkspaceEditorData {
   reloadVersion: number;
   settings: Settings;
   saveNote: (content: string, noteId?: string) => Promise<void>;
+  setActiveNoteHasUnsavedChanges?: (
+    noteId: string | null,
+    hasUnsavedChanges: boolean,
+  ) => void;
   renameNote: (noteId: string, newName: string) => Promise<{ id: string }>;
   reloadCurrentNote: () => Promise<void>;
   createNote: () => Promise<void>;
@@ -689,6 +693,9 @@ function EditorImpl({
     : workspaceMode
       ? workspaceMode.reloadVersion
       : notesCtx!.reloadVersion;
+  const setActiveNoteHasUnsavedChanges =
+    workspaceMode?.setActiveNoteHasUnsavedChanges ??
+    notesCtx?.setActiveNoteHasUnsavedChanges;
   const pinNote = workspaceMode?.pinNote ?? notesCtx?.pinNote;
   const unpinNote = workspaceMode?.unpinNote ?? notesCtx?.unpinNote;
   const notes = workspaceMode?.notes ?? notesCtx?.notes;
@@ -767,6 +774,7 @@ function EditorImpl({
     currentNote,
     currentNoteIdRef,
     onDocumentTitleChange: setDocumentTitle,
+    onDirtyStateChange: setActiveNoteHasUnsavedChanges,
     editorReady,
     editorRef,
     focusAndSelectTitle,
@@ -1326,7 +1334,7 @@ function EditorImpl({
                 <Tooltip content={`External changes detected (${mod}${isMac ? "" : "+"}R to refresh)`}>
                   <button
                     onClick={reloadCurrentNote}
-                    className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-text-muted hover:bg-bg-muted hover:text-text transition-colors font-medium"
+                    className="ui-focus-ring h-[var(--ui-control-height-compact)] rounded-[var(--ui-radius-md)] px-2.5 flex items-center gap-1.5 text-xs text-[var(--color-warning)] bg-[var(--color-warning-muted)] hover:bg-[color-mix(in_srgb,var(--color-warning)_18%,transparent)] transition-colors font-medium"
                   >
                     <RefreshCwIcon className="w-4.5 h-4.5 stroke-[1.5]" />
                     <span>Refresh</span>

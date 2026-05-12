@@ -356,6 +356,7 @@ function AppContent() {
     selectNote,
     selectNoteRange,
     selectAllVisibleNotes,
+    setActiveNoteHasUnsavedChanges,
     syncNotesFolder,
     unpinNote,
   } = useNotesActions();
@@ -1156,6 +1157,7 @@ function AppContent() {
       reloadVersion,
       settings,
       saveNote,
+      setActiveNoteHasUnsavedChanges,
       renameNote,
       reloadCurrentNote,
       createNote,
@@ -1180,6 +1182,7 @@ function AppContent() {
       saveNote,
       selectNote,
       selectedNoteId,
+      setActiveNoteHasUnsavedChanges,
       settings,
       unpinNote,
     ],

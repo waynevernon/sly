@@ -173,7 +173,7 @@ describe("NotesContext", () => {
     });
   });
 
-  it("flags active note file events as external changes when disk content differs", async () => {
+  it("automatically reloads active note file events when disk content differs and editor is clean", async () => {
     let fileChangeListener:
       | ((event: {
           payload: {
@@ -226,7 +226,72 @@ describe("NotesContext", () => {
     });
 
     await waitFor(() => {
+      expect(result.current.hasExternalChanges).toBe(false);
+      expect(result.current.currentNote?.content).toBe("# Alpha\nExternal edit");
+      expect(result.current.currentNote?.modified).toBe(3);
+      expect(result.current.reloadVersion).toBe(1);
+    });
+  });
+
+  it("flags active note file events as external changes when local edits are unsaved", async () => {
+    let fileChangeListener:
+      | ((event: {
+          payload: {
+            changed_ids: string[];
+            folder_structure_changed: boolean;
+          };
+        }) => void)
+      | undefined;
+
+    vi.mocked(listen).mockImplementation((async (event, callback) => {
+      if (event === "file-change") {
+        fileChangeListener = callback as typeof fileChangeListener;
+      }
+      return () => {};
+    }) as typeof listen);
+
+    vi.mocked(notesService.readNote)
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nBody",
+        path: "/notes/alpha.md",
+        modified: 2,
+      })
+      .mockResolvedValueOnce({
+        id: "alpha",
+        title: "Alpha note",
+        content: "# Alpha\nExternal edit",
+        path: "/notes/alpha.md",
+        modified: 3,
+      });
+
+    const { result } = renderHook(() => useNotes(), { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.selectNote("alpha");
+    });
+
+    act(() => {
+      result.current.setActiveNoteHasUnsavedChanges("alpha", true);
+    });
+
+    await act(async () => {
+      fileChangeListener?.({
+        payload: {
+          changed_ids: ["alpha"],
+          folder_structure_changed: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
       expect(result.current.hasExternalChanges).toBe(true);
+      expect(result.current.currentNote?.content).toBe("# Alpha\nBody");
     });
   });
 
