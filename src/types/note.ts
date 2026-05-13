@@ -210,6 +210,7 @@ export interface Settings {
   noteSortMode: NoteSortMode;
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode: FolderSortMode;
+  notesEnabled?: boolean | null;
   tasksEnabled?: boolean | null;
   taskQuickAddShortcut?: TaskQuickAddShortcut | null;
 }
@@ -236,6 +237,7 @@ export interface SettingsPatch {
   noteSortMode?: NoteSortMode;
   folderNoteSortModes?: Record<string, NoteSortMode> | null;
   folderSortMode?: FolderSortMode;
+  notesEnabled?: boolean | null;
   tasksEnabled?: boolean | null;
   taskQuickAddShortcut?: TaskQuickAddShortcut | null;
 }

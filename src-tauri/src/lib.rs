@@ -171,6 +171,10 @@ fn default_tasks_enabled() -> Option<bool> {
     Some(true)
 }
 
+fn default_notes_enabled() -> Option<bool> {
+    Some(true)
+}
+
 pub(crate) fn normalize_task_quick_add_shortcut_value(value: &str) -> Option<String> {
     let trimmed = value.trim();
 
@@ -580,6 +584,12 @@ pub struct Settings {
     #[serde(rename = "folderSortMode", default)]
     pub folder_sort_mode: FolderSortMode,
     #[serde(
+        rename = "notesEnabled",
+        skip_serializing_if = "Option::is_none",
+        default = "default_notes_enabled"
+    )]
+    pub notes_enabled: Option<bool>,
+    #[serde(
         rename = "tasksEnabled",
         skip_serializing_if = "Option::is_none",
         default = "default_tasks_enabled"
@@ -618,6 +628,7 @@ impl Default for Settings {
             note_sort_mode: NoteSortMode::default(),
             folder_note_sort_modes: None,
             folder_sort_mode: FolderSortMode::default(),
+            notes_enabled: default_notes_enabled(),
             tasks_enabled: default_tasks_enabled(),
             task_quick_add_shortcut: None,
         }
@@ -669,6 +680,8 @@ pub struct SettingsPatch {
     pub folder_note_sort_modes: Option<Option<HashMap<String, NoteSortMode>>>,
     #[serde(default)]
     pub folder_sort_mode: Option<FolderSortMode>,
+    #[serde(default)]
+    pub notes_enabled: Option<Option<bool>>,
     #[serde(default)]
     pub tasks_enabled: Option<Option<bool>>,
     #[serde(default)]
@@ -6185,6 +6198,7 @@ mod tests {
         );
         assert_eq!(rewritten["noteListPreviewLines"], serde_json::json!(3));
         assert_eq!(rewritten["folderSortMode"], serde_json::json!("nameAsc"));
+        assert_eq!(rewritten["notesEnabled"], serde_json::json!(true));
         assert_eq!(rewritten["tasksEnabled"], serde_json::json!(true));
         assert!(rewritten.get("taskQuickAddShortcut").is_none());
 
@@ -6215,6 +6229,7 @@ mod tests {
   "noteSortMode": "modifiedDesc",
   "folderNoteSortModes": null,
   "folderSortMode": "nameAsc",
+  "notesEnabled": true,
   "tasksEnabled": true
 }"#;
         std::fs::write(&path, content).unwrap();
@@ -6223,6 +6238,32 @@ mod tests {
 
         assert_eq!(settings.recent_note_ids, Some(vec!["alpha".to_string()]));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), content);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_settings_keeps_at_least_one_workspace_enabled() {
+        let path = temp_file_path("workspace-settings-workspace-modes");
+        std::fs::write(
+            &path,
+            r#"{
+  "schemaVersion": 1,
+  "notesEnabled": false,
+  "tasksEnabled": false
+}"#,
+        )
+        .unwrap();
+
+        let settings = persistence::workspace_settings::load_settings_from_path(&path);
+
+        assert_eq!(settings.notes_enabled, Some(true));
+        assert_eq!(settings.tasks_enabled, Some(false));
+
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(rewritten["notesEnabled"], serde_json::json!(true));
+        assert_eq!(rewritten["tasksEnabled"], serde_json::json!(false));
 
         let _ = std::fs::remove_file(path);
     }
@@ -6721,6 +6762,7 @@ mod tests {
                 NoteSortMode::CreatedAsc,
             )])),
             folder_sort_mode: FolderSortMode::NameDesc,
+            notes_enabled: Some(true),
             tasks_enabled: Some(false),
             task_quick_add_shortcut: None,
         };

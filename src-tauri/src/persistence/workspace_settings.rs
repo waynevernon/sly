@@ -123,6 +123,9 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: SettingsPatch
     if let Some(folder_sort_mode) = patch.folder_sort_mode {
         settings.folder_sort_mode = folder_sort_mode;
     }
+    if let Some(notes_enabled) = patch.notes_enabled {
+        settings.notes_enabled = notes_enabled;
+    }
     if let Some(tasks_enabled) = patch.tasks_enabled {
         settings.tasks_enabled = tasks_enabled;
     }
@@ -223,6 +226,14 @@ pub(crate) fn canonicalize_settings(settings: &mut Settings) -> bool {
         settings.tasks_enabled = Some(true);
         changed = true;
     }
+    if settings.notes_enabled.is_none() {
+        settings.notes_enabled = Some(true);
+        changed = true;
+    }
+    if settings.notes_enabled == Some(false) && settings.tasks_enabled == Some(false) {
+        settings.notes_enabled = Some(true);
+        changed = true;
+    }
 
     if let Some(task_quick_add_shortcut) = settings.task_quick_add_shortcut.take() {
         match normalize_task_quick_add_shortcut_value(&task_quick_add_shortcut) {
@@ -317,6 +328,7 @@ fn canonicalize_settings_value(value: &mut Value) {
     );
     normalize_folder_note_sort_modes_field(object, "folderNoteSortModes");
     normalize_string_enum_field(object, "folderSortMode", &["nameAsc", "nameDesc"]);
+    normalize_optional_bool_field(object, "notesEnabled");
     normalize_optional_bool_field(object, "tasksEnabled");
     normalize_optional_string_field(object, "taskQuickAddShortcut");
 }

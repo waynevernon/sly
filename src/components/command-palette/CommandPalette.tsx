@@ -204,6 +204,8 @@ export function CommandPalette({
     { id: string; title: string; preview: string; modified: number }[]
   >([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const notesEnabled = settings?.notesEnabled ?? true;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -288,49 +290,53 @@ export function CommandPalette({
 
   // Memoize commands array
   const commands = useMemo<AppCommand[]>(() => {
-    const baseCommands: AppCommand[] = [
-      {
-        id: "new-note",
-        label: "New Note",
-        section: "Notes",
-        shortcut: `${mod} ${shift} N`,
-        keywords: ["create", "document", "markdown"],
-        icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
-        action: () => {
-          onShowNotes?.();
-          createNote();
-          onClose();
+    const baseCommands: AppCommand[] = [];
+
+    if (notesEnabled) {
+      baseCommands.push(
+        {
+          id: "new-note",
+          label: "New Note",
+          section: "Notes",
+          shortcut: `${mod} ${shift} N`,
+          keywords: ["create", "document", "markdown"],
+          icon: <FilePlusCorner className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: () => {
+            onShowNotes?.();
+            createNote();
+            onClose();
+          },
         },
-      },
-      {
-        id: "daily-note",
-        label: "Daily Note",
-        section: "Notes",
-        shortcut: `${mod} ${shift} D`,
-        keywords: ["today", "journal", "date"],
-        icon: <Sun className="w-4.5 h-4.5 stroke-[1.5]" />,
-        action: () => {
-          onShowNotes?.();
-          onOpenDailyNote?.();
-          onClose();
+        {
+          id: "daily-note",
+          label: "Daily Note",
+          section: "Notes",
+          shortcut: `${mod} ${shift} D`,
+          keywords: ["today", "journal", "date"],
+          icon: <Sun className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: () => {
+            onShowNotes?.();
+            onOpenDailyNote?.();
+            onClose();
+          },
         },
-      },
-      {
-        id: "new-folder",
-        label: "New Folder",
-        section: "Notes",
-        keywords: ["create", "directory"],
-        shortcut: undefined,
-        icon: <FolderPlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
-        action: () => {
-          onClose();
-          window.dispatchEvent(new CustomEvent("create-new-folder"));
+        {
+          id: "new-folder",
+          label: "New Folder",
+          section: "Notes",
+          keywords: ["create", "directory"],
+          shortcut: undefined,
+          icon: <FolderPlusIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: () => {
+            onClose();
+            window.dispatchEvent(new CustomEvent("create-new-folder"));
+          },
         },
-      },
-    ];
+      );
+    }
 
     // Add note-specific commands if a note is selected
-    if (currentNote) {
+    if (notesEnabled && currentNote) {
       const isPinned =
         settings?.pinnedNoteIds?.includes(currentNote.id) || false;
 
@@ -616,8 +622,8 @@ export function CommandPalette({
           ? [selectedTaskId]
           : [];
 
-    baseCommands.push(
-      {
+    if (tasksEnabled) {
+      baseCommands.push({
         id: "new-task",
         label: "New Task",
         section: "Tasks",
@@ -628,8 +634,8 @@ export function CommandPalette({
           onOpenTaskCapture?.();
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "new-task-current-view",
         label: `New Task in ${TASK_VIEW_LABELS[selectedView]}`,
         section: "Tasks",
@@ -643,8 +649,8 @@ export function CommandPalette({
           });
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "search-tasks",
         label: "Search Tasks",
         section: "Tasks",
@@ -658,8 +664,8 @@ export function CommandPalette({
           });
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "refresh-tasks",
         label: "Refresh Tasks",
         section: "Tasks",
@@ -669,79 +675,79 @@ export function CommandPalette({
           await refreshTasks();
           onClose();
         },
-      },
-    );
-
-    for (const view of TASK_VIEW_ORDER) {
-      const Icon = TASK_VIEW_ICONS[view];
-      baseCommands.push({
-        id: `task-view-${view}`,
-        label: `Show ${TASK_VIEW_LABELS[view]} Tasks`,
-        section: "Tasks",
-        keywords: ["tasks", "view", "list", TASK_VIEW_LABELS[view]],
-        icon: <Icon className="w-4.5 h-4.5 stroke-[1.7]" />,
-        action: () => {
-          selectView(view);
-          onShowTasks?.();
-          onClose();
-        },
       });
-    }
 
-    for (const tagName of tagNames) {
-      baseCommands.push({
-        id: `task-tag-${tagName}`,
-        label: `Show Task Tag: ${tagName}`,
-        section: "Tasks",
-        keywords: ["tasks", "tag", tagName],
-        icon: <FolderIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
-        action: () => {
-          selectTag(tagName);
-          onShowTasks?.();
-          onClose();
-        },
-      });
-    }
-
-    if (selectedTaskActionIds.length > 0) {
-      const taskCountLabel =
-        selectedTaskActionIds.length > 1
-          ? `${selectedTaskActionIds.length} Selected Tasks`
-          : "Current Task";
-      const isCurrentTaskCompleted = Boolean(selectedTask?.completedAt);
-      baseCommands.push(
-        {
-          id: "toggle-current-task-complete",
-          label: `${isCurrentTaskCompleted ? "Reopen" : "Complete"} ${taskCountLabel}`,
+      for (const view of TASK_VIEW_ORDER) {
+        const Icon = TASK_VIEW_ICONS[view];
+        baseCommands.push({
+          id: `task-view-${view}`,
+          label: `Show ${TASK_VIEW_LABELS[view]} Tasks`,
           section: "Tasks",
-          keywords: ["done", "finish", "checkbox"],
-          icon: <CheckCheck className="w-4.5 h-4.5 stroke-[1.7]" />,
-          action: async () => {
-            await Promise.all(
-              selectedTaskActionIds.map((id) =>
-                setCompleted(id, !isCurrentTaskCompleted),
-              ),
-            );
+          keywords: ["tasks", "view", "list", TASK_VIEW_LABELS[view]],
+          icon: <Icon className="w-4.5 h-4.5 stroke-[1.7]" />,
+          action: () => {
+            selectView(view);
+            onShowTasks?.();
             onClose();
           },
-        },
-        {
-          id: "delete-current-task",
-          label: `Delete ${taskCountLabel}`,
+        });
+      }
+
+      for (const tagName of tagNames) {
+        baseCommands.push({
+          id: `task-tag-${tagName}`,
+          label: `Show Task Tag: ${tagName}`,
           section: "Tasks",
-          keywords: ["remove", "trash"],
-          icon: <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
-          action: async () => {
-            await Promise.all(selectedTaskActionIds.map((id) => deleteTaskAction(id)));
+          keywords: ["tasks", "tag", tagName],
+          icon: <FolderIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+          action: () => {
+            selectTag(tagName);
+            onShowTasks?.();
             onClose();
           },
-        },
-      );
+        });
+      }
+
+      if (selectedTaskActionIds.length > 0) {
+        const taskCountLabel =
+          selectedTaskActionIds.length > 1
+            ? `${selectedTaskActionIds.length} Selected Tasks`
+            : "Current Task";
+        const isCurrentTaskCompleted = Boolean(selectedTask?.completedAt);
+        baseCommands.push(
+          {
+            id: "toggle-current-task-complete",
+            label: `${isCurrentTaskCompleted ? "Reopen" : "Complete"} ${taskCountLabel}`,
+            section: "Tasks",
+            keywords: ["done", "finish", "checkbox"],
+            icon: <CheckCheck className="w-4.5 h-4.5 stroke-[1.7]" />,
+            action: async () => {
+              await Promise.all(
+                selectedTaskActionIds.map((id) =>
+                  setCompleted(id, !isCurrentTaskCompleted),
+                ),
+              );
+              onClose();
+            },
+          },
+          {
+            id: "delete-current-task",
+            label: `Delete ${taskCountLabel}`,
+            section: "Tasks",
+            keywords: ["remove", "trash"],
+            icon: <TrashIcon className="w-4.5 h-4.5 stroke-[1.5]" />,
+            action: async () => {
+              await Promise.all(selectedTaskActionIds.map((id) => deleteTaskAction(id)));
+              onClose();
+            },
+          },
+        );
+      }
     }
 
     // Focus mode and source toggle
-    baseCommands.push(
-      {
+    if (notesEnabled) {
+      baseCommands.push({
         id: "show-notes",
         label: "Switch to Notes",
         section: "Navigation",
@@ -752,20 +758,8 @@ export function CommandPalette({
           onShowNotes?.();
           onClose();
         },
-      },
-      {
-        id: "show-tasks",
-        label: "Switch to Tasks",
-        section: "Tasks",
-        shortcut: `${mod} 2`,
-        keywords: ["workspace", "mode"],
-        icon: <CheckSquare className="w-4.5 h-4.5 stroke-[1.7]" />,
-        action: () => {
-          onShowTasks?.();
-          onClose();
-        },
-      },
-      {
+      });
+      baseCommands.push({
         id: "search-notes",
         label: "Search Notes",
         section: "Navigation",
@@ -779,8 +773,8 @@ export function CommandPalette({
           });
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "toggle-outline-panel",
         label: `${rightPanelVisible ? "Hide" : "Show"} Right Pane`,
         section: "Navigation",
@@ -791,8 +785,8 @@ export function CommandPalette({
           onToggleRightPanel?.();
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "focus-mode",
         label: focusMode ? "Exit Focus Mode" : "Enter Focus Mode",
         section: "Editor",
@@ -803,8 +797,8 @@ export function CommandPalette({
           onToggleFocusMode?.();
           onClose();
         },
-      },
-      {
+      });
+      baseCommands.push({
         id: "toggle-source",
         label: "Toggle Markdown Source",
         section: "Editor",
@@ -815,7 +809,25 @@ export function CommandPalette({
           window.dispatchEvent(new CustomEvent("toggle-source-mode"));
           onClose();
         },
-      },
+      });
+    }
+
+    if (tasksEnabled) {
+      baseCommands.push({
+        id: "show-tasks",
+        label: "Switch to Tasks",
+        section: "Tasks",
+        shortcut: `${mod} 2`,
+        keywords: ["workspace", "mode"],
+        icon: <CheckSquare className="w-4.5 h-4.5 stroke-[1.7]" />,
+        action: () => {
+          onShowTasks?.();
+          onClose();
+        },
+      });
+    }
+
+    baseCommands.push(
       {
         id: "pane-one",
         label: "Switch to 1-Pane View",
@@ -1060,6 +1072,8 @@ export function CommandPalette({
     selectNote,
     refreshNotes,
     settings,
+    notesEnabled,
+    tasksEnabled,
     pinNote,
     unpinNote,
     focusMode,
@@ -1106,7 +1120,7 @@ export function CommandPalette({
 
   // Debounced search using Tantivy (local state, doesn't affect sidebar)
   useEffect(() => {
-    if (!open) return;
+    if (!open || !notesEnabled) return;
 
     const trimmed = query.trim();
     if (!trimmed) {
@@ -1125,7 +1139,7 @@ export function CommandPalette({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [query, open]);
+  }, [notesEnabled, query, open]);
 
   // Clear local search when palette closes
   useEffect(() => {
@@ -1136,11 +1150,13 @@ export function CommandPalette({
 
   // Use search results when searching, otherwise show all notes
   const filteredNotes = useMemo(() => {
+    if (!notesEnabled) return [];
     if (!query.trim()) return notes;
     return localSearchResults;
-  }, [query, notes, localSearchResults]);
+  }, [notesEnabled, query, notes, localSearchResults]);
 
   const filteredTasks = useMemo(() => {
+    if (!tasksEnabled) return [];
     const trimmed = query.trim();
     if (activeSubmenu !== "root" || !trimmed) return [];
 
@@ -1150,7 +1166,7 @@ export function CommandPalette({
         if (a.starred !== b.starred) return a.starred ? -1 : 1;
         return b.createdAt.localeCompare(a.createdAt);
       });
-  }, [activeSubmenu, query, tasks]);
+  }, [activeSubmenu, query, tasks, tasksEnabled]);
 
   // Memoize filtered commands
   const activeCommands = activeSubmenu === "theme" ? themeCommands : commands;

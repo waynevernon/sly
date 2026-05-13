@@ -120,11 +120,15 @@ export function TaskNavigationPane({
   onShowNotes,
   onShowTasks,
 }: TaskNavigationPaneProps) {
+  const { settings } = useNotes();
+  const notesEnabled = settings?.notesEnabled ?? true;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
+
   return (
     <div className="ui-pane-shell flex h-full flex-col select-none bg-bg-secondary">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        {onShowNotes && onShowTasks ? (
+        {notesEnabled && tasksEnabled && onShowNotes && onShowTasks ? (
           <div className="flex min-w-0 items-center gap-1 -ml-2">
             <Tooltip content={`Notes (${shortcut(mod, "1")})`}>
               <button

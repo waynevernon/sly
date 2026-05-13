@@ -143,6 +143,7 @@ interface NotesActionsContextValue {
   setFolderSortMode: (mode: FolderSortMode) => Promise<void>;
   setShowPinnedNotes: (showPinnedNotes: boolean) => Promise<void>;
   setShowRecentNotes: (showRecentNotes: boolean) => Promise<void>;
+  setNotesEnabled: (enabled: boolean) => Promise<void>;
   setTasksEnabled: (enabled: boolean) => Promise<void>;
   setTaskQuickAddShortcut: (
     shortcut: TaskQuickAddShortcut | null,
@@ -174,6 +175,7 @@ const DEFAULT_SETTINGS: Settings = {
   noteListPreviewLines: 2,
   noteSortMode: DEFAULT_NOTE_SORT_MODE,
   folderSortMode: DEFAULT_FOLDER_SORT_MODE,
+  notesEnabled: true,
   tasksEnabled: true,
 };
 
@@ -535,6 +537,7 @@ function buildSettingsPatch(current: Settings, next: Settings): SettingsPatch {
   );
   assignField("noteSortMode", current.noteSortMode, next.noteSortMode);
   assignField("folderSortMode", current.folderSortMode, next.folderSortMode);
+  assignField("notesEnabled", current.notesEnabled, next.notesEnabled);
   assignField("tasksEnabled", current.tasksEnabled, next.tasksEnabled);
   assignField(
     "taskQuickAddShortcut",
@@ -948,10 +951,28 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [persistSettings],
   );
 
+  const setNotesEnabled = useCallback(
+    async (enabled: boolean) => {
+      await persistSettings((currentSettings) => ({
+        ...currentSettings,
+        notesEnabled: enabled,
+        tasksEnabled:
+          !enabled && currentSettings.tasksEnabled === false
+            ? true
+            : currentSettings.tasksEnabled,
+      }));
+    },
+    [persistSettings],
+  );
+
   const setTasksEnabled = useCallback(
     async (enabled: boolean) => {
       await persistSettings((currentSettings) => ({
         ...currentSettings,
+        notesEnabled:
+          !enabled && currentSettings.notesEnabled === false
+            ? true
+            : currentSettings.notesEnabled,
         tasksEnabled: enabled,
       }));
     },
@@ -2691,6 +2712,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderSortMode,
       setShowPinnedNotes,
       setShowRecentNotes,
+      setNotesEnabled,
       setTasksEnabled,
       setTaskQuickAddShortcut,
     }),
@@ -2737,6 +2759,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFolderSortMode,
       setShowPinnedNotes,
       setShowRecentNotes,
+      setNotesEnabled,
       setTasksEnabled,
       setTaskQuickAddShortcut,
     ]

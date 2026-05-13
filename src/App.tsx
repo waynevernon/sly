@@ -64,10 +64,17 @@ const WorkspaceNoteApp = lazy(() =>
 );
 
 const TASKS_DISABLED_TOAST_ID = "tasks-disabled";
+const NOTES_DISABLED_TOAST_ID = "notes-disabled";
 
 function showTasksDisabledToast() {
   toast.info("Tasks aren't enabled yet. Turn them on in Settings → Tasks.", {
     id: TASKS_DISABLED_TOAST_ID,
+  });
+}
+
+function showNotesDisabledToast() {
+  toast.info("Notes aren't enabled yet. Turn them on in Settings → Notes.", {
+    id: NOTES_DISABLED_TOAST_ID,
   });
 }
 
@@ -424,6 +431,7 @@ function AppContent() {
   const selectedTaskViewRef = useRef(selectedView);
   selectedTaskViewRef.current = selectedView;
   const tasksEnabled = settings?.tasksEnabled ?? true;
+  const notesEnabled = settings?.notesEnabled ?? true;
   const showRightPanel =
     rightPanelVisible &&
     !focusMode &&
@@ -434,7 +442,10 @@ function AppContent() {
     if (!tasksEnabled && workspaceMode !== "notes") {
       setWorkspaceMode("notes");
     }
-  }, [tasksEnabled, workspaceMode]);
+    if (!notesEnabled && tasksEnabled && workspaceMode !== "tasks") {
+      setWorkspaceMode("tasks");
+    }
+  }, [notesEnabled, tasksEnabled, workspaceMode]);
 
   useEffect(() => {
     if (isTasksModeActive && paneMode === 1) {
@@ -526,8 +537,13 @@ function AppContent() {
   }, [setRightPanelVisible]);
 
   const showNotesMode = useCallback(() => {
+    if (!notesEnabled) {
+      showNotesDisabledToast();
+      return;
+    }
+
     setWorkspaceMode("notes");
-  }, []);
+  }, [notesEnabled]);
 
   const showTasksMode = useCallback(() => {
     if (!tasksEnabled) {
@@ -543,6 +559,26 @@ function AppContent() {
     }
     setWorkspaceMode("tasks");
   }, [clearNoteSelection, setPaneMode, tasksEnabled]);
+
+  const createNoteFromShortcut = useCallback(() => {
+    if (!notesEnabled) {
+      showNotesDisabledToast();
+      return;
+    }
+
+    showNotesMode();
+    void createNote();
+  }, [createNote, notesEnabled, showNotesMode]);
+
+  const openDailyNoteFromShortcut = useCallback(() => {
+    if (!notesEnabled) {
+      showNotesDisabledToast();
+      return;
+    }
+
+    showNotesMode();
+    void openDailyNote();
+  }, [notesEnabled, openDailyNote, showNotesMode]);
 
   const openTaskCapture = useCallback(() => {
     if (!tasksEnabled) {
@@ -772,8 +808,7 @@ function AppContent() {
         e.key.toLowerCase() === "n"
       ) {
         e.preventDefault();
-        showNotesMode();
-        createNote();
+        createNoteFromShortcut();
         return;
       }
 
@@ -784,8 +819,7 @@ function AppContent() {
         e.key.toLowerCase() === "d"
       ) {
         e.preventDefault();
-        showNotesMode();
-        openDailyNote();
+        openDailyNoteFromShortcut();
         return;
       }
 
@@ -840,6 +874,10 @@ function AppContent() {
       // Cmd+Shift+Enter - Toggle focus mode
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
         e.preventDefault();
+        if (!notesEnabled) {
+          showNotesDisabledToast();
+          return;
+        }
         toggleFocusMode();
         return;
       }
@@ -851,6 +889,10 @@ function AppContent() {
         e.key.toLowerCase() === "m"
       ) {
         e.preventDefault();
+        if (!notesEnabled) {
+          showNotesDisabledToast();
+          return;
+        }
         window.dispatchEvent(new CustomEvent("toggle-source-mode"));
         return;
       }
@@ -927,8 +969,7 @@ function AppContent() {
           }
           return;
         }
-        showNotesMode();
-        createNote();
+        createNoteFromShortcut();
         return;
       }
 
@@ -1009,6 +1050,10 @@ function AppContent() {
       // Cmd+R - Reload current note (pull external changes)
       if ((e.metaKey || e.ctrlKey) && e.key === "r") {
         e.preventDefault();
+        if (!notesEnabled) {
+          showNotesDisabledToast();
+          return;
+        }
         reloadCurrentNote();
         return;
       }
@@ -1111,6 +1156,8 @@ function AppContent() {
   }, [
     createNote,
     openDailyNote,
+    createNoteFromShortcut,
+    openDailyNoteFromShortcut,
     applyPaneModeSelection,
     cycleWorkspacePaneMode,
     duplicateNote,
@@ -1128,6 +1175,7 @@ function AppContent() {
     showNotesMode,
     showTasksMode,
     tasksEnabled,
+    notesEnabled,
     toggleFocusMode,
     setInterfaceZoom,
   ]);

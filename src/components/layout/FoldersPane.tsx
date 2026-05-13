@@ -61,13 +61,14 @@ export function FoldersPane({
     setShowRecentNotes,
   } = useNotes();
   const tasksEnabled = settings?.tasksEnabled ?? true;
+  const notesEnabled = settings?.notesEnabled ?? true;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="ui-pane-shell h-full bg-bg-secondary flex flex-col select-none">
       <div className="ui-pane-drag-region" data-tauri-drag-region></div>
       <div className="ui-pane-header border-border/80">
-        {tasksEnabled && onShowNotes && onShowTasks ? (
+        {notesEnabled && tasksEnabled && onShowNotes && onShowTasks ? (
           <div className="flex min-w-0 items-center gap-1 -ml-2">
             <Tooltip content={`Notes (${shortcut(mod, "1")})`}>
               <button

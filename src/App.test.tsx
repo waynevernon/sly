@@ -60,7 +60,7 @@ const notesDataState = {
     path: "/notes/alpha.md",
     modified: 1,
   },
-  settings: { tasksEnabled: false },
+  settings: { notesEnabled: true, tasksEnabled: false },
   searchQuery: "",
   searchResults: [],
   hasExternalChanges: false,
@@ -299,6 +299,7 @@ describe("App", () => {
     };
     themeState.paneMode = 3;
     themeState.rightPanelVisible = true;
+    notesDataState.settings.notesEnabled = true;
     notesDataState.settings.tasksEnabled = false;
     tasksState.selectedView = "inbox";
     tasksState.selectedTaskId = "task-1";
@@ -427,6 +428,24 @@ describe("App", () => {
     expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
+  it("shows the disabled notes toast with Cmd/Ctrl+Shift+N when notes are disabled", async () => {
+    notesDataState.settings.notesEnabled = false;
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    expect(await screen.findByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "N", metaKey: true, shiftKey: true });
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Notes aren't enabled yet. Turn them on in Settings → Notes.",
+      { id: "notes-disabled" },
+    );
+    expect(notesActionsState.createNote).not.toHaveBeenCalled();
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
+  });
+
   it("opens the daily note from anywhere with Cmd/Ctrl+Shift+D", async () => {
     notesDataState.settings.tasksEnabled = true;
 
@@ -508,6 +527,23 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
     });
+  });
+
+  it("shows the disabled notes toast with Cmd/Ctrl+1 when notes are disabled", async () => {
+    notesDataState.settings.notesEnabled = false;
+    notesDataState.settings.tasksEnabled = true;
+
+    render(<App />);
+
+    expect(await screen.findByText("workspace-navigation:tasks")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "1", metaKey: true });
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "Notes aren't enabled yet. Turn them on in Settings → Notes.",
+      { id: "notes-disabled" },
+    );
+    expect(screen.getByText("workspace-navigation:tasks")).toBeInTheDocument();
   });
 
   it("shows the disabled tasks toast with Cmd/Ctrl+2 when tasks are disabled", () => {

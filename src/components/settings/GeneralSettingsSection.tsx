@@ -49,8 +49,10 @@ function TemplateTagsReference({ example }: { example: string }) {
 }
 
 export function GeneralSettingsSection() {
-  const { notesFolder, setNotesFolder, knownFolders } = useNotes();
+  const { notesFolder, setNotesFolder, knownFolders, settings, setNotesEnabled } = useNotes();
   const { confirmDeletions, setConfirmDeletions } = useTheme();
+  const notesEnabled = settings?.notesEnabled ?? true;
+  const tasksEnabled = settings?.tasksEnabled ?? true;
   const [noteTemplate, setNoteTemplate] = useState<string>("Untitled");
   const [previewNoteName, setPreviewNoteName] = useState<string>("Untitled");
   const [dailyNoteTemplate, setDailyNoteTemplate] = useState<string>("{date}");
@@ -188,6 +190,35 @@ export function GeneralSettingsSection() {
 
   return (
     <div className="space-y-10 pt-8 pb-10">
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex flex-col gap-0.75">
+            <h2 className="text-xl font-medium">Notes</h2>
+            <p className="text-sm text-text-muted max-w-lg">
+              Enable the notes workspace. Notes are stored as markdown files in this vault.
+            </p>
+          </div>
+          <div className="ui-settings-toggle-group">
+            <Button
+              onClick={() => void setNotesEnabled(false)}
+              variant={!notesEnabled ? "primary" : "ghost"}
+              size="xs"
+              disabled={!tasksEnabled}
+              title={!tasksEnabled ? "Turn tasks on before turning notes off." : undefined}
+            >
+              Off
+            </Button>
+            <Button
+              onClick={() => void setNotesEnabled(true)}
+              variant={notesEnabled ? "primary" : "ghost"}
+              size="xs"
+            >
+              On
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Folder Location */}
       <section className="space-y-4">
         <h2 className="text-xl font-medium mb-0.5">Folder Location</h2>

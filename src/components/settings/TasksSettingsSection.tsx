@@ -11,6 +11,7 @@ import { Button } from "../ui";
 export function TasksSettingsSection() {
   const { settings, setTasksEnabled, setTaskQuickAddShortcut } = useNotes();
   const tasksEnabled = settings?.tasksEnabled ?? true;
+  const notesEnabled = settings?.notesEnabled ?? true;
   const configuredShortcut = settings?.taskQuickAddShortcut ?? null;
   const [isRecording, setIsRecording] = useState(false);
 
@@ -67,6 +68,8 @@ export function TasksSettingsSection() {
               onClick={() => void setTasksEnabled(false)}
               variant={!tasksEnabled ? "primary" : "ghost"}
               size="xs"
+              disabled={!notesEnabled}
+              title={!notesEnabled ? "Turn notes on before turning tasks off." : undefined}
             >
               Off
             </Button>
